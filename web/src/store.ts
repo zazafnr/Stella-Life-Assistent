@@ -5,7 +5,7 @@
 
 import { useSyncExternalStore } from 'react';
 import {
-  formatDateDe, interpret, todayIn, type ChatMessage, type ChatResponse, type Item, type SyncResponse,
+  formatDateDe, interpret, todayIn, type ChatMessage, type ChatResponse, type Item, type SyncResponse, type Tone,
 } from '@stella/shared';
 
 export type BookProvider = 'digi4school' | 'scook';
@@ -15,7 +15,7 @@ export interface Me {
   id: string; name: string; email: string; timeZone: string; ingestUrl: string;
   settings: {
     eveningTime?: string; studyTime?: string; stepGoal?: number;
-    books?: BookConfig[]; homeworkAutopilot?: boolean; mailAutoTrash?: boolean;
+    books?: BookConfig[]; homeworkAutopilot?: boolean; mailAutoTrash?: boolean; tone?: Tone;
   };
   integrations: {
     books: Record<BookProvider, { connected: boolean; cookies: boolean; email: string | null }>;
@@ -23,6 +23,7 @@ export interface Me {
     mailAccounts: number;
     handwritingFont: boolean;
     freeNotes?: boolean;
+    googleSignIn?: boolean;
   };
 }
 

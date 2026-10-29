@@ -2,7 +2,7 @@ import { createReadStream, existsSync } from 'node:fs';
 import path from 'node:path';
 import Fastify, { type FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
-import { addDays, todayIn, type Item } from '@stella/shared';
+import { addDays, isTone, todayIn, voice, type Item } from '@stella/shared';
 import { config } from './config.ts';
 import {
   deleteSecret, hasSecret, HttpError, login, logout, register, requireUser, setSecret, userByIngestToken, userCount,
@@ -12,18 +12,19 @@ import {
   type User, type UserSettings,
 } from './db.ts';
 import { handleChat } from './assistant.ts';
-import { addItem, changeItem } from './planner.ts';
+import { addItem, changeItem, rescheduleAll } from './planner.ts';
 import { modelStatus } from './llm.ts';
 import { pushToUser, saveSubscription, vapidPublicKey } from './push.ts';
 import { startScheduler } from './scheduler.ts';
 import { toICalendar } from './ical.ts';
-import { getBookCredentials, listShelf, normalizeCookies, PROVIDERS, saveBookCredentials, screenshotPage, secretName } from './books.ts';
+import { getBookCredentials, listShelf, LOGIN_PAGES, normalizeCookies, PROVIDERS, saveBookCredentials, screenshotPage, secretName } from './books.ts';
 import { deleteUserFont, renderHandwriting, saveUserFont, userFontPath } from './handwriting.ts';
 import { checkAllMail, listAccounts, PRESETS, publicAccounts, restoreMail, saveAccounts, testAccount, type MailAccount } from './mail.ts';
 import { lessonsFor, syncUntis, testUntis, type UntisCredentials } from './untis.ts';
 import { FILE_TYPES, filePath, saveDataUrl, saveFile } from './files.ts';
 import type { BookProvider } from './db.ts';
 import { ackNotesEntry, notesInbox, usesFreeNotes } from './notes.ts';
+import { finishGoogle, finishTarget, googleAuthUrl, googleConfigured, readState, type OAuthClient } from './oauth.ts';
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, bodyLimit: 2 * 1024 * 1024 });
 app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: 5 * 1024 * 1024 }, (_req, body, done) => done(null, body));
@@ -49,6 +50,8 @@ function publicUser(user: User) {
       mailAccounts: listAccounts(user.id).length,
       handwritingFont: !!userFontPath(user.id),
       freeNotes: usesFreeNotes(user.id),
+      /** Server kann "Mit Google anmelden" (GOOGLE_CLIENT_ID gesetzt) */
+      googleSignIn: googleConfigured(),
     },
   };
 }
@@ -62,10 +65,7 @@ app.get('/api/status', async () => ({
 app.post('/api/auth/register', async (req) => {
   const b = req.body as Record<string, unknown>;
   const { token, user } = register(str(b.name, 80) || 'Du', str(b.email, 200), str(b.password, 200), str(b.timeZone, 60), str(b.device, 80));
-  addMessage(user.id, 'assistant',
-    `Hi ${user.name}! 👋 Ich bin Stella. Schreib mir einfach kurz, was ansteht – zum Beispiel:\n` +
-    `• „Latein HÜ S. 45 Nr. 3 Freitag“\n• „Mathe SA 12.11.“\n• „was steht an?“\n` +
-    `Ich trag's ein, erinnere dich rechtzeitig und mach dir Lernpläne. 💫`);
+  addMessage(user.id, 'assistant', voice(user.settings.tone).welcome(user.name));
   return { token, user: publicUser(user) };
 });
 
@@ -73,6 +73,26 @@ app.post('/api/auth/login', async (req) => {
   const b = req.body as Record<string, unknown>;
   const { token, user } = login(str(b.email, 200), str(b.password, 200), str(b.device, 80));
   return { token, user: publicUser(user) };
+});
+
+// Rückkehr von Google nach "Mit Google anmelden" – der signierte state sagt, wer es war
+app.get('/api/oauth/google/callback', async (req, reply) => {
+  const q = req.query as Record<string, string>;
+  const state = readState(str(q.state));
+  if (!state) return reply.code(400).type('text/html; charset=utf-8').send(finishTarget('desktop', false, 'Der Link ist abgelaufen. Bitte in Stella nochmal auf „Mit Google anmelden“ tippen.').html);
+  let result: ReturnType<typeof finishTarget>;
+  if (q.error || !q.code) {
+    result = finishTarget(state.c, false, q.error === 'access_denied' ? 'Du hast die Anmeldung abgebrochen.' : `Google meldet: ${str(q.error, 100) || 'kein Code'}`);
+  } else {
+    try {
+      const account = await finishGoogle(state.u, str(q.code, 2000));
+      void checkAllMail(state.u).catch(() => {});
+      result = finishTarget(state.c, true, `${account.user} ist verbunden – Stella sortiert ab jetzt deine Mails.`);
+    } catch (err) {
+      result = finishTarget(state.c, false, (err as Error).message);
+    }
+  }
+  return result.redirect ? reply.redirect(result.redirect) : reply.type('text/html; charset=utf-8').send(result.html);
 });
 
 // ---------- Kurzbefehle / Webhooks (Token in der URL statt Login) ----------
@@ -155,12 +175,20 @@ app.register(async (api) => {
     }
     if (typeof b.homeworkAutopilot === 'boolean') patch.homeworkAutopilot = b.homeworkAutopilot;
     if (typeof b.mailAutoTrash === 'boolean') patch.mailAutoTrash = b.mailAutoTrash;
+    if (b.tone !== undefined) {
+      if (!isTone(b.tone)) throw new HttpError(400, 'Ton muss nett, frech oder cool sein');
+      patch.tone = b.tone;
+    }
     let tz: string | undefined;
     if (b.timeZone) {
       try { new Intl.DateTimeFormat('de', { timeZone: str(b.timeZone) }); tz = str(b.timeZone); } catch { throw new HttpError(400, 'Unbekannte Zeitzone'); }
     }
     updateUserSettings(req.user.id, patch, tz);
-    return publicUser(getUser(req.user.id)!);
+    const user = getUser(req.user.id)!;
+    // Erinnerungen tragen Uhrzeit und Ton in sich → neu erzeugen
+    if (patch.eveningTime || patch.studyTime || (patch.tone && patch.tone !== req.user.settings.tone)) rescheduleAll(user);
+    if (patch.tone && patch.tone !== req.user.settings.tone) addMessage(user.id, 'assistant', voice(patch.tone).toneChanged());
+    return publicUser(user);
   });
 
   // Chat
@@ -286,6 +314,14 @@ app.register(async (api) => {
       ...(str(b.email) ? { email: str(b.email, 200), password: str(b.password, 200) } : {}),
       ...(cookies ? { cookies } : {}),
     });
+    // aus dem Login-Fenster der Apps: gleich prüfen, ob die Anmeldung trägt, und das Regal mitschicken
+    if (b.verify === true) {
+      try {
+        return { ok: true, shelf: await listShelf(req.user.id, p) };
+      } catch (err) {
+        throw new HttpError(400, `Anmeldung nicht erkannt – bitte im Fenster fertig einloggen und dann erst schließen. (${(err as Error).message})`);
+      }
+    }
     return { ok: true };
   });
   api.delete('/api/integrations/books/:provider', async (req: FastifyRequest<{ Params: { provider: string } }>) => {
@@ -294,6 +330,9 @@ app.register(async (api) => {
     if (p === 'digi4school') deleteSecret(req.user.id, 'digi4school');
     return { ok: true };
   });
+  // Wo die Apps das Login-Fenster öffnen und welche Cookies sie übernehmen
+  api.get('/api/integrations/books/login-pages', async () =>
+    Object.fromEntries(Object.entries(LOGIN_PAGES).map(([p, v]) => [p, { url: v.url, domains: v.domains.source }])));
   api.get('/api/integrations/books/:provider/shelf', async (req: FastifyRequest<{ Params: { provider: string } }>) => {
     try { return await listShelf(req.user.id, provider(req.params.provider)); } catch (err) { throw new HttpError(502, (err as Error).message); }
   });
@@ -341,6 +380,12 @@ app.register(async (api) => {
 
   // ----- E-Mail -----
   api.get('/api/mail/accounts', async (req) => publicAccounts(req.user.id));
+  api.post('/api/oauth/google/start', async (req) => {
+    if (!googleConfigured()) throw new HttpError(400, 'Google-Anmeldung ist auf dem Server noch nicht eingerichtet – siehe docs/google-oauth.md.');
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const client = (['web', 'desktop', 'ios'].includes(str(b.client)) ? str(b.client) : 'web') as OAuthClient;
+    return { url: googleAuthUrl(req.user.id, client, str(b.email, 200) || undefined) };
+  });
   api.post('/api/mail/accounts', async (req) => {
     const b = req.body as Record<string, unknown>;
     const prov = (['gmail', 'icloud', 'other'].includes(str(b.provider)) ? str(b.provider) : 'other') as MailAccount['provider'];

@@ -452,3 +452,31 @@ textarea.cookies { min-height: 90px; font-family: ui-monospace, monospace; font-
 .login-card { position: relative; z-index: 1; width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; text-align: center; padding: 28px; border-radius: 28px; background: rgba(255, 255, 255, .85); backdrop-filter: blur(16px); border: 1px solid var(--border); box-shadow: var(--shadow-lg); }
 .login-star { margin: 0 auto 4px; width: 72px; height: 72px; border-radius: 24px; background: #fff; color: var(--pink); display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-lg); }
 .tagline { color: var(--muted); margin: -4px 0 10px; }
+
+/* Ton-Auswahl: nett / frech / cool */
+.tone-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.tone {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 8px;
+  border-radius: var(--radius); border: 1.5px solid var(--border); background: var(--surface); box-shadow: var(--shadow);
+  font: inherit; color: var(--text); cursor: pointer;
+  transition: transform .2s cubic-bezier(.2, .8, .3, 1.4), border-color .2s, box-shadow .2s, background .2s;
+}
+.tone:hover { transform: translateY(-2px); }
+.tone:active { transform: scale(.97); }
+.tone-emoji { font-size: 30px; line-height: 1; transition: transform .35s cubic-bezier(.2, .8, .3, 1.6); }
+.tone-label { font-weight: 600; font-size: 15px; }
+.tone.active { border-color: var(--blue); background: linear-gradient(180deg, #fff, #EEF5FF); box-shadow: 0 10px 28px rgba(31, 111, 235, .18); }
+.tone.active .tone-emoji { transform: scale(1.18) rotate(-6deg); }
+.tone-example { margin: 2px 6px 0; color: var(--muted); font-size: 14px; font-style: italic; animation: tone-in .35s ease-out both; }
+@keyframes tone-in { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .tone, .tone-emoji, .tone-example { transition: none; animation: none; } }
+
+/* Anmelden-Knöpfe für Verbindungen */
+.connect-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
+.btn-google {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 18px; border-radius: 12px;
+  border: 1.5px solid #DADCE0; background: #fff; color: #1F1F1F; font: 600 15px/1 Inter, system-ui, sans-serif; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15, 42, 74, .06); transition: transform .15s, box-shadow .15s;
+}
+.btn-google:hover { box-shadow: 0 6px 18px rgba(15, 42, 74, .12); transform: translateY(-1px); }
+.btn-google:disabled { opacity: .7; cursor: progress; }

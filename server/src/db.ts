@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import type { Attachment, ChatMessage, Item, ItemKind, ItemStatus } from '@stella/shared';
+import type { Attachment, ChatMessage, Item, ItemKind, ItemStatus, Tone } from '@stella/shared';
 import { config } from './config.ts';
 
 export const db = new Database(path.join(config.dataDir, 'stella.db'));
@@ -209,6 +209,8 @@ export interface UserSettings {
   homeworkAutopilot?: boolean;
   /** Werbung/Spam automatisch in den Papierkorb */
   mailAutoTrash?: boolean;
+  /** wie Stella schreibt: nett, frech oder cool */
+  tone?: Tone;
 }
 
 export interface User {

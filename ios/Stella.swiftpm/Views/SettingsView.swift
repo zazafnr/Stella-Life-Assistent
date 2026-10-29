@@ -32,6 +32,14 @@ struct SettingsView: View {
                     }
 
                     Section {
+                        TonePicker(selected: Tone(rawValue: me.settings.tone ?? "nett") ?? .nett) { tone in
+                            await save(["tone": .string(tone.rawValue)])
+                        }
+                    } header: {
+                        Text("Wie Stella schreibt")
+                    }
+
+                    Section {
                         toggle("HÜs selbst lösen", "Stella löst Hausübungen und schreibt sie in deiner Handschrift ins FreeNotes-Heft.",
                                symbol: "wand.and.stars", tint: Theme.pink, value: me.settings.homeworkAutopilot ?? false) { v in
                             await save(["homeworkAutopilot": .bool(v)])
@@ -70,15 +78,17 @@ struct SettingsView: View {
                                    detail: me.integrations.mailAccounts == 1 ? "1 Postfach" : "\(me.integrations.mailAccounts) Postfächer")
                         connection("Handschrift", symbol: "pencil.and.scribble", on: me.integrations.handwritingFont, detail: "eigene Schrift für das Heft")
                         connection("FreeNotes", symbol: "ipad.and.iphone", on: me.integrations.freeNotes ?? false, detail: "Heft auf dem iPad")
-                        Button {
-                            if let url = URL(string: API.shared.server + "/#settings") { openURL(url) }
+                        NavigationLink {
+                            ConnectionsView()
                         } label: {
-                            Label("Verbindungen im Browser einrichten", systemImage: "safari")
+                            Label("Verbinden & anmelden", systemImage: "link.badge.plus")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(Theme.blue)
                         }
                     } header: {
                         Text("Verbindungen")
                     } footer: {
-                        Text("Passwörter und App-Passwörter gibst du einmal auf der Website ein – sie liegen verschlüsselt auf deinem Server.")
+                        Text("Gmail mit Google-Anmeldung, Schulbücher auf der echten Anbieter-Seite, WebUntis per QR-Code. Handschrift und FreeNotes richtest du auf der Website ein.")
                     }
 
                     Section {
@@ -296,5 +306,51 @@ struct HealthSheet: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .card()
+    }
+}
+
+/** Drei Karten: nett, frech, cool – mit Beispielsatz */
+struct TonePicker: View {
+    var selected: Tone
+    var onPick: (Tone) async -> Void
+    @State private var shown: Tone?
+
+    var body: some View {
+        let current = shown ?? selected
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                ForEach(Tone.allCases) { tone in
+                    let on = tone == current
+                    Button {
+                        guard tone != current else { return }
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) { shown = tone }
+                        Task { await onPick(tone) }
+                    } label: {
+                        VStack(spacing: 6) {
+                            Text(tone.emoji)
+                                .font(.system(size: 30))
+                                .scaleEffect(on ? 1.18 : 1)
+                                .rotationEffect(.degrees(on ? -6 : 0))
+                            Text(tone.label)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Theme.text)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(on ? Theme.blueTint : Theme.bg, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(on ? Theme.blue : Theme.border, lineWidth: on ? 2 : 1))
+                    }
+                    .buttonStyle(PressableStyle())
+                    .accessibilityAddTraits(on ? .isSelected : [])
+                }
+            }
+            Text("„\(current.example)“")
+                .font(.system(size: 14).italic())
+                .foregroundStyle(Theme.muted)
+                .id(current)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+        }
+        .padding(.vertical, 6)
+        .sensoryFeedback(.selection, trigger: current)
     }
 }

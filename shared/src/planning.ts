@@ -3,6 +3,7 @@
 
 import { addDays, diffDays, formatDateDe, weekdayOf, type Ymd } from './dates.ts';
 import type { ItemKind } from './parser.ts';
+import { voice, type Tone } from './voice.ts';
 
 export interface PlannedReminder {
   date: Ymd;
@@ -17,6 +18,8 @@ export interface ReminderPrefs {
   eveningTime: string;
   /** Uhrzeit für Lern-Erinnerungen */
   studyTime: string;
+  /** wie Stella klingt */
+  tone?: Tone;
 }
 
 export const DEFAULT_PREFS: ReminderPrefs = { eveningTime: '19:00', studyTime: '16:30' };
@@ -28,6 +31,7 @@ export function planReminders(
 ): PlannedReminder[] {
   if (!item.due) return [];
   const label = [item.title, item.detail].filter(Boolean).join(' – ');
+  const v = voice(prefs.tone);
   const out: PlannedReminder[] = [];
   const add = (daysBefore: number, time: string, message: string, withAttachments = false) => {
     const date = addDays(item.due!, -daysBefore);
@@ -36,28 +40,28 @@ export function planReminders(
 
   switch (item.kind) {
     case 'homework':
-      add(1, prefs.eveningTime, `📚 Morgen fällig: ${label}`, true);
+      add(1, prefs.eveningTime, v.homeworkTomorrow(label), true);
       break;
     case 'exam':
-      add(7, prefs.studyTime, `📅 In einer Woche: ${item.title}. Zeit, mit dem Lernen zu starten!`);
-      add(1, prefs.eveningTime, `🍀 Morgen ist ${item.title}. Letzte Wiederholung – und früh schlafen!`);
+      add(7, prefs.studyTime, v.examInAWeek(item.title));
+      add(1, prefs.eveningTime, v.examTomorrow(item.title));
       break;
     case 'assignment':
-      add(3, prefs.studyTime, `⏳ In 3 Tagen: ${label}`);
-      add(1, prefs.eveningTime, `📌 Morgen fällig: ${label}`);
+      add(3, prefs.studyTime, v.dueInThreeDays(label));
+      add(1, prefs.eveningTime, v.dueTomorrow(label));
       break;
     case 'event':
     case 'todo':
       if (item.time) {
         // 1 Stunde vorher
         const [h, m] = item.time.split(':').map(Number);
-        if (h >= 1) out.push({ date: item.due, time: `${String(h - 1).padStart(2, '0')}:${String(m).padStart(2, '0')}`, message: `⏰ In einer Stunde: ${label}`, withAttachments: false });
+        if (h >= 1) out.push({ date: item.due, time: `${String(h - 1).padStart(2, '0')}:${String(m).padStart(2, '0')}`, message: v.inAnHour(label), withAttachments: false });
       } else {
-        add(1, prefs.eveningTime, `📌 Morgen: ${label}`);
+        add(1, prefs.eveningTime, v.tomorrow(label));
       }
       break;
     case 'study':
-      out.push({ date: item.due, time: item.time ?? prefs.studyTime, message: `🧠 Lernzeit: ${label}`, withAttachments: false });
+      out.push({ date: item.due, time: item.time ?? prefs.studyTime, message: v.studyTime(label), withAttachments: false });
       break;
   }
   return out;

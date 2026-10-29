@@ -6,7 +6,7 @@
 // Falls ein Login über Umwege (Microsoft-/Schul-SSO) nicht automatisch geht, kann man in den
 // Einstellungen die Cookies aus dem eigenen Browser einfügen.
 
-import { existsSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { config } from './config.ts';
 import { getSecret, setSecret } from './auth.ts';
@@ -239,4 +239,12 @@ export async function fetchBookPage(userId: string, itemId: string, pageDelta = 
 export function saveBookCredentials(userId: string, provider: BookProvider, creds: BookCredentials) {
   const existing = getBookCredentials(userId, provider) ?? {};
   setSecret(userId, secretName(provider), { ...existing, ...creds });
+  // neue Anmeldung → alte Browser-Sitzung verwerfen, sonst gewinnen abgelaufene Cookies
+  if (creds.cookies) rmSync(statePath(userId, provider), { force: true });
 }
+
+/** Login-Domains der Anbieter – nur deren Cookies werden aus einem Login-Fenster übernommen */
+export const LOGIN_PAGES: Record<BookProvider, { url: string; domains: RegExp }> = {
+  digi4school: { url: 'https://digi4school.at/ebooks', domains: /(^|\.)digi4school\.at$/i },
+  scook: { url: 'https://www.scook.at/', domains: /(^|\.)(scook\.at|cornelsen\.de|veritas\.at)$/i },
+};

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { TONE_INFO, TONES, type Tone } from '@stella/shared';
 import { api, logout, refreshMe, useStore, type Me } from '../store.ts';
 import { enablePush, isIos, isStandalone, pushPermission } from '../push.ts';
 import { Copy, Section, useAction } from './settings/ui.tsx';
@@ -78,6 +79,8 @@ export function Settings({ back }: { back: () => void }) {
           </div>
         </section>
 
+        <TonePicker value={me.settings.tone ?? 'nett'} onChange={(tone) => void patch({ tone }, `${TONE_INFO[tone].emoji} Stella ist jetzt ${TONE_INFO[tone].label.toLowerCase()}`)} />
+
         <Group title="Verbindungen">
           {rows.map((r) => (
             <button key={r.id} type="button" className="list-row" onClick={() => setSheet(r.id)}>
@@ -129,6 +132,24 @@ export function Settings({ back }: { back: () => void }) {
       {sheet === 'notify' && <Sheet title="Mitteilungen" onClose={() => setSheet(null)}><Notifications onChange={() => setPerm(pushPermission())} /></Sheet>}
       {sheet === 'ai' && ai && <Sheet title="KI" onClose={() => setSheet(null)}><AiDetails ai={ai} /></Sheet>}
     </div>
+  );
+}
+
+function TonePicker({ value, onChange }: { value: Tone; onChange: (t: Tone) => void }) {
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <h2 className="eyebrow" style={{ margin: '4px 4px 0' }}>Wie Stella schreibt</h2>
+      <div className="tone-grid" role="radiogroup" aria-label="Wie Stella schreibt">
+        {TONES.map((t) => (
+          <button key={t} type="button" role="radio" aria-checked={value === t} className={value === t ? 'tone active' : 'tone'}
+            onClick={() => value !== t && onChange(t)}>
+            <span className="tone-emoji" aria-hidden="true">{TONE_INFO[t].emoji}</span>
+            <span className="tone-label">{TONE_INFO[t].label}</span>
+          </button>
+        ))}
+      </div>
+      <p className="tone-example" key={value}>„{TONE_INFO[value].example}“</p>
+    </section>
   );
 }
 

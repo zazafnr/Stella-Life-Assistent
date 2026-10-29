@@ -166,6 +166,61 @@ ipcMain.on('stella:titlebar', (_e, color) => {
   try { win.setTitleBarOverlay({ color, symbolColor: '#2C4566', height: 34 }); } catch { /* ältere Systeme */ }
 });
 
+// Schulbuch-Login: echtes Anmeldefenster des Anbieters (inkl. Schul-/Microsoft-Login) in einer
+// frischen, nur dafür angelegten Sitzung. Beim Schließen gehen deren Cookies an die Web-App,
+// die sie verschlüsselt auf dem Stella-Server ablegt. Passwörter sieht Stella dabei nie.
+let bookWin = null;
+ipcMain.handle('stella:book-login', async (event, { provider, url, domains }) => {
+  if (!sameOrigin(event.senderFrame?.url ?? '')) throw new Error('Nur aus Stella heraus erlaubt');
+  if (!/^https:\/\//.test(url)) throw new Error('Ungültige Anmeldeseite');
+  let domainRe;
+  try { domainRe = new RegExp(domains, 'i'); } catch { throw new Error('Ungültige Domains'); }
+  if (bookWin) { bookWin.focus(); return null; }
+
+  const partition = `book-login-${provider}-${Date.now()}`; // ohne "persist:" → nur im Speicher
+  const name = provider === 'scook' ? 'scook' : 'digi4school';
+  bookWin = new BrowserWindow({
+    width: 1100,
+    height: 820,
+    parent: win ?? undefined,
+    title: `Bei ${name} anmelden – danach dieses Fenster schließen`,
+    icon: ICON,
+    backgroundColor: '#FFFFFF',
+    autoHideMenuBar: false,
+    webPreferences: { partition, contextIsolation: true, sandbox: true, nodeIntegration: false },
+  });
+  const ses = bookWin.webContents.session;
+  const finish = () => bookWin?.close();
+  // "Fertig" oben im Fenster (Windows/Linux) – Schließen geht genauso
+  bookWin.setMenu(Menu.buildFromTemplate([
+    { label: '✓ Fertig – Anmeldung übernehmen', click: finish },
+    { label: 'Abbrechen', click: () => { bookWin?.destroy(); } },
+  ]));
+  // Titel nicht von der Seite überschreiben lassen, damit der Hinweis stehen bleibt
+  bookWin.on('page-title-updated', (e) => e.preventDefault());
+  bookWin.webContents.setWindowOpenHandler(({ url: u }) => {
+    bookWin?.loadURL(u).catch(() => {});
+    return { action: 'deny' };
+  });
+  bookWin.loadURL(url).catch(() => {});
+
+  return new Promise((resolve) => {
+    let cookies = null;
+    bookWin.on('close', async (e) => {
+      if (cookies !== null) return;
+      e.preventDefault();
+      const all = await ses.cookies.get({}).catch(() => []);
+      cookies = all.filter((c) => domainRe.test(String(c.domain ?? '').replace(/^\./, '')));
+      bookWin.destroy();
+    });
+    bookWin.on('closed', () => {
+      bookWin = null;
+      ses.clearStorageData().catch(() => {});
+      resolve(cookies && cookies.length ? cookies : null);
+    });
+  });
+});
+
 ipcMain.handle('stella:get-server', () => config.serverUrl());
 ipcMain.handle('stella:set-server', (_e, raw) => {
   const url = config.setServer(raw);

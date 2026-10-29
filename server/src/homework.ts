@@ -2,7 +2,7 @@
 // Danach ist die HÜ erledigt – am Vorabend kommt nur noch: "✅ Latein HÜ erledigt".
 
 import { readFileSync } from 'node:fs';
-import { addDays, DEFAULT_PREFS, formatDateDe, WEEKDAYS_DE, weekdayOf, zonedToUtc, type Attachment, type Item } from '@stella/shared';
+import { addDays, DEFAULT_PREFS, formatDateDe, WEEKDAYS_DE, weekdayOf, zonedToUtc, voice, type Attachment, type Item } from '@stella/shared';
 import { addAttachment, addMessage, addReminder, enqueueJob, getItem, getUser, type User } from './db.ts';
 import { renderHandwriting } from './handwriting.ts';
 import { complete, type ContentPart } from './llm.ts';
@@ -118,8 +118,7 @@ export async function solveHomework(userId: string, itemId: string, attempt = 0)
   changeItem(user, itemId, { status: 'done', notes: solution.heftText });
   scheduleDoneNotice(user, item);
 
-  const msg = `✅ **${item.title}** erledigt${item.detail ? ` (${item.detail})` : ''} – ` +
-    (usesFreeNotes(userId) ? 'beim nächsten Öffnen von FreeNotes steht sie in deinem Heft.' : 'steht in deinem Heft.');
+  const msg = voice(getUser(userId)?.settings.tone).solved(`${item.title}${item.detail ? ` (${item.detail})` : ''}`, usesFreeNotes(userId));
   addMessage(userId, 'assistant', msg, { attachments: [attachment] });
   await pushToUser(userId, { title: 'Stella', body: msg.replace(/\*\*/g, ''), tag: itemId });
 }
@@ -130,5 +129,5 @@ function scheduleDoneNotice(user: User, item: Item) {
   const day = addDays(item.due, -1);
   const at = zonedToUtc(day, user.settings.eveningTime ?? DEFAULT_PREFS.eveningTime, user.timeZone);
   if (at.getTime() <= Date.now()) return;
-  addReminder(user.id, item.id, at, `✅ ${item.title} für ${formatDateDe(item.due)} ist erledigt – liegt in deinem Heft.`, false, true);
+  addReminder(user.id, item.id, at, voice(user.settings.tone).solvedReminder(item.title, formatDateDe(item.due)), false, true);
 }

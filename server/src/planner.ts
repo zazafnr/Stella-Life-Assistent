@@ -5,12 +5,13 @@ import {
 } from '@stella/shared';
 import { nextLessonDate } from './untis.ts';
 import {
-  addReminder, clearOpenReminders, createItem, enqueueJob, getItem, getItemRaw, type NewItem, updateItem, type User,
+  addReminder, clearOpenReminders, createItem, enqueueJob, getItem, getItemRaw, listItems, type NewItem, updateItem, type User,
 } from './db.ts';
 
 const prefsOf = (user: User) => ({
   eveningTime: user.settings.eveningTime ?? DEFAULT_PREFS.eveningTime,
   studyTime: user.settings.studyTime ?? DEFAULT_PREFS.studyTime,
+  tone: user.settings.tone,
 });
 
 export function scheduleReminders(user: User, item: Item) {
@@ -21,6 +22,11 @@ export function scheduleReminders(user: User, item: Item) {
     const at = zonedToUtc(r.date, r.time, user.timeZone);
     if (at.getTime() > Date.now()) addReminder(user.id, item.id, at, r.message, r.withAttachments);
   }
+}
+
+/** alle offenen Erinnerungen neu erzeugen, z. B. nach neuer Abendzeit oder neuem Ton */
+export function rescheduleAll(user: User) {
+  for (const item of listItems(user.id, { from: todayIn(user.timeZone) })) scheduleReminders(user, item);
 }
 
 function findBook(user: User, subject: string | null) {

@@ -1,7 +1,7 @@
 // Stellas "Gehirn": erst schnelle Regeln (offline-fähig, kostenlos), dann die KI mit Werkzeugen.
 
 import {
-  addDays, formatDateDe, interpret, nextSchoolDay, parseEntry, splitTopics, timeIn, todayIn, WEEKDAYS_DE, weekdayOf,
+  addDays, formatDateDe, interpret, nextSchoolDay, parseEntry, splitTopics, timeIn, todayIn, toneInstruction, voice, WEEKDAYS_DE, weekdayOf,
   type Attachment, type ChatMessage, type ChatResponse, type Item, type ItemKind, type ParsedEntry,
 } from '@stella/shared';
 import {
@@ -28,6 +28,7 @@ const say = (t: Turn, text: string, attachments: ChatMessage['attachments'] = []
 /** Satzende ohne doppelten Punkt nach "Freitag, 30.10." */
 const dot = (s: string) => (s.endsWith('.') ? s : `${s}.`);
 const touched = (t: Turn, ...items: (Item | null)[]) => items.forEach((i) => i && t.changed.set(i.id, i));
+const v = (t: Turn) => voice(t.user.settings.tone);
 
 export async function handleChat(user: User, text: string, clientId: string | null, imageIds: string[] = []): Promise<ChatResponse> {
   if (clientId && findMessageByClientId(user.id, clientId)) return { messages: [], items: [] }; // schon verarbeitet
@@ -87,7 +88,7 @@ async function onCreate(t: Turn, e: ParsedEntry) {
     const item = addParsedEntry(t.user, e);
     touched(t, item);
     setPending(t.user.id, 'due_date', item.id);
-    say(t, `📅 ${item.title} notiert – wann ist der Termin?`);
+    say(t, v(t).askDate(item.title));
     return;
   }
   const item = addParsedEntry(t.user, e);
@@ -97,16 +98,14 @@ async function onCreate(t: Turn, e: ParsedEntry) {
 
   if (item.kind === 'homework') {
     const remindDay = addDays(item.due!, -1);
-    const parts = [dot(`✅ Notiert: **${item.title}**${item.detail ? ` – ${item.detail}` : ''}, fällig ${when}`)];
-    if (remindDay >= t.today) parts.push(`Ich erinnere dich ${formatDateDe(remindDay, t.today)} um ${evening}.`);
+    const parts = [dot(v(t).noted(`**${item.title}**${item.detail ? ` – ${item.detail}` : ''}, fällig ${when}`))];
+    if (remindDay >= t.today) parts.push(v(t).remindAt(formatDateDe(remindDay, t.today), evening));
     const book = bookFor(t.user, item.subject);
     if (t.images.length) {
       attachPhotos(t, item);
-      if (autopilot(t.user)) parts.push('Ich lös die Aufgabe vom Foto und schreib sie dir ins Heft. ✍️');
+      if (autopilot(t.user)) parts.push(v(t).solveFromPhoto());
     } else if (book && item.page) {
-      parts.push(autopilot(t.user)
-        ? `Ich hol mir die Seite aus ${PROVIDERS[book.provider].name}, lös die Aufgabe und schreib sie dir ins Heft. ✍️`
-        : `Ich hol mir die Seite aus ${PROVIDERS[book.provider].name} und schick dir das Bild mit. 📸`);
+      parts.push(autopilot(t.user) ? v(t).fetchAndSolve(PROVIDERS[book.provider].name) : v(t).fetchOnly(PROVIDERS[book.provider].name));
     }
     if (e.dueAssumed) {
       const fromTimetable = item.due !== nextSchoolDay(t.today);
@@ -119,32 +118,32 @@ async function onCreate(t: Turn, e: ParsedEntry) {
   }
 
   if (item.kind === 'exam') {
-    say(t, `📅 Eingetragen: **${item.title}** am ${dot(formatDateDe(item.due!))} Ich erinnere dich eine Woche und einen Tag vorher.`);
+    say(t, v(t).examNoted(item.title, dot(formatDateDe(item.due!))));
     if (item.material) {
       await makePlan(t, item.id, item.material);
     } else {
       setPending(t.user.id, 'exam_material', item.id);
-      say(t, `Welcher Stoff kommt dran? Dann bau ich dir einen Lernplan. (Oder schreib „weiß noch nicht“.)`);
+      say(t, v(t).askMaterial());
     }
     return;
   }
 
-  say(t, dot(`✅ Notiert: **${item.title}**${item.detail ? ` – ${item.detail}` : ''}, ${when}`));
+  say(t, dot(v(t).noted(`**${item.title}**${item.detail ? ` – ${item.detail}` : ''}, ${when}`)));
 }
 
 function onDone(t: Turn, subject: string | null, kind: ItemKind | null) {
   const candidates = listItems(t.user.id, { from: addDays(t.today, -14) })
     .filter((i) => i.kind !== 'study' && (!subject || i.subject === subject) && (!kind || i.kind === kind));
   const item = candidates[0];
-  if (!item) { say(t, 'Hmm, dazu finde ich nichts Offenes. 🤔'); return; }
+  if (!item) { say(t, v(t).nothingFound()); return; }
   touched(t, changeItem(t.user, item.id, { status: 'done' }));
   const left = listItems(t.user.id, { from: t.today, to: addDays(t.today, 1) }).filter((i) => i.kind === 'homework').length;
-  say(t, `Stark! **${item.title}** ist abgehakt ✅${left ? ` Für morgen ist noch ${left} HÜ offen.` : ''}`);
+  say(t, v(t).done(item.title, left));
 }
 
 export function agendaText(user: User, today: string, days: number): string {
   const items = listItems(user.id, { from: today, to: addDays(today, days) });
-  if (!items.length) return `Nichts offen in den nächsten ${days} Tagen. 🎉`;
+  if (!items.length) return voice(user.settings.tone).nothingAhead(days);
   const byDay = new Map<string, Item[]>();
   for (const i of items) byDay.set(i.due ?? 'ohne Datum', [...(byDay.get(i.due ?? 'ohne Datum') ?? []), i]);
   const icon: Record<string, string> = { homework: '📚', exam: '📝', assignment: '📌', event: '📅', todo: '☑️', study: '🧠' };
@@ -171,7 +170,7 @@ async function answerPending(t: Turn, pending: { type: string; itemId: string; c
     say(t, `👍 ${item.title} am ${formatDateDe(due)} – eingetragen!`);
     if (item.kind === 'exam' && !item.material) {
       setPending(t.user.id, 'exam_material', item.id);
-      say(t, 'Welcher Stoff kommt dran? Dann bau ich dir einen Lernplan.');
+      say(t, v(t).askMaterial());
     }
     return true;
   }
@@ -338,7 +337,8 @@ ${user.name} geht in Österreich zur Schule. Du hilfst vor allem bei Organisatio
 Heute ist ${WEEKDAYS_DE[weekdayOf(today)]}, ${today}, ${timeIn(user.timeZone)} Uhr (${user.timeZone}).
 
 Regeln:
-- Antworte auf Deutsch, locker, kurz (wie eine Chat-Nachricht), gern mit passenden Emojis.
+- Antworte auf Deutsch, kurz (wie eine Chat-Nachricht).
+- ${toneInstruction(user.settings.tone)}
 - Nutze die Werkzeuge, um Einträge anzulegen/zu ändern, statt nur darüber zu reden. Rechne Daten selbst aus (YYYY-MM-DD).
 - Erfinde keine Termine oder Fakten über ${user.name}. Frag nach, wenn etwas Wichtiges fehlt.
 - Bei Tests/Schularbeiten: nach dem Stoff fragen und dann create_study_plan nutzen.

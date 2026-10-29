@@ -7,7 +7,7 @@ import { Inbox } from './components/Inbox.tsx';
 import { Health } from './components/Health.tsx';
 import { Settings } from './components/Settings.tsx';
 import { Icon, type IconName } from './ui/Icon.tsx';
-import { Sky, StarMark } from './ui/Decor.tsx';
+import { Sky, StarMark, showToast } from './ui/Decor.tsx';
 
 export type Tab = 'today' | 'chat' | 'planner' | 'inbox' | 'health' | 'settings';
 
@@ -37,6 +37,14 @@ export function App() {
   useEffect(() => { if (token && !hasMe) void refreshMe().catch(() => {}); }, [token, hasMe]);
   useEffect(() => { history.replaceState(null, '', tab === 'today' ? location.pathname : `#${tab}`); }, [tab]);
   useEffect(() => { document.documentElement.classList.toggle('is-desktop', isDesktopApp); }, []);
+  // zurück von "Mit Google anmelden": ?provider=gmail&ok=1&message=…#settings
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    if (!q.has('provider')) return;
+    showToast(q.get('message') || (q.get('ok') === '1' ? 'Verbunden!' : 'Hat nicht geklappt'), q.get('ok') !== '1');
+    history.replaceState(null, '', location.pathname + location.hash);
+    if (token) void refreshMe().catch(() => {});
+  }, [token]);
   useEffect(() => {
     if (!isDesktopApp) return;
     // Fensterknöpfe oben rechts sitzen auf dem Himmel – nur im Chat mit Seitenspalte auf Weiß

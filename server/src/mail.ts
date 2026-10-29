@@ -6,7 +6,8 @@
 //   newsletter/spam → Papierkorb (nicht endgültig gelöscht, in der App wiederherstellbar)
 //   normal      → bleibt einfach liegen
 //
-// Gmail & iCloud brauchen ein App-Passwort (nicht dein normales Passwort):
+// Gmail geht mit "Mit Google anmelden" (oauth.ts, IMAP über XOAUTH2) oder einem App-Passwort.
+// iCloud kennt keine Anmeldung für fremde Apps – dort braucht es ein App-Passwort:
 //   Gmail:  myaccount.google.com → Sicherheit → 2-Faktor an → "App-Passwörter"
 //   iCloud: account.apple.com → Anmeldung & Sicherheit → "App-spezifische Passwörter"
 
@@ -15,6 +16,7 @@ import { simpleParser } from 'mailparser';
 import { getSecret, setSecret } from './auth.ts';
 import { addMessage, db, getUser, newId, now } from './db.ts';
 import { complete, LlmUnavailable, llmAvailable } from './llm.ts';
+import { accessToken } from './oauth.ts';
 import { pushToUser } from './push.ts';
 
 export type MailProvider = 'gmail' | 'icloud' | 'other';
@@ -26,7 +28,10 @@ export interface MailAccount {
   host: string;
   port: number;
   user: string;
+  /** App-Passwort; leer bei Google-Anmeldung */
   pass: string;
+  /** "Mit Google anmelden": Refresh-Token statt Passwort */
+  oauth?: { provider: 'google'; refreshToken: string };
 }
 
 export const PRESETS: Record<Exclude<MailProvider, 'other'>, { host: string; port: number }> = {
@@ -67,18 +72,19 @@ export function saveAccounts(userId: string, accounts: MailAccount[]) {
 export function publicAccounts(userId: string) {
   const state = db.prepare('SELECT account_id, last_error, checked_at FROM mail_state WHERE user_id = ?').all(userId) as
     { account_id: string; last_error: string | null; checked_at: string | null }[];
-  return listAccounts(userId).map(({ pass: _pass, ...a }) => {
+  return listAccounts(userId).map(({ pass: _pass, oauth, ...a }) => {
     const s = state.find((x) => x.account_id === a.id);
-    return { ...a, lastError: s?.last_error ?? null, checkedAt: s?.checked_at ?? null };
+    return { ...a, auth: oauth ? 'google' : 'password', lastError: s?.last_error ?? null, checkedAt: s?.checked_at ?? null };
   });
 }
 
-function client(a: MailAccount) {
-  return new ImapFlow({ host: a.host, port: a.port, secure: true, auth: { user: a.user, pass: a.pass }, logger: false });
+async function client(a: MailAccount) {
+  const auth = a.oauth ? { user: a.user, accessToken: await accessToken(a) } : { user: a.user, pass: a.pass };
+  return new ImapFlow({ host: a.host, port: a.port, secure: true, auth, logger: false });
 }
 
 export async function testAccount(a: MailAccount) {
-  const c = client(a);
+  const c = await client(a);
   await c.connect();
   await c.logout();
 }
@@ -141,7 +147,7 @@ Format: {"mails": [{"id": 123, "category": "newsletter", "summary": "…", "conf
 async function checkAccount(userId: string, account: MailAccount) {
   const user = getUser(userId)!;
   const autoTrash = user.settings.mailAutoTrash !== false;
-  const c = client(account);
+  const c = await client(account);
   await c.connect();
   const lock = await c.getMailboxLock('INBOX');
   try {
@@ -236,7 +242,7 @@ export async function restoreMail(userId: string, eventId: string) {
   const payload = JSON.parse(row.payload) as { accountId: string; messageId: string | null; action: string };
   const account = listAccounts(userId).find((a) => a.id === payload.accountId);
   if (!account || !payload.messageId || payload.action !== 'trash') throw new Error('Kann nicht wiederhergestellt werden');
-  const c = client(account);
+  const c = await client(account);
   await c.connect();
   try {
     const trash = await trashPath(c);

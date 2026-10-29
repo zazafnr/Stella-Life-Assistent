@@ -58,12 +58,64 @@ struct SyncResponse: Codable {
     var busyItems: [String]?
 }
 
+struct BookConfig: Codable, Hashable {
+    var subject: String
+    var provider: String
+    var url: String
+    var pageOffset: Int?
+    var pageUrlTemplate: String?
+}
+
 struct UserSettings: Codable, Hashable {
     var eveningTime: String?
     var studyTime: String?
     var stepGoal: Int?
     var homeworkAutopilot: Bool?
     var mailAutoTrash: Bool?
+    var books: [BookConfig]?
+    /** "nett", "frech" oder "cool" */
+    var tone: String?
+}
+
+enum Tone: String, CaseIterable, Identifiable {
+    case nett, frech, cool
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+    var emoji: String {
+        switch self {
+        case .nett: return "🌸"
+        case .frech: return "😏"
+        case .cool: return "😎"
+        }
+    }
+    var example: String {
+        switch self {
+        case .nett: return "Notiert! Ich erinnere dich morgen um 19:00. 💫"
+        case .frech: return "Schon wieder Latein? Na gut, notiert – ich nerv dich morgen um 19:00."
+        case .cool: return "Läuft. Steht drin, Reminder morgen 19:00."
+        }
+    }
+}
+
+struct MailAccount: Codable, Hashable, Identifiable {
+    var id: String
+    var label: String
+    var provider: String
+    var user: String
+    var auth: String?
+    var lastError: String?
+    var checkedAt: String?
+}
+
+struct ShelfBook: Codable, Hashable, Identifiable {
+    var title: String
+    var url: String
+    var id: String { url }
+}
+
+struct LoginPage: Codable, Hashable {
+    var url: String
+    var domains: String
 }
 
 struct BookIntegration: Codable, Hashable {
@@ -78,6 +130,7 @@ struct Integrations: Codable, Hashable {
     var mailAccounts: Int
     var handwritingFont: Bool
     var freeNotes: Bool?
+    var googleSignIn: Bool?
 }
 
 struct Me: Codable, Hashable {

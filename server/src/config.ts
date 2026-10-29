@@ -26,6 +26,11 @@ export const config = {
     /** Tageslimit für Gratis-Modelle: 50 ohne Guthaben, 1000 nach einmal 10 $ Aufladen */
     dailyLimit: Number(env.STELLA_LLM_DAILY_LIMIT ?? 50),
   },
+  /** "Mit Google anmelden" für Gmail – OAuth-Client aus der Google Cloud Console */
+  google: {
+    clientId: env.GOOGLE_CLIENT_ID ?? '',
+    clientSecret: env.GOOGLE_CLIENT_SECRET ?? '',
+  },
   webDist: path.resolve(import.meta.dirname, '../../web/dist'),
 };
 
