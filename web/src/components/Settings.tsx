@@ -7,16 +7,18 @@ import { Books } from './settings/Books.tsx';
 import { Mail } from './settings/Mail.tsx';
 import { Untis } from './settings/Untis.tsx';
 import { Handwriting } from './settings/Handwriting.tsx';
+import { ActionLog, MemoryView, Permissions } from './settings/Assistant.tsx';
 import { Icon, type IconName } from '../ui/Icon.tsx';
 import { Sheet, Sky, StarMark, Switch, showToast } from '../ui/Decor.tsx';
 
-type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'notify' | 'ai';
+type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'notify' | 'ai' | 'perms' | 'memory' | 'log';
 
 interface AiStatusData { configured: boolean; chain: string[]; visionChain: string[]; coolingDown: string[]; usedToday: number; dailyLimit: number }
 
 export function Settings({ back }: { back: () => void }) {
   const me = useStore((s) => s.me);
   const online = useStore((s) => s.online);
+  const waiting = useStore((s) => Object.values(s.actions).filter((a) => a.status === 'proposed').length);
   const [sheet, setSheet] = useState<SheetId | null>(null);
   const [ai, setAi] = useState<AiStatusData | null>(null);
   const [perm, setPerm] = useState(pushPermission());
@@ -92,15 +94,26 @@ export function Settings({ back }: { back: () => void }) {
           ))}
         </Group>
 
-        <Group title="Stella für dich">
-          <label className="list-row">
-            <span className="grow"><span className="list-title">HÜ-Autopilot</span><span className="list-sub">Aufgaben lösen und ins Heft schreiben</span></span>
-            <Switch label="HÜ-Autopilot" checked={me.settings.homeworkAutopilot !== false} onChange={(v) => void patch({ homeworkAutopilot: v }, v ? 'Autopilot an' : 'Autopilot aus')} />
-          </label>
-          <label className="list-row">
-            <span className="grow"><span className="list-title">Werbung automatisch löschen</span><span className="list-sub">landet im Papierkorb, nicht weg</span></span>
-            <Switch label="Werbung automatisch löschen" checked={me.settings.mailAutoTrash !== false} onChange={(v) => void patch({ mailAutoTrash: v })} />
-          </label>
+        <Group title="Stella als Assistentin">
+          <button type="button" className="list-row" onClick={() => setSheet('perms')}>
+            <span className="icon-tile blue" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="shield" size={18} /></span>
+            <span className="grow"><span className="list-title">Was Stella selbst darf</span><span className="list-sub">HÜs lösen, Planer ändern, Werbung löschen …</span></span>
+            <Icon name="chevron" size={16} />
+          </button>
+          <button type="button" className="list-row" onClick={() => setSheet('memory')}>
+            <span className="icon-tile pink" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="memory" size={18} /></span>
+            <span className="grow"><span className="list-title">Was Stella über dich weiß</span><span className="list-sub">ansehen, ändern, löschen</span></span>
+            <Icon name="chevron" size={16} />
+          </button>
+          <button type="button" className="list-row" onClick={() => setSheet('log')}>
+            <span className="icon-tile green" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="history" size={18} /></span>
+            <span className="grow"><span className="list-title">Was Stella getan hat</span><span className="list-sub">mit „Rückgängig“</span></span>
+            {waiting > 0 && <span className="status warn">{waiting} {waiting === 1 ? 'Frage' : 'Fragen'}</span>}
+            <Icon name="chevron" size={16} />
+          </button>
+        </Group>
+
+        <Group title="Zeiten & Ziele">
           <TimeRow label="Erinnerung am Vorabend" value={me.settings.eveningTime ?? '19:00'} onSave={(v) => void patch({ eveningTime: v })} />
           <TimeRow label="Lernzeit" value={me.settings.studyTime ?? '16:30'} onSave={(v) => void patch({ studyTime: v })} />
           <label className="list-row">
@@ -131,6 +144,9 @@ export function Settings({ back }: { back: () => void }) {
       {sheet === 'health' && <Sheet title="Health, SMS & Kalender" onClose={() => setSheet(null)}><Shortcuts me={me} /></Sheet>}
       {sheet === 'notify' && <Sheet title="Mitteilungen" onClose={() => setSheet(null)}><Notifications onChange={() => setPerm(pushPermission())} /></Sheet>}
       {sheet === 'ai' && ai && <Sheet title="KI" onClose={() => setSheet(null)}><AiDetails ai={ai} /></Sheet>}
+      {sheet === 'perms' && <Sheet title="Was Stella selbst darf" onClose={() => setSheet(null)}><Permissions /></Sheet>}
+      {sheet === 'memory' && <Sheet title="Was Stella über dich weiß" onClose={() => setSheet(null)}><MemoryView /></Sheet>}
+      {sheet === 'log' && <Sheet title="Was Stella getan hat" onClose={() => setSheet(null)}><ActionLog /></Sheet>}
     </div>
   );
 }

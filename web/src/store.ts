@@ -5,7 +5,8 @@
 
 import { useSyncExternalStore } from 'react';
 import {
-  formatDateDe, interpret, todayIn, type ChatMessage, type ChatResponse, type Item, type SyncResponse, type Tone,
+  formatDateDe, interpret, todayIn, type ActionEntry, type ActionGroup, type ChatMessage, type ChatResponse, type Item, type PermissionLevel,
+  type SyncResponse, type Tone,
 } from '@stella/shared';
 
 export type BookProvider = 'digi4school' | 'scook';
@@ -16,6 +17,7 @@ export interface Me {
   settings: {
     eveningTime?: string; studyTime?: string; stepGoal?: number;
     books?: BookConfig[]; homeworkAutopilot?: boolean; mailAutoTrash?: boolean; tone?: Tone;
+    permissions?: Partial<Record<ActionGroup, PermissionLevel>>;
   };
   integrations: {
     books: Record<BookProvider, { connected: boolean; cookies: boolean; email: string | null }>;
@@ -39,12 +41,14 @@ interface State {
   online: boolean;
   thinking: boolean;
   busyItems: string[];
+  /** Aktionen und Vorschläge von Stella (für Karten mit Ja/Nein und „Rückgängig“) */
+  actions: Record<string, ActionEntry>;
 }
 
 const STORAGE_KEY = 'stella-state-v1';
 
 function load(): State {
-  const base: State = { token: null, me: null, items: {}, messages: [], outbox: [], lastSync: null, online: navigator.onLine, thinking: false, busyItems: [] };
+  const base: State = { token: null, me: null, items: {}, messages: [], outbox: [], lastSync: null, online: navigator.onLine, thinking: false, busyItems: [], actions: {} };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return { ...base, ...JSON.parse(raw), online: navigator.onLine, thinking: false };
@@ -93,12 +97,12 @@ export async function authenticate(mode: 'login' | 'register', body: Record<stri
   const { token, user } = await api<{ token: string; user: Me }>(`/api/auth/${mode}`, {
     method: 'POST', json: { ...body, device, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
   });
-  set({ token, me: user, items: {}, messages: [], outbox: [], lastSync: null });
+  set({ token, me: user, items: {}, messages: [], outbox: [], lastSync: null, actions: {} });
   await sync();
 }
 
 export function logoutLocal() {
-  set({ token: null, me: null, items: {}, messages: [], outbox: [], lastSync: null });
+  set({ token: null, me: null, items: {}, messages: [], outbox: [], lastSync: null, actions: {} });
 }
 
 export async function logout() {
@@ -164,6 +168,7 @@ export function sync(): Promise<void> {
       if (!state.lastSync) set({ items: {} });
       mergeItems(res.items);
       mergeMessages(res.messages);
+      mergeActions(res.actions ?? [], !state.lastSync);
       set({ lastSync: res.serverTime, online: true, busyItems: res.busyItems ?? [] });
     } catch (err) {
       if (isNetworkError(err)) set({ online: false });
@@ -250,6 +255,26 @@ function queueOffline(text: string, clientId: string, createdAt: string) {
     items: localItem ? { ...s.items, [localItem.id]: localItem } : s.items,
     online: false,
   }));
+}
+
+// ---------- Aktionen: Ja / Nein / Rückgängig ----------
+
+function mergeActions(list: ActionEntry[], replace = false) {
+  if (!list.length && !replace) return;
+  set((s) => {
+    const next = replace ? {} as Record<string, ActionEntry> : { ...s.actions };
+    for (const a of list) next[a.id] = a;
+    return { actions: next };
+  });
+}
+
+/** Vorschlag annehmen/ablehnen oder etwas rückgängig machen */
+export async function decideAction(id: string, decision: 'approve' | 'reject' | 'undo') {
+  const res = await api<{ action: ActionEntry; items: Item[] }>(`/api/actions/${id}/${decision}`, { method: 'POST' });
+  mergeActions([res.action]);
+  mergeItems(res.items);
+  void sync();
+  return res.action;
 }
 
 // ---------- Planer ----------

@@ -9,8 +9,10 @@ import {
   recentMessages, setPending, type User,
 } from './db.ts';
 import { PROVIDERS } from './books.ts';
-import { SOLUTION_CAPTION } from './homework.ts';
 import { lessonsFor } from './untis.ts';
+import { lastUndoable, levelFor, perform, undo, type ActionParams, type ActionType, type Performed } from './actions.ts';
+import { buildLagebild, lagebildPrompt } from './context.ts';
+import { cleanSchedule, findMemory, isCategory } from './memory.ts';
 import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type ToolDef } from './llm.ts';
 import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
 
@@ -25,6 +27,8 @@ interface Turn {
 
 const say = (t: Turn, text: string, attachments: ChatMessage['attachments'] = []) =>
   t.replies.push(addMessage(t.user.id, 'assistant', text, { attachments }));
+/** Nachrichten aus Aktionen (Rückfragen, „✓ erledigt“) direkt in die Chat-Antwort */
+const sayAction = (t: Turn) => (text: string, actionId: string) => { t.replies.push(addMessage(t.user.id, 'assistant', text, { actionId })); };
 /** Satzende ohne doppelten Punkt nach "Freitag, 30.10." */
 const dot = (s: string) => (s.endsWith('.') ? s : `${s}.`);
 const touched = (t: Turn, ...items: (Item | null)[]) => items.forEach((i) => i && t.changed.set(i.id, i));
@@ -40,7 +44,8 @@ export async function handleChat(user: User, text: string, clientId: string | nu
   const pending = getPending(user.id);
 
   let handled = false;
-  if (pending && intent?.type !== 'create') handled = await answerPending(t, pending, text);
+  if (/^\s*(bitte\s+)?(mach\s+(das|es)\s+)?r(ü|ue)ckg(ä|ae)ngig\b|^\s*undo\b/iu.test(text)) handled = undoLast(t);
+  if (!handled && pending && intent?.type !== 'create') handled = await answerPending(t, pending, text);
   if (pending && !handled) clearPending(user.id);
 
   if (!handled && images.length && intent?.type !== 'create') handled = attachPhotoToRecentHomework(t);
@@ -56,13 +61,29 @@ export async function handleChat(user: User, text: string, clientId: string | nu
   return { messages: t.replies, items: [...t.changed.values()], userMessage };
 }
 
-const autopilot = (u: User) => u.settings.homeworkAutopilot !== false;
+/** HÜ-Autopilot: löst Stella von selbst (auto/melden)? */
+const autopilot = (u: User) => ['auto', 'notify'].includes(levelFor(u, 'homework'));
 
-/** Foto der Aufgabe an eine HÜ hängen und (Autopilot) lösen lassen. */
+function undoLast(t: Turn): boolean {
+  const last = lastUndoable(t.user.id);
+  if (!last) { say(t, 'Ich finde gerade nichts, was ich rückgängig machen könnte. 🤔'); return true; }
+  const { changed } = undo(t.user.id, last.id);
+  touched(t, ...changed);
+  say(t, `↩️ Rückgängig: ${last.summary}.`);
+  return true;
+}
+
+/** Foto der Aufgabe an eine HÜ hängen. */
 function attachPhotos(t: Turn, item: Item) {
   for (const img of t.images) addAttachment(t.user.id, item.id, { ...img, caption: `${item.subject ?? ''} Aufgabe`.trim() });
   touched(t, getItem(t.user.id, item.id));
-  if (autopilot(t.user)) enqueueJob(t.user.id, 'solve_homework', { itemId: item.id });
+}
+
+/** HÜ lösen lassen – je nach Recht sofort oder mit Rückfrage. Nach der eigenen Antwort aufrufen. */
+function requestSolve(t: Turn, item: Item) {
+  if (levelFor(t.user, 'homework') === 'never') return;
+  const r = perform(t.user, 'homework.solve', { itemId: item.id }, { source: 'auto', quiet: true, say: sayAction(t) });
+  touched(t, ...r.changed);
 }
 
 /** Foto ohne Text: gehört wohl zur gerade eingetragenen HÜ. */
@@ -78,6 +99,7 @@ function attachPhotoToRecentHomework(t: Turn): boolean {
   say(t, autopilot(t.user)
     ? `📸 Hab das Foto zu **${item.title}** gelegt – ich lös das und schreib's dir ins Heft. ✍️`
     : `📸 Hab das Foto zu **${item.title}** gelegt.`);
+  requestSolve(t, item);
   return true;
 }
 
@@ -114,6 +136,7 @@ async function onCreate(t: Turn, e: ParsedEntry) {
         : `_(Kein Datum erkannt – ich hab den nächsten Schultag genommen. Schreib z. B. „${item.subject ?? ''} HÜ bis Freitag“, wenn's anders ist.)_`);
     }
     say(t, parts.join(' '));
+    if (t.images.length) requestSolve(t, item);
     return;
   }
 
@@ -325,72 +348,129 @@ const TOOLS: ToolDef[] = [
       parameters: { type: 'object', properties: { source: { type: 'string', enum: ['email', 'social', 'sms'] }, limit: { type: 'number' } } },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'remember',
+      description: 'Etwas Dauerhaftes über den Nutzer merken (Person, Routine, Vorliebe, Schule, Ziel, Gesundheit). Routinen mit schedule, damit Stella sie beim Planen freihält.',
+      parameters: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'kurzer Satz, z. B. "Fußballtraining" oder "Frau Huber ist Klassenvorstand" oder "Französisch fällt schwer"' },
+          category: { type: 'string', enum: ['person', 'routine', 'preference', 'school', 'goal', 'health', 'other'] },
+          schedule: {
+            type: 'object', description: 'nur bei Routinen mit fester Zeit',
+            properties: { days: { type: 'array', items: { type: 'number' }, description: '1=Mo … 7=So' }, start: { type: 'string', description: 'HH:MM' }, end: { type: 'string', description: 'HH:MM' } },
+          },
+          explicit: { type: 'boolean', description: 'true, wenn der Nutzer ausdrücklich "merk dir …" gesagt hat' },
+        },
+        required: ['text', 'category'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_memory',
+      description: 'Einen gemerkten Eintrag korrigieren (id wie m:abcd1234 aus dem Lagebild).',
+      parameters: { type: 'object', properties: { id: { type: 'string' }, text: { type: 'string' }, category: { type: 'string' }, schedule: { type: 'object' } }, required: ['id'] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'forget',
+      description: 'Einen gemerkten Eintrag löschen (z. B. "vergiss das", oder wenn er nicht mehr stimmt).',
+      parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+    },
+  },
 ];
 
 function systemPrompt(user: User, today: string): string {
-  const upcoming = listItems(user.id, { from: today, to: addDays(today, 21) })
-    .filter((i) => i.kind !== 'study')
-    .map((i) => `- [${i.id}] ${i.due} ${i.title}${i.detail ? ` (${i.detail})` : ''}`).join('\n') || '(nichts)';
+  const lb = buildLagebild(user, 8);
   return `Du bist Stella, der persönliche Assistent von ${user.name}. Motto: "Let Stella handle your life."
-${user.name} geht in Österreich zur Schule. Du hilfst vor allem bei Organisation: HÜs, Tests, Schularbeiten, Termine, Lernen, Gesundheit.
+${user.name} geht in Österreich zur Schule. Du nimmst ${user.name} Arbeit ab: Schule, Termine, Lernen, Nachrichten, Alltag.
 
-Heute ist ${WEEKDAYS_DE[weekdayOf(today)]}, ${today}, ${timeIn(user.timeZone)} Uhr (${user.timeZone}).
+Jetzt: ${WEEKDAYS_DE[weekdayOf(today)]}, ${today}, ${timeIn(user.timeZone)} Uhr (${user.timeZone}).
 
 Regeln:
 - Antworte auf Deutsch, kurz (wie eine Chat-Nachricht).
 - ${toneInstruction(user.settings.tone)}
-- Nutze die Werkzeuge, um Einträge anzulegen/zu ändern, statt nur darüber zu reden. Rechne Daten selbst aus (YYYY-MM-DD).
-- Erfinde keine Termine oder Fakten über ${user.name}. Frag nach, wenn etwas Wichtiges fehlt.
-- Bei Tests/Schularbeiten: nach dem Stoff fragen und dann create_study_plan nutzen.
-- Hausübungen erledigst du für ${user.name} (solve_homework): Stella löst sie und schreibt sie in Handschrift ins Heft.
-- Du kennst Stundenplan (timetable), E-Mails & Social-Media-Benachrichtigungen (recent_inbox) und Gesundheitsdaten.
+- HANDELN statt erklären: Wenn ${user.name} etwas organisiert, geplant, verschoben, abgesagt oder vorbereitet haben will, tu es mit den Werkzeugen (mehrere Schritte sind ok). Rechne Daten selbst aus (YYYY-MM-DD).
+- Manche Aktionen brauchen die Zustimmung von ${user.name}: Dann bekommt ${user.name} eine Karte mit Ja/Nein – sag nur kurz, dass du gefragt hast.
+- Nutze das Lagebild unten (freie Zeiten, Tests, Lernstand) für Vorschläge. Plane nichts in belegte Zeiten.
+- Erfinde keine Termine oder Fakten. Frag nach, wenn etwas Wichtiges fehlt.
+- Bei Tests/Schularbeiten: Stoff erfragen, dann create_study_plan.
+- Hausübungen erledigst du (solve_homework): Stella löst sie und schreibt sie in Handschrift ins Heft.
+- GEDÄCHTNIS: Erfährst du etwas Dauerhaftes und Nützliches über ${user.name} (Personen und ihre Rolle, feste Termine/Routinen mit Wochentag und Uhrzeit, Vorlieben, was schwer/leicht fällt, Ziele), speichere es sofort mit remember – ohne nachzufragen und ohne es groß anzukündigen. Nicht speichern: Einmaliges (das ist ein Planer-Eintrag), Banales, Passwörter, Dinge, die schon unten stehen. Ist etwas überholt, ändere oder lösche den alten Eintrag (update_memory/forget). Nutze dein Wissen, ohne es jedes Mal zu erwähnen.
 
-Anstehende Einträge (nächste 3 Wochen):
-${upcoming}`;
+LAGEBILD
+${lagebildPrompt(lb)}`;
+}
+
+/** Ergebnis einer Aktion so formulieren, dass das Modell weiß, was passiert ist */
+function actionResult(t: Turn, r: Performed) {
+  touched(t, ...r.changed);
+  if (r.status === 'refused') return { error: r.reason };
+  if (r.status === 'proposed') return { proposed: true, info: 'Der Nutzer bekommt eine Rückfrage-Karte mit Ja/Nein und entscheidet selbst.' };
+  return { ok: true, ...(typeof r.result === 'object' && r.result ? r.result : {}) };
+}
+
+function act<T extends ActionType>(t: Turn, type: T, params: ActionParams[T], source: 'chat' | 'auto' = 'chat') {
+  return actionResult(t, perform(t.user, type, params, { source, quiet: source === 'chat', say: sayAction(t) }));
 }
 
 async function runTool(t: Turn, name: string, args: Record<string, any>): Promise<unknown> {
   const u = t.user;
   switch (name) {
     case 'create_entry': {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(args.due ?? '')) return { error: 'due muss YYYY-MM-DD sein' };
-      const item = addItem(u, {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(args.due ?? ''))) return { error: 'due muss YYYY-MM-DD sein' };
+      return act(t, 'item.create', {
         kind: KINDS.includes(args.kind) ? args.kind : 'todo', title: String(args.title), subject: args.subject ?? null,
         detail: args.detail ?? null, due: args.due, time: args.time ?? null, material: args.material ?? null, source: 'ai',
       });
-      touched(t, item);
-      return { ok: true, id: item.id };
     }
     case 'list_entries':
       return listItems(u.id, { from: args.from ?? t.today, to: args.to, kind: args.kind, includeDone: args.include_done })
         .slice(0, 40).map(({ id, kind, title, detail, due, time, status, material }) => ({ id, kind, title, detail, due, time, status, material }));
     case 'update_entry': {
-      const { id, ...patch } = args;
-      const item = changeItem(u, String(id), patch);
-      touched(t, item);
-      return item ? { ok: true } : { error: 'nicht gefunden' };
+      const { id, ...rest } = args;
+      const allowed = ['status', 'due', 'time', 'title', 'detail', 'notes', 'material', 'deleted'];
+      const patch = Object.fromEntries(Object.entries(rest).filter(([k]) => allowed.includes(k)));
+      if (!getItem(u.id, String(id))) return { error: 'nicht gefunden' };
+      return act(t, 'item.update', { id: String(id), patch });
     }
-    case 'create_study_plan': {
-      const exam = changeItem(u, String(args.exam_id), { material: String(args.material) });
-      if (!exam) return { error: 'Test nicht gefunden' };
-      const sessions = createStudyPlan(u, exam.id);
-      touched(t, exam, ...sessions);
-      return { sessions: sessions.map((s) => ({ date: s.due, focus: s.detail })) };
+    case 'create_study_plan':
+      if (!getItem(u.id, String(args.exam_id))) return { error: 'Test nicht gefunden' };
+      return act(t, 'study_plan.create', { examId: String(args.exam_id), material: String(args.material) });
+    case 'solve_homework':
+      if (!getItem(u.id, String(args.entry_id))) return { error: 'nicht gefunden' };
+      return act(t, 'homework.solve', { itemId: String(args.entry_id), again: !!args.again });
+    case 'remember': {
+      const text = String(args.text ?? '').trim();
+      if (!text) return { error: 'text fehlt' };
+      const explicit = args.explicit === true;
+      return actionResult(t, perform(u, 'memory.add', {
+        category: isCategory(args.category) ? args.category : 'other', text,
+        source: explicit ? 'user' : 'learned', schedule: cleanSchedule(args.schedule),
+      }, { source: explicit ? 'chat' : 'auto', quiet: explicit, say: sayAction(t) }));
     }
-    case 'solve_homework': {
-      let item = getItem(u.id, String(args.entry_id));
-      if (!item) return { error: 'nicht gefunden' };
-      if (args.again) {
-        // alte Lösung entfernen, damit neu gelöst (und erneut ins Heft geschrieben) wird
-        db.prepare('DELETE FROM notes_deliveries WHERE user_id = ? AND item_id = ?').run(u.id, item.id);
-        item = changeItem(u, item.id, {
-          status: 'open', notes: null, attachments: item.attachments.filter((a) => !a.caption?.startsWith(SOLUTION_CAPTION)),
-        })!;
-        touched(t, item);
-      }
-      if (!item.attachments.length && !(item.page && bookFor(u, item.subject))) return { error: 'Kein Foto und kein Buch hinterlegt – Nutzer soll ein Foto schicken.' };
-      enqueueJob(u.id, item.attachments.length ? 'solve_homework' : 'book_page', { itemId: item.id });
-      return { ok: true, info: 'Wird im Hintergrund gelöst, Nutzer bekommt eine Nachricht.' };
+    case 'update_memory': {
+      const m = findMemory(u.id, String(args.id ?? ''));
+      if (!m) return { error: 'Eintrag nicht gefunden' };
+      return act(t, 'memory.update', {
+        id: m.id,
+        patch: {
+          ...(args.text ? { text: String(args.text) } : {}),
+          ...(isCategory(args.category) ? { category: args.category } : {}),
+          ...(args.schedule !== undefined ? { schedule: cleanSchedule(args.schedule) } : {}),
+        },
+      });
+    }
+    case 'forget': {
+      const m = findMemory(u.id, String(args.id ?? ''));
+      if (!m) return { error: 'Eintrag nicht gefunden' };
+      return act(t, 'memory.delete', { id: m.id });
     }
     case 'timetable':
       return lessonsFor(u.id, args.from ?? t.today, args.to ?? addDays(t.today, 1));
@@ -415,7 +495,8 @@ async function runAgent(t: Turn) {
   ];
   try {
     for (let step = 0; step < 6; step++) {
-      const { message } = await complete(messages, TOOLS);
+      // ab dem zweiten Schritt ist es eine Kette („Handle it“) – dafür das stärkere Modell, falls eingetragen
+      const { message } = await complete(messages, TOOLS, { heavy: step > 0 });
       messages.push({ role: 'assistant', content: message.content ?? '', tool_calls: message.tool_calls });
       if (!message.tool_calls?.length) {
         say(t, message.content?.trim() || '🤔');

@@ -23,6 +23,12 @@ export const config = {
     /** nur ":free"-Modelle automatisch wählen */
     freeOnly: env.STELLA_FREE_ONLY !== 'false',
     baseUrl: env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1',
+    /**
+     * Optional: stärkere (Bezahl-)Modelle nur für schwere Aufgaben – HÜs lösen, lange „Handle it“-Ketten,
+     * Wochenplanung. Kommagetrennt, z. B. "google/gemini-2.5-flash". Zählen nicht zum Gratis-Tageslimit.
+     */
+    heavyModels: (env.STELLA_HEAVY_MODELS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+    heavyVisionModels: (env.STELLA_HEAVY_VISION_MODELS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
     /** Tageslimit für Gratis-Modelle: 50 ohne Guthaben, 1000 nach einmal 10 $ Aufladen */
     dailyLimit: Number(env.STELLA_LLM_DAILY_LIMIT ?? 50),
   },

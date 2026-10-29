@@ -3,6 +3,7 @@ import { addDays, todayIn } from '@stella/shared';
 import { compressImage, sendMessage, useStore } from '../store.ts';
 import { AuthImage, Lightbox, Rich } from './Rich.tsx';
 import { ItemStatus } from './Today.tsx';
+import { ActionCard } from './ActionCard.tsx';
 import { Icon } from '../ui/Icon.tsx';
 import { Sky, StarMark } from '../ui/Decor.tsx';
 
@@ -100,6 +101,7 @@ export function Chat() {
                     <div className={`bubble ${m.role}${m.pending ? ' pending' : ''}`}>
                       {m.text && <Rich text={m.text} />}
                       {m.attachments.map((a) => <AuthImage key={a.id} id={a.id} alt={a.caption} onOpen={setLightbox} />)}
+                      {m.actionId && <ActionCard id={m.actionId} />}
                       <span className="meta">{m.pending ? 'wird gesendet' : timeLabel(m.createdAt)}</span>
                     </div>
                   </div>

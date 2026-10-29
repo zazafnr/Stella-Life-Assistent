@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import type { Attachment, ChatMessage, Item, ItemKind, ItemStatus, Tone } from '@stella/shared';
+import type { ActionGroup, Attachment, ChatMessage, Item, ItemKind, ItemStatus, PermissionLevel, Tone } from '@stella/shared';
 import { config } from './config.ts';
 
 export const db = new Database(path.join(config.dataDir, 'stella.db'));
@@ -168,6 +168,36 @@ const MIGRATIONS: string[] = [
     requests INTEGER NOT NULL DEFAULT 0
   );
   `,
+  `
+  -- Stellas Gedächtnis: was sie über den Nutzer weiß (lernt selbst, Nutzer sieht und ändert alles)
+  CREATE TABLE memories (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category TEXT NOT NULL,
+    text TEXT NOT NULL,
+    source TEXT NOT NULL,
+    schedule TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX memories_user ON memories(user_id, updated_at);
+  -- Alles, was Stella tut oder vorschlägt – mit Daten zum Rückgängigmachen
+  CREATE TABLE actions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    params TEXT NOT NULL,
+    status TEXT NOT NULL,
+    source TEXT NOT NULL,
+    undo TEXT,
+    result TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX actions_user ON actions(user_id, updated_at);
+  ALTER TABLE messages ADD COLUMN action_id TEXT;
+  `,
 ];
 
 function migrate() {
@@ -211,6 +241,8 @@ export interface UserSettings {
   mailAutoTrash?: boolean;
   /** wie Stella schreibt: nett, frech oder cool */
   tone?: Tone;
+  /** was Stella von sich aus darf (je Bereich), siehe actions.ts */
+  permissions?: Partial<Record<ActionGroup, PermissionLevel>>;
 }
 
 export interface User {
@@ -344,10 +376,11 @@ export function itemsChangedSince(userId: string, since: string): Item[] {
 
 // ---------- Messages ----------
 
-type MsgRow = { id: string; client_id: string | null; role: string; text: string; attachments: string; created_at: string };
+type MsgRow = { id: string; client_id: string | null; role: string; text: string; attachments: string; created_at: string; action_id?: string | null };
 const toMessage = (r: MsgRow): ChatMessage => ({
   id: r.id, clientId: r.client_id, role: r.role as ChatMessage['role'], text: r.text,
   attachments: JSON.parse(r.attachments), createdAt: r.created_at,
+  ...(r.action_id ? { actionId: r.action_id } : {}),
 });
 
 export function findMessageByClientId(userId: string, clientId: string): ChatMessage | null {
@@ -356,10 +389,10 @@ export function findMessageByClientId(userId: string, clientId: string): ChatMes
 }
 
 export function addMessage(userId: string, role: ChatMessage['role'], text: string,
-  opts: { clientId?: string | null; attachments?: Attachment[]; createdAt?: string } = {}): ChatMessage {
+  opts: { clientId?: string | null; attachments?: Attachment[]; createdAt?: string; actionId?: string } = {}): ChatMessage {
   const id = newId();
-  db.prepare('INSERT INTO messages (id, user_id, client_id, role, text, attachments, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(id, userId, opts.clientId ?? null, role, text, JSON.stringify(opts.attachments ?? []), opts.createdAt ?? now());
+  db.prepare('INSERT INTO messages (id, user_id, client_id, role, text, attachments, created_at, action_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, userId, opts.clientId ?? null, role, text, JSON.stringify(opts.attachments ?? []), opts.createdAt ?? now(), opts.actionId ?? null);
   return toMessage(db.prepare('SELECT * FROM messages WHERE id = ?').get(id) as MsgRow);
 }
 

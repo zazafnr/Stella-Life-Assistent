@@ -244,6 +244,7 @@ struct Bubble: View {
                             .foregroundStyle(message.isUser ? .white : Theme.text)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .fixedSize(horizontal: false, vertical: true)
+                        if let id = message.actionId { ActionCardView(id: id) }
                         HStack(spacing: 4) {
                             Text(time)
                             if message.pending == true { Image(systemName: "clock") }
@@ -341,5 +342,76 @@ extension UIImage {
         format.scale = 1
         let resized = UIGraphicsImageRenderer(size: target, format: format).image { _ in draw(in: CGRect(origin: .zero, size: target)) }
         return resized.jpegData(compressionQuality: 0.72)
+    }
+}
+
+/// Unter einer Stella-Nachricht: Vorschlag mit Ja/Nein oder Erledigtes mit „Rückgängig“
+@MainActor
+struct ActionCardView: View {
+    var id: String
+    @Environment(Store.self) private var store
+    @State private var busy = false
+    @State private var error: String?
+
+    var body: some View {
+        if let action = store.actions[id] {
+            VStack(alignment: .leading, spacing: 6) {
+                if action.proposed {
+                    HStack(spacing: 8) {
+                        Button { run("approve") } label: {
+                            Label("Ja, mach das", systemImage: "checkmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
+                                .background(Theme.blue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                        Button { run("reject") } label: {
+                            Text("Nein")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Theme.blue)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
+                                .background(Theme.blueTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                    }
+                    .buttonStyle(PressableStyle())
+                    .disabled(busy)
+                } else {
+                    HStack(spacing: 10) {
+                        Label(Self.label(action.status), systemImage: action.status == "done" ? "checkmark" : "circle.slash")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(action.status == "done" ? Theme.green : action.status == "failed" ? Theme.pinkText : Theme.muted)
+                        if action.canUndo {
+                            Button("Rückgängig") { run("undo") }
+                                .font(.system(size: 13, weight: .semibold))
+                                .disabled(busy)
+                        }
+                    }
+                }
+                if let error { Text(error).font(.system(size: 12)).foregroundStyle(Theme.pinkText) }
+            }
+            .padding(.top, 6)
+            .transition(.opacity)
+        }
+    }
+
+    static func label(_ status: String) -> String {
+        switch status {
+        case "done": return "Erledigt"
+        case "rejected": return "Abgelehnt"
+        case "undone": return "Rückgängig gemacht"
+        case "failed": return "Hat nicht geklappt"
+        default: return "Wartet auf dich"
+        }
+    }
+
+    private func run(_ decision: String) {
+        busy = true
+        error = nil
+        Task {
+            do { try await store.decide(id, decision) } catch { self.error = error.localizedDescription }
+            busy = false
+        }
     }
 }

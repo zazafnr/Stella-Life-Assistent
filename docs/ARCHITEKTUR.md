@@ -73,7 +73,34 @@ Gut zu wissen:
 - **Qualität:** Gratis-Bildmodelle lesen Buchseiten gut, sind aber nicht fehlerfrei. Wenn eine Lösung nicht passt, im Chat „Französisch HÜ nochmal lösen“ schreiben oder mit `STELLA_VISION_MODELS` ein stärkeres Modell festlegen.
 - Ausschalten: Einstellungen → Schulbücher → HÜ-Autopilot.
 
-## 7. Fahrplan
+## 7. Stella als Assistentin: Lagebild, Aktionen, Gedächtnis
+
+Stella soll sich nicht wie ein Chatbot anfühlen, sondern Zusammenhänge sehen und Arbeit abnehmen.
+Drei Bausteine tragen das – alles Weitere (Briefing, Hinweise, Wochenplan) baut darauf auf.
+
+**Lagebild** (`server/src/context.ts`) – eine Sicht auf die nächsten Tage: Stunden mit Entfall,
+Einträge, Tests mit Lernstand, überfällige Dinge, wichtige Nachrichten, Gedächtnis und die **freien
+Zeitfenster** (Schule, Routinen und Termine sind belegt). Kommt ohne KI aus. Der Chat-Agent bekommt es
+komplett in den Prompt; Briefing, Hinweise und Wochenplanung lesen dieselbe Quelle.
+
+**Aktionen mit Rechte-Stufen** (`server/src/actions.ts`) – alles, was Stella *tut*, ist eine benannte
+Aktion (Eintrag anlegen/verschieben/löschen, Lernplan, HÜ lösen, sich etwas merken) mit Protokoll und
+7 Tage „Rückgängig“. Je Bereich gilt eine Stufe: *selbst · melden · fragen · nie*.
+- Was der Nutzer im Chat verlangt, ist Zustimmung → wird ausgeführt (außer „nie“).
+- Was Stella von sich aus tut (Autopilot, Gelerntes, später Hinweise), folgt der Stufe; „fragen“
+  erzeugt eine Karte mit Ja/Nein im Chat. „mach das rückgängig“ nimmt die letzte Aktion zurück.
+
+**Gedächtnis** (`server/src/memory.ts`, `learning.ts`) – Fakten pro Nutzer (Personen, Routinen mit
+Wochentag und Uhrzeit, Vorlieben, Schule, Ziele). Stella lernt selbst: im Chat über das Werkzeug
+`remember`, und einmal pro Nacht (2–5 Uhr) aus allen Nachrichten des Tages – auch denen, die ohne KI
+verarbeitet wurden. Routinen mit Zeiten gelten im Lagebild als belegt. Der Nutzer sieht und ändert
+alles unter „Was Stella über dich weiß“.
+
+**Modelle pro Aufgabe** – Gratis-Modelle für die Masse; mit `STELLA_HEAVY_MODELS` /
+`STELLA_HEAVY_VISION_MODELS` bekommen schwere Aufgaben (HÜ lösen, mehrstufige Ketten) zuerst ein
+stärkeres Modell. Bezahlmodelle zählen nicht zum Gratis-Tageslimit.
+
+## 8. Fahrplan
 
 **Phase 1: dieser Stand** ✅
 Chat, Kurznotizen (auch offline), Planer, Erinnerungen, Lernpläne, Push, Kalender-Abo, Gesundheit und SMS über Kurzbefehle, digi4school (Kalibrierung offen), automatische KI-Modellwahl.

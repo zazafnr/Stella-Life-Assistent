@@ -76,10 +76,18 @@ function pick(models: ModelInfo[], capability: Capability): string[] {
   return usable.sort((a, b) => rank(a) - rank(b)).map((m) => m.id).slice(0, 5);
 }
 
-export async function modelChain(capability: Capability = 'tools'): Promise<string[]> {
+export async function modelChain(capability: Capability = 'tools', heavy = false): Promise<string[]> {
   const configured = capability === 'tools' ? config.openrouter.models : config.openrouter.visionModels;
+  const strong = heavy ? (capability === 'tools' ? config.openrouter.heavyModels : config.openrouter.heavyVisionModels) : [];
   const auto = configured.length ? [] : pick(await refreshCatalog(), capability);
-  return [...new Set([...configured, ...auto, FALLBACK_ROUTER])];
+  return [...new Set([...strong, ...configured, ...auto, FALLBACK_ROUTER])];
+}
+
+/** Gratis-Modelle zählen zum Tageslimit von OpenRouter, Bezahlmodelle nicht. */
+function isFree(model: string): boolean {
+  if (model === FALLBACK_ROUTER || model.endsWith(':free')) return true;
+  const info = catalog.find((m) => m.id === model);
+  return !!info && Number(info.pricing?.prompt) === 0 && Number(info.pricing?.completion) === 0;
 }
 
 export async function modelStatus() {
@@ -87,6 +95,7 @@ export async function modelStatus() {
     configured: llmAvailable(),
     chain: llmAvailable() ? await modelChain('tools') : [],
     visionChain: llmAvailable() ? await modelChain('vision') : [],
+    heavy: { tools: config.openrouter.heavyModels, vision: config.openrouter.heavyVisionModels },
     coolingDown: [...cooldownUntil].filter(([, t]) => t > Date.now()).map(([m]) => m),
     usedToday: usageToday(),
     dailyLimit: config.openrouter.dailyLimit,
@@ -121,14 +130,16 @@ function checkBudget(background: boolean) {
 export interface CompletionResult { message: Extract<LlmMessage, { role: 'assistant' }>; model: string }
 
 export async function complete(messages: LlmMessage[], tools?: ToolDef[],
-  opts: { json?: boolean; vision?: boolean; timeoutMs?: number; background?: boolean } = {}): Promise<CompletionResult> {
+  opts: { json?: boolean; vision?: boolean; timeoutMs?: number; background?: boolean; heavy?: boolean } = {}): Promise<CompletionResult> {
   if (!llmAvailable()) throw new LlmUnavailable('Kein OPENROUTER_API_KEY gesetzt.');
   const errors: string[] = [];
 
-  for (const model of await modelChain(opts.vision ? 'vision' : 'tools')) {
+  for (const model of await modelChain(opts.vision ? 'vision' : 'tools', opts.heavy)) {
     if ((cooldownUntil.get(model) ?? 0) > Date.now()) continue;
-    checkBudget(!!opts.background);
-    countRequest();
+    if (isFree(model)) {
+      checkBudget(!!opts.background);
+      countRequest();
+    }
     try {
       const res = await fetch(`${config.openrouter.baseUrl}/chat/completions`, {
         method: 'POST',

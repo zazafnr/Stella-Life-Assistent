@@ -40,16 +40,20 @@ struct SettingsView: View {
                     }
 
                     Section {
-                        toggle("HÜs selbst lösen", "Stella löst Hausübungen und schreibt sie in deiner Handschrift ins FreeNotes-Heft.",
-                               symbol: "wand.and.stars", tint: Theme.pink, value: me.settings.homeworkAutopilot ?? false) { v in
-                            await save(["homeworkAutopilot": .bool(v)])
+                        NavigationLink { PermissionsView() } label: {
+                            row("Was Stella selbst darf", symbol: "checkmark.shield", tint: Theme.blue, detail: nil)
                         }
-                        toggle("Werbung löschen", "Spam und Werbung landen automatisch im Papierkorb – zurückholen geht in der Inbox.",
-                               symbol: "trash", tint: Theme.blue, value: me.settings.mailAutoTrash ?? false) { v in
-                            await save(["mailAutoTrash": .bool(v)])
+                        NavigationLink { MemoryView() } label: {
+                            row("Was Stella über dich weiß", symbol: "brain.head.profile", tint: Theme.pink, detail: nil)
+                        }
+                        NavigationLink { ActionLogView() } label: {
+                            row("Was Stella getan hat", symbol: "clock.arrow.circlepath", tint: Theme.greenBright,
+                                detail: store.waitingForMe > 0 ? "\(store.waitingForMe) offen" : nil)
                         }
                     } header: {
-                        Text("Stella macht das für dich")
+                        Text("Stella als Assistentin")
+                    } footer: {
+                        Text("Stella lernt selbst dazu und erledigt Dinge für dich – hier legst du fest, was sie darf, und siehst alles, was sie weiß und getan hat.")
                     }
 
                     Section {
@@ -198,21 +202,6 @@ struct SettingsView: View {
             Spacer()
             if let detail { Text(detail).foregroundStyle(Theme.muted).font(.system(size: 15)) }
         }
-    }
-
-    private func toggle(_ title: String, _ help: String, symbol: String, tint: Color, value: Bool,
-                        save: @escaping (Bool) async -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Toggle(isOn: Binding(get: { value }, set: { v in Task { await save(v) } })) {
-                row(title, symbol: symbol, tint: tint, detail: nil)
-            }
-            .tint(Theme.blue)
-            Text(help)
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.muted)
-                .padding(.leading, 42)
-        }
-        .padding(.vertical, 2)
     }
 
     private func connection(_ title: String, symbol: String, on: Bool, detail: String) -> some View {

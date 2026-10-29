@@ -81,7 +81,7 @@ Ist die Aufgabe nicht auf dem Bild: "found": false. Geht sie sichtbar auf der n�
   const { message } = await complete([
     { role: 'system', content: 'Du bist ein ausgezeichneter Schüler an einer österreichischen Schule. Du löst Hausübungen fehlerfrei.' },
     { role: 'user', content: parts },
-  ], undefined, { vision: true, json: true, timeoutMs: 120_000 });
+  ], undefined, { vision: true, json: true, timeoutMs: 120_000, heavy: true });
   return parseJson(message.content ?? '');
 }
 

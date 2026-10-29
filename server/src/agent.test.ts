@@ -36,6 +36,24 @@ const mock = createServer((req, res) => {
     }
     if (json.model === 'busy/model:free') { res.statusCode = 429; res.end('{"error":"rate limited"}'); return; }
     const hasToolResult = json.messages.some((m: { role: string }) => m.role === 'tool');
+    // nächtliche Lern-Runde
+    if (String(json.messages[0]?.content).includes('sich Dauerhaftes über seinen Nutzer')) {
+      res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: JSON.stringify({ facts: [
+        { category: 'person', text: 'Mia ist die beste Freundin' },
+        { category: 'quatsch', text: 'wird ignoriert' },
+      ] }) } }] }));
+      return;
+    }
+    // Gedächtnis: Nutzer erzählt von einer Routine → KI merkt sie sich selbst
+    const lastUser = [...json.messages].reverse().find((m: { role: string }) => m.role === 'user');
+    if (String(lastUser?.content).includes('Training')) {
+      res.end(JSON.stringify({ choices: [{ message: hasToolResult
+        ? { role: 'assistant', content: 'Viel Spaß beim Training! ⚽' }
+        : { role: 'assistant', content: null, tool_calls: [{ id: 'm1', type: 'function', function: { name: 'remember', arguments: JSON.stringify({
+          text: 'Fußballtraining', category: 'routine', schedule: { days: [2, 4], start: '17:00', end: '18:30' },
+        }) } }] } }] }));
+      return;
+    }
     res.end(JSON.stringify({
       choices: [{
         message: hasToolResult
@@ -93,7 +111,7 @@ test('freie Frage → KI ruft Werkzeug auf → Termin im Planer, Ausweichen bei 
   assert.ok(calls.some((c) => c.model === 'busy/model:free'));
   assert.ok(calls.some((c) => c.model === 'good/model:free'));
   // Systemprompt enthält das heutige Datum, damit die KI rechnen kann
-  assert.match(calls.at(-1)!.messages[0].content, /Heute ist/);
+  assert.match(calls.at(-1)!.messages[0].content, /Jetzt: .*Uhr/);
 });
 
 test('HÜ-Autopilot: Foto → gelöst, in Handschrift, erledigt, Vorabend-Info statt Erinnerung', async () => {
@@ -122,4 +140,27 @@ test('HÜ-Autopilot: Foto → gelöst, in Handschrift, erledigt, Vorabend-Info s
   assert.match(inbox[0].text, /^__S\. 45 Nr\. 16__/);
   assert.ok(ackNotesEntry(user.id, item.id, 'Französisch-Heft', 3));
   assert.equal(notesInbox(user.id).length, 0);
+});
+
+test('KI lernt selbst: Routine aus dem Gespräch landet im Gedächtnis – mit Zeiten', async () => {
+  const { listMemories } = await import('./memory.ts');
+  const res = await handleChat(user, 'ich hab dienstags und donnerstags von 17 bis halb 7 Training', null);
+  assert.match(res.messages.at(-1)!.text, /Training/);
+  const m = listMemories(user.id).find((x) => x.text === 'Fußballtraining');
+  assert.ok(m, 'gemerkt');
+  assert.equal(m!.source, 'learned');
+  assert.deepEqual(m!.schedule, { days: [2, 4], start: '17:00', end: '18:30' });
+});
+
+test('nächtliche Lern-Runde: nur gültige neue Fakten, höchstens einmal pro Nacht', async () => {
+  const { listMemories } = await import('./memory.ts');
+  const { nightlyLearning } = await import('./learning.ts');
+  for (const t of ['Mia kommt morgen vorbei', 'mit Mia lernen', 'Mia hat Geburtstag']) await handleChat(user, t, null).catch(() => {});
+  const night = new Date(`${new Date().toISOString().slice(0, 10)}T02:30:00Z`); // 03:30 in Wien, die Nachrichten von eben liegen im 24-h-Fenster
+  await nightlyLearning(user.id, night);
+  assert.ok(listMemories(user.id).some((m) => m.text === 'Mia ist die beste Freundin'));
+  assert.ok(!listMemories(user.id).some((m) => m.text === 'wird ignoriert'));
+  const before = listMemories(user.id).length;
+  await nightlyLearning(user.id, night);
+  assert.equal(listMemories(user.id).length, before);
 });

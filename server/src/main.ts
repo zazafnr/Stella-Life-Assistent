@@ -25,6 +25,8 @@ import { FILE_TYPES, filePath, saveDataUrl, saveFile } from './files.ts';
 import type { BookProvider } from './db.ts';
 import { ackNotesEntry, notesInbox, usesFreeNotes } from './notes.ts';
 import { finishGoogle, finishTarget, googleAuthUrl, googleConfigured, readState, type OAuthClient } from './oauth.ts';
+import { approve, GROUPS, isGroup, isLevel, levelFor, listActions, reject, undo } from './actions.ts';
+import { addMemory, cleanSchedule, deleteMemory, isCategory, listMemories, MEMORY_CATEGORIES, updateMemory } from './memory.ts';
 
 // trustProxy nur für Caddy auf derselben Maschine – sonst ließe sich die Absender-Adresse fälschen
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, bodyLimit: 2 * 1024 * 1024, trustProxy: '127.0.0.1' });
@@ -174,8 +176,25 @@ app.register(async (api) => {
         pageUrlTemplate: str(x.pageUrlTemplate, 500) || undefined,
       })).filter((x) => x.subject && x.url.startsWith('https://'));
     }
-    if (typeof b.homeworkAutopilot === 'boolean') patch.homeworkAutopilot = b.homeworkAutopilot;
-    if (typeof b.mailAutoTrash === 'boolean') patch.mailAutoTrash = b.mailAutoTrash;
+    const permissions = { ...(req.user.settings.permissions ?? {}) };
+    if (typeof b.homeworkAutopilot === 'boolean') {
+      patch.homeworkAutopilot = b.homeworkAutopilot;
+      permissions.homework = b.homeworkAutopilot ? 'auto' : 'never';
+    }
+    if (typeof b.mailAutoTrash === 'boolean') {
+      patch.mailAutoTrash = b.mailAutoTrash;
+      permissions.mail_sort = b.mailAutoTrash ? 'auto' : 'never';
+    }
+    if (b.permissions && typeof b.permissions === 'object') {
+      for (const [g, level] of Object.entries(b.permissions as Record<string, unknown>)) {
+        if (!isGroup(g) || !isLevel(level) || !GROUPS[g].levels.includes(level)) throw new HttpError(400, `Ungültiges Recht: ${g}`);
+        permissions[g] = level;
+      }
+      // die alten Schalter mitziehen, damit ältere Apps dasselbe anzeigen
+      if (permissions.homework) patch.homeworkAutopilot = permissions.homework !== 'never';
+      if (permissions.mail_sort) patch.mailAutoTrash = permissions.mail_sort !== 'never';
+    }
+    if (Object.keys(permissions).length) patch.permissions = permissions;
     if (b.tone !== undefined) {
       if (!isTone(b.tone)) throw new HttpError(400, 'Ton muss nett, frech oder cool sein');
       patch.tone = b.tone;
@@ -220,11 +239,14 @@ app.register(async (api) => {
     if (!since) {
       const today = todayIn(req.user.timeZone);
       const items = listItems(req.user.id, { from: addDays(today, -30), includeDone: true });
-      return { items, messages: recentMessages(req.user.id, 80), serverTime, busyItems: busyItems(req.user.id) };
+      return {
+        items, messages: recentMessages(req.user.id, 80), serverTime, busyItems: busyItems(req.user.id),
+        actions: listActions(req.user.id, { limit: 100 }),
+      };
     }
     return {
       items: itemsChangedSince(req.user.id, since), messages: messagesSince(req.user.id, since), serverTime,
-      busyItems: busyItems(req.user.id),
+      busyItems: busyItems(req.user.id), actions: listActions(req.user.id, { since }),
     };
   });
 
@@ -468,6 +490,49 @@ app.register(async (api) => {
   });
 
   api.get('/api/ai/status', async () => modelStatus());
+
+  // ----- Was Stella selbst darf -----
+  api.get('/api/permissions', async (req) => Object.entries(GROUPS).map(([group, g]) => ({
+    group, label: g.label, help: g.help, levels: g.levels, default: g.default, level: levelFor(req.user, group as keyof typeof GROUPS),
+  })));
+
+  // ----- Protokoll, Vorschläge, Rückgängig -----
+  api.get('/api/actions', async (req) => listActions(req.user.id, { limit: Math.min(Number((req.query as Record<string, string>).limit) || 100, 300) }));
+  const decide = (fn: (userId: string, id: string) => unknown) => async (req: FastifyRequest<{ Params: { id: string } }>) => {
+    try {
+      const out = fn(req.user.id, req.params.id) as { entry?: unknown; changed?: Item[] } | object;
+      return 'entry' in out ? { action: out.entry, items: (out as { changed: Item[] }).changed } : { action: out, items: [] };
+    } catch (err) {
+      throw new HttpError(400, (err as Error).message);
+    }
+  };
+  api.post('/api/actions/:id/approve', decide(approve));
+  api.post('/api/actions/:id/reject', decide(reject));
+  api.post('/api/actions/:id/undo', decide(undo));
+
+  // ----- Was Stella über dich weiß -----
+  api.get('/api/memories', async (req) => ({ categories: MEMORY_CATEGORIES, memories: listMemories(req.user.id) }));
+  api.post('/api/memories', async (req) => {
+    const b = req.body as Record<string, unknown>;
+    if (!str(b.text).trim()) throw new HttpError(400, 'Text fehlt');
+    return addMemory(req.user.id, {
+      category: isCategory(b.category) ? b.category : 'other', text: str(b.text, 300), source: 'user', schedule: cleanSchedule(b.schedule),
+    }).memory;
+  });
+  api.patch('/api/memories/:id', async (req: FastifyRequest<{ Params: { id: string } }>) => {
+    const b = req.body as Record<string, unknown>;
+    const m = updateMemory(req.user.id, req.params.id, {
+      ...(b.text !== undefined ? { text: str(b.text, 300) } : {}),
+      ...(isCategory(b.category) ? { category: b.category } : {}),
+      ...(b.schedule !== undefined ? { schedule: cleanSchedule(b.schedule) } : {}),
+    });
+    if (!m) throw new HttpError(404, 'Nicht gefunden');
+    return m;
+  });
+  api.delete('/api/memories/:id', async (req: FastifyRequest<{ Params: { id: string } }>) => {
+    if (!deleteMemory(req.user.id, req.params.id)) throw new HttpError(404, 'Nicht gefunden');
+    return { ok: true };
+  });
 });
 
 // ---------- Web-App ausliefern ----------

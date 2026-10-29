@@ -17,6 +17,7 @@ import { getSecret, setSecret } from './auth.ts';
 import { addMessage, db, getUser, newId, now } from './db.ts';
 import { complete, LlmUnavailable, llmAvailable } from './llm.ts';
 import { accessToken } from './oauth.ts';
+import { levelFor } from './actions.ts';
 import { pushToUser } from './push.ts';
 
 export type MailProvider = 'gmail' | 'icloud' | 'other';
@@ -146,7 +147,7 @@ Format: {"mails": [{"id": 123, "category": "newsletter", "summary": "…", "conf
 
 async function checkAccount(userId: string, account: MailAccount) {
   const user = getUser(userId)!;
-  const autoTrash = user.settings.mailAutoTrash !== false;
+  const autoTrash = levelFor(user, 'mail_sort') !== 'never';
   const c = await client(account);
   await c.connect();
   const lock = await c.getMailboxLock('INBOX');

@@ -41,8 +41,62 @@ struct ChatMessage: Codable, Hashable, Identifiable {
     var attachments: [Attachment]
     var createdAt: String
     var pending: Bool?
+    /** Karte mit Ja/Nein oder „Rückgängig“ */
+    var actionId: String?
 
     var isUser: Bool { role == "user" }
+}
+
+/** Etwas, das Stella getan hat oder vorschlägt */
+struct ActionEntry: Codable, Hashable, Identifiable {
+    var id: String
+    var type: String
+    var group: String
+    var summary: String
+    /** proposed, done, rejected, undone, failed */
+    var status: String
+    var source: String
+    var canUndo: Bool
+    var createdAt: String
+    var updatedAt: String
+
+    var proposed: Bool { status == "proposed" }
+}
+
+struct ActionDecision: Codable {
+    var action: ActionEntry
+    var items: [Item]
+}
+
+/** Was Stella über den Nutzer weiß */
+struct Memory: Codable, Hashable, Identifiable {
+    struct Schedule: Codable, Hashable {
+        var days: [Int]
+        var start: String
+        var end: String
+    }
+    var id: String
+    var category: String
+    var text: String
+    var source: String
+    var schedule: Schedule?
+    var createdAt: String
+    var updatedAt: String
+}
+
+struct MemoryList: Codable {
+    var categories: [String: String]
+    var memories: [Memory]
+}
+
+/** Ein Bereich in „Was Stella selbst darf“ */
+struct PermissionRow: Codable, Hashable, Identifiable {
+    var group: String
+    var label: String
+    var help: String
+    var levels: [String]
+    var level: String
+    var id: String { group }
 }
 
 struct ChatResponse: Codable {
@@ -56,6 +110,7 @@ struct SyncResponse: Codable {
     var messages: [ChatMessage]
     var serverTime: String
     var busyItems: [String]?
+    var actions: [ActionEntry]?
 }
 
 struct BookConfig: Codable, Hashable {

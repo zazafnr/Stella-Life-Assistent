@@ -14,6 +14,7 @@ import { getBrowser } from './browser.ts';
 import { addAttachment, addMessage, enqueueJob, getUser, type BookProvider } from './db.ts';
 import { saveFile } from './files.ts';
 import { bookForItem } from './planner.ts';
+import { levelFor, perform } from './actions.ts';
 
 type Page = import('playwright').Page;
 type Frame = import('playwright').Frame;
@@ -228,11 +229,14 @@ export async function fetchBookPage(userId: string, itemId: string, pageDelta = 
   const attachment = { id: fileId, kind: 'image' as const, caption: `${item.subject ?? ''} S. ${printed}`.trim() };
   addAttachment(userId, itemId, attachment);
 
-  if (user.settings.homeworkAutopilot !== false) {
+  const level = levelFor(user, 'homework');
+  if (level === 'auto' || level === 'notify') {
     enqueueJob(userId, 'solve_homework', { itemId, attempt: solveAttempt });
   } else {
     addMessage(userId, 'assistant', `📸 Hab dir Seite ${printed} für **${item.title}** geholt` +
       `${item.exercises ? ` (Nr. ${item.exercises})` : ''}.`, { attachments: [attachment] });
+    // „fragt vorher“: Karte „Darf ich … lösen?“ – nach Ja wird mit dem Foto gelöst
+    if (level === 'ask') perform(user, 'homework.solve', { itemId }, { source: 'auto' });
   }
 }
 

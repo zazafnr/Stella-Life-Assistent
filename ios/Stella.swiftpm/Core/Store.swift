@@ -11,6 +11,8 @@ final class Store {
     var items: [String: Item] = [:]
     var messages: [ChatMessage] = []
     var busyItems: Set<String> = []
+    /** Aktionen und Vorschläge von Stella */
+    var actions: [String: ActionEntry] = [:]
     var lastSync: String?
     var online = true
     var thinking = false
@@ -33,6 +35,7 @@ final class Store {
         var messages: [ChatMessage]
         var outbox: [Outbox]
         var lastSync: String?
+        var actions: [ActionEntry]?
     }
 
     init() {
@@ -89,6 +92,7 @@ final class Store {
         outbox = []
         lastSync = nil
         busyItems = []
+        actions = [:]
         loggedIn = false
         persist()
         Notifier.shared.clear()
@@ -125,6 +129,8 @@ final class Store {
             if me == nil { await refreshMe() }
             merge(items: res.items)
             merge(messages: res.messages)
+            if lastSync == nil { actions = [:] }
+            for a in res.actions ?? [] { actions[a.id] = a }
             busyItems = Set(res.busyItems ?? [])
             lastSync = res.serverTime
             online = true
@@ -226,6 +232,20 @@ final class Store {
         persist()
     }
 
+    // MARK: Vorschläge, Rückgängig
+
+    /** decision: approve, reject oder undo */
+    func decide(_ id: String, _ decision: String) async throws {
+        let res: ActionDecision = try await api.send("POST", "/api/actions/\(id)/\(decision)", as: ActionDecision.self)
+        actions[res.action.id] = res.action
+        merge(items: res.items)
+        if decision == "approve" { Haptics.success() }
+        persist()
+        await sync()
+    }
+
+    var waitingForMe: Int { actions.values.filter(\.proposed).count }
+
     // MARK: Planer
 
     func setDone(_ item: Item, _ done: Bool) async {
@@ -275,7 +295,8 @@ final class Store {
     private func persist() {
         let waiting = Set(outbox.map { "local-\($0.clientId)" })
         let kept = messages.filter { m in m.pending != true || waiting.contains(m.id) }
-        let cache = Cache(me: me, items: Array(items.values), messages: kept, outbox: outbox, lastSync: lastSync)
+        let cache = Cache(me: me, items: Array(items.values), messages: kept, outbox: outbox, lastSync: lastSync,
+                          actions: Array(actions.values))
         if let data = try? JSONEncoder().encode(cache) { try? data.write(to: cacheURL, options: .atomic) }
     }
 
@@ -286,6 +307,7 @@ final class Store {
         messages = cache.messages
         outbox = cache.outbox
         lastSync = cache.lastSync
+        actions = Dictionary((cache.actions ?? []).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
     }
 }
 
