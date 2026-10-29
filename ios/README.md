@@ -51,5 +51,5 @@ Stella.swiftpm/
   Views/    Heute, Chat, Planer, Detail, Inbox, Einstellungen, Schritte-Diagramm
 ```
 
-Bei jedem Push baut GitHub Actions die App mit Xcode 16 und 26 für den Simulator
+Bei jedem Push baut GitHub Actions die App mit Xcode 26 für den Simulator
 (`.github/workflows/ios.yml`).

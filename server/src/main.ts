@@ -26,7 +26,8 @@ import type { BookProvider } from './db.ts';
 import { ackNotesEntry, notesInbox, usesFreeNotes } from './notes.ts';
 import { finishGoogle, finishTarget, googleAuthUrl, googleConfigured, readState, type OAuthClient } from './oauth.ts';
 
-const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, bodyLimit: 2 * 1024 * 1024 });
+// trustProxy nur für Caddy auf derselben Maschine – sonst ließe sich die Absender-Adresse fälschen
+const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, bodyLimit: 2 * 1024 * 1024, trustProxy: '127.0.0.1' });
 app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: 5 * 1024 * 1024 }, (_req, body, done) => done(null, body));
 
 app.setErrorHandler((err, _req, reply) => {
@@ -71,7 +72,7 @@ app.post('/api/auth/register', async (req) => {
 
 app.post('/api/auth/login', async (req) => {
   const b = req.body as Record<string, unknown>;
-  const { token, user } = login(str(b.email, 200), str(b.password, 200), str(b.device, 80));
+  const { token, user } = login(str(b.email, 200), str(b.password, 200), str(b.device, 80), req.ip);
   return { token, user: publicUser(user) };
 });
 

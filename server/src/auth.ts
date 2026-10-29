@@ -47,10 +47,41 @@ export function register(name: string, email: string, password: string, timeZone
   return { token: createSession(id, device), user: getUser(id)! };
 }
 
-export function login(email: string, password: string, device?: string) {
-  const row = db.prepare('SELECT id, password_hash FROM users WHERE email = ?').get(email.trim().toLowerCase()) as
+// Schutz gegen Passwort-Raten: nach 8 Fehlversuchen je Adresse bzw. je E-Mail 15 Minuten Pause.
+const FAIL_LIMIT = 8;
+const FAIL_WINDOW = 15 * 60_000;
+const failures = new Map<string, { count: number; until: number }>();
+
+function checkLocked(keys: string[]) {
+  const now = Date.now();
+  for (const k of keys) {
+    const f = failures.get(k);
+    if (f && f.until > now && f.count >= FAIL_LIMIT) {
+      throw new HttpError(429, `Zu viele Fehlversuche – bitte in ${Math.ceil((f.until - now) / 60_000)} Minuten nochmal.`);
+    }
+  }
+}
+
+function noteFailure(keys: string[]) {
+  const now = Date.now();
+  for (const k of keys) {
+    const f = failures.get(k);
+    failures.set(k, f && f.until > now ? { count: f.count + 1, until: f.until } : { count: 1, until: now + FAIL_WINDOW });
+  }
+  if (failures.size > 10_000) for (const [k, f] of failures) if (f.until <= now) failures.delete(k);
+}
+
+export function login(email: string, password: string, device?: string, ip = '') {
+  const mail = email.trim().toLowerCase();
+  const keys = [`mail:${mail}`, ...(ip ? [`ip:${ip}`] : [])];
+  checkLocked(keys);
+  const row = db.prepare('SELECT id, password_hash FROM users WHERE email = ?').get(mail) as
     { id: string; password_hash: string } | undefined;
-  if (!row || !verifyPassword(password, row.password_hash)) throw new HttpError(401, 'E-Mail oder Passwort falsch.');
+  if (!row || !verifyPassword(password, row.password_hash)) {
+    noteFailure(keys);
+    throw new HttpError(401, 'E-Mail oder Passwort falsch.');
+  }
+  keys.forEach((k) => failures.delete(k));
   return { token: createSession(row.id, device), user: getUser(row.id)! };
 }
 
