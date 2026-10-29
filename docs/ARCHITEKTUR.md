@@ -57,35 +57,35 @@ Später, wenn nötig: eine **native iOS-App mit Expo (React Native)**. Die Logik
 
 Von Bots, die sich mit deinem Passwort in Instagram, TikTok oder Snapchat einloggen, rate ich klar ab: Das verstößt gegen deren Regeln, und dein Konto wird sehr wahrscheinlich gesperrt.
 
-## 5. digi4school kalibrieren
+## 5. Schulbücher (scook, digi4school) einrichten
 
-digi4school hat keine offizielle Schnittstelle. Stella steuert deshalb einen unsichtbaren Browser (Playwright). Ohne echtes Konto konnte ich das nicht testen. So richtest du es ein:
-1. Einstellungen → digi4school → Zugangsdaten eintragen → **Bücherregal laden**.
-2. Jedem Buch ein Fach zuordnen (genau so geschrieben, wie Stella das Fach nennt: „Latein“, „Mathe“, „Englisch“ …).
-3. `Latein HÜ S. 45 Nr. 1 morgen` schreiben und das Bild prüfen. Ist es die falsche Seite, den **Seitenversatz** anpassen. Funktioniert das Blättern gar nicht, schick mir die URL, die im Browser bei geöffneter Seite 45 steht. Dann trage ich eine passende `pageUrlTemplate` ein.
+Keiner der Anbieter hat eine offizielle Schnittstelle. Stella steuert deshalb einen unsichtbaren Browser: Sie öffnet das Buch, tippt die Seitenzahl ins Seitenfeld („45 / 236“) und schneidet nur die Buchseite aus.
+1. Einstellungen → Schulbücher → bei **scook** bzw. **digi4school** einloggen. Klappt der Login nicht (z. B. Microsoft-/Schul-Login): am PC einloggen, mit der Chrome-Erweiterung „Cookie-Editor“ die Cookies als JSON exportieren und bei Stella einfügen.
+2. Unter **Fach → Buch** den Link des Buchs eintragen, z. B. `https://scook.at/produkt/d85c6530-…` für *Nouvelles Perspectives A2+* → Fach „Französisch“, Anbieter „scook“.
+3. **Testen**: Fach wählen, Seite 45 → „Seite holen“. Zeigt das Bild eine andere Seite, den Seitenversatz anpassen. In deinem scook-Buch stimmt die Viewer-Seite mit der gedruckten überein (45 = „quarante-cinq“), Versatz also 0.
 
-## 6. HÜ-Hilfe und die Notes-App
+## 6. HÜ-Autopilot & FreeNotes
 
-Geplant ist die Verbindung zu deiner Notes-App (`zazafnr/notes`): Stella legt dort zur HÜ eine Seite mit der Aufgabe an. Dafür brauche ich Zugriff auf das Repo. Füge es dieser Session hinzu oder sag mir, wie die Notes-App Daten speichert.
+Ablauf: Kurznotiz oder Foto → Stella holt die Buchseite → ein **Bildmodell** (automatisch das beste kostenlose bei OpenRouter) löst die Aufgabe → Ergebnis im **Heft-Format von FreeNotes** (`__S. 45 Nr. 16__`, Ergebnisse `==x = 4==`, kurze Zeilen) → **FreeNotes** holt es ab und schreibt es mit deiner Handschrift-Engine als echte, radierbare Pencil-Striche ins Fach-Heft. Danach ist die HÜ erledigt, und am Vorabend schreibt Stella nur noch „✅ Französisch HÜ erledigt“.
 
-Bei „KI füllt die HÜ in meiner Handschrift aus“ bin ich ehrlich: Das kann ich bauen, aber es schadet dir selbst. Spätestens bei der Schularbeit fehlt dir dann genau das Üben, das die HÜ eigentlich ist. Mein Vorschlag ist ein **Tutor-Modus** in der Notes-App: Stella zeigt die Aufgabe, gibt Schritt-für-Schritt-Hinweise, prüft deine Lösung und erklärt Fehler. Das geht oft genauso schnell, und du lernst dabei für den Test.
+Gut zu wissen:
+- **Wann es im Heft steht:** FreeNotes kann auf dem iPad nicht im Hintergrund laufen. Es schreibt beim nächsten Öffnen der App, solange gerade kein Heft offen ist, und danach alle 5 Minuten.
+- **Qualität:** Gratis-Bildmodelle lesen Buchseiten gut, sind aber nicht fehlerfrei. Wenn eine Lösung nicht passt, im Chat „Französisch HÜ nochmal lösen“ schreiben oder mit `STELLA_VISION_MODELS` ein stärkeres Modell festlegen.
+- Ausschalten: Einstellungen → Schulbücher → HÜ-Autopilot.
 
 ## 7. Fahrplan
 
 **Phase 1: dieser Stand** ✅
 Chat, Kurznotizen (auch offline), Planer, Erinnerungen, Lernpläne, Push, Kalender-Abo, Gesundheit und SMS über Kurzbefehle, digi4school (Kalibrierung offen), automatische KI-Modellwahl.
 
-**Phase 2: Postfach**
-- 2 E-Mail-Konten über IMAP. Die KI teilt ein in *wichtig* (→ Nachricht an dich), *normal* und *Werbung/Spam* (→ Papierkorb).
-- Neuer Bereich **„Inbox“** in der App: E-Mails, SMS und Social-Media-Benachrichtigungen (aus den E-Mails von Instagram/TikTok) gesammelt, nach Personen gruppiert, zum Antippen.
-- Morgen-Briefing um 6:45: Was heute ansteht, welche HÜ fällig ist, wichtige Mails.
+**Phase 2: Postfach, Schule+** ✅
+E-Mail (Gmail, iCloud), Inbox mit Social-Media-Benachrichtigungen, scook, HÜ-Autopilot mit FreeNotes, Fotos im Chat, WebUntis.
 
-**Phase 3: Schule+**
-- Verbindung zur Notes-App (Tutor-Modus, HÜ-Seiten).
-- Foto der Tafel oder des Hefts an Stella schicken → Bildmodell liest die HÜ heraus.
-- Stundenplan hinterlegen → „Latein HÜ“ ohne Datum bedeutet automatisch die nächste Lateinstunde statt den nächsten Schultag.
-- WebUntis-Anbindung, falls deine Schule es nutzt (Stundenplan, Entfall, Hausübungen).
+**Phase 3: als Nächstes**
+- Morgen-Briefing um 6:45: Was heute ansteht, welche HÜ fällig ist, wichtige Mails, Entfall.
+- Arbeitsblätter direkt ausfüllen: Foto → FreeNotes legt den Scan als Seite an und schreibt die Antworten in die Lücken (FreeNotes kann das schon lokal).
 - Lernplan-Abfrage: Stella fragt dich in der Lernzeit kurz Vokabeln oder Fragen zum Stoff ab.
+- Chat-Befehl „nochmal lösen“ / „Lösung zeigen“.
 
 **Phase 4: Leben**
 - Gesundheit: Wasser, Schlaf, Bildschirmzeit. Sanfter Schubs bei zu wenig Bewegung.

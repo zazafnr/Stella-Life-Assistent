@@ -9,6 +9,7 @@ import {
   recentMessages, setPending, type User,
 } from './db.ts';
 import { PROVIDERS } from './books.ts';
+import { SOLUTION_CAPTION } from './homework.ts';
 import { lessonsFor } from './untis.ts';
 import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type ToolDef } from './llm.ts';
 import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
@@ -297,8 +298,8 @@ const TOOLS: ToolDef[] = [
     type: 'function',
     function: {
       name: 'solve_homework',
-      description: 'HÜ automatisch lösen und in Handschrift ins Heft schreiben (braucht Buchseite oder Foto der Aufgabe).',
-      parameters: { type: 'object', properties: { entry_id: { type: 'string' } }, required: ['entry_id'] },
+      description: 'HÜ automatisch lösen und in Handschrift ins Heft schreiben (braucht Buchseite oder Foto der Aufgabe). again=true löst eine schon gelöste HÜ neu (z. B. "nochmal lösen", "Lösung ist falsch").',
+      parameters: { type: 'object', properties: { entry_id: { type: 'string' }, again: { type: 'boolean' } }, required: ['entry_id'] },
     },
   },
   {
@@ -377,8 +378,16 @@ async function runTool(t: Turn, name: string, args: Record<string, any>): Promis
       return { sessions: sessions.map((s) => ({ date: s.due, focus: s.detail })) };
     }
     case 'solve_homework': {
-      const item = getItem(u.id, String(args.entry_id));
+      let item = getItem(u.id, String(args.entry_id));
       if (!item) return { error: 'nicht gefunden' };
+      if (args.again) {
+        // alte Lösung entfernen, damit neu gelöst (und erneut ins Heft geschrieben) wird
+        db.prepare('DELETE FROM notes_deliveries WHERE user_id = ? AND item_id = ?').run(u.id, item.id);
+        item = changeItem(u, item.id, {
+          status: 'open', notes: null, attachments: item.attachments.filter((a) => !a.caption?.startsWith(SOLUTION_CAPTION)),
+        })!;
+        touched(t, item);
+      }
       if (!item.attachments.length && !(item.page && bookFor(u, item.subject))) return { error: 'Kein Foto und kein Buch hinterlegt – Nutzer soll ein Foto schicken.' };
       enqueueJob(u.id, item.attachments.length ? 'solve_homework' : 'book_page', { itemId: item.id });
       return { ok: true, info: 'Wird im Hintergrund gelöst, Nutzer bekommt eine Nachricht.' };

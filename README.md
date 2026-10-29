@@ -6,26 +6,31 @@ Stella ist dein eigener KI-Assistent für Schule und Alltag. Du schreibst in Sti
 
 | Du schreibst | Stella macht |
 |---|---|
-| `Latein Hü Seite 45 nr 3 Freitag` | trägt die HÜ für Freitag ein, holt Seite 45 aus digi4school als Bild und erinnert dich Donnerstag um 19:00 (mit Bild) |
+| `Französisch HÜ S. 45 Nr. 16 Freitag` | trägt die HÜ ein, holt Seite 45 aus scook/digi4school, **löst die Aufgabe** und schreibt sie in deiner Handschrift in dein FreeNotes-Heft. Am Vorabend kommt nur noch: „✅ Französisch HÜ erledigt“ |
+| 📷 Foto vom Arbeitsblatt + `Mathe HÜ AB Nr 3 morgen` | genauso, nur vom Foto |
 | `Mathe SA 12.11.` | trägt die Schularbeit ein, fragt nach dem Stoff, baut einen Lernplan und erinnert eine Woche und einen Tag vorher |
+| `Latein HÜ S. 20 Nr. 1` (ohne Datum) | nimmt die nächste Lateinstunde laut WebUntis |
 | `was steht an?` | Übersicht der nächsten zwei Wochen |
-| `Latein HÜ erledigt` | hakt die HÜ ab |
 | alles andere | die KI antwortet und kann Einträge selbst anlegen, ändern und Lernpläne bauen |
+
+Dazu im Hintergrund:
+- 📧 **2× Gmail + iCloud**: Wichtige Mails kommen als Nachricht, Werbung und Spam wandern in den Papierkorb (in der App wiederherstellbar)
+- 📸 **Social**: Benachrichtigungen von Instagram, TikTok usw. landen gesammelt im Inbox-Tab
+- 🏫 **WebUntis**: Stundenplan, Entfall („🎉 Morgen entfällt Mathe“), Hausübungen und Tests, die Lehrer:innen eintragen
 
 Läuft als **Web-App, iPhone-/iPad-App (PWA) und PC-App** mit einem Konto, alles synchronisiert. Der Server läuft auf deinem VPS.
 
 ## Was schon geht
 
-- 💬 Chat mit Kurznotiz-Erkennung, die **ohne KI und offline** funktioniert (HÜ, SA, Test, Referat …, Datum wie „Freitag“, „12.11.“, „in 2 Wochen“)
-- 🗓️ Planer: HÜs, Tests, Abgaben, Termine, Lerneinheiten
-- ⏰ Erinnerungen per Push-Mitteilung (iPhone, iPad, PC)
-- 🧠 Lernpläne für Tests (mehr Einheiten kurz vor dem Test, zum Schluss Wiederholung und Probe-Test)
-- 📸 digi4school: Buchseite der HÜ automatisch als Bild (⚠️ muss mit deinem Konto kalibriert werden, siehe unten)
-- 📅 Kalender-Abo: alle Einträge im normalen iPhone-, Google- oder Outlook-Kalender
-- ❤️ Gesundheit: Schritte aus Apple Health über einen Kurzbefehl, mit 14-Tage-Diagramm
-- 🔔 SMS-Weiterleitung über einen Kurzbefehl. Schreibt dir jemand 3× in 30 Minuten, meldet sich Stella
-- 📴 Offline: Die App startet ohne Netz, Kurznotizen werden sofort verstanden und später synchronisiert. Erinnerungen verschickt der VPS auch dann, wenn dein Handy aus ist.
-- 🤖 KI über OpenRouter: wählt automatisch die besten **kostenlosen** Modelle und weicht bei Limits auf andere aus
+- 💬 Chat mit Kurznotiz-Erkennung, die **ohne KI und offline** funktioniert, plus Fotos (Arbeitsblätter)
+- ✍️ **HÜ-Autopilot**: Buchseite (scook, digi4school) oder Foto → Bild-Modell löst die Aufgabe → Heft-Text → **FreeNotes** schreibt sie Strich für Strich in deiner Handschrift ins Fach-Heft (im Chat gibt es eine Vorschau als Heftseite)
+- 🗓️ Planer mit Stundenplan, Erinnerungen per Push (iPhone, iPad, PC), Lernpläne für Tests
+- 📥 Inbox: E-Mails (Gmail, iCloud, IMAP), Social-Media-Benachrichtigungen, SMS
+- 🏫 WebUntis (Passwort oder QR-Code bei Microsoft-Login)
+- 📅 Kalender-Abo für den iPhone-, Google- oder Outlook-Kalender
+- ❤️ Schritte aus Apple Health und SMS-Weiterleitung über Kurzbefehle
+- 📴 Offline-fähig, der VPS arbeitet weiter, auch wenn dein Handy aus ist
+- 🤖 KI über OpenRouter: wählt automatisch die besten **kostenlosen** Modelle (auch Bildmodelle) und weicht bei Limits auf andere aus
 
 Was als Nächstes kommt und was technisch (noch) nicht geht, steht in **[docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md)**.
 
@@ -59,6 +64,9 @@ Safari öffnen → Teilen → **„Zum Home-Bildschirm“** → Stella von dort 
 ### Auf den PC
 In Chrome oder Edge öffnen → in der Adressleiste auf **„App installieren“** klicken.
 
+### FreeNotes (iPad) verbinden
+In FreeNotes → Einstellungen → **Stella** → Server-Adresse, E-Mail und Passwort eingeben. FreeNotes holt gelöste HÜs beim Öffnen und alle 5 Minuten ab und schreibt sie ins Heft des passenden Fachs (gibt es keins, legt es eins an). Die Anbindung liegt im FreeNotes-Repo auf dem Branch `claude/stella-anbindung`.
+
 ## Lokal entwickeln
 
 ```bash
@@ -79,7 +87,8 @@ Die App läuft dann auf http://localhost:5173. Tests mit `npm test`, Typprüfung
 
 ```
 shared/   Parser für Kurznotizen, Datumslogik, Erinnerungs- und Lernplan-Regeln (Server + App)
-server/   Fastify + SQLite: API, KI-Agent, Erinnerungen, Jobs, digi4school, Push, Kalender-Abo
+server/   Fastify + SQLite: API, KI-Agent, Erinnerungen, Jobs, Schulbücher (scook, digi4school),
+          HÜ-Löser, Handschrift-Vorschau, E-Mail (IMAP), WebUntis, Push, Kalender-Abo, FreeNotes-Schnittstelle
 web/      React-PWA: Chat, Planer, Gesundheit, Einstellungen, Offline-Speicher
 deploy/   Docker Compose + Caddy (HTTPS) + Backup-Skript
 ```
