@@ -18,7 +18,7 @@ Dazu im Hintergrund:
 - 📸 **Social**: Benachrichtigungen von Instagram, TikTok usw. landen gesammelt im Inbox-Tab
 - 🏫 **WebUntis**: Stundenplan, Entfall („🎉 Morgen entfällt Mathe“), Hausübungen und Tests, die Lehrer:innen eintragen
 
-Läuft als **Web-App, iPhone-/iPad-App (PWA) und PC-App** mit einem Konto, alles synchronisiert. Der Server läuft auf deinem VPS.
+Läuft als **Web-App, native iPhone-/iPad-App (SwiftUI) und PC-App (Electron)** mit einem Konto, alles synchronisiert. Der Server läuft auf deinem VPS.
 
 ## Was schon geht
 
@@ -68,10 +68,12 @@ sudo STELLA_DOMAIN=stella.deinedomain.at ./deploy/install-vps.sh
 Konfiguration danach in `/etc/stella/stella.env`, Logs mit `journalctl -u stella -f`.
 
 ### Aufs iPhone/iPad
-Safari öffnen → Teilen → **„Zum Home-Bildschirm“** → Stella von dort öffnen → Einstellungen → **Mitteilungen aktivieren**.
+Native App in [`ios/Stella.swiftpm`](ios/README.md): auf dem iPad in **Swift Playgrounds** öffnen und ▶︎ antippen, aufs iPhone über Xcode oder TestFlight. Erinnerungen plant die App als lokale Mitteilungen ein, Schritte liest sie direkt vom iPhone.
+
+Ohne App geht es auch über Safari → Teilen → **„Zum Home-Bildschirm“**.
 
 ### Auf den PC
-In Chrome oder Edge öffnen → in der Adressleiste auf **„App installieren“** klicken.
+**Windows:** Unter Releases → [„Stella für Windows“](../../releases/tag/pc-app) die `.exe` laden und doppelklicken (Details in [`desktop/`](desktop/README.md)). Stella sitzt dann in der Taskleiste und meldet sich mit echten Windows-Mitteilungen.
 
 ### FreeNotes (iPad) verbinden
 In FreeNotes → Einstellungen → **Stella** → Server-Adresse, E-Mail und Passwort eingeben. FreeNotes holt gelöste HÜs beim Öffnen und alle 5 Minuten ab und schreibt sie ins Heft des passenden Fachs (gibt es keins, legt es eins an). Die Anbindung liegt im FreeNotes-Repo auf dem Branch `claude/stella-anbindung`.
