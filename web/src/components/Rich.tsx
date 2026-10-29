@@ -45,7 +45,7 @@ export function Lightbox({ url, onClose }: { url: string; onClose: () => void })
   return (
     <div className="lightbox" onClick={onClose} role="dialog">
       <img src={url} alt="" />
-      <a className="lightbox-save" href={url} download="stella-aufgabe.png" onClick={(e) => e.stopPropagation()}>Sichern</a>
+      <a className="lightbox-save btn" href={url} download="stella-aufgabe.png" onClick={(e) => e.stopPropagation()}>Sichern</a>
     </div>
   );
 }

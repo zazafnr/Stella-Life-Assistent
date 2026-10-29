@@ -14,7 +14,7 @@ export function Untis({ me }: { me: Me }) {
       {me.integrations.webuntis ? (
         <div className="button-row">
           <span className="ok-text">✅ Verbunden</span>
-          <button type="button" className="secondary" onClick={() => run(() => api('/api/integrations/webuntis/sync', { method: 'POST' }), 'Abgeglichen.')}>Jetzt abgleichen</button>
+          <button type="button" className="btn secondary" onClick={() => run(() => api('/api/integrations/webuntis/sync', { method: 'POST' }), 'Abgeglichen.')}>Jetzt abgleichen</button>
           <button type="button" className="link danger" onClick={() => run(async () => { await api('/api/integrations/webuntis', { method: 'DELETE' }); await refreshMe(); }, 'Getrennt.')}>Trennen</button>
         </div>
       ) : (
@@ -23,7 +23,7 @@ export function Untis({ me }: { me: Me }) {
             <button type="button" className={mode === 'password' ? 'chip active' : 'chip'} onClick={() => setMode('password')}>Benutzername & Passwort</button>
             <button type="button" className={mode === 'qr' ? 'chip active' : 'chip'} onClick={() => setMode('qr')}>Microsoft-Login / QR-Code</button>
           </div>
-          <form className="form-grid" onSubmit={(e) => {
+          <form className="form-grid two" onSubmit={(e) => {
             e.preventDefault();
             void run(async () => {
               await api('/api/integrations/webuntis', { method: 'PUT', json: mode === 'qr' ? { qr: form.qr } : form });
@@ -40,7 +40,7 @@ export function Untis({ me }: { me: Me }) {
             ) : (
               <label style={{ gridColumn: '1 / -1' }}>Inhalt des QR-Codes<input placeholder="untis://setschool?url=…" {...set('qr')} required /></label>
             )}
-            <button type="submit">Verbinden</button>
+            <button type="submit" className="btn">Verbinden</button>
           </form>
           <p className="muted small">
             {mode === 'password'

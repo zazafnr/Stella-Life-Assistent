@@ -53,6 +53,8 @@ export interface SyncResponse {
   items: Item[];
   messages: ChatMessage[];
   serverTime: string;
+  /** Einträge, an denen Stella gerade arbeitet */
+  busyItems?: string[];
 }
 
 export interface HealthDay {

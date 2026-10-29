@@ -39,7 +39,7 @@ export function Mail({ me }: { me: Me }) {
       )}
 
       <h3>Postfach hinzufügen</h3>
-      <form className="form-grid" onSubmit={(e) => {
+      <form className="form-grid two" onSubmit={(e) => {
         e.preventDefault();
         void run(async () => {
           setAccounts(await api('/api/mail/accounts', { method: 'POST', json: form }));
@@ -56,7 +56,7 @@ export function Mail({ me }: { me: Me }) {
         <label>E-Mail-Adresse<input type="email" required value={form.user} onChange={(e) => setForm({ ...form, user: e.target.value })} /></label>
         <label>App-Passwort<input type="password" required autoComplete="off" value={form.pass} onChange={(e) => setForm({ ...form, pass: e.target.value })} /></label>
         {form.provider === 'other' && <label>IMAP-Server<input placeholder="imap.example.com" value={form.host} onChange={(e) => setForm({ ...form, host: e.target.value })} /></label>}
-        <button type="submit">Verbinden</button>
+        <button type="submit" className="btn">Verbinden</button>
       </form>
       <p className="muted small">{HELP[form.provider]}</p>
       {view}

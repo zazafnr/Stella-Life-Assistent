@@ -23,7 +23,7 @@ import { checkAllMail, listAccounts, PRESETS, publicAccounts, restoreMail, saveA
 import { lessonsFor, syncUntis, testUntis, type UntisCredentials } from './untis.ts';
 import { FILE_TYPES, filePath, saveDataUrl, saveFile } from './files.ts';
 import type { BookProvider } from './db.ts';
-import { ackNotesEntry, notesInbox } from './notes.ts';
+import { ackNotesEntry, notesInbox, usesFreeNotes } from './notes.ts';
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, bodyLimit: 2 * 1024 * 1024 });
 app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: 5 * 1024 * 1024 }, (_req, body, done) => done(null, body));
@@ -48,6 +48,7 @@ function publicUser(user: User) {
       webuntis: hasSecret(user.id, 'webuntis'),
       mailAccounts: listAccounts(user.id).length,
       handwritingFont: !!userFontPath(user.id),
+      freeNotes: usesFreeNotes(user.id),
     },
   };
 }
@@ -179,16 +180,30 @@ app.register(async (api) => {
   });
 
   // Abgleich für alle Geräte: "gib mir alles, was sich seit X geändert hat"
+  // Einträge, an denen Stella gerade im Hintergrund arbeitet (Buchseite holen, HÜ lösen)
+  const busyItems = (userId: string) => (db.prepare(`SELECT DISTINCT json_extract(payload, '$.itemId') AS id FROM jobs
+      WHERE user_id = ? AND status IN ('queued', 'running') AND type IN ('book_page', 'digi4school_page', 'solve_homework')`)
+    .all(userId) as { id: string }[]).map((r) => r.id).filter(Boolean);
+
   api.get('/api/sync', async (req) => {
     const since = str((req.query as Record<string, string>).since);
     const serverTime = now();
     if (!since) {
       const today = todayIn(req.user.timeZone);
       const items = listItems(req.user.id, { from: addDays(today, -30), includeDone: true });
-      return { items, messages: recentMessages(req.user.id, 80), serverTime };
+      return { items, messages: recentMessages(req.user.id, 80), serverTime, busyItems: busyItems(req.user.id) };
     }
-    return { items: itemsChangedSince(req.user.id, since), messages: messagesSince(req.user.id, since), serverTime };
+    return {
+      items: itemsChangedSince(req.user.id, since), messages: messagesSince(req.user.id, since), serverTime,
+      busyItems: busyItems(req.user.id),
+    };
   });
+
+  // Anstehende Erinnerungen – die iOS-App plant daraus lokale Mitteilungen
+  api.get('/api/reminders/upcoming', async (req) => db.prepare(`SELECT r.id, r.item_id AS itemId, r.fire_at AS fireAt, r.message
+      FROM reminders r LEFT JOIN items i ON i.id = r.item_id
+      WHERE r.user_id = ? AND r.sent_at IS NULL AND r.fire_at > ? AND (i.id IS NULL OR (i.deleted = 0 AND (i.status = 'open' OR r.always = 1)))
+      ORDER BY r.fire_at LIMIT 60`).all(req.user.id, now()));
 
   // Planer
   api.get('/api/items', async (req) => {

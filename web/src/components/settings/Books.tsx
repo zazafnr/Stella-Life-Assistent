@@ -20,14 +20,14 @@ function ProviderLogin({ me, provider, label }: { me: Me; provider: BookProvider
       {state.connected ? (
         <div className="button-row">
           <span className="ok-text">✅ Verbunden{state.email ? ` (${state.email})` : ''}{state.cookies ? ' · mit Cookies' : ''}</span>
-          <button type="button" className="secondary" onClick={() => run(async () => setShelf(await api(`/api/integrations/books/${provider}/shelf`)), 'Bücherregal geladen.')}>Bücherregal laden</button>
+          <button type="button" className="btn secondary" onClick={() => run(async () => setShelf(await api(`/api/integrations/books/${provider}/shelf`)), 'Bücherregal geladen.')}>Bücherregal laden</button>
           <button type="button" className="link danger" onClick={() => run(async () => { await api(`/api/integrations/books/${provider}`, { method: 'DELETE' }); await refreshMe(); }, 'Getrennt.')}>Trennen</button>
         </div>
       ) : (
-        <form className="form-grid" onSubmit={(e) => { e.preventDefault(); void run(async () => { await api(`/api/integrations/books/${provider}`, { method: 'PUT', json: { email, password } }); setPassword(''); await refreshMe(); }, 'Gespeichert.'); }}>
+        <form className="form-grid two" onSubmit={(e) => { e.preventDefault(); void run(async () => { await api(`/api/integrations/books/${provider}`, { method: 'PUT', json: { email, password } }); setPassword(''); await refreshMe(); }, 'Gespeichert.'); }}>
           <label>E-Mail / Benutzer<input autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
           <label>Passwort<input type="password" autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
-          <button type="submit">Verbinden</button>
+          <button type="submit" className="btn">Verbinden</button>
         </form>
       )}
       <button type="button" className="link" onClick={() => setShowCookies(!showCookies)}>
@@ -37,7 +37,7 @@ function ProviderLogin({ me, provider, label }: { me: Me; provider: BookProvider
         <>
           <p className="muted small">Am PC in Chrome bei {label} einloggen → Erweiterung „Cookie-Editor“ → Export → JSON → hier einfügen.</p>
           <textarea className="cookies" value={cookies} onChange={(e) => setCookies(e.target.value)} placeholder='[{"name": "...", "value": "...", "domain": "..."}]' />
-          <button type="button" onClick={() => run(async () => { await api(`/api/integrations/books/${provider}`, { method: 'PUT', json: { cookies } }); setCookies(''); await refreshMe(); }, 'Cookies gespeichert.')}>Cookies speichern</button>
+          <button type="button" className="btn" onClick={() => run(async () => { await api(`/api/integrations/books/${provider}`, { method: 'PUT', json: { cookies } }); setCookies(''); await refreshMe(); }, 'Cookies gespeichert.')}>Cookies speichern</button>
         </>
       )}
       {shelf && (
@@ -79,14 +79,14 @@ export function Books({ me }: { me: Me }) {
           <select value={b.provider} onChange={(e) => update(i, { provider: e.target.value as BookProvider })}>
             {PROVIDERS.map(([p, l]) => <option key={p} value={p}>{l}</option>)}
           </select>
-          <input placeholder="https://…" value={b.url} onChange={(e) => update(i, { url: e.target.value })} />
+          <input className="url" placeholder="https://…" value={b.url} onChange={(e) => update(i, { url: e.target.value })} />
           <input type="number" title="Seitenversatz" value={b.pageOffset ?? 0} onChange={(e) => update(i, { pageOffset: Number(e.target.value) })} />
           <button type="button" className="link danger" onClick={() => setBooks(books.filter((_, j) => j !== i))}>✕</button>
         </div>
       ))}
       <div className="button-row">
-        <button type="button" className="secondary" onClick={() => setBooks([...books, { subject: '', provider: 'scook', url: '', pageOffset: 0 }])}>+ Buch</button>
-        <button type="button" onClick={() => run(async () => { await api('/api/settings', { method: 'PATCH', json: { books } }); await refreshMe(); }, 'Bücher gespeichert.')}>Speichern</button>
+        <button type="button" className="btn secondary" onClick={() => setBooks([...books, { subject: '', provider: 'scook', url: '', pageOffset: 0 }])}>+ Buch</button>
+        <button type="button" className="btn" onClick={() => run(async () => { await api('/api/settings', { method: 'PATCH', json: { books } }); await refreshMe(); }, 'Bücher gespeichert.')}>Speichern</button>
       </div>
 
       <h3>Testen</h3>
@@ -97,7 +97,7 @@ export function Books({ me }: { me: Me }) {
           {(me.settings.books ?? []).map((b) => <option key={b.subject} value={b.subject}>{b.subject}</option>)}
         </select>
         <input type="number" style={{ width: 90 }} value={preview.page} onChange={(e) => setPreview({ ...preview, page: e.target.value })} />
-        <button type="button" disabled={!preview.subject} onClick={() => run(async () => {
+        <button type="button" className="btn" disabled={!preview.subject} onClick={() => run(async () => {
           const { fileId } = await api<{ fileId: string }>('/api/integrations/books/preview', { method: 'POST', json: { subject: preview.subject, page: Number(preview.page) } });
           setPreview((p) => ({ ...p, fileId }));
         }, 'Seite geholt.')}>Seite holen</button>

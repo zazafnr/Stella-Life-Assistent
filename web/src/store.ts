@@ -22,6 +22,7 @@ export interface Me {
     webuntis: boolean;
     mailAccounts: number;
     handwritingFont: boolean;
+    freeNotes?: boolean;
   };
 }
 
@@ -36,12 +37,13 @@ interface State {
   lastSync: string | null;
   online: boolean;
   thinking: boolean;
+  busyItems: string[];
 }
 
 const STORAGE_KEY = 'stella-state-v1';
 
 function load(): State {
-  const base: State = { token: null, me: null, items: {}, messages: [], outbox: [], lastSync: null, online: navigator.onLine, thinking: false };
+  const base: State = { token: null, me: null, items: {}, messages: [], outbox: [], lastSync: null, online: navigator.onLine, thinking: false, busyItems: [] };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return { ...base, ...JSON.parse(raw), online: navigator.onLine, thinking: false };
@@ -136,6 +138,18 @@ function mergeMessages(incoming: ChatMessage[]) {
   });
 }
 
+// In der PC-App (Electron) gibt es kein Web-Push: neue Stella-Nachrichten als Systemmitteilung zeigen
+function notifyDesktop(incoming: ChatMessage[], firstSync: boolean) {
+  const desktop = (window as { stellaDesktop?: { notify: (title: string, body: string) => void } }).stellaDesktop;
+  if (!desktop || firstSync) return;
+  const known = new Set(state.messages.map((m) => m.id));
+  for (const m of incoming) {
+    if (m.role === 'assistant' && !known.has(m.id) && (document.hidden || !document.hasFocus())) {
+      desktop.notify('Stella', m.text.replace(/\*\*|_/g, '').slice(0, 180));
+    }
+  }
+}
+
 let syncing: Promise<void> | null = null;
 
 export function sync(): Promise<void> {
@@ -145,10 +159,11 @@ export function sync(): Promise<void> {
       await flushOutbox();
       const q = state.lastSync ? `?since=${encodeURIComponent(state.lastSync)}` : '';
       const res = await api<SyncResponse>(`/api/sync${q}`);
+      notifyDesktop(res.messages, !state.lastSync);
       if (!state.lastSync) set({ items: {} });
       mergeItems(res.items);
       mergeMessages(res.messages);
-      set({ lastSync: res.serverTime, online: true });
+      set({ lastSync: res.serverTime, online: true, busyItems: res.busyItems ?? [] });
     } catch (err) {
       if (isNetworkError(err)) set({ online: false });
     } finally {

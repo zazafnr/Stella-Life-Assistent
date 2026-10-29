@@ -34,11 +34,11 @@ export function Handwriting({ me }: { me: Me }) {
           if (f) void run(() => upload(f), 'Schrift gespeichert.');
           e.target.value = '';
         }} />
-        <button type="button" className="secondary" onClick={() => fileRef.current?.click()}>{me.integrations.handwritingFont ? 'Andere Schrift hochladen' : 'Eigene Schrift hochladen'}</button>
+        <button type="button" className="btn secondary" onClick={() => fileRef.current?.click()}>{me.integrations.handwritingFont ? 'Andere Schrift hochladen' : 'Eigene Schrift hochladen'}</button>
         {me.integrations.handwritingFont && (
           <button type="button" className="link danger" onClick={() => run(async () => { await api('/api/handwriting/font', { method: 'DELETE' }); await refreshMe(); }, 'Standard-Schrift aktiv.')}>Eigene Schrift entfernen</button>
         )}
-        <button type="button" onClick={() => run(async () => setPreview((await api<{ fileId: string }>('/api/handwriting/preview', { method: 'POST' })).fileId), 'Vorschau erstellt.')}>Vorschau</button>
+        <button type="button" className="btn" onClick={() => run(async () => setPreview((await api<{ fileId: string }>('/api/handwriting/preview', { method: 'POST' })).fileId), 'Vorschau erstellt.')}>Vorschau</button>
       </div>
       {preview && <AuthImage key={preview} id={preview} onOpen={(url) => window.open(url)} />}
       {view}

@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { Switch } from '../../ui/Decor.tsx';
 
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return <section className="card"><h2>{title}</h2>{children}</section>;
@@ -22,7 +23,7 @@ export function Copy({ value }: { value: string }) {
   return (
     <div className="copy-row">
       <code>{value}</code>
-      <button type="button" onClick={() => navigator.clipboard.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); })}>
+      <button type="button" className="btn" onClick={() => navigator.clipboard.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); })}>
         {copied ? '✓' : 'Kopieren'}
       </button>
     </div>
@@ -31,9 +32,9 @@ export function Copy({ value }: { value: string }) {
 
 export function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className="toggle-row">
+    <div className="toggle-row">
       <span>{label}</span>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-    </label>
+      <Switch label={label} checked={checked} onChange={onChange} />
+    </div>
   );
 }
