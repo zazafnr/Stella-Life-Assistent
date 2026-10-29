@@ -76,6 +76,16 @@ after(async () => {
   await (await getBrowser()).close().catch(() => {});
 });
 
+test('Tagesbudget: Hintergrund-Aufgaben nur bis zur Hälfte', async () => {
+  const { complete, usageToday, LlmUnavailable } = await import('./llm.ts');
+  const { db } = await import('./db.ts');
+  const day = new Date().toISOString().slice(0, 10);
+  db.prepare('INSERT OR REPLACE INTO llm_usage (day, requests) VALUES (?, 25)').run(day);
+  await assert.rejects(complete([{ role: 'user', content: 'x' }], undefined, { background: true }), LlmUnavailable);
+  assert.equal(usageToday(), 25);
+  db.prepare('DELETE FROM llm_usage').run();
+});
+
 test('freie Frage → KI ruft Werkzeug auf → Termin im Planer, Ausweichen bei 429', async () => {
   const res = await handleChat(user, 'Ich hab am 20. November um halb 3 einen Zahnarzttermin, kannst du das eintragen?', 'x1');
   assert.equal(res.messages.at(-1)!.text, 'Erledigt! Zahnarzt ist eingetragen 🦷');

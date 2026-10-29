@@ -162,6 +162,12 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (user_id, item_id)
   );
   `,
+  `
+  CREATE TABLE llm_usage (
+    day TEXT PRIMARY KEY,
+    requests INTEGER NOT NULL DEFAULT 0
+  );
+  `,
 ];
 
 function migrate() {

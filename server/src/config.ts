@@ -23,6 +23,8 @@ export const config = {
     /** nur ":free"-Modelle automatisch wählen */
     freeOnly: env.STELLA_FREE_ONLY !== 'false',
     baseUrl: env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1',
+    /** Tageslimit für Gratis-Modelle: 50 ohne Guthaben, 1000 nach einmal 10 $ Aufladen */
+    dailyLimit: Number(env.STELLA_LLM_DAILY_LIMIT ?? 50),
   },
   webDist: path.resolve(import.meta.dirname, '../../web/dist'),
 };

@@ -119,7 +119,7 @@ ${JSON.stringify(rest.map((m) => ({ id: m.uid, from: m.from, subject: m.subject,
 
 Format: {"mails": [{"id": 123, "category": "newsletter", "summary": "…", "confidence": 0.9}]}`,
         },
-      ], undefined, { json: true, timeoutMs: 90_000 });
+      ], undefined, { json: true, timeoutMs: 90_000, background: true });
       const text = message.content ?? '';
       const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as { mails?: { id: number; category: Category; summary: string; confidence: number }[] };
       for (const r of parsed.mails ?? []) {

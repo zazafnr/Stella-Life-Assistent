@@ -124,13 +124,17 @@ function Shortcuts({ me }: { me: Me }) {
 }
 
 function AiStatus() {
-  const [status, setStatus] = useState<{ configured: boolean; chain: string[]; visionChain: string[]; coolingDown: string[] } | null>(null);
+  const [status, setStatus] = useState<{
+    configured: boolean; chain: string[]; visionChain: string[]; coolingDown: string[]; usedToday: number; dailyLimit: number;
+  } | null>(null);
   useEffect(() => { api<typeof status>('/api/ai/status').then(setStatus).catch(() => {}); }, []);
   if (!status) return null;
   return (
     <Section title="KI">
       {status.configured ? (
         <>
+          <p>Heute verbraucht: <strong>{status.usedToday} / {status.dailyLimit}</strong> KI-Anfragen
+            {status.dailyLimit <= 50 && <span className="muted"> · einmal 10 $ bei OpenRouter aufladen → 1000 pro Tag</span>}</p>
           <p className="muted">Stella probiert diese Modelle der Reihe nach (OpenRouter):</p>
           <ol className="models">
             {status.chain.map((m) => <li key={m}><code>{m}</code>{status.coolingDown.includes(m) && ' (Pause – Limit)'}</li>)}

@@ -6,6 +6,7 @@
 // dem nächsten weiter – zuletzt über OpenRouters eigenen Zufalls-Router "openrouter/free".
 
 import { config } from './config.ts';
+import { db } from './db.ts';
 
 export interface ToolCall { id: string; type: 'function'; function: { name: string; arguments: string } }
 
@@ -87,20 +88,47 @@ export async function modelStatus() {
     chain: llmAvailable() ? await modelChain('tools') : [],
     visionChain: llmAvailable() ? await modelChain('vision') : [],
     coolingDown: [...cooldownUntil].filter(([, t]) => t > Date.now()).map(([m]) => m),
+    usedToday: usageToday(),
+    dailyLimit: config.openrouter.dailyLimit,
   };
 }
 
 export class LlmUnavailable extends Error {}
 
+// ---------- Tagesbudget ----------
+// OpenRouter zählt Gratis-Anfragen pro Tag (UTC). Hintergrund-Arbeit (Mails sortieren) darf nur
+// die Hälfte nutzen, damit für Chat und HÜs immer etwas übrig bleibt.
+
+const utcDay = () => new Date().toISOString().slice(0, 10);
+
+export function usageToday(): number {
+  const row = db.prepare('SELECT requests FROM llm_usage WHERE day = ?').get(utcDay()) as { requests: number } | undefined;
+  return row?.requests ?? 0;
+}
+
+function countRequest() {
+  db.prepare('INSERT INTO llm_usage (day, requests) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET requests = requests + 1').run(utcDay());
+}
+
+function checkBudget(background: boolean) {
+  const limit = config.openrouter.dailyLimit;
+  if (!limit) return;
+  const used = usageToday();
+  if (background && used >= limit * 0.5) throw new LlmUnavailable('Tagesbudget für Hintergrund-Aufgaben aufgebraucht.');
+  if (used >= limit) throw new LlmUnavailable(`Tageslimit von ${limit} KI-Anfragen erreicht (ab 1 Uhr nachts geht's wieder).`);
+}
+
 export interface CompletionResult { message: Extract<LlmMessage, { role: 'assistant' }>; model: string }
 
 export async function complete(messages: LlmMessage[], tools?: ToolDef[],
-  opts: { json?: boolean; vision?: boolean; timeoutMs?: number } = {}): Promise<CompletionResult> {
+  opts: { json?: boolean; vision?: boolean; timeoutMs?: number; background?: boolean } = {}): Promise<CompletionResult> {
   if (!llmAvailable()) throw new LlmUnavailable('Kein OPENROUTER_API_KEY gesetzt.');
   const errors: string[] = [];
 
   for (const model of await modelChain(opts.vision ? 'vision' : 'tools')) {
     if ((cooldownUntil.get(model) ?? 0) > Date.now()) continue;
+    checkBudget(!!opts.background);
+    countRequest();
     try {
       const res = await fetch(`${config.openrouter.baseUrl}/chat/completions`, {
         method: 'POST',

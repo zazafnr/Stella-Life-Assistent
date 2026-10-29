@@ -58,6 +58,15 @@ cd deploy && docker compose up -d --build
 
 Danach `https://stella.deinedomain.at` öffnen. Das **erste** Konto, das du anlegst, ist deins, danach ist die Registrierung zu.
 
+### Neben anderen Diensten (ohne Docker)
+Läuft auf dem VPS schon Caddy (z. B. für RugScan), nimm statt Docker das Installationsskript. Es legt einen eigenen Dienst `stella` an (Port 8795), hängt nur einen eigenen Block an die Caddyfile und lässt den Rest unangetastet:
+
+```bash
+sudo STELLA_DOMAIN=stella.deinedomain.at ./deploy/install-vps.sh
+```
+
+Konfiguration danach in `/etc/stella/stella.env`, Logs mit `journalctl -u stella -f`.
+
 ### Aufs iPhone/iPad
 Safari öffnen → Teilen → **„Zum Home-Bildschirm“** → Stella von dort öffnen → Einstellungen → **Mitteilungen aktivieren**.
 

@@ -214,7 +214,7 @@ async function refineFocuses(exam: Item, material: string, dates: string[]): Pro
           `Die letzte Einheit ist Wiederholung + Probe-Test. Pro Einheit ein kurzer, konkreter Fokus (max. 12 Wörter). ` +
           `Format: {"sessions": ["…", "…"]}`,
       },
-    ], undefined, { json: true });
+    ], undefined, { json: true, background: true });
     const parsed = JSON.parse((message.content ?? '').replace(/^```(json)?|```$/g, '')) as { sessions?: unknown };
     const list = Array.isArray(parsed.sessions) ? parsed.sessions.map(String) : [];
     return list.length === dates.length ? list : null;
