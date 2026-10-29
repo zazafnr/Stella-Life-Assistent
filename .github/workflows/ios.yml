@@ -1,0 +1,53 @@
+name: iOS-App
+
+# Kompiliert die Swift-Playgrounds-App auf einem Mac in der Cloud,
+# damit Fehler auffallen, bevor sie aufs iPhone/iPad kommt.
+on:
+  push:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        xcode: ["16", "26"]
+    name: build (Xcode ${{ matrix.xcode }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode ${{ matrix.xcode }} wählen
+        run: |
+          XC=$(ls -d /Applications/Xcode_${{ matrix.xcode }}*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+
+      - name: Schemes anzeigen
+        working-directory: ios/Stella.swiftpm
+        run: xcodebuild -list
+
+      - name: Für iPhone-/iPad-Simulator kompilieren
+        working-directory: ios/Stella.swiftpm
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -scheme Stella \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee build.log | grep -E "error:|warning:|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log
+
+      - name: Fehler-Zusammenfassung
+        if: failure()
+        working-directory: ios/Stella.swiftpm
+        run: grep -E "error:" build.log | sort -u | head -80 || true
