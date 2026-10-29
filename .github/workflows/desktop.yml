@@ -40,15 +40,6 @@ jobs:
         # Ohne Code-Signing-Zertifikat – Windows SmartScreen warnt beim ersten Start einmal.
         run: npx electron-builder --win nsis zip --x64 --publish never
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Stella-Windows
-          path: |
-            desktop/release/*.exe
-            desktop/release/*.zip
-          retention-days: 30
-          if-no-files-found: error
-
       # Feste Download-Adresse: immer die neueste Version unter dem Tag "pc-app"
       - name: Download-Seite aktualisieren
         shell: bash
@@ -60,3 +51,15 @@ jobs:
             --target "${{ github.sha }}" --prerelease \
             --title "Stella für Windows" \
             --notes "Neueste PC-App von \`${{ github.ref_name }}\`. Die .exe herunterladen und doppelklicken – Windows fragt beim ersten Start einmal nach („Weitere Informationen“ → „Trotzdem ausführen“)."
+
+      # Zusätzlich als Actions-Artefakt – zählt zum Speicherkontingent des Kontos,
+      # deshalb darf es scheitern, ohne den Lauf rot zu machen.
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: Stella-Windows
+          path: |
+            desktop/release/*.exe
+            desktop/release/*.zip
+          retention-days: 7
+          if-no-files-found: error
