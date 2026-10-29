@@ -1,0 +1,25 @@
+# Auf dem VPS:  cd deploy && docker compose up -d --build
+services:
+  stella:
+    build: ..
+    restart: unless-stopped
+    env_file: ../.env
+    volumes:
+      - stella-data:/data
+
+  # Caddy holt automatisch ein HTTPS-Zertifikat (nötig für iPhone-Push & PWA)
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - STELLA_DOMAIN=${STELLA_DOMAIN:?STELLA_DOMAIN in deploy/.env setzen, z. B. stella.deinedomain.at}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+
+volumes:
+  stella-data:
+  caddy-data:
