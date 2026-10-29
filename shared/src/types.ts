@@ -45,6 +45,8 @@ export interface ChatMessage {
 export interface ChatResponse {
   messages: ChatMessage[];
   items: Item[];
+  /** die gespeicherte Nutzer-Nachricht (mit Fotos), ersetzt den lokalen Platzhalter */
+  userMessage?: ChatMessage;
 }
 
 export interface SyncResponse {

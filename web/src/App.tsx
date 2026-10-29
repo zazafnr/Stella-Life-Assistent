@@ -4,11 +4,13 @@ import { Chat } from './components/Chat.tsx';
 import { Planner } from './components/Planner.tsx';
 import { Health } from './components/Health.tsx';
 import { Settings } from './components/Settings.tsx';
+import { Inbox } from './components/Inbox.tsx';
 
-type Tab = 'chat' | 'planner' | 'health' | 'settings';
+type Tab = 'chat' | 'planner' | 'inbox' | 'health' | 'settings';
 const TABS: [Tab, string, string][] = [
   ['chat', '💬', 'Chat'],
   ['planner', '🗓️', 'Planer'],
+  ['inbox', '📥', 'Inbox'],
   ['health', '❤️', 'Gesundheit'],
   ['settings', '⚙️', 'Einstellungen'],
 ];
@@ -42,6 +44,7 @@ export function App() {
         {!online && <div className="offline-bar">📴 Offline – Stella merkt sich alles und gleicht ab, sobald du wieder Netz hast.</div>}
         {tab === 'chat' && <Chat />}
         {tab === 'planner' && <Planner />}
+        {tab === 'inbox' && <Inbox />}
         {tab === 'health' && <Health />}
         {tab === 'settings' && <Settings />}
       </main>

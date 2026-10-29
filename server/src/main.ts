@@ -16,10 +16,17 @@ import { addItem, changeItem } from './planner.ts';
 import { modelStatus } from './llm.ts';
 import { pushToUser, saveSubscription, vapidPublicKey } from './push.ts';
 import { startScheduler } from './scheduler.ts';
-import { listDigi4SchoolBooks } from './digi4school.ts';
 import { toICalendar } from './ical.ts';
+import { getBookCredentials, listShelf, normalizeCookies, PROVIDERS, saveBookCredentials, screenshotPage, secretName } from './books.ts';
+import { deleteUserFont, renderHandwriting, saveUserFont, userFontPath } from './handwriting.ts';
+import { checkAllMail, listAccounts, PRESETS, publicAccounts, restoreMail, saveAccounts, testAccount, type MailAccount } from './mail.ts';
+import { lessonsFor, syncUntis, testUntis, type UntisCredentials } from './untis.ts';
+import { FILE_TYPES, filePath, saveDataUrl, saveFile } from './files.ts';
+import type { BookProvider } from './db.ts';
+import { ackNotesEntry, notesInbox } from './notes.ts';
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, bodyLimit: 2 * 1024 * 1024 });
+app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: 5 * 1024 * 1024 }, (_req, body, done) => done(null, body));
 
 app.setErrorHandler((err, _req, reply) => {
   if (err instanceof HttpError) return reply.code(err.status).send({ error: err.message });
@@ -33,7 +40,15 @@ function publicUser(user: User) {
   return {
     id: user.id, name: user.name, email: user.email, timeZone: user.timeZone, settings: user.settings,
     ingestUrl: `${config.publicUrl}/api/ingest/${user.ingestToken}`,
-    integrations: { digi4school: hasSecret(user.id, 'digi4school') },
+    integrations: {
+      books: Object.fromEntries((Object.keys(PROVIDERS) as BookProvider[]).map((p) => {
+        const c = getBookCredentials(user.id, p);
+        return [p, { connected: !!c, cookies: !!c?.cookies?.length, email: c?.email ?? null }];
+      })),
+      webuntis: hasSecret(user.id, 'webuntis'),
+      mailAccounts: listAccounts(user.id).length,
+      handwritingFont: !!userFontPath(user.id),
+    },
   };
 }
 
@@ -130,12 +145,15 @@ app.register(async (api) => {
     if (b.eveningTime !== undefined) patch.eveningTime = time(b.eveningTime);
     if (b.studyTime !== undefined) patch.studyTime = time(b.studyTime);
     if (b.stepGoal !== undefined) patch.stepGoal = Math.max(0, Number(b.stepGoal) || 0);
-    if (Array.isArray(b.digi4schoolBooks)) {
-      patch.digi4schoolBooks = b.digi4schoolBooks.slice(0, 40).map((x: any) => ({
-        subject: str(x.subject, 60), url: str(x.url, 500), pageOffset: Number(x.pageOffset) || 0,
+    if (Array.isArray(b.books)) {
+      patch.books = b.books.slice(0, 40).map((x: any) => ({
+        subject: str(x.subject, 60).trim(), provider: (x.provider in PROVIDERS ? x.provider : 'digi4school') as BookProvider,
+        url: str(x.url, 500).trim(), pageOffset: Number(x.pageOffset) || 0,
         pageUrlTemplate: str(x.pageUrlTemplate, 500) || undefined,
       })).filter((x) => x.subject && x.url.startsWith('https://'));
     }
+    if (typeof b.homeworkAutopilot === 'boolean') patch.homeworkAutopilot = b.homeworkAutopilot;
+    if (typeof b.mailAutoTrash === 'boolean') patch.mailAutoTrash = b.mailAutoTrash;
     let tz: string | undefined;
     if (b.timeZone) {
       try { new Intl.DateTimeFormat('de', { timeZone: str(b.timeZone) }); tz = str(b.timeZone); } catch { throw new HttpError(400, 'Unbekannte Zeitzone'); }
@@ -145,11 +163,14 @@ app.register(async (api) => {
   });
 
   // Chat
-  api.post('/api/chat', async (req) => {
+  api.post('/api/chat', { bodyLimit: 15 * 1024 * 1024 }, async (req) => {
     const b = req.body as Record<string, unknown>;
     const text = str(b.text, 4000).trim();
-    if (!text) throw new HttpError(400, 'Leere Nachricht');
-    return handleChat(req.user, text, str(b.clientId, 100) || null);
+    const images = (Array.isArray(b.images) ? b.images : []).slice(0, 4).map((d) => {
+      try { return saveDataUrl(String(d)); } catch { throw new HttpError(400, 'Bild konnte nicht gelesen werden'); }
+    });
+    if (!text && !images.length) throw new HttpError(400, 'Leere Nachricht');
+    return handleChat(req.user, text, str(b.clientId, 100) || null, images);
   });
 
   api.get('/api/messages', async (req) => {
@@ -199,14 +220,16 @@ app.register(async (api) => {
     return { ok: true };
   });
 
-  // Bilder (z. B. digi4school-Screenshots) – nur für den Besitzer
+  // Bilder (Buchseiten, Fotos, Lösungen) – nur für den Besitzer
   api.get('/api/files/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply) => {
     const id = req.params.id.replace(/[^a-f0-9-]/g, '');
-    const owned = db.prepare(`SELECT 1 FROM items WHERE user_id = ? AND attachments LIKE ?
-      UNION SELECT 1 FROM messages WHERE user_id = ? AND attachments LIKE ?`).get(req.user.id, `%${id}%`, req.user.id, `%${id}%`);
-    const file = path.join(config.dataDir, 'files', `${id}.png`);
-    if (!owned || !existsSync(file)) throw new HttpError(404, 'Nicht gefunden');
-    return reply.type('image/png').header('Cache-Control', 'private, max-age=31536000, immutable').send(createReadStream(file));
+    const owned = id.length >= 32 && db.prepare(`SELECT 1 FROM items WHERE user_id = ? AND attachments LIKE ?
+      UNION SELECT 1 FROM messages WHERE user_id = ? AND attachments LIKE ?
+      UNION SELECT 1 FROM notified WHERE user_id = ? AND key = ?`).get(req.user.id, `%${id}%`, req.user.id, `%${id}%`, req.user.id, `file:${id}`);
+    const file = filePath(id);
+    if (!owned || !file) throw new HttpError(404, 'Nicht gefunden');
+    const type = FILE_TYPES[path.extname(file).slice(1)] ?? 'application/octet-stream';
+    return reply.type(type).header('Cache-Control', 'private, max-age=31536000, immutable').send(createReadStream(file));
   });
 
   // Push
@@ -230,23 +253,157 @@ app.register(async (api) => {
       FROM health_days WHERE user_id = ? AND date >= ? ORDER BY date`).all(req.user.id, from);
   });
 
-  // Integrationen
-  api.put('/api/integrations/digi4school', async (req) => {
+  // ----- Schulbücher (digi4school, scook) -----
+  const provider = (p: string): BookProvider => {
+    if (!(p in PROVIDERS)) throw new HttpError(404, 'Unbekannter Anbieter');
+    return p as BookProvider;
+  };
+  api.put('/api/integrations/books/:provider', async (req: FastifyRequest<{ Params: { provider: string } }>) => {
     const b = req.body as Record<string, unknown>;
-    if (!str(b.email) || !str(b.password)) throw new HttpError(400, 'E-Mail und Passwort nötig');
-    setSecret(req.user.id, 'digi4school', { email: str(b.email, 200), password: str(b.password, 200) });
+    const p = provider(req.params.provider);
+    let cookies: unknown[] | undefined;
+    if (b.cookies) {
+      try { cookies = typeof b.cookies === 'string' ? JSON.parse(b.cookies) : b.cookies as unknown[]; } catch { throw new HttpError(400, 'Cookies sind kein gültiges JSON'); }
+      if (!Array.isArray(cookies) || !normalizeCookies(cookies).length) throw new HttpError(400, 'Keine gültigen Cookies gefunden');
+    }
+    if (!cookies && (!str(b.email) || !str(b.password))) throw new HttpError(400, 'E-Mail und Passwort (oder Cookies) nötig');
+    saveBookCredentials(req.user.id, p, {
+      ...(str(b.email) ? { email: str(b.email, 200), password: str(b.password, 200) } : {}),
+      ...(cookies ? { cookies } : {}),
+    });
     return { ok: true };
   });
-  api.delete('/api/integrations/digi4school', async (req) => {
-    deleteSecret(req.user.id, 'digi4school');
+  api.delete('/api/integrations/books/:provider', async (req: FastifyRequest<{ Params: { provider: string } }>) => {
+    const p = provider(req.params.provider);
+    deleteSecret(req.user.id, secretName(p));
+    if (p === 'digi4school') deleteSecret(req.user.id, 'digi4school');
     return { ok: true };
   });
-  api.get('/api/integrations/digi4school/books', async (req) => {
+  api.get('/api/integrations/books/:provider/shelf', async (req: FastifyRequest<{ Params: { provider: string } }>) => {
+    try { return await listShelf(req.user.id, provider(req.params.provider)); } catch (err) { throw new HttpError(502, (err as Error).message); }
+  });
+  // Probe-Screenshot zum Kalibrieren (Seitenversatz)
+  api.post('/api/integrations/books/preview', async (req) => {
+    const b = req.body as Record<string, unknown>;
+    const book = req.user.settings.books?.find((x) => x.subject === str(b.subject));
+    if (!book) throw new HttpError(404, 'Kein Buch für dieses Fach');
+    const printed = Number(b.page) || 1;
     try {
-      return await listDigi4SchoolBooks(req.user.id);
+      const png = await screenshotPage(req.user.id, book.provider, book.url, printed + (book.pageOffset ?? 0), book.pageUrlTemplate);
+      const id = saveFile(png, 'png');
+      db.prepare('INSERT OR IGNORE INTO notified (user_id, key, created_at) VALUES (?, ?, ?)').run(req.user.id, `file:${id}`, now());
+      return { fileId: id };
     } catch (err) {
       throw new HttpError(502, (err as Error).message);
     }
+  });
+
+  // ----- WebUntis -----
+  api.put('/api/integrations/webuntis', async (req) => {
+    const b = req.body as Record<string, unknown>;
+    const creds: UntisCredentials = str(b.qr)
+      ? { qr: str(b.qr, 1000) }
+      : { server: str(b.server, 200), school: str(b.school, 200), username: str(b.username, 200), password: str(b.password, 200) };
+    try { await testUntis(creds); } catch (err) { throw new HttpError(400, `WebUntis-Login fehlgeschlagen: ${(err as Error).message}`); }
+    setSecret(req.user.id, 'webuntis', creds);
+    void syncUntis(req.user.id).catch((err) => app.log.warn(err));
+    return { ok: true };
+  });
+  api.delete('/api/integrations/webuntis', async (req) => {
+    deleteSecret(req.user.id, 'webuntis');
+    db.prepare('DELETE FROM lessons WHERE user_id = ?').run(req.user.id);
+    return { ok: true };
+  });
+  api.post('/api/integrations/webuntis/sync', async (req) => {
+    try { await syncUntis(req.user.id); } catch (err) { throw new HttpError(502, (err as Error).message); }
+    return { ok: true };
+  });
+  api.get('/api/timetable', async (req) => {
+    const q = req.query as Record<string, string>;
+    const today = todayIn(req.user.timeZone);
+    return lessonsFor(req.user.id, q.from || today, q.to || addDays(today, 6));
+  });
+
+  // ----- E-Mail -----
+  api.get('/api/mail/accounts', async (req) => publicAccounts(req.user.id));
+  api.post('/api/mail/accounts', async (req) => {
+    const b = req.body as Record<string, unknown>;
+    const prov = (['gmail', 'icloud', 'other'].includes(str(b.provider)) ? str(b.provider) : 'other') as MailAccount['provider'];
+    const preset = prov === 'other' ? null : PRESETS[prov];
+    const account: MailAccount = {
+      id: newId(), provider: prov, label: str(b.label, 60) || str(b.user, 200),
+      host: preset?.host ?? str(b.host, 200), port: preset?.port ?? (Number(b.port) || 993),
+      user: str(b.user, 200).trim(), pass: str(b.pass, 200).replace(/\s+/g, ''),
+    };
+    if (!account.host || !account.user || !account.pass) throw new HttpError(400, 'Adresse und App-Passwort nötig');
+    try { await testAccount(account); } catch (err) { throw new HttpError(400, `Anmeldung fehlgeschlagen: ${(err as Error).message}`); }
+    saveAccounts(req.user.id, [...listAccounts(req.user.id), account]);
+    void checkAllMail(req.user.id).catch(() => {});
+    return publicAccounts(req.user.id);
+  });
+  api.delete('/api/mail/accounts/:id', async (req: FastifyRequest<{ Params: { id: string } }>) => {
+    saveAccounts(req.user.id, listAccounts(req.user.id).filter((a) => a.id !== req.params.id));
+    db.prepare('DELETE FROM mail_state WHERE user_id = ? AND account_id = ?').run(req.user.id, req.params.id);
+    return publicAccounts(req.user.id);
+  });
+  api.post('/api/mail/check', async (req) => {
+    await checkAllMail(req.user.id);
+    return publicAccounts(req.user.id);
+  });
+
+  // ----- Inbox: E-Mails, Social Media, SMS -----
+  api.get('/api/inbox', async (req) => {
+    const q = req.query as Record<string, string>;
+    const where = ['user_id = ?'];
+    const args: unknown[] = [req.user.id];
+    if (q.source) { where.push('source = ?'); args.push(q.source); }
+    if (q.before) { where.push('created_at < ?'); args.push(q.before); }
+    const rows = db.prepare(`SELECT id, source, sender, text, payload, created_at FROM inbox_events WHERE ${where.join(' AND ')}
+      ORDER BY created_at DESC LIMIT ?`).all(...args, Math.min(Number(q.limit) || 100, 300)) as
+      { id: string; source: string; sender: string | null; text: string | null; payload: string; created_at: string }[];
+    return rows.map((r) => {
+      const p = JSON.parse(r.payload) as Record<string, unknown>;
+      return {
+        id: r.id, source: r.source, sender: r.sender, text: r.text, createdAt: r.created_at,
+        summary: p.summary ?? null, category: p.category ?? null, action: p.action ?? null,
+        account: p.account ?? null, platform: p.platform ?? null,
+      };
+    });
+  });
+  api.post('/api/inbox/:id/restore', async (req: FastifyRequest<{ Params: { id: string } }>) => {
+    try { await restoreMail(req.user.id, req.params.id); } catch (err) { throw new HttpError(400, (err as Error).message); }
+    return { ok: true };
+  });
+
+  // ----- FreeNotes (iPad-Heft): gelöste HÜs abholen -----
+  api.get('/api/notes/inbox', async (req) => notesInbox(req.user.id));
+  api.post('/api/notes/inbox/:id/ack', async (req: FastifyRequest<{ Params: { id: string } }>) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    if (!ackNotesEntry(req.user.id, req.params.id, str(b.notebook, 200) || null, Number.isFinite(Number(b.page)) ? Number(b.page) : null)) {
+      throw new HttpError(404, 'Nicht gefunden');
+    }
+    return { ok: true };
+  });
+
+  // ----- Handschrift -----
+  api.put('/api/handwriting/font', async (req) => {
+    const ext = str(req.headers['x-filename']).split('.').pop()?.toLowerCase() ?? '';
+    if (!Buffer.isBuffer(req.body) || !req.body.length) throw new HttpError(400, 'Keine Datei');
+    try { saveUserFont(req.user.id, req.body, ext); } catch (err) { throw new HttpError(400, (err as Error).message); }
+    return { ok: true };
+  });
+  api.delete('/api/handwriting/font', async (req) => {
+    deleteUserFont(req.user.id);
+    return { ok: true };
+  });
+  api.post('/api/handwriting/preview', async (req) => {
+    const png = await renderHandwriting(req.user.id, {
+      date: 'Fr, 30.10.',
+      text: '__S. 45 Nr. 16__\n\n1) Oui, elle y va en avion.\n2) Non, je ne m\'y intéresse pas.\n3) 3 · 4 + 2 = ==14==\nÄpfel, Übung, Größe',
+    });
+    const id = saveFile(png, 'png');
+    db.prepare('INSERT OR IGNORE INTO notified (user_id, key, created_at) VALUES (?, ?, ?)').run(req.user.id, `file:${id}`, now());
+    return { fileId: id };
   });
 
   api.get('/api/ai/status', async () => modelStatus());

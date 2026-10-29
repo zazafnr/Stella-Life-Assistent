@@ -18,6 +18,8 @@ export const config = {
     apiKey: env.OPENROUTER_API_KEY ?? '',
     /** Bevorzugte Modelle, kommagetrennt. Leer = automatisch die besten kostenlosen wählen. */
     models: (env.STELLA_MODELS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+    /** Modelle, die Bilder lesen können (HÜ-Seiten lösen). Leer = automatisch. */
+    visionModels: (env.STELLA_VISION_MODELS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
     /** nur ":free"-Modelle automatisch wählen */
     freeOnly: env.STELLA_FREE_ONLY !== 'false',
     baseUrl: env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1',

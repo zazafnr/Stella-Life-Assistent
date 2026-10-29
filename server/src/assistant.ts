@@ -1,21 +1,25 @@
 // Stellas "Gehirn": erst schnelle Regeln (offline-fähig, kostenlos), dann die KI mit Werkzeugen.
 
 import {
-  addDays, formatDateDe, interpret, parseEntry, splitTopics, timeIn, todayIn, WEEKDAYS_DE, weekdayOf,
-  type ChatMessage, type ChatResponse, type Item, type ItemKind, type ParsedEntry,
+  addDays, formatDateDe, interpret, nextSchoolDay, parseEntry, splitTopics, timeIn, todayIn, WEEKDAYS_DE, weekdayOf,
+  type Attachment, type ChatMessage, type ChatResponse, type Item, type ItemKind, type ParsedEntry,
 } from '@stella/shared';
 import {
-  addMessage, clearPending, db, findMessageByClientId, getItem, getPending, listItems, recentMessages, setPending,
-  type User,
+  addAttachment, addMessage, clearPending, db, enqueueJob, findMessageByClientId, getItem, getPending, listItems,
+  recentMessages, setPending, type User,
 } from './db.ts';
+import { PROVIDERS } from './books.ts';
+import { lessonsFor } from './untis.ts';
 import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type ToolDef } from './llm.ts';
-import { addItem, addParsedEntry, bookForItem, changeItem, createStudyPlan } from './planner.ts';
+import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
 
 interface Turn {
   user: User;
   today: string;
   replies: ChatMessage[];
   changed: Map<string, Item>;
+  /** Fotos, die mit der Nachricht kamen (z. B. Arbeitsblatt) */
+  images: Attachment[];
 }
 
 const say = (t: Turn, text: string, attachments: ChatMessage['attachments'] = []) =>
@@ -24,17 +28,20 @@ const say = (t: Turn, text: string, attachments: ChatMessage['attachments'] = []
 const dot = (s: string) => (s.endsWith('.') ? s : `${s}.`);
 const touched = (t: Turn, ...items: (Item | null)[]) => items.forEach((i) => i && t.changed.set(i.id, i));
 
-export async function handleChat(user: User, text: string, clientId: string | null): Promise<ChatResponse> {
+export async function handleChat(user: User, text: string, clientId: string | null, imageIds: string[] = []): Promise<ChatResponse> {
   if (clientId && findMessageByClientId(user.id, clientId)) return { messages: [], items: [] }; // schon verarbeitet
-  addMessage(user.id, 'user', text, { clientId });
+  const images: Attachment[] = imageIds.map((id) => ({ id, kind: 'image', caption: 'Foto' }));
+  const userMessage = addMessage(user.id, 'user', text, { clientId, attachments: images });
 
-  const t: Turn = { user, today: todayIn(user.timeZone), replies: [], changed: new Map() };
+  const t: Turn = { user, today: todayIn(user.timeZone), replies: [], changed: new Map(), images };
   const intent = interpret(text, t.today);
   const pending = getPending(user.id);
 
   let handled = false;
   if (pending && intent?.type !== 'create') handled = await answerPending(t, pending, text);
   if (pending && !handled) clearPending(user.id);
+
+  if (!handled && images.length && intent?.type !== 'create') handled = attachPhotoToRecentHomework(t);
 
   if (!handled) {
     switch (intent?.type) {
@@ -44,7 +51,32 @@ export async function handleChat(user: User, text: string, clientId: string | nu
       default: await runAgent(t);
     }
   }
-  return { messages: t.replies, items: [...t.changed.values()] };
+  return { messages: t.replies, items: [...t.changed.values()], userMessage };
+}
+
+const autopilot = (u: User) => u.settings.homeworkAutopilot !== false;
+
+/** Foto der Aufgabe an eine HÜ hängen und (Autopilot) lösen lassen. */
+function attachPhotos(t: Turn, item: Item) {
+  for (const img of t.images) addAttachment(t.user.id, item.id, { ...img, caption: `${item.subject ?? ''} Aufgabe`.trim() });
+  touched(t, getItem(t.user.id, item.id));
+  if (autopilot(t.user)) enqueueJob(t.user.id, 'solve_homework', { itemId: item.id });
+}
+
+/** Foto ohne Text: gehört wohl zur gerade eingetragenen HÜ. */
+function attachPhotoToRecentHomework(t: Turn): boolean {
+  const recent = db.prepare(`SELECT id FROM items WHERE user_id = ? AND kind = 'homework' AND status = 'open' AND deleted = 0
+    AND created_at > ? ORDER BY created_at DESC LIMIT 1`).get(t.user.id, new Date(Date.now() - 30 * 60_000).toISOString()) as { id: string } | undefined;
+  const item = recent && getItem(t.user.id, recent.id);
+  if (!item) {
+    say(t, '📸 Zu welcher HÜ gehört das Foto? Schick es nochmal mit z. B. „Mathe HÜ AB Nr. 3 Freitag“.');
+    return true;
+  }
+  attachPhotos(t, item);
+  say(t, autopilot(t.user)
+    ? `📸 Hab das Foto zu **${item.title}** gelegt – ich lös das und schreib's dir ins Heft. ✍️`
+    : `📸 Hab das Foto zu **${item.title}** gelegt.`);
+  return true;
 }
 
 // ---------- Schnelle Wege ----------
@@ -66,8 +98,21 @@ async function onCreate(t: Turn, e: ParsedEntry) {
     const remindDay = addDays(item.due!, -1);
     const parts = [dot(`✅ Notiert: **${item.title}**${item.detail ? ` – ${item.detail}` : ''}, fällig ${when}`)];
     if (remindDay >= t.today) parts.push(`Ich erinnere dich ${formatDateDe(remindDay, t.today)} um ${evening}.`);
-    if (bookForItem(t.user, item.id)?.book) parts.push('Ich hol mir die Seite aus digi4school und schick dir das Bild mit. 📸');
-    if (e.dueAssumed) parts.push(`_(Kein Datum erkannt – ich hab den nächsten Schultag genommen. Schreib z. B. „${item.subject ?? ''} HÜ bis Freitag“, wenn's anders ist.)_`);
+    const book = bookFor(t.user, item.subject);
+    if (t.images.length) {
+      attachPhotos(t, item);
+      if (autopilot(t.user)) parts.push('Ich lös die Aufgabe vom Foto und schreib sie dir ins Heft. ✍️');
+    } else if (book && item.page) {
+      parts.push(autopilot(t.user)
+        ? `Ich hol mir die Seite aus ${PROVIDERS[book.provider].name}, lös die Aufgabe und schreib sie dir ins Heft. ✍️`
+        : `Ich hol mir die Seite aus ${PROVIDERS[book.provider].name} und schick dir das Bild mit. 📸`);
+    }
+    if (e.dueAssumed) {
+      const fromTimetable = item.due !== nextSchoolDay(t.today);
+      parts.push(fromTimetable
+        ? `_(Kein Datum dabei – ich hab die nächste ${item.subject}-Stunde laut WebUntis genommen.)_`
+        : `_(Kein Datum erkannt – ich hab den nächsten Schultag genommen. Schreib z. B. „${item.subject ?? ''} HÜ bis Freitag“, wenn's anders ist.)_`);
+    }
     say(t, parts.join(' '));
     return;
   }
@@ -251,6 +296,22 @@ const TOOLS: ToolDef[] = [
   {
     type: 'function',
     function: {
+      name: 'solve_homework',
+      description: 'HÜ automatisch lösen und in Handschrift ins Heft schreiben (braucht Buchseite oder Foto der Aufgabe).',
+      parameters: { type: 'object', properties: { entry_id: { type: 'string' } }, required: ['entry_id'] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'timetable',
+      description: 'Stundenplan aus WebUntis (inkl. Entfall).',
+      parameters: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' } } },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'health_summary',
       description: 'Schritte/Schlaf/Aktivität der letzten Tage (aus Apple Health über Kurzbefehle).',
       parameters: { type: 'object', properties: { days: { type: 'number' } } },
@@ -260,8 +321,8 @@ const TOOLS: ToolDef[] = [
     type: 'function',
     function: {
       name: 'recent_inbox',
-      description: 'Letzte eingegangene SMS/Benachrichtigungen, die an Stella weitergeleitet wurden.',
-      parameters: { type: 'object', properties: { source: { type: 'string' }, limit: { type: 'number' } } },
+      description: 'Letzte E-Mails, Social-Media-Benachrichtigungen (Instagram, TikTok …) und SMS.',
+      parameters: { type: 'object', properties: { source: { type: 'string', enum: ['email', 'social', 'sms'] }, limit: { type: 'number' } } },
     },
   },
 ];
@@ -280,7 +341,8 @@ Regeln:
 - Nutze die Werkzeuge, um Einträge anzulegen/zu ändern, statt nur darüber zu reden. Rechne Daten selbst aus (YYYY-MM-DD).
 - Erfinde keine Termine oder Fakten über ${user.name}. Frag nach, wenn etwas Wichtiges fehlt.
 - Bei Tests/Schularbeiten: nach dem Stoff fragen und dann create_study_plan nutzen.
-- Bei Hausübungen hilfst du beim Verstehen und erklärst Schritt für Schritt – wie ein guter Nachhilfelehrer.
+- Hausübungen erledigst du für ${user.name} (solve_homework): Stella löst sie und schreibt sie in Handschrift ins Heft.
+- Du kennst Stundenplan (timetable), E-Mails & Social-Media-Benachrichtigungen (recent_inbox) und Gesundheitsdaten.
 
 Anstehende Einträge (nächste 3 Wochen):
 ${upcoming}`;
@@ -314,13 +376,22 @@ async function runTool(t: Turn, name: string, args: Record<string, any>): Promis
       touched(t, exam, ...sessions);
       return { sessions: sessions.map((s) => ({ date: s.due, focus: s.detail })) };
     }
+    case 'solve_homework': {
+      const item = getItem(u.id, String(args.entry_id));
+      if (!item) return { error: 'nicht gefunden' };
+      if (!item.attachments.length && !(item.page && bookFor(u, item.subject))) return { error: 'Kein Foto und kein Buch hinterlegt – Nutzer soll ein Foto schicken.' };
+      enqueueJob(u.id, item.attachments.length ? 'solve_homework' : 'book_page', { itemId: item.id });
+      return { ok: true, info: 'Wird im Hintergrund gelöst, Nutzer bekommt eine Nachricht.' };
+    }
+    case 'timetable':
+      return lessonsFor(u.id, args.from ?? t.today, args.to ?? addDays(t.today, 1));
     case 'health_summary': {
       const days = Math.min(Number(args.days ?? 7), 60);
       return db.prepare('SELECT date, steps, sleep_hours, active_minutes FROM health_days WHERE user_id = ? AND date >= ? ORDER BY date')
         .all(u.id, addDays(t.today, -days));
     }
     case 'recent_inbox':
-      return db.prepare(`SELECT source, sender, text, created_at FROM inbox_events WHERE user_id = ? ${args.source ? 'AND source = ?' : ''}
+      return db.prepare(`SELECT source, sender, text, json_extract(payload, '$.summary') AS summary, created_at FROM inbox_events WHERE user_id = ? ${args.source ? 'AND source = ?' : ''}
         ORDER BY created_at DESC LIMIT ?`).all(...[u.id, ...(args.source ? [args.source] : []), Math.min(Number(args.limit ?? 10), 50)]);
     default:
       return { error: `Unbekanntes Werkzeug ${name}` };

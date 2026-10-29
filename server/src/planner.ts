@@ -3,6 +3,7 @@
 import {
   buildStudyPlan, DEFAULT_PREFS, planReminders, zonedToUtc, todayIn, type Item, type ParsedEntry,
 } from '@stella/shared';
+import { nextLessonDate } from './untis.ts';
 import {
   addReminder, clearOpenReminders, createItem, enqueueJob, getItem, getItemRaw, type NewItem, updateItem, type User,
 } from './db.ts';
@@ -24,20 +25,25 @@ export function scheduleReminders(user: User, item: Item) {
 
 function findBook(user: User, subject: string | null) {
   if (!subject) return null;
-  return user.settings.digi4schoolBooks?.find((b) => b.subject.toLowerCase() === subject.toLowerCase()) ?? null;
+  return user.settings.books?.find((b) => b.subject.toLowerCase() === subject.toLowerCase()) ?? null;
 }
 
 export function addItem(user: User, data: NewItem): Item {
   const item = createItem(user.id, data);
   scheduleReminders(user, item);
-  // HÜ mit Seitenzahl und hinterlegtem Buch → Seite von digi4school holen
+  // HÜ mit Seitenzahl und hinterlegtem Buch → Seite aus dem E-Book holen (danach ggf. lösen)
   if (item.kind === 'homework' && item.page && findBook(user, item.subject)) {
-    enqueueJob(user.id, 'digi4school_page', { itemId: item.id });
+    enqueueJob(user.id, 'book_page', { itemId: item.id });
   }
   return item;
 }
 
 export function addParsedEntry(user: User, e: ParsedEntry): Item {
+  // "Latein HÜ" ohne Datum → nächste Lateinstunde laut WebUntis (statt nächster Schultag)
+  if (e.dueAssumed && e.subject) {
+    const next = nextLessonDate(user.id, e.subject, todayIn(user.timeZone));
+    if (next) e = { ...e, due: next };
+  }
   return addItem(user, {
     kind: e.kind, subject: e.subject, title: e.title, detail: e.detail || null,
     page: e.page, exercises: e.exercises, book: e.book, due: e.due, time: e.time,
@@ -67,6 +73,10 @@ export function createStudyPlan(user: User, examId: string, focuses?: string[]):
     parentId: exam.id,
     source: 'plan',
   }));
+}
+
+export function bookFor(user: User, subject: string | null) {
+  return findBook(user, subject);
 }
 
 export function bookForItem(user: User, itemId: string) {

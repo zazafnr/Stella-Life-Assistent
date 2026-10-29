@@ -1,34 +1,11 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { api, logout, refreshMe, useStore, type Me } from '../store.ts';
 import { enablePush, isIos, isStandalone, pushPermission } from '../push.ts';
-
-type Book = NonNullable<Me['settings']['digi4schoolBooks']>[number];
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return <section className="card"><h2>{title}</h2>{children}</section>;
-}
-
-function useAction() {
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const run = async (fn: () => Promise<unknown>, okText: string) => {
-    setMsg(null);
-    try { await fn(); setMsg({ ok: true, text: okText }); } catch (err) { setMsg({ ok: false, text: (err as Error).message }); }
-  };
-  const view = msg && <p className={msg.ok ? 'ok-text' : 'error-text'}>{msg.text}</p>;
-  return [run, view] as const;
-}
-
-function Copy({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className="copy-row">
-      <code>{value}</code>
-      <button type="button" onClick={() => navigator.clipboard.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); })}>
-        {copied ? '✓' : 'Kopieren'}
-      </button>
-    </div>
-  );
-}
+import { Copy, Section, useAction } from './settings/ui.tsx';
+import { Books } from './settings/Books.tsx';
+import { Mail } from './settings/Mail.tsx';
+import { Untis } from './settings/Untis.tsx';
+import { Handwriting } from './settings/Handwriting.tsx';
 
 export function Settings() {
   const me = useStore((s) => s.me)!;
@@ -43,7 +20,10 @@ export function Settings() {
       <Account me={me} online={online} outbox={outbox} />
       <Notifications />
       <Times me={me} />
-      <Digi4School me={me} />
+      <Books me={me} />
+      <Handwriting me={me} />
+      <Untis me={me} />
+      <Mail me={me} />
       <Shortcuts me={me} />
       <AiStatus />
     </div>
@@ -112,68 +92,6 @@ function Times({ me }: { me: Me }) {
   );
 }
 
-function Digi4School({ me }: { me: Me }) {
-  const [run, view] = useAction();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [books, setBooks] = useState<Book[]>(me.settings.digi4schoolBooks ?? []);
-  const [shelf, setShelf] = useState<{ title: string; url: string }[] | null>(null);
-  const connected = me.integrations.digi4school;
-
-  const saveBooks = (next: Book[]) => run(async () => {
-    await api('/api/settings', { method: 'PATCH', json: { digi4schoolBooks: next } });
-    await refreshMe();
-  }, 'Bücher gespeichert.');
-  const update = (i: number, patch: Partial<Book>) => setBooks(books.map((b, j) => (j === i ? { ...b, ...patch } : b)));
-
-  return (
-    <Section title="digi4school">
-      <p className="muted">Stella holt bei HÜs mit Seitenzahl automatisch die Buchseite als Bild. Dein Passwort wird verschlüsselt auf deinem Server gespeichert.</p>
-      {connected ? (
-        <div className="button-row">
-          <span className="ok-text">✅ Verbunden</span>
-          <button type="button" className="secondary" onClick={() => run(async () => { await api('/api/integrations/digi4school/books').then((b) => setShelf(b as never)); }, 'Bücherregal geladen.')}>Bücherregal laden</button>
-          <button type="button" className="link danger" onClick={() => run(async () => { await api('/api/integrations/digi4school', { method: 'DELETE' }); await refreshMe(); }, 'Verbindung entfernt.')}>Trennen</button>
-        </div>
-      ) : (
-        <form className="form-grid" onSubmit={(e) => { e.preventDefault(); void run(async () => { await api('/api/integrations/digi4school', { method: 'PUT', json: { email, password } }); setPassword(''); await refreshMe(); }, 'Gespeichert.'); }}>
-          <label>E-Mail<input type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
-          <label>Passwort<input type="password" autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
-          <button type="submit">Verbinden</button>
-        </form>
-      )}
-
-      {shelf && (
-        <div className="shelf">
-          {shelf.length === 0 && <p className="muted">Keine Bücher gefunden.</p>}
-          {shelf.map((b) => (
-            <div key={b.url} className="shelf-row">
-              <span>{b.title || b.url}</span>
-              <button type="button" className="link" onClick={() => setBooks([...books, { subject: '', url: b.url, pageOffset: 0 }])}>+ zuordnen</button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <h3>Fach → Buch</h3>
-      {books.map((b, i) => (
-        <div key={i} className="book-row">
-          <input placeholder="Fach (z. B. Latein)" value={b.subject} onChange={(e) => update(i, { subject: e.target.value })} />
-          <input placeholder="https://digi4school.at/ebook/…" value={b.url} onChange={(e) => update(i, { url: e.target.value })} />
-          <input type="number" title="Seitenversatz: PDF-Seite minus gedruckte Seitenzahl" value={b.pageOffset ?? 0} onChange={(e) => update(i, { pageOffset: Number(e.target.value) })} />
-          <button type="button" className="link danger" onClick={() => setBooks(books.filter((_, j) => j !== i))}>✕</button>
-        </div>
-      ))}
-      <div className="button-row">
-        <button type="button" className="secondary" onClick={() => setBooks([...books, { subject: '', url: '', pageOffset: 0 }])}>+ Buch</button>
-        <button type="button" onClick={() => void saveBooks(books)}>Speichern</button>
-      </div>
-      <p className="muted small">Seitenversatz: Wenn Stella Seite 45 will, aber Seite 43 aufmacht, trag 2 ein.</p>
-      {view}
-    </Section>
-  );
-}
-
 function Shortcuts({ me }: { me: Me }) {
   return (
     <>
@@ -206,7 +124,7 @@ function Shortcuts({ me }: { me: Me }) {
 }
 
 function AiStatus() {
-  const [status, setStatus] = useState<{ configured: boolean; chain: string[]; coolingDown: string[] } | null>(null);
+  const [status, setStatus] = useState<{ configured: boolean; chain: string[]; visionChain: string[]; coolingDown: string[] } | null>(null);
   useEffect(() => { api<typeof status>('/api/ai/status').then(setStatus).catch(() => {}); }, []);
   if (!status) return null;
   return (
@@ -216,6 +134,10 @@ function AiStatus() {
           <p className="muted">Stella probiert diese Modelle der Reihe nach (OpenRouter):</p>
           <ol className="models">
             {status.chain.map((m) => <li key={m}><code>{m}</code>{status.coolingDown.includes(m) && ' (Pause – Limit)'}</li>)}
+          </ol>
+          <p className="muted">Zum Lesen von Buchseiten und Fotos (HÜ-Autopilot):</p>
+          <ol className="models">
+            {status.visionChain.map((m) => <li key={m}><code>{m}</code>{status.coolingDown.includes(m) && ' (Pause – Limit)'}</li>)}
           </ol>
         </>
       ) : (

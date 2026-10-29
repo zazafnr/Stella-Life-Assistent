@@ -35,7 +35,7 @@ export type Intent =
 const B = '(?<![\\p{L}\\p{N}])';
 const E = '(?![\\p{L}\\p{N}])';
 
-const SUBJECTS: [string, string[]][] = [
+export const SUBJECTS: [string, string[]][] = [
   ['Mathe', ['mathe', 'mathematik', 'ma']],
   ['Deutsch', ['deutsch', 'de', 'dt']],
   ['Englisch', ['englisch', 'english', 'engl', 'en']],
@@ -58,6 +58,28 @@ const SUBJECTS: [string, string[]][] = [
   ['Sport', ['sport', 'bsp', 'turnen']],
   ['Wirtschaft', ['wirtschaft', 'bwl', 'rw', 'rechnungswesen']],
 ];
+
+/** Kürzel aus WebUntis o. Ä. (oft nur ein Buchstabe) → Fachname wie im Planer */
+const SINGLE_LETTER: Record<string, string> = {
+  m: 'Mathe', d: 'Deutsch', e: 'Englisch', l: 'Latein', f: 'Französisch', s: 'Spanisch', i: 'Italienisch',
+};
+
+export function normalizeSubject(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const clean = raw.trim().toLowerCase();
+  if (!clean) return null;
+  const words = clean.split(/[\s_\-/.]+/u);
+  for (const w of [clean, ...words]) {
+    const hit = SUBJECTS.find(([name, aliases]) => name.toLowerCase() === w || aliases.includes(w));
+    if (hit) return hit[0];
+  }
+  if (SINGLE_LETTER[words[0]]) return SINGLE_LETTER[words[0]];
+  // Präfix-Treffer, z. B. "MAM" (Mathematik), "BSPK" (Bewegung und Sport)
+  const prefix = clean.length <= 5 && /^[a-zäöü]+$/u.test(clean)
+    ? SUBJECTS.find(([, aliases]) => aliases.some((a) => a.length >= 2 && clean.startsWith(a)))
+    : undefined;
+  return prefix ? prefix[0] : raw.trim();
+}
 
 const KINDS: [ItemKind, string, string[]][] = [
   ['homework', 'HÜ', ['hü', 'hue', 'hüs', 'hausübung', 'hausuebung', 'hausaufgabe', 'hausaufgaben', 'ha', 'hausi', 'hausis']],

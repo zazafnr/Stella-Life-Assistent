@@ -9,8 +9,11 @@ import { config } from './config.ts';
 
 export interface ToolCall { id: string; type: 'function'; function: { name: string; arguments: string } }
 
+export type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
+
 export type LlmMessage =
-  | { role: 'system' | 'user'; content: string }
+  | { role: 'system'; content: string }
+  | { role: 'user'; content: string | ContentPart[] }
   | { role: 'assistant'; content: string | null; tool_calls?: ToolCall[] }
   | { role: 'tool'; tool_call_id: string; content: string };
 
@@ -36,43 +39,53 @@ const REFRESH_MS = 6 * 60 * 60 * 1000;
  */
 const PREFERRED_HINTS = ['inkling', 'nemotron-3-super', 'gemma-4', 'qwen', 'deepseek', 'llama-4', 'mistral', 'glm'];
 
-let cachedModels: string[] = [];
+type Capability = 'tools' | 'vision';
+
+let catalog: ModelInfo[] = [];
 let lastRefresh = 0;
 const cooldownUntil = new Map<string, number>();
 
 export const llmAvailable = () => !!config.openrouter.apiKey;
 
-async function refreshModels(): Promise<string[]> {
-  if (Date.now() - lastRefresh < REFRESH_MS && cachedModels.length) return cachedModels;
+async function refreshCatalog(): Promise<ModelInfo[]> {
+  if (Date.now() - lastRefresh < REFRESH_MS && catalog.length) return catalog;
   try {
     const res = await fetch(`${config.openrouter.baseUrl}/models`, { signal: AbortSignal.timeout(15_000) });
     const { data } = (await res.json()) as { data: ModelInfo[] };
-    const usable = data.filter((m) => {
-      const free = m.id.endsWith(':free') || (Number(m.pricing?.prompt) === 0 && Number(m.pricing?.completion) === 0);
-      return (!config.openrouter.freeOnly || free) && m.supported_parameters?.includes('tools');
-    });
-    const rank = (m: ModelInfo) => {
-      const hint = PREFERRED_HINTS.findIndex((h) => m.id.toLowerCase().includes(h));
-      return (hint === -1 ? PREFERRED_HINTS.length : hint) * 1e9 - (m.context_length ?? 0);
-    };
-    cachedModels = usable.sort((a, b) => rank(a) - rank(b)).map((m) => m.id).slice(0, 5);
+    catalog = data;
     lastRefresh = Date.now();
   } catch (err) {
     console.warn('Modell-Liste von OpenRouter nicht abrufbar:', (err as Error).message);
   }
-  return cachedModels;
+  return catalog;
 }
 
-export async function modelChain(): Promise<string[]> {
-  const configured = config.openrouter.models;
-  const auto = configured.length ? [] : await refreshModels();
+function pick(models: ModelInfo[], capability: Capability): string[] {
+  const usable = models.filter((m) => {
+    const free = m.id.endsWith(':free') || (Number(m.pricing?.prompt) === 0 && Number(m.pricing?.completion) === 0);
+    if (config.openrouter.freeOnly && !free) return false;
+    return capability === 'tools'
+      ? m.supported_parameters?.includes('tools')
+      : m.architecture?.input_modalities?.includes('image');
+  });
+  const rank = (m: ModelInfo) => {
+    const hint = PREFERRED_HINTS.findIndex((h) => m.id.toLowerCase().includes(h));
+    return (hint === -1 ? PREFERRED_HINTS.length : hint) * 1e9 - (m.context_length ?? 0);
+  };
+  return usable.sort((a, b) => rank(a) - rank(b)).map((m) => m.id).slice(0, 5);
+}
+
+export async function modelChain(capability: Capability = 'tools'): Promise<string[]> {
+  const configured = capability === 'tools' ? config.openrouter.models : config.openrouter.visionModels;
+  const auto = configured.length ? [] : pick(await refreshCatalog(), capability);
   return [...new Set([...configured, ...auto, FALLBACK_ROUTER])];
 }
 
 export async function modelStatus() {
   return {
     configured: llmAvailable(),
-    chain: llmAvailable() ? await modelChain() : [],
+    chain: llmAvailable() ? await modelChain('tools') : [],
+    visionChain: llmAvailable() ? await modelChain('vision') : [],
     coolingDown: [...cooldownUntil].filter(([, t]) => t > Date.now()).map(([m]) => m),
   };
 }
@@ -81,16 +94,17 @@ export class LlmUnavailable extends Error {}
 
 export interface CompletionResult { message: Extract<LlmMessage, { role: 'assistant' }>; model: string }
 
-export async function complete(messages: LlmMessage[], tools?: ToolDef[], opts: { json?: boolean } = {}): Promise<CompletionResult> {
+export async function complete(messages: LlmMessage[], tools?: ToolDef[],
+  opts: { json?: boolean; vision?: boolean; timeoutMs?: number } = {}): Promise<CompletionResult> {
   if (!llmAvailable()) throw new LlmUnavailable('Kein OPENROUTER_API_KEY gesetzt.');
   const errors: string[] = [];
 
-  for (const model of await modelChain()) {
+  for (const model of await modelChain(opts.vision ? 'vision' : 'tools')) {
     if ((cooldownUntil.get(model) ?? 0) > Date.now()) continue;
     try {
       const res = await fetch(`${config.openrouter.baseUrl}/chat/completions`, {
         method: 'POST',
-        signal: AbortSignal.timeout(60_000),
+        signal: AbortSignal.timeout(opts.timeoutMs ?? 60_000),
         headers: {
           Authorization: `Bearer ${config.openrouter.apiKey}`,
           'Content-Type': 'application/json',
@@ -102,7 +116,7 @@ export async function complete(messages: LlmMessage[], tools?: ToolDef[], opts: 
           messages,
           ...(tools?.length ? { tools, tool_choice: 'auto' } : {}),
           ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
-          temperature: 0.4,
+          temperature: opts.vision ? 0.1 : 0.4,
         }),
       });
       if (!res.ok) {

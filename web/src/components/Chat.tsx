@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { sendMessage, useStore } from '../store.ts';
+import { compressImage, sendMessage, useStore } from '../store.ts';
 import { AuthImage, Lightbox, Rich } from './Rich.tsx';
 
-const SUGGESTIONS = ['Latein HÜ S. 45 Nr. 3 Freitag', 'Mathe SA 12.11.', 'was steht an?', 'Latein HÜ erledigt'];
+const SUGGESTIONS = ['Französisch HÜ S. 45 Nr. 16 Freitag', 'Mathe SA 12.11.', 'was steht an?', 'Latein HÜ erledigt'];
 
 function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });
@@ -23,6 +23,8 @@ export function Chat() {
   const [text, setText] = useState('');
   const [error, setError] = useState('');
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -31,14 +33,27 @@ export function Chat() {
 
   async function submit(value = text) {
     const t = value.trim();
-    if (!t) return;
+    if (!t && !photos.length) return;
+    const imgs = photos;
     setText('');
+    setPhotos([]);
     setError('');
     try {
-      await sendMessage(t);
+      await sendMessage(t, imgs);
     } catch (err) {
       setError((err as Error).message);
       setText(t);
+      setPhotos(imgs);
+    }
+  }
+
+  async function addPhotos(files: FileList | null) {
+    if (!files) return;
+    try {
+      const added = await Promise.all([...files].slice(0, 4).map((f) => compressImage(f)));
+      setPhotos((p) => [...p, ...added].slice(0, 4));
+    } catch {
+      setError('Foto konnte nicht gelesen werden.');
     }
   }
 
@@ -84,7 +99,18 @@ export function Chat() {
       )}
       {error && <div className="error-bar">{error}</div>}
 
+      {photos.length > 0 && (
+        <div className="photo-strip">
+          {photos.map((p, i) => (
+            <button key={i} type="button" className="photo-thumb" onClick={() => setPhotos(photos.filter((_, j) => j !== i))} aria-label="Foto entfernen">
+              <img src={p} alt="" /><span>✕</span>
+            </button>
+          ))}
+        </div>
+      )}
       <form className="composer" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
+        <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { void addPhotos(e.target.files); e.target.value = ''; }} />
+        <button type="button" className="attach" aria-label="Foto der Aufgabe" onClick={() => fileRef.current?.click()}>📷</button>
         <textarea
           ref={inputRef}
           rows={1}
@@ -95,7 +121,7 @@ export function Chat() {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void submit(); }
           }}
         />
-        <button type="submit" disabled={!text.trim()} aria-label="Senden">↑</button>
+        <button type="submit" disabled={!text.trim() && !photos.length} aria-label="Senden">↑</button>
       </form>
       {lightbox && <Lightbox url={lightbox} onClose={() => setLightbox(null)} />}
     </div>

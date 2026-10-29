@@ -8,13 +8,21 @@ import {
   formatDateDe, interpret, todayIn, type ChatMessage, type ChatResponse, type Item, type SyncResponse,
 } from '@stella/shared';
 
+export type BookProvider = 'digi4school' | 'scook';
+export interface BookConfig { subject: string; provider: BookProvider; url: string; pageOffset?: number; pageUrlTemplate?: string }
+
 export interface Me {
   id: string; name: string; email: string; timeZone: string; ingestUrl: string;
   settings: {
     eveningTime?: string; studyTime?: string; stepGoal?: number;
-    digi4schoolBooks?: { subject: string; url: string; pageOffset?: number; pageUrlTemplate?: string }[];
+    books?: BookConfig[]; homeworkAutopilot?: boolean; mailAutoTrash?: boolean;
   };
-  integrations: { digi4school: boolean };
+  integrations: {
+    books: Record<BookProvider, { connected: boolean; cookies: boolean; email: string | null }>;
+    webuntis: boolean;
+    mailAccounts: number;
+    handwritingFont: boolean;
+  };
 }
 
 interface OutboxEntry { clientId: string; text: string; createdAt: string }
@@ -164,29 +172,32 @@ async function flushOutbox() {
       messages: s.messages.filter((m) => m.id !== `local-reply-${entry.clientId}`),
     }));
     mergeItems(res.items, [`local-${entry.clientId}`]);
-    mergeMessages(res.messages);
+    mergeMessages(res.userMessage ? [res.userMessage, ...res.messages] : res.messages);
   }
 }
 
 // ---------- Chat ----------
 
-export async function sendMessage(text: string) {
+export async function sendMessage(text: string, images: string[] = []) {
+  if (images.length && !navigator.onLine) throw new Error('Fotos kann ich nur mit Internet annehmen.');
   const clientId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
-  const local: ChatMessage = { id: `local-${clientId}`, clientId, role: 'user', text, attachments: [], createdAt, pending: true };
+  const local: ChatMessage = {
+    id: `local-${clientId}`, clientId, role: 'user', text: text || '📸', attachments: [], createdAt, pending: true,
+  };
   set((s) => ({ messages: [...s.messages, local] }));
 
   if (navigator.onLine) {
     set({ thinking: true });
     try {
-      const res = await api<ChatResponse>('/api/chat', { method: 'POST', json: { text, clientId } });
+      const res = await api<ChatResponse>('/api/chat', { method: 'POST', json: { text, clientId, images } });
       set((s) => ({ messages: s.messages.map((m) => (m.id === local.id ? { ...m, pending: false } : m)) }));
       mergeItems(res.items);
-      mergeMessages(res.messages);
+      mergeMessages(res.userMessage ? [res.userMessage, ...res.messages] : res.messages);
       set({ online: true });
       return;
     } catch (err) {
-      if (!isNetworkError(err)) {
+      if (!isNetworkError(err) || images.length) {
         set((s) => ({ messages: s.messages.filter((m) => m.id !== local.id) }));
         throw err;
       }
@@ -262,4 +273,16 @@ export function startBackgroundSync() {
   navigator.serviceWorker?.addEventListener('message', (e) => { if (e.data === 'sync') void sync(); });
   setInterval(() => { if (!document.hidden) void sync(); }, 20_000);
   void sync();
+}
+
+/** Foto verkleinern (max. 2000 px, JPEG) – spart Datenvolumen, reicht zum Lesen der Aufgabe. */
+export async function compressImage(file: File, maxSide = 2000): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return canvas.toDataURL('image/jpeg', 0.85);
 }

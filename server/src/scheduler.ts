@@ -2,28 +2,36 @@
 // (z. B. digi4school-Seiten holen). Deshalb funktioniert Stella auch, wenn dein Handy offline ist –
 // sobald es wieder Netz hat, sind die Nachrichten im Chat und die Push-Mitteilung kommt an.
 
-import { addMessage, db, getItem, getUser, now } from './db.ts';
-import { fetchDigi4SchoolPage } from './digi4school.ts';
+import { todayIn } from '@stella/shared';
+import { hasSecret } from './auth.ts';
+import { addMessage, allUserIds, db, getItem, getUser, notifyOnce, now } from './db.ts';
+import { checkAllMail, listAccounts } from './mail.ts';
+import { syncUntis } from './untis.ts';
+import { fetchBookPage } from './books.ts';
+import { solveHomework } from './homework.ts';
 import { pushToUser } from './push.ts';
 
-type ReminderRow = { id: string; user_id: string; item_id: string | null; message: string; with_attachments: number };
+type ReminderRow = { id: string; user_id: string; item_id: string | null; message: string; with_attachments: number; always: number };
 type JobRow = { id: string; user_id: string; type: string; payload: string; attempts: number };
 
 const JOB_HANDLERS: Record<string, (userId: string, payload: any) => Promise<void>> = {
-  digi4school_page: (userId, payload) => fetchDigi4SchoolPage(userId, payload.itemId),
+  book_page: (userId, p) => fetchBookPage(userId, p.itemId, p.pageDelta ?? 0, p.thenSolveAttempt ?? 0),
+  digi4school_page: (userId, p) => fetchBookPage(userId, p.itemId),
+  solve_homework: (userId, p) => solveHomework(userId, p.itemId, p.attempt ?? 0),
 };
 
 async function sendDueReminders() {
   const ts = now();
   const due = db.prepare(`SELECT r.* FROM reminders r LEFT JOIN items i ON i.id = r.item_id
-      WHERE r.sent_at IS NULL AND r.fire_at <= ? AND (i.id IS NULL OR (i.status = 'open' AND i.deleted = 0))`)
+      WHERE r.sent_at IS NULL AND r.fire_at <= ?
+        AND (i.id IS NULL OR (i.deleted = 0 AND (i.status = 'open' OR r.always = 1)))`)
     .all(ts) as ReminderRow[];
   for (const r of due) {
     db.prepare('UPDATE reminders SET sent_at = ? WHERE id = ?').run(now(), r.id);
     const item = r.item_id ? getItem(r.user_id, r.item_id) : null;
     const attachments = r.with_attachments && item ? item.attachments : [];
     let text = r.message;
-    if (item?.kind === 'homework') text += '\nSchreib mir „erledigt“, wenn du fertig bist. 😉';
+    if (item?.kind === 'homework' && !r.always) text += '\nSchreib mir „erledigt“, wenn du fertig bist. 😉';
     addMessage(r.user_id, 'assistant', text, { attachments });
     await pushToUser(r.user_id, { title: 'Stella', body: r.message, url: '/', tag: r.item_id ?? r.id });
   }
@@ -53,7 +61,33 @@ async function runJobs() {
   }
 }
 
+// Regelmäßige Abgleiche pro Nutzer (Postfächer, WebUntis)
+const lastRun = new Map<string, number>();
+async function every(key: string, ms: number, fn: () => Promise<void>) {
+  if (Date.now() - (lastRun.get(key) ?? 0) < ms) return;
+  lastRun.set(key, Date.now());
+  await fn();
+}
+
+async function periodic() {
+  for (const userId of allUserIds()) {
+    if (listAccounts(userId).length) {
+      await every(`mail:${userId}`, 5 * 60_000, () => checkAllMail(userId)).catch((err) => console.warn('Mail:', err.message));
+    }
+    if (hasSecret(userId, 'webuntis')) {
+      await every(`untis:${userId}`, 2 * 3600_000, () => syncUntis(userId)).catch((err) => {
+        console.warn('WebUntis:', err.message);
+        const user = getUser(userId);
+        if (user && notifyOnce(userId, `untis-error-${todayIn(user.timeZone)}`)) {
+          addMessage(userId, 'assistant', `⚠️ WebUntis-Abgleich klappt gerade nicht: ${err.message}`);
+        }
+      });
+    }
+  }
+}
+
 let busy = false;
+let periodicBusy = false;
 export function startScheduler() {
   // Jobs, die beim letzten Neustart mittendrin waren, nochmal einreihen
   db.prepare(`UPDATE jobs SET status = 'queued' WHERE status = 'running'`).run();
@@ -69,6 +103,18 @@ export function startScheduler() {
       busy = false;
     }
   };
+  // Postfächer & WebUntis getrennt, damit langsame Server keine Erinnerung verzögern
+  const slowTick = async () => {
+    if (periodicBusy) return;
+    periodicBusy = true;
+    try {
+      await periodic();
+    } finally {
+      periodicBusy = false;
+    }
+  };
   setInterval(tick, 30_000);
+  setInterval(slowTick, 60_000);
   void tick();
+  void slowTick();
 }

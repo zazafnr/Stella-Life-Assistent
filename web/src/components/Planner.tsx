@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
-import { formatDateDe, todayIn, type Item } from '@stella/shared';
-import { deleteItem, patchItem, useStore } from '../store.ts';
+import { useEffect, useMemo, useState } from 'react';
+import { addDays, formatDateDe, todayIn, type Item } from '@stella/shared';
+import { api, deleteItem, patchItem, useStore } from '../store.ts';
 import { AuthImage, Lightbox } from './Rich.tsx';
 
 const ICON: Record<string, string> = { homework: '📚', exam: '📝', assignment: '📌', event: '📅', todo: '☑️', study: '🧠' };
@@ -8,8 +8,39 @@ const KIND_LABEL: Record<string, string> = {
   homework: 'Hausübung', exam: 'Test / Schularbeit', assignment: 'Abgabe', event: 'Termin', todo: 'To-do', study: 'Lerneinheit',
 };
 
-type Filter = 'all' | 'school' | 'exams' | 'study';
-const FILTERS: [Filter, string][] = [['all', 'Alles'], ['school', 'HÜs & Abgaben'], ['exams', 'Tests'], ['study', 'Lernplan']];
+type Filter = 'all' | 'school' | 'exams' | 'study' | 'timetable';
+const FILTERS: [Filter, string][] = [['all', 'Alles'], ['school', 'HÜs & Abgaben'], ['exams', 'Tests'], ['study', 'Lernplan'], ['timetable', 'Stundenplan']];
+
+interface Lesson { date: string; start: string; end: string; subject: string | null; code: string | null; status: string; info: string | null }
+
+function Timetable({ today }: { today: string }) {
+  const [lessons, setLessons] = useState<Lesson[] | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    api<Lesson[]>(`/api/timetable?from=${today}&to=${addDays(today, 6)}`).then(setLessons).catch((err: Error) => setError(err.message));
+  }, [today]);
+  if (error) return <div className="error-bar">{error}</div>;
+  if (!lessons) return null;
+  if (!lessons.length) return <div className="empty"><div className="empty-star">✦</div><p>Kein Stundenplan. Verbinde WebUntis unter Einstellungen.</p></div>;
+  const days = [...new Set(lessons.map((l) => l.date))];
+  return (
+    <>
+      {days.map((d) => (
+        <section key={d}>
+          <h2>{formatDateDe(d, today)}</h2>
+          <div className="card lessons">
+            {lessons.filter((l) => l.date === d).map((l, i) => (
+              <div key={i} className={`lesson ${l.status}`}>
+                <span className="lesson-time">{l.start}</span>
+                <span>{l.subject ?? l.code}{l.status === 'cancelled' ? ' – entfällt' : ''}{l.info ? <span className="muted"> · {l.info}</span> : null}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </>
+  );
+}
 const matches = (f: Filter, i: Item) =>
   f === 'all' || (f === 'school' && (i.kind === 'homework' || i.kind === 'assignment'))
   || (f === 'exams' && i.kind === 'exam') || (f === 'study' && i.kind === 'study');
@@ -84,6 +115,8 @@ export function Planner() {
         </div>
       </header>
       {error && <div className="error-bar" onClick={() => setError('')}>{error}</div>}
+      {filter === 'timetable' && <Timetable today={today} />}
+      {filter !== 'timetable' && <>
 
       {overdue.length > 0 && (
         <section>
@@ -112,6 +145,7 @@ export function Planner() {
           {showDone && <ul className="items">{done.map(row)}</ul>}
         </section>
       )}
+      </>}
       {lightbox && <Lightbox url={lightbox} onClose={() => setLightbox(null)} />}
     </div>
   );

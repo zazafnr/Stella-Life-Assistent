@@ -121,6 +121,47 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX inbox_user_created ON inbox_events(user_id, created_at);
   `,
+  `
+  ALTER TABLE reminders ADD COLUMN always INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE items ADD COLUMN external_id TEXT;
+  CREATE UNIQUE INDEX items_external ON items(user_id, external_id) WHERE external_id IS NOT NULL;
+  CREATE TABLE lessons (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    date TEXT NOT NULL,
+    start TEXT NOT NULL,
+    end TEXT NOT NULL,
+    subject TEXT,
+    subject_code TEXT,
+    status TEXT NOT NULL DEFAULT 'normal',
+    info TEXT
+  );
+  CREATE INDEX lessons_user_date ON lessons(user_id, date);
+  CREATE TABLE mail_state (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    account_id TEXT NOT NULL,
+    uid_validity TEXT NOT NULL,
+    last_uid INTEGER NOT NULL,
+    last_error TEXT,
+    checked_at TEXT,
+    PRIMARY KEY (user_id, account_id)
+  );
+  CREATE TABLE notified (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    key TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, key)
+  );
+  `,
+  `
+  CREATE TABLE notes_deliveries (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    delivered_at TEXT NOT NULL,
+    notebook TEXT,
+    page INTEGER,
+    PRIMARY KEY (user_id, item_id)
+  );
+  `,
 ];
 
 function migrate() {
@@ -139,11 +180,29 @@ export const newId = () => randomUUID();
 
 // ---------- Users ----------
 
+export type BookProvider = 'digi4school' | 'scook';
+
+export interface BookConfig {
+  subject: string;
+  provider: BookProvider;
+  url: string;
+  /** gedruckte Seitenzahl + Versatz = Seite im E-Book-Viewer */
+  pageOffset?: number;
+  /** optional: direkte Seiten-URL mit {page} */
+  pageUrlTemplate?: string;
+}
+
 export interface UserSettings {
   eveningTime?: string;
   studyTime?: string;
-  digi4schoolBooks?: { subject: string; url: string; pageOffset?: number; pageUrlTemplate?: string }[];
+  books?: BookConfig[];
+  /** veraltet – wird beim Lesen in `books` übernommen */
+  digi4schoolBooks?: Omit<BookConfig, 'provider'>[];
   stepGoal?: number;
+  /** HÜs automatisch lösen und in Handschrift ins Heft schreiben */
+  homeworkAutopilot?: boolean;
+  /** Werbung/Spam automatisch in den Papierkorb */
+  mailAutoTrash?: boolean;
 }
 
 export interface User {
@@ -156,10 +215,21 @@ export interface User {
 }
 
 type UserRow = { id: string; name: string; email: string; time_zone: string; settings: string; ingest_token: string };
+function readSettings(json: string): UserSettings {
+  const s = JSON.parse(json) as UserSettings;
+  if (!s.books && s.digi4schoolBooks) s.books = s.digi4schoolBooks.map((b) => ({ ...b, provider: 'digi4school' }));
+  delete s.digi4schoolBooks;
+  return s;
+}
+
 const toUser = (r: UserRow): User => ({
   id: r.id, name: r.name, email: r.email, timeZone: r.time_zone,
-  settings: JSON.parse(r.settings), ingestToken: r.ingest_token,
+  settings: readSettings(r.settings), ingestToken: r.ingest_token,
 });
+
+export function allUserIds(): string[] {
+  return (db.prepare('SELECT id FROM users').all() as { id: string }[]).map((r) => r.id);
+}
 
 export function getUser(id: string): User | null {
   const r = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined;
@@ -191,23 +261,28 @@ export const toItem = (r: ItemRow): Item => ({
 export interface NewItem {
   kind: ItemKind; title: string; subject?: string | null; detail?: string | null; notes?: string | null;
   page?: string | null; exercises?: string | null; book?: string | null; due?: string | null; time?: string | null;
-  material?: string | null; parentId?: string | null; source?: string;
+  material?: string | null; parentId?: string | null; source?: string; externalId?: string | null;
 }
 
 export function createItem(userId: string, n: NewItem): Item {
   const id = newId();
   const ts = now();
   db.prepare(`INSERT INTO items (id, user_id, kind, subject, title, detail, notes, page, exercises, book, due, time,
-      material, parent_id, source, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      material, parent_id, source, external_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(id, userId, n.kind, n.subject ?? null, n.title, n.detail ?? null, n.notes ?? null, n.page ?? null,
       n.exercises ?? null, n.book ?? null, n.due ?? null, n.time ?? null, n.material ?? null, n.parentId ?? null,
-      n.source ?? 'chat', ts, ts);
+      n.source ?? 'chat', n.externalId ?? null, ts, ts);
   return getItem(userId, id)!;
 }
 
 export function getItem(userId: string, id: string): Item | null {
   const r = db.prepare('SELECT * FROM items WHERE user_id = ? AND id = ?').get(userId, id) as ItemRow | undefined;
+  return r ? toItem(r) : null;
+}
+
+export function getItemByExternalId(userId: string, externalId: string): Item | null {
+  const r = db.prepare('SELECT * FROM items WHERE user_id = ? AND external_id = ?').get(userId, externalId) as ItemRow | undefined;
   return r ? toItem(r) : null;
 }
 
@@ -294,13 +369,20 @@ export function messagesSince(userId: string, since: string): ChatMessage[] {
 
 // ---------- Reminders ----------
 
-export function addReminder(userId: string, itemId: string | null, fireAt: Date, message: string, withAttachments = false) {
-  db.prepare('INSERT INTO reminders (id, user_id, item_id, fire_at, message, with_attachments) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(newId(), userId, itemId, fireAt.toISOString(), message, Number(withAttachments));
+export function addReminder(userId: string, itemId: string | null, fireAt: Date, message: string, withAttachments = false,
+  always = false) {
+  db.prepare('INSERT INTO reminders (id, user_id, item_id, fire_at, message, with_attachments, always) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(newId(), userId, itemId, fireAt.toISOString(), message, Number(withAttachments), Number(always));
 }
 
 export function clearOpenReminders(userId: string, itemId: string) {
   db.prepare('DELETE FROM reminders WHERE user_id = ? AND item_id = ? AND sent_at IS NULL').run(userId, itemId);
+}
+
+/** Einmal-Benachrichtigungen (z. B. "Stunde entfällt") nicht doppelt schicken */
+export function notifyOnce(userId: string, key: string): boolean {
+  const r = db.prepare('INSERT OR IGNORE INTO notified (user_id, key, created_at) VALUES (?, ?, ?)').run(userId, key, now());
+  return r.changes > 0;
 }
 
 // ---------- Pending questions ----------

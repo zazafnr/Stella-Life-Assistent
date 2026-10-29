@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { interpret, parseEntry } from './parser.ts';
+import { interpret, normalizeSubject, parseEntry } from './parser.ts';
 import { buildStudyPlan, planReminders } from './planning.ts';
 import { nextWeekday, zonedToUtc } from './dates.ts';
 
@@ -103,4 +103,19 @@ test('Lernplan: verteilt, endet mit Wiederholung, nie am Prüfungstag', () => {
 test('Zeitzonen inkl. Sommerzeit', () => {
   assert.equal(zonedToUtc('2026-10-29', '19:00', 'Europe/Vienna').toISOString(), '2026-10-29T18:00:00.000Z');
   assert.equal(zonedToUtc('2026-07-01', '19:00', 'Europe/Vienna').toISOString(), '2026-07-01T17:00:00.000Z');
+});
+
+test('Fächer aus WebUntis-Kürzeln', () => {
+  assert.equal(normalizeSubject('F'), 'Französisch');
+  assert.equal(normalizeSubject('M'), 'Mathe');
+  assert.equal(normalizeSubject('Latein'), 'Latein');
+  assert.equal(normalizeSubject('BSPK'), 'Sport');
+  assert.equal(normalizeSubject('Mathematik'), 'Mathe');
+  assert.equal(normalizeSubject('Robotik'), 'Robotik');
+});
+
+test('Französisch-HÜ aus dem scook-Buch', () => {
+  const e = parseEntry('Französisch HÜ S. 45 Nr. 16 Freitag', WED)!;
+  assert.equal(e.subject, 'Französisch');
+  assert.equal(e.exercises, '16');
 });

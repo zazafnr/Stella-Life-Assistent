@@ -16,8 +16,8 @@ const { addDays, todayIn } = await import('@stella/shared');
 const { user } = register('Lukas', 'lukas@example.com', 'supergeheim', 'Europe/Vienna');
 const today = todayIn('Europe/Vienna');
 
-test('HÜ per Kurznotiz → Eintrag, Erinnerung am Vorabend, digi4school-Job', async () => {
-  updateUserSettings(user.id, { digi4schoolBooks: [{ subject: 'Latein', url: 'https://digi4school.at/ebook/abc' }] });
+test('HÜ per Kurznotiz → Eintrag, Erinnerung am Vorabend, Buchseiten-Job', async () => {
+  updateUserSettings(user.id, { books: [{ subject: 'Latein', provider: 'digi4school', url: 'https://digi4school.at/ebook/abc' }] });
   const u = getUser(user.id)!;
   const res = await handleChat(u, 'Latein Hü Seite 45 nr 3 in 5 tagen', 'c1');
   assert.equal(res.items.length, 1);
@@ -25,12 +25,12 @@ test('HÜ per Kurznotiz → Eintrag, Erinnerung am Vorabend, digi4school-Job', a
   assert.equal(item.title, 'Latein HÜ');
   assert.equal(item.due, addDays(today, 5));
   assert.match(res.messages[0].text, /Notiert.*Latein HÜ.*S\. 45 Nr\. 3/);
-  assert.match(res.messages[0].text, /digi4school/);
+  assert.match(res.messages[0].text, /digi4school, lös die Aufgabe und schreib sie dir ins Heft/);
 
   const reminders = db.prepare('SELECT * FROM reminders WHERE item_id = ?').all(item.id) as { fire_at: string; with_attachments: number }[];
   assert.equal(reminders.length, 1);
   assert.equal(reminders[0].with_attachments, 1);
-  const jobs = db.prepare(`SELECT * FROM jobs WHERE type = 'digi4school_page'`).all();
+  const jobs = db.prepare(`SELECT * FROM jobs WHERE type = 'book_page'`).all();
   assert.equal(jobs.length, 1);
 });
 
