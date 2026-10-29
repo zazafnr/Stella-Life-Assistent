@@ -103,3 +103,7 @@ server/   Fastify + SQLite: API, KI-Agent, Erinnerungen, Jobs, Schulbücher (sco
 web/      React-PWA: Chat, Planer, Gesundheit, Einstellungen, Offline-Speicher
 deploy/   Docker Compose + Caddy (HTTPS) + Backup-Skript
 ```
+
+## Rechte
+
+© 2026 zaza.dev – **Alle Rechte vorbehalten.** Der Code ist zum Anschauen öffentlich, aber nicht frei lizenziert: Kopieren, Weitergeben oder Verwenden in eigenen Projekten ist ohne schriftliche Erlaubnis nicht gestattet. Details in [`LICENSE`](LICENSE).
