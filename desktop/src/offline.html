@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:" />
+<title>Stella</title>
+<style>
+  :root { --bg:#F5F9FF; --text:#0F2A4A; --muted:#5B7190; --blue:#1F6FEB; --pink:#FF7EB3; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; font-family:Inter, "Segoe UI", system-ui, sans-serif; color:var(--text);
+    background:linear-gradient(180deg,#CFE6FF 0%,#E8F3FF 45%,var(--bg) 100%); -webkit-app-region:drag; }
+  main { height:100%; display:grid; place-items:center; text-align:center; padding:24px; }
+  .card { background:rgba(255,255,255,.82); border-radius:24px; padding:36px 40px; max-width:420px;
+    box-shadow:0 20px 60px rgba(31,111,235,.15); -webkit-app-region:no-drag; animation:rise .5s ease-out both; }
+  .star { color:var(--pink); animation:hop 2.4s ease-in-out infinite; display:inline-block; }
+  h1 { font-size:22px; margin:12px 0 6px; }
+  p { color:var(--muted); line-height:1.5; margin:0 0 22px; }
+  button { font:inherit; font-weight:600; border:0; border-radius:14px; padding:12px 22px; cursor:pointer;
+    background:var(--blue); color:#fff; transition:transform .15s; }
+  button:hover { transform:translateY(-1px); }
+  .small { display:block; margin-top:14px; font-size:13px; color:var(--muted); }
+  .cloud { position:fixed; background:#fff; border-radius:999px; opacity:.85; filter:blur(.3px); animation:drift 40s linear infinite; }
+  @keyframes rise { from { opacity:0; transform:translateY(12px); } }
+  @keyframes hop { 0%,100% { transform:translateY(0) rotate(0); } 50% { transform:translateY(-8px) rotate(12deg); } }
+  @keyframes drift { from { transform:translateX(-30vw); } to { transform:translateX(130vw); } }
+  @media (prefers-reduced-motion: reduce) { * { animation:none !important; } }
+</style>
+</head>
+<body>
+<div class="cloud" style="top:8%;width:140px;height:44px"></div>
+<div class="cloud" style="top:18%;width:90px;height:30px;animation-delay:-18s"></div>
+<main>
+  <div class="card">
+    <span class="star"><svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.6 7.1.7-5.4 4.8 1.6 7L12 17.4 5.8 21.1l1.6-7L2 9.3l7.1-.7z"/></svg></span>
+    <h1>Stella ist gerade nicht erreichbar</h1>
+    <p>Kein Internet oder der Server schläft kurz. Ich versuche es gleich von selbst noch einmal.</p>
+    <button id="retry" type="button">Nochmal versuchen</button>
+    <span class="small" id="info"></span>
+  </div>
+</main>
+<script>
+  const target = new URLSearchParams(location.search).get('url');
+  const info = document.getElementById('info');
+  let left = 15;
+  function go() { if (target && /^https?:/.test(target)) location.href = target; }
+  document.getElementById('retry').addEventListener('click', go);
+  window.addEventListener('online', go);
+  setInterval(() => { left -= 1; if (left <= 0) { left = 15; go(); } info.textContent = `Neuer Versuch in ${left} s`; }, 1000);
+</script>
+</body>
+</html>

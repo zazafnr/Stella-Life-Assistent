@@ -114,7 +114,7 @@ code { font-size: 13px; background: var(--surface-2); padding: 2px 6px; border-r
 .app { height: 100%; display: flex; }
 .content { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; overflow: hidden; }
 .page {
-  position: relative; flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  position: relative; flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
   padding: calc(20px + env(safe-area-inset-top)) 20px calc(var(--tabbar-h) + 48px + env(safe-area-inset-bottom));
 }
 .page-inner { position: relative; z-index: 1; width: 100%; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
@@ -163,6 +163,13 @@ code { font-size: 13px; background: var(--surface-2); padding: 2px 6px; border-r
 .is-desktop .desktop-drag { height: 34px; position: fixed; top: 0; left: 0; right: 150px; z-index: 50; }
 .is-desktop .sidebar { padding-top: 40px; }
 .is-desktop button, .is-desktop a, .is-desktop input, .is-desktop textarea { -webkit-app-region: no-drag; }
+.is-desktop .aside-today { padding-top: 46px; }
+/* schmale, ruhige Scrollbalken in der PC-App (Windows zeigt sonst graue Balken) */
+.is-desktop ::-webkit-scrollbar { width: 10px; height: 10px; }
+.is-desktop ::-webkit-scrollbar-track { background: transparent; }
+.is-desktop ::-webkit-scrollbar-thumb { background: rgba(91, 113, 144, .28); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
+.is-desktop ::-webkit-scrollbar-thumb:hover { background-color: rgba(91, 113, 144, .45); }
+.is-desktop ::-webkit-scrollbar-button { display: none; }
 
 /* ---------- Bausteine ---------- */
 .card {

@@ -37,6 +37,14 @@ export function App() {
   useEffect(() => { if (token && !hasMe) void refreshMe().catch(() => {}); }, [token, hasMe]);
   useEffect(() => { history.replaceState(null, '', tab === 'today' ? location.pathname : `#${tab}`); }, [tab]);
   useEffect(() => { document.documentElement.classList.toggle('is-desktop', isDesktopApp); }, []);
+  useEffect(() => {
+    if (!isDesktopApp) return;
+    // Fensterknöpfe oben rechts sitzen auf dem Himmel – nur im Chat mit Seitenspalte auf Weiß
+    const paint = () => window.stellaDesktop?.setTitleBarColor?.(tab === 'chat' && innerWidth >= 1240 ? '#FAFCFF' : '#D2E7FE');
+    paint();
+    addEventListener('resize', paint);
+    return () => removeEventListener('resize', paint);
+  }, [tab]);
 
   const openHomework = useMemo(() => Object.values(items).filter((i) => i.kind === 'homework' && i.status === 'open' && !i.deleted).length, [items]);
 
