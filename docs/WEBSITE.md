@@ -1,6 +1,6 @@
 # Website evolsior.com
 
-Statische Seite (kein Framework). Quellen in `site-src/`, gebaut nach `site/` (liegt im Repo).
+Statische Seite (kein Framework). Quellen in `site-src/`, gebaut nach `site/public/` (liegt im Repo), Cloudflare-Konfiguration in `site/wrangler.jsonc`.
 
 | Adresse | Inhalt |
 |---|---|
@@ -12,16 +12,18 @@ Statische Seite (kein Framework). Quellen in `site-src/`, gebaut nach `site/` (l
 ## Ändern
 
 1. Texte und Aussehen in `site-src/` ändern (`*.body.html`, `*.css`, `*.js`).
-2. `python3 scripts/build-site.py` – baut `site/`.
-3. `site/` committen und nach `main` pushen. Cloudflare Pages veröffentlicht automatisch.
+2. `python3 scripts/build-site.py` – baut `site/public/`.
+3. `site/` committen und nach `main` pushen. Cloudflare veröffentlicht automatisch.
 
-Die iPhone-Bilder (`site/assets/stella/*.jpg`, 1179×2556, mit Statusleiste) entstehen aus der Web-App mit Demo-Daten
+Die iPhone-Bilder (`site/public/assets/stella/*.jpg`, 1179×2556, mit Statusleiste) entstehen aus der Web-App mit Demo-Daten
 (`server/scripts/demo-seed.ts`). Die App spricht Deutsch, die Bilder sind für die englische Seite übersetzt.
 
-## Cloudflare Pages (einmalig)
+## Cloudflare (einmalig)
 
-Workers & Pages → Create → Pages → Connect to Git → Repo `Stella-Life-Assistent`, Branch `main`.
-Build command: leer. Build output directory: `site`. Danach im Projekt „Custom domains“: `evolsior.com` und `www.evolsior.com`.
+Workers & Pages → Create → Import a repository → `Stella-Life-Assistent`, Production branch `main`.
+Project name `evolsior` (muss zu `name` in `site/wrangler.jsonc` passen). Unter Advanced: **Root directory** `site`.
+Build command leer, Deploy command `npx wrangler deploy`. Danach im Projekt unter Settings → Domains & Routes:
+`evolsior.com` und `www.evolsior.com` als Custom domain hinzufügen.
 
 ## E-Mail
 
