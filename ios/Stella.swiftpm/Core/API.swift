@@ -26,9 +26,19 @@ final class API: @unchecked Sendable {
         set { UserDefaults.standard.set(API.normalize(newValue) ?? API.defaultServer, forKey: "server") }
     }
 
+    /** falls der Schlüsselbund nicht geht (unsignierter Simulator-Build, z. B. Appetize): nur im Speicher */
+    private var memoryToken: String?
+
     var token: String? {
-        get { Demo.token ?? Keychain.read("token") }
-        set { if let v = newValue { Keychain.write("token", v) } else { Keychain.delete("token") } }
+        get { Demo.token ?? Keychain.read("token") ?? memoryToken }
+        set {
+            if let v = newValue {
+                memoryToken = Keychain.write("token", v) ? nil : v
+            } else {
+                Keychain.delete("token")
+                memoryToken = nil
+            }
+        }
     }
 
     static func normalize(_ raw: String) -> String? {
@@ -108,13 +118,14 @@ enum Keychain {
         return String(data: d, encoding: .utf8)
     }
 
-    static func write(_ key: String, _ value: String) {
+    @discardableResult
+    static func write(_ key: String, _ value: String) -> Bool {
         delete(key)
         let q: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: key,
             kSecValueData as String: Data(value.utf8), kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
         ]
-        SecItemAdd(q as CFDictionary, nil)
+        return SecItemAdd(q as CFDictionary, nil) == errSecSuccess
     }
 
     static func delete(_ key: String) {

@@ -61,7 +61,7 @@ struct LoginView: View {
                             if busy { ProgressView().tint(.white) } else { Text(register ? "Konto erstellen" : "Anmelden") }
                         }
                         .buttonStyle(PrimaryButton())
-                        .disabled(busy || email.isEmpty || password.count < 8)
+                        .disabled(busy || email.isEmpty || password.isEmpty || (register && password.count < 8))
                         .padding(.top, 4)
 
                         Button(register ? "Schon ein Konto? Anmelden" : "Noch kein Konto?") {

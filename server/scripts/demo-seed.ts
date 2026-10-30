@@ -3,10 +3,17 @@
 // aussehen wie im Alltag. Gibt am Ende nur den Login-Token aus.
 //
 //   STELLA_DATA_DIR=/tmp/demo STELLA_SECRET=… npx tsx server/scripts/demo-seed.ts > token.txt
+//
+// Mit DEMO_EMAIL / DEMO_PASSWORD / DEMO_NAME auch als Testkonto auf einem echten Server
+// (das Passwort darf dann kürzer sein als bei der normalen Registrierung).
 
 process.env.OPENROUTER_API_KEY = '';
+process.env.STELLA_ALLOW_REGISTRATION = 'true';
+const EMAIL = process.env.DEMO_EMAIL || 'demo@stella.local';
+const PASSWORD = process.env.DEMO_PASSWORD || 'demo-passwort-123';
+const NAME = process.env.DEMO_NAME || 'Lukas';
 
-const { register } = await import('../src/auth.ts');
+const { hashPassword, register } = await import('../src/auth.ts');
 const { addMessage, db, getUser, newId, updateUserSettings } = await import('../src/db.ts');
 const { addItem } = await import('../src/planner.ts');
 const { addMemory } = await import('../src/memory.ts');
@@ -17,8 +24,9 @@ const { isoWeekday } = await import('../src/context.ts');
 const { addDays, todayIn } = await import('@stella/shared');
 
 const TZ = 'Europe/Vienna';
-const { user: created, token } = register('Lukas', 'demo@stella.local', 'demo-passwort-123', TZ, 'iPhone');
+const { user: created, token } = register(NAME, EMAIL, PASSWORD.length >= 8 ? PASSWORD : 'vorlaeufig-12345678', TZ, 'iPhone');
 const uid = created.id;
+if (PASSWORD.length < 8) db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(PASSWORD), uid);
 const user = () => getUser(uid)!;
 const today = todayIn(TZ);
 updateUserSettings(uid, { tone: 'nett', studyTime: '16:30', eveningTime: '19:00', stepGoal: 8000 });
@@ -68,7 +76,7 @@ const matheBlocks = plan.blocks.filter((b) => b.parentId === mathe.id);
 if (matheBlocks.length) perform(user(), 'week_plan.apply', { blocks: matheBlocks }, { source: 'chat', quiet: true });
 
 // Chat über die echten Wege (ohne KI)
-addMessage(uid, 'assistant', '☀️ Guten Morgen, Lukas! Heute hast du bis 12:35 Schule, um 16:30 lernst du Mathe (Ableitungen). Morgen fällt Physik aus. 💫');
+addMessage(uid, 'assistant', `☀️ Guten Morgen, ${NAME}! Heute hast du bis 12:35 Schule, um 16:30 lernst du Mathe (Ableitungen). Morgen fällt Physik aus. 💫`);
 await handleChat(user(), 'Deutsch HÜ bis morgen Erörterung S. 45', null);
 await handleChat(user(), 'erinnere mich in 2 Stunden an Mama anrufen', null);
 await handleChat(user(), 'merk dir, dass ich am Freitag nach der Schule zu Oma fahre', null);

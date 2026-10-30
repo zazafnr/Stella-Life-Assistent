@@ -132,8 +132,8 @@ function Login() {
         <h1 className="display">Stella</h1>
         <p className="tagline">Let Stella handle your life.</p>
         {mode === 'register' && <label className="field" style={{ textAlign: 'left' }}>Dein Name<input autoComplete="given-name" required {...field('name')} /></label>}
-        <label className="field" style={{ textAlign: 'left' }}>E-Mail<input type="email" autoComplete="email" required {...field('email')} /></label>
-        <label className="field" style={{ textAlign: 'left' }}>Passwort<input type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={8} required {...field('password')} /></label>
+        <label className="field" style={{ textAlign: 'left' }}>E-Mail<input type={mode === 'login' ? 'text' : 'email'} inputMode="email" autoCapitalize="none" autoComplete="email" required {...field('email')} /></label>
+        <label className="field" style={{ textAlign: 'left' }}>Passwort<input type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={mode === 'login' ? 1 : 8} required {...field('password')} /></label>
         {error && <p className="error-text" style={{ margin: 0 }}>{error}</p>}
         <button type="submit" className="btn block" disabled={busy}>{mode === 'login' ? 'Anmelden' : 'Konto erstellen'}</button>
         <button type="button" className="link" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
