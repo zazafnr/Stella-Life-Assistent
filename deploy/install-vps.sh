@@ -5,7 +5,8 @@
 #
 #   sudo STELLA_DOMAIN=stella.example.at ./deploy/install-vps.sh
 #
-# Optional: STELLA_PORT (Standard 8795), OPENROUTER_API_KEY (nur beim ersten Mal nötig).
+# Optional: STELLA_PORT (Standard 8795), OPENROUTER_API_KEY (nur beim ersten Mal nötig),
+# STELLA_ALIASES (weitere Adressen, durch Leerzeichen getrennt, die auf dieselbe App zeigen).
 set -euo pipefail
 
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -15,6 +16,7 @@ ENV_DIR=/etc/stella
 ENV_FILE=$ENV_DIR/stella.env
 PORT=${STELLA_PORT:-8795}
 DOMAIN=${STELLA_DOMAIN:?STELLA_DOMAIN setzen, z. B. stella.example.at}
+ALIASES=${STELLA_ALIASES:-}
 CADDYFILE=/etc/caddy/Caddyfile
 BROWSERS=$APP/ms-playwright
 
@@ -94,8 +96,10 @@ systemctl enable stella >/dev/null
 systemctl restart stella
 
 log "Caddy ($DOMAIN → 127.0.0.1:$PORT)"
+NAMES="$DOMAIN"
+for a in $ALIASES; do NAMES="$NAMES, $a"; done
 BLOCK="# stella-begin
-$DOMAIN {
+$NAMES {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:$PORT
 }
