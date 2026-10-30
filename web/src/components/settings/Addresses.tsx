@@ -1,16 +1,32 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../store.ts';
+import { api, type Me } from '../../store.ts';
 import { Section, useAction } from './ui.tsx';
 
 interface Address { id: string; email: string; verified: boolean; primary: boolean }
 
 /** Von welchen Adressen Stella E-Mails annimmt (stella@evolsior.com) */
-export function Addresses() {
+const isDesktop = 'stellaDesktop' in window;
+
+export function Addresses({ me }: { me: Me }) {
   const [list, setList] = useState<Address[] | null>(null);
   const [email, setEmail] = useState('');
   const [codes, setCodes] = useState<Record<string, string>>({});
   const [run, view, busy] = useAction();
   useEffect(() => { api<{ emails: Address[] }>('/api/me/emails').then((r) => setList(r.emails)).catch(() => setList([])); }, []);
+  const google = me.integrations.googleSignIn === true;
+  /** Google bestätigt die Adresse. PC-App: im Browser öffnen und hier auf das Ergebnis warten. */
+  const withGoogle = () => run(async () => {
+    const { url } = await api<{ url: string }>('/api/me/emails/google', { method: 'POST', json: { client: isDesktop ? 'desktop' : 'web' } });
+    if (!isDesktop) { location.href = url; return; }
+    window.open(url, '_blank');
+    const known = list?.length ?? 0;
+    for (let i = 0; i < 100; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const now = (await api<{ emails: Address[] }>('/api/me/emails')).emails;
+      if (now.length > known) { setList(now); return; }
+    }
+    throw new Error('Keine Antwort von Google bekommen. Versuch es nochmal.');
+  }, isDesktop ? 'Adresse ist verknüpft.' : 'Weiter zu Google …');
   const pending = list?.find((a) => !a.verified && !a.primary);
   return (
     <>
@@ -35,11 +51,16 @@ export function Addresses() {
           </form>
         )}
         <form className="form-grid two" onSubmit={(e) => { e.preventDefault(); void run(async () => { setList((await api<{ emails: Address[] }>('/api/me/emails', { method: 'POST', json: { email } })).emails); setEmail(''); }, 'Code verschickt. Gib ihn oben ein.'); }}>
-          <label style={{ gridColumn: '1 / -1' }}>Adresse hinzufügen
+          <label style={{ gridColumn: '1 / -1' }}>{google ? 'Andere Adresse, per Code bestätigen' : 'Adresse hinzufügen'}
             <input type="email" autoComplete="off" placeholder="du@firma.at" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </label>
           <div className="button-row" style={{ gridColumn: '1 / -1' }}><button type="submit" className="btn" disabled={busy || !email.includes('@')}>Code schicken</button></div>
         </form>
+        {google && (
+          <div className="button-row">
+            <button type="button" className="btn-google" disabled={busy} onClick={() => void withGoogle()}>Mit Google bestätigen</button>
+          </div>
+        )}
         {view}
       </Section>
     </>

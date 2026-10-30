@@ -9,10 +9,12 @@ process.env.STELLA_SECRET = 'test-secret-1234567890';
 process.env.STELLA_PUBLIC_URL = 'https://stella.example.at';
 process.env.GOOGLE_CLIENT_ID = 'client-123.apps.googleusercontent.com';
 process.env.GOOGLE_CLIENT_SECRET = 'geheim';
+process.env.STELLA_ALLOW_REGISTRATION = 'true';
 
 const { register } = await import('./auth.ts');
 const { listAccounts, publicAccounts, saveAccounts } = await import('./mail.ts');
-const { accessToken, finishGoogle, finishTarget, googleAuthUrl, makeState, readState } = await import('./oauth.ts');
+const { accessToken, finishGoogle, finishGoogleLink, finishTarget, googleAuthUrl, googleLinkUrl, makeState, readState } = await import('./oauth.ts');
+const { findUserByAddress, linkVerifiedAddress } = await import('./inbound.ts');
 
 const { user } = register('Lukas', 'lukas@example.com', 'supergeheim', 'Europe/Vienna');
 
@@ -81,5 +83,34 @@ test('Rückweg: iOS über stella-auth://, Web zurück in die Einstellungen, PC b
   const html = finishTarget('desktop', true, '<b>x</b>').html!;
   assert.match(html, /Gmail ist verbunden/);
   assert.ok(!html.includes('<b>x</b>'));
-  globalThis.fetch = realFetch;
 });
+
+test('Adresse per Google bestätigen: nur openid und email, kein Postfachzugriff, kein Refresh-Token', async () => {
+  const url = new URL(googleLinkUrl(user.id, 'web'));
+  assert.equal(url.searchParams.get('scope'), 'openid email');
+  assert.equal(url.searchParams.get('access_type'), null);
+  const state = readState(url.searchParams.get('state')!)!;
+  assert.equal(state.p, 'link');
+  assert.equal(state.u, user.id);
+  assert.equal(await finishGoogleLink('code-abc'), 'lukas@gmail.com');
+});
+
+test('Von Google bestätigte Adresse wird ohne Code verknüpft; fremde Konten bleiben draußen', () => {
+  assert.equal(findUserByAddress('lukas@gmail.com'), null);
+  const list = linkVerifiedAddress(user, 'Lukas@Gmail.com');
+  assert.ok(list.some((a) => a.email === 'lukas@gmail.com' && a.verified && !a.primary));
+  assert.equal(findUserByAddress('lukas@gmail.com')?.id, user.id);
+  assert.equal(linkVerifiedAddress(user, 'lukas@gmail.com').filter((a) => a.email === 'lukas@gmail.com').length, 1, 'zweimal ändert nichts');
+
+  const { user: other } = register('Anna', 'anna@example.com', 'supergeheim', 'Europe/Vienna');
+  assert.throws(() => linkVerifiedAddress(other, 'lukas@gmail.com'), /anderen Konto/);
+  assert.throws(() => linkVerifiedAddress(other, 'kaputt'), /gültige/);
+});
+
+test('Abschlussseite nennt „Adresse ist verknüpft“', () => {
+  assert.match(finishTarget('desktop', true, 'ok', 'link').html!, /Adresse ist verknüpft/);
+  assert.match(finishTarget('web', true, 'ok', 'link').redirect!, /provider=address/);
+  assert.match(finishTarget('desktop', true, 'ok').html!, /Gmail ist verbunden/);
+});
+
+test.after(() => { globalThis.fetch = realFetch; });

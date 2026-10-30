@@ -211,7 +211,7 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
       {sheet === 'ai' && ai && <Sheet title="KI" onClose={() => setSheet(null)}><AiDetails ai={ai} /></Sheet>}
       {sheet === 'perms' && <Sheet title="Was Stella selbst darf" onClose={() => setSheet(null)}><Permissions /></Sheet>}
       {sheet === 'memory' && <Sheet title="Was Stella über dich weiß" onClose={() => setSheet(null)}><MemoryView /></Sheet>}
-      {sheet === 'addresses' && <Sheet title="Mail an Stella" onClose={() => setSheet(null)}><Addresses /></Sheet>}
+      {sheet === 'addresses' && <Sheet title="Mail an Stella" onClose={() => setSheet(null)}><Addresses me={me} /></Sheet>}
       {sheet === 'server' && <Sheet title="Server" onClose={() => setSheet(null)}><Server /></Sheet>}
       {sheet === 'delete' && <Sheet title="Konto löschen" onClose={() => setSheet(null)}><DeleteAccount onDeleted={() => { setSheet(null); logoutLocal(); }} /></Sheet>}
       {sheet === 'log' && <Sheet title="Was Stella getan hat" onClose={() => setSheet(null)}><ActionLog /></Sheet>}

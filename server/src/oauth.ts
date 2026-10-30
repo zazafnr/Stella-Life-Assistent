@@ -25,12 +25,12 @@ const SCOPES = ['https://mail.google.com/', 'openid', 'email'];
 export const googleConfigured = () => !!(config.google.clientId && config.google.clientSecret);
 export const redirectUri = () => `${config.publicUrl}/api/oauth/google/callback`;
 
-interface State { u: string; c: OAuthClient; n: string; exp: number }
+interface State { u: string; c: OAuthClient; n: string; exp: number; /** 'link': nur eine E-Mail-Adresse bestätigen, kein Postfachzugriff */ p?: 'link' }
 
 const sign = (data: string) => createHmac('sha256', `oauth:${config.secret || 'stella'}`).update(data).digest('base64url');
 
-export function makeState(userId: string, client: OAuthClient): string {
-  const body = Buffer.from(JSON.stringify({ u: userId, c: client, n: randomBytes(8).toString('hex'), exp: Date.now() + 15 * 60_000 } satisfies State))
+export function makeState(userId: string, client: OAuthClient, purpose?: 'link'): string {
+  const body = Buffer.from(JSON.stringify({ u: userId, c: client, n: randomBytes(8).toString('hex'), exp: Date.now() + 15 * 60_000, ...(purpose ? { p: purpose } : {}) } satisfies State))
     .toString('base64url');
   return `${body}.${sign(body)}`;
 }
@@ -64,6 +64,19 @@ export function googleAuthUrl(userId: string, client: OAuthClient, loginHint?: s
   return `${AUTH_URL}?${q}`;
 }
 
+/** Nur die Adresse bestätigen (Bereiche openid + email): kein Zugriff auf das Postfach, braucht keine Prüfung durch Google. */
+export function googleLinkUrl(userId: string, client: OAuthClient): string {
+  const q = new URLSearchParams({
+    client_id: config.google.clientId,
+    redirect_uri: redirectUri(),
+    response_type: 'code',
+    scope: 'openid email',
+    prompt: 'select_account',
+    state: makeState(userId, client, 'link'),
+  });
+  return `${AUTH_URL}?${q}`;
+}
+
 interface TokenResponse { access_token: string; expires_in: number; refresh_token?: string; id_token?: string; error?: string; error_description?: string }
 
 async function tokenRequest(params: Record<string, string>): Promise<TokenResponse> {
@@ -87,6 +100,17 @@ function emailFromIdToken(idToken: string | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+/** Code aus dem Callback einlösen: die von Google bestätigte Adresse zurückgeben (für „Mail an Stella“). */
+export async function finishGoogleLink(code: string): Promise<string> {
+  const tokens = await tokenRequest({ code, grant_type: 'authorization_code', redirect_uri: redirectUri() });
+  const payload = tokens.id_token?.split('.')[1];
+  let claims: { email?: string; email_verified?: boolean } = {};
+  try { claims = JSON.parse(Buffer.from(payload ?? '', 'base64url').toString()); } catch { /* unten abgelehnt */ }
+  if (!claims.email) throw new Error('Google hat keine E-Mail-Adresse mitgeschickt');
+  if (claims.email_verified === false) throw new Error('Google hat diese Adresse nicht als bestätigt gemeldet');
+  return claims.email.toLowerCase();
 }
 
 /** Code aus dem Callback einlösen und das Gmail-Postfach anlegen (oder ein App-Passwort-Postfach umstellen). */
@@ -130,8 +154,8 @@ export async function accessToken(account: MailAccount): Promise<string> {
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /** Wohin es nach Google zurückgeht: Web-App, iOS-App (fängt stella-auth:// ab) oder eine Abschlussseite für den Browser. */
-export function finishTarget(client: OAuthClient, ok: boolean, message: string): { redirect?: string; html?: string } {
-  const q = new URLSearchParams({ provider: 'gmail', ok: ok ? '1' : '0', message });
+export function finishTarget(client: OAuthClient, ok: boolean, message: string, what: 'gmail' | 'link' = 'gmail'): { redirect?: string; html?: string } {
+  const q = new URLSearchParams({ provider: what === 'link' ? 'address' : 'gmail', ok: ok ? '1' : '0', message });
   if (client === 'ios') return { redirect: `stella-auth://done?${q}` };
   if (client === 'web') return { redirect: `${config.publicUrl}/?${q}#settings` };
   return {
@@ -142,7 +166,7 @@ background:linear-gradient(180deg,#CFE6FF,#E8F3FF 45%,#F5F9FF)}
 .card{background:#fff;border-radius:24px;padding:36px 40px;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(31,111,235,.15)}
 h1{font-size:22px;margin:12px 0 8px}p{color:#5B7190;line-height:1.5;margin:0}.big{font-size:44px}
 </style></head><body><div class="card"><div class="big">${ok ? '✅' : '😕'}</div>
-<h1>${ok ? 'Gmail ist verbunden' : 'Das hat nicht geklappt'}</h1><p>${esc(message)}</p>
+<h1>${ok ? (what === 'link' ? 'Adresse ist verknüpft' : 'Gmail ist verbunden') : 'Das hat nicht geklappt'}</h1><p>${esc(message)}</p>
 <p style="margin-top:14px">Du kannst dieses Fenster schließen und zu Stella zurückgehen.</p></div></body></html>`,
   };
 }
