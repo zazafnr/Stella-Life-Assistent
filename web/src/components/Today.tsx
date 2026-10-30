@@ -93,7 +93,7 @@ export function Today({ go }: { go: (t: Tab) => void }) {
           </button>
         </header>
 
-        <BriefingCard onChat={() => go('chat')} />
+        <BriefingCard onOpen={go} />
 
         <section className="card" aria-label={dueLabel}>
           <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>

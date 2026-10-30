@@ -19,13 +19,14 @@ import { startScheduler } from './scheduler.ts';
 import { toICalendar } from './ical.ts';
 import { getBookCredentials, listShelf, LOGIN_PAGES, normalizeCookies, PROVIDERS, saveBookCredentials, screenshotPage, secretName } from './books.ts';
 import { deleteUserFont, renderHandwriting, saveUserFont, userFontPath } from './handwriting.ts';
-import { checkAllMail, listAccounts, PRESETS, publicAccounts, restoreMail, saveAccounts, testAccount, type MailAccount } from './mail.ts';
+import { checkAllMail, draftReply, getMailEvent, listAccounts, PRESETS, publicAccounts, restoreMail, saveAccounts, setEventField, testAccount, type MailAccount } from './mail.ts';
 import { lessonsFor, syncUntis, testUntis, type UntisCredentials } from './untis.ts';
 import { FILE_TYPES, filePath, saveDataUrl, saveFile } from './files.ts';
 import type { BookProvider } from './db.ts';
 import { ackNotesEntry, notesInbox, usesFreeNotes } from './notes.ts';
 import { finishGoogle, finishTarget, googleAuthUrl, googleConfigured, readState, type OAuthClient } from './oauth.ts';
-import { approve, GROUPS, isGroup, isLevel, levelFor, listActions, reject, undo } from './actions.ts';
+import { approve, GROUPS, isGroup, isLevel, levelFor, listActions, perform, reject, undo } from './actions.ts';
+import { LlmUnavailable } from './llm.ts';
 import { buildBriefing } from './briefing.ts';
 import { acceptHint, dismissHint } from './hints.ts';
 import { addMemory, cleanSchedule, deleteMemory, isCategory, listMemories, MEMORY_CATEGORIES, updateMemory } from './memory.ts';
@@ -457,8 +458,51 @@ app.register(async (api) => {
         id: r.id, source: r.source, sender: r.sender, text: r.text, createdAt: r.created_at,
         summary: p.summary ?? null, category: p.category ?? null, action: p.action ?? null,
         account: p.account ?? null, platform: p.platform ?? null,
+        reason: p.reason ?? null, deadline: p.deadline ?? null, needsReply: !!p.needsReply, handled: !!p.handled,
+        replied: p.replied ?? null, draft: p.draft ?? null, deadlineActionId: p.deadlineActionId ?? null,
       };
     });
+  });
+  // Antwort entwerfen (KI), bearbeiten, senden – Senden ist immer ein ausdrücklicher Klick
+  api.post('/api/inbox/:id/draft', async (req: FastifyRequest<{ Params: { id: string } }>) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    try {
+      const memories = listMemories(req.user.id).filter((m) => m.category === 'person').map((m) => `- ${m.text}`).join('\n');
+      return await draftReply(req.user, req.params.id, str(b.instruction, 500), memories);
+    } catch (err) {
+      throw new HttpError(err instanceof LlmUnavailable ? 503 : 400, (err as Error).message);
+    }
+  });
+  api.post('/api/inbox/:id/send', async (req: FastifyRequest<{ Params: { id: string } }>) => {
+    const b = req.body as Record<string, unknown>;
+    const ev = getMailEvent(req.user.id, req.params.id);
+    if (!ev) throw new HttpError(404, 'Mail nicht gefunden');
+    const body = str(b.body, 20_000).trim();
+    if (!body) throw new HttpError(400, 'Kein Text');
+    const r = perform(req.user, 'mail.send', {
+      accountId: ev.payload.accountId, to: str(b.to, 300) || ev.payload.fromAddress, subject: str(b.subject, 300) || `Re: ${ev.text ?? ''}`,
+      body, inReplyTo: ev.payload.messageId ?? null, eventId: ev.id,
+    }, { source: 'chat', quiet: true });
+    if (r.status === 'refused') throw new HttpError(403, r.reason);
+    // der Klick auf „Senden“ nach dem Lesen des Textes ist die Zustimmung
+    const action = r.status === 'proposed' ? approve(req.user.id, r.actionId).entry : null;
+    return { ok: true, action };
+  });
+  api.post('/api/inbox/:id/handled', async (req: FastifyRequest<{ Params: { id: string } }>) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    if (!setEventField(req.user.id, req.params.id, { handled: b.handled === false ? 0 : 1 })) throw new HttpError(404, 'Nicht gefunden');
+    return { ok: true };
+  });
+  api.post('/api/inbox/:id/deadline', async (req: FastifyRequest<{ Params: { id: string } }>) => {
+    const ev = getMailEvent(req.user.id, req.params.id);
+    const d = ev?.payload.deadline as { date: string; time: string | null; what: string } | null | undefined;
+    if (!ev || !d) throw new HttpError(404, 'Keine Frist in dieser Mail');
+    const r = perform(req.user, 'item.create', {
+      kind: d.time ? 'event' : 'todo', title: d.what, due: d.date, time: d.time, detail: `aus der Mail von ${ev.sender}`, source: 'mail',
+    }, { source: 'chat', quiet: true });
+    if (r.status === 'refused') throw new HttpError(403, r.reason);
+    setEventField(req.user.id, ev.id, { deadlineActionId: r.actionId });
+    return { ok: true, items: r.changed };
   });
   api.post('/api/inbox/:id/restore', async (req: FastifyRequest<{ Params: { id: string } }>) => {
     try { await restoreMail(req.user.id, req.params.id); } catch (err) { throw new HttpError(400, (err as Error).message); }

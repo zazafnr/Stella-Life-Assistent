@@ -22,7 +22,7 @@ struct TodayView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         header.rise(0)
-                        BriefingCardView(onChat: { go(.chat) })
+                        BriefingCardView(onOpen: { go($0 == "inbox" ? .inbox : .chat) })
                         dueCard.rise(1)
                         HStack(spacing: 14) {
                             examCard
@@ -406,7 +406,7 @@ struct LessonChip: View {
 /// Oben auf „Heute“: morgens der Überblick, den ganzen Tag „Mir ist aufgefallen“
 @MainActor
 struct BriefingCardView: View {
-    var onChat: () -> Void
+    var onOpen: (String) -> Void
     @Environment(Store.self) private var store
     @State private var briefing: Briefing?
     @State private var gone: Set<String> = []
@@ -437,7 +437,7 @@ struct BriefingCardView: View {
                     if !hints.isEmpty {
                         Text("MIR IST AUFGEFALLEN").eyebrow(color: Theme.pinkText).padding(.top, sections.isEmpty ? 0 : 4)
                         ForEach(hints) { h in
-                            HintRowView(hint: h, onChat: onChat, onGone: { withAnimation(.spring) { _ = gone.insert(h.key) } })
+                            HintRowView(hint: h, onOpen: onOpen, onGone: { withAnimation(.spring) { _ = gone.insert(h.key) } })
                                 .transition(.opacity.combined(with: .move(edge: .top)))
                         }
                     }
@@ -458,7 +458,7 @@ struct BriefingCardView: View {
 @MainActor
 struct HintRowView: View {
     var hint: Hint
-    var onChat: () -> Void
+    var onOpen: (String) -> Void
     var onGone: () -> Void
     @Environment(Store.self) private var store
     @State private var busy = false
@@ -473,11 +473,11 @@ struct HintRowView: View {
                 if let id = hint.actionId, store.actions[id]?.proposed == true {
                     ActionCardView(id: id)
                 } else if let label = hint.actionLabel {
-                    Button(label) { Task { await accept(thenChat: false) } }
+                    Button(label) { Task { await accept(thenOpen: nil) } }
                         .buttonStyle(SmallButton())
                         .disabled(busy)
-                } else if let label = hint.answerInChat {
-                    Button(label) { Task { await accept(thenChat: true) } }
+                } else if let open = hint.open {
+                    Button(open.label) { Task { await accept(thenOpen: open.tab) } }
                         .buttonStyle(SmallButton())
                 }
                 Button {
@@ -495,16 +495,17 @@ struct HintRowView: View {
 
     private var escaped: String { hint.key.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: ":/"))) ?? hint.key }
 
-    private func accept(thenChat: Bool) async {
+    private func accept(thenOpen tab: String?) async {
         busy = true
         defer { busy = false }
         struct Result: Decodable { var status: String }
         do {
             _ = try await API.shared.send("POST", "/api/hints/\(escaped)/accept", as: Result.self)
-            if thenChat { onChat() } else { Haptics.success(); onGone() }
+            if let tab { onOpen(tab) } else { Haptics.success(); onGone() }
             await store.sync()
         } catch {
-            if thenChat { onChat() }
+            // „Antwort schreiben“ hat nichts anzunehmen – einfach hinführen
+            if let tab { onOpen(tab) }
         }
     }
 }

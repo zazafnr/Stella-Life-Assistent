@@ -142,14 +142,15 @@ struct Hint: Codable, Hashable, Identifiable {
     var actionLabel: String?
     var actionId: String?
     var itemId: String?
+    /** Knopf, der in den Chat oder die Inbox führt (z. B. „Stoff sagen“, „Antwort schreiben“) */
+    var open: HintOpen?
     var id: String { key }
     var high: Bool { priority == "high" }
-    /** Rückfrage, die man im Chat beantwortet */
-    var answerInChat: String? {
-        if key.hasPrefix("exam_no_material") { return "Stoff sagen" }
-        if key.hasPrefix("no_source") { return "Foto schicken" }
-        return nil
-    }
+}
+
+struct HintOpen: Codable, Hashable {
+    var tab: String
+    var label: String
 }
 
 struct BriefingSection: Codable, Hashable, Identifiable {
@@ -273,10 +274,34 @@ struct InboxEntry: Codable, Hashable, Identifiable {
     var action: String?
     var account: String?
     var platform: String?
+    var reason: String?
+    var deadline: MailDeadline?
+    var needsReply: Bool?
+    var handled: Bool?
+    var replied: String?
+    var draft: MailDraft?
+    var deadlineActionId: String?
 
     var trashed: Bool { action == "trash" }
     var important: Bool { category == "important" }
     var date: Date? { ISO.parse(createdAt) }
+    /** „Wichtig für dich“: wichtige Mail der letzten 7 Tage, noch nicht erledigt */
+    var focus: Bool {
+        guard source == "email", handled != true, !trashed, important || needsReply == true || deadline != nil,
+              let d = date else { return false }
+        return d > Date().addingTimeInterval(-7 * 86_400)
+    }
+}
+
+struct MailDeadline: Codable, Hashable {
+    var date: String
+    var time: String?
+    var what: String
+}
+
+struct MailDraft: Codable, Hashable {
+    var subject: String?
+    var body: String
 }
 
 struct UpcomingReminder: Codable, Hashable, Identifiable {

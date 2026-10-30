@@ -8,7 +8,7 @@ import { addMessage, allUserIds, db, getItem, getUser, notifyOnce, now } from '.
 import { nightlyLearning } from './learning.ts';
 import { maybeSendBriefing } from './briefing.ts';
 import { deliverHints } from './hints.ts';
-import { checkAllMail, listAccounts } from './mail.ts';
+import { checkAllMail, listAccounts, sendMail } from './mail.ts';
 import { syncUntis } from './untis.ts';
 import { fetchBookPage } from './books.ts';
 import { solveHomework } from './homework.ts';
@@ -21,6 +21,10 @@ const JOB_HANDLERS: Record<string, (userId: string, payload: any) => Promise<voi
   book_page: (userId, p) => fetchBookPage(userId, p.itemId, p.pageDelta ?? 0, p.thenSolveAttempt ?? 0),
   digi4school_page: (userId, p) => fetchBookPage(userId, p.itemId),
   solve_homework: (userId, p) => solveHomework(userId, p.itemId, p.attempt ?? 0),
+  send_mail: async (userId, p) => {
+    await sendMail(userId, p);
+    addMessage(userId, 'assistant', `✉️ Gesendet an ${p.to}: „${p.subject}“`);
+  },
 };
 
 async function sendDueReminders() {

@@ -53,6 +53,7 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
       out.push({
         key: `exam_no_material:${e.exam.id}`, priority: e.daysLeft <= 5 ? 'high' : 'normal', itemId: e.exam.id,
         text: v.hintNoMaterial(e.exam.title, e.daysLeft), pending: { type: 'exam_material', itemId: e.exam.id },
+        open: { tab: 'chat', label: 'Stoff sagen' },
       });
     } else if (e.hasMaterial && e.sessions.total === 0 && e.daysLeft >= 2 && e.daysLeft <= 14) {
       out.push({
@@ -113,7 +114,7 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
     if (afternoon && levelFor(user, 'homework') !== 'never') {
       for (const hw of dueTomorrow.filter((i) => i.kind === 'homework')) {
         if (hw.attachments.length || (hw.page && bookFor(user, hw.subject))) continue;
-        out.push({ key: `no_source:${hw.id}`, priority: 'high', itemId: hw.id, text: v.hintNoSource(hw.title) });
+        out.push({ key: `no_source:${hw.id}`, priority: 'high', itemId: hw.id, text: v.hintNoSource(hw.title), open: { tab: 'chat', label: 'Foto schicken' } });
       }
     }
 
@@ -122,6 +123,13 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
     if (heavy.length >= 3 && today.freeMinutes < 120) {
       out.push({ key: `overloaded:${tomorrow}`, priority: 'normal', text: v.hintOverloaded(heavy.length, today.freeMinutes) });
     }
+  }
+
+  // Mails, die auf eine Antwort warten (älter als ein halber Tag)
+  const halfDay = Date.now() - 12 * 3600_000;
+  for (const m of lb.importantInbox) {
+    if (!m.needsReply || m.source !== 'email' || Date.parse(m.createdAt) > halfDay) continue;
+    out.push({ key: `reply:${m.id}`, priority: 'normal', text: v.hintReply(m.sender ?? 'Jemand', m.summary), open: { tab: 'inbox', label: 'Antwort schreiben' } });
   }
 
   // bekannter Zustand: Vorschlag schon verschickt / weggeklickt / abgelehnt

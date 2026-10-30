@@ -30,7 +30,7 @@ export interface ExamContext {
   sessions: { total: number; done: number; missed: number };
 }
 
-export interface InboxHighlight { id: string; source: string; sender: string | null; summary: string; createdAt: string }
+export interface InboxHighlight { id: string; source: string; sender: string | null; summary: string; createdAt: string; needsReply: boolean; reason: string | null }
 
 export interface Lagebild {
   today: Ymd;
@@ -138,7 +138,10 @@ export function buildLagebild(user: User, days = 7): Lagebild {
   const importantInbox = (db.prepare(`SELECT id, source, sender, text, payload, created_at FROM inbox_events WHERE user_id = ? AND created_at > ?
     AND (json_extract(payload, '$.category') = 'important' OR source = 'sms') AND COALESCE(json_extract(payload, '$.handled'), 0) = 0
     ORDER BY created_at DESC LIMIT 8`).all(user.id, since) as { id: string; source: string; sender: string | null; text: string | null; payload: string; created_at: string }[])
-    .map((r) => ({ id: r.id, source: r.source, sender: r.sender, summary: (JSON.parse(r.payload).summary as string | undefined) || r.text || '', createdAt: r.created_at }));
+    .map((r) => {
+      const p = JSON.parse(r.payload) as { summary?: string; needsReply?: boolean; reason?: string };
+      return { id: r.id, source: r.source, sender: r.sender, summary: p.summary || r.text || '', createdAt: r.created_at, needsReply: !!p.needsReply, reason: p.reason ?? null };
+    });
 
   return { today, now, days: dayList, exams, overdue, importantInbox, memories };
 }
@@ -161,7 +164,7 @@ export function lagebildPrompt(lb: Lagebild): string {
   const exams = lb.exams.map((e) => `- [${e.exam.id}] ${e.exam.title} in ${e.daysLeft} Tagen – Stoff: ${e.hasMaterial ? e.exam.material : 'UNBEKANNT'}; ` +
     `Lerneinheiten ${e.sessions.done}/${e.sessions.total} erledigt${e.sessions.missed ? `, ${e.sessions.missed} verpasst` : ''}`);
   const overdue = lb.overdue.map((i) => `- [${i.id}] ${i.title} (war fällig ${i.due})`);
-  const inbox = lb.importantInbox.map((m) => `- ${m.source} von ${m.sender ?? '?'}: ${m.summary}`);
+  const inbox = lb.importantInbox.map((m) => `- [${m.id}] ${m.source} von ${m.sender ?? '?'}: ${m.summary}${m.needsReply ? ' (wartet auf Antwort)' : ''}`);
   const mem = lb.memories.slice(0, 80).map((m) => `- (m:${m.id.slice(0, 8)}) ${MEMORY_CATEGORIES[m.category]}: ${m.text}` +
     (m.schedule ? ` [${m.schedule.days.map((x) => ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][x]).join('/')} ${m.schedule.start}–${m.schedule.end}]` : ''));
 

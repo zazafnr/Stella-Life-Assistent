@@ -30,7 +30,8 @@ struct InboxView: View {
         }
     }
 
-    private var shown: [InboxEntry] { (entries ?? []).filter(filter.matches) }
+    private var focus: [InboxEntry] { (entries ?? []).filter(\.focus) }
+    private var shown: [InboxEntry] { (entries ?? []).filter { filter.matches($0) && !(filter == .important && $0.focus) } }
 
     var body: some View {
         NavigationStack {
@@ -40,10 +41,23 @@ struct InboxView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         Text("Inbox").font(Theme.display(32)).foregroundStyle(Theme.text).padding(.top, 12)
+                        if filter == .important, !focus.isEmpty {
+                            Text("WICHTIG FÜR DICH")
+                                .font(.system(size: 13, weight: .bold))
+                                .tracking(1)
+                                .foregroundStyle(Theme.pinkText)
+                            ForEach(Array(focus.enumerated()), id: \.element.id) { index, e in
+                                FocusCard(entry: e) { msg in
+                                    if !msg.isEmpty { show(msg) }
+                                    Task { await load() }
+                                }
+                                .rise(min(index, 6))
+                            }
+                        }
                         counters
                         if entries == nil {
                             ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
-                        } else if shown.isEmpty {
+                        } else if shown.isEmpty && !(filter == .important && !focus.isEmpty) {
                             VStack(spacing: 12) {
                                 Cloud(width: 90)
                                 Text(filter == .important ? "Nichts Wichtiges – alles ruhig." : "Hier ist gerade nichts.")

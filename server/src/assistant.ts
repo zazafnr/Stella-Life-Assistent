@@ -15,6 +15,7 @@ import { buildLagebild, lagebildPrompt } from './context.ts';
 import { briefingText } from './briefing.ts';
 import { findHints, markDelivered as markHintDelivered } from './hints.ts';
 import { cleanSchedule, findMemory, isCategory, listMemories } from './memory.ts';
+import { draftReply } from './mail.ts';
 import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type ToolDef } from './llm.ts';
 import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
 
@@ -482,6 +483,18 @@ const TOOLS: ToolDef[] = [
   {
     type: 'function',
     function: {
+      name: 'reply_mail',
+      description: 'Auf eine E-Mail antworten (id aus recent_inbox oder dem Lagebild). Stella schreibt den Text, der Nutzer bekommt ihn zum Bestätigen – gesendet wird erst nach seinem Ja.',
+      parameters: {
+        type: 'object',
+        properties: { inbox_id: { type: 'string' }, instruction: { type: 'string', description: 'was inhaltlich drinstehen soll, z. B. "ich bin morgen krank"' } },
+        required: ['inbox_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'remember',
       description: 'Etwas Dauerhaftes über den Nutzer merken (Person, Routine, Vorliebe, Schule, Ziel, Gesundheit). Routinen mit schedule, damit Stella sie beim Planen freihält.',
       parameters: {
@@ -611,8 +624,18 @@ async function runTool(t: Turn, name: string, args: Record<string, any>): Promis
         .all(u.id, addDays(t.today, -days));
     }
     case 'recent_inbox':
-      return db.prepare(`SELECT source, sender, text, json_extract(payload, '$.summary') AS summary, created_at FROM inbox_events WHERE user_id = ? ${args.source ? 'AND source = ?' : ''}
+      return db.prepare(`SELECT id, source, sender, text, json_extract(payload, '$.summary') AS summary, json_extract(payload, '$.needsReply') AS needs_reply,
+        json_extract(payload, '$.deadline') AS deadline, created_at FROM inbox_events WHERE user_id = ? ${args.source ? 'AND source = ?' : ''}
         ORDER BY created_at DESC LIMIT ?`).all(...[u.id, ...(args.source ? [args.source] : []), Math.min(Number(args.limit ?? 10), 50)]);
+    case 'reply_mail': {
+      const memories = listMemories(u.id).filter((m) => m.category === 'person').map((m) => `- ${m.text}`).join('\n');
+      const draft = await draftReply(u, String(args.inbox_id ?? ''), String(args.instruction ?? ''), memories);
+      // Senden ist heikel: immer als Karte mit dem vollen Text
+      return actionResult(t, perform(u, 'mail.send', draft, {
+        source: 'chat', quiet: true, say: sayAction(t),
+        question: `✉️ Antwort an ${draft.to} – „${draft.subject}“:\n\n${draft.body.split('\n').map((l) => `> ${l}`).join('\n')}\n\nSoll ich das so senden?`,
+      }));
+    }
     default:
       return { error: `Unbekanntes Werkzeug ${name}` };
   }

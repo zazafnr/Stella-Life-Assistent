@@ -48,7 +48,7 @@ export interface ChatMessage {
 export type PermissionLevel = 'auto' | 'notify' | 'ask' | 'never';
 
 /** Bereiche, für die man Stella Rechte gibt */
-export type ActionGroup = 'planner' | 'delete' | 'homework' | 'mail_sort' | 'memory';
+export type ActionGroup = 'planner' | 'delete' | 'homework' | 'mail_sort' | 'mail_send' | 'memory';
 
 export type ActionStatus = 'proposed' | 'done' | 'rejected' | 'undone' | 'failed';
 
@@ -114,6 +114,8 @@ export interface Hint {
   actionLabel?: string;
   /** schon als Vorschlag-Karte verschickt */
   actionId?: string;
+  /** statt Aktion: woanders weitermachen (Rückfrage im Chat beantworten, Antwort in der Inbox schreiben) */
+  open?: { tab: 'chat' | 'inbox'; label: string };
   itemId?: string;
 }
 

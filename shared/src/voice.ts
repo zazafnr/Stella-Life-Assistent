@@ -117,6 +117,16 @@ export function voice(tone: Tone | undefined) {
       frech: `🫧 ${fact}? Nie gehört. 😇`,
       cool: `🫧 Weg: ${fact}`,
     }),
+    mailDeadlineAsk: (from: string, what: string, when: string) => by({
+      nett: `📬 In der Mail von ${from} steht: „${what}“ bis ${when}. Soll ich das eintragen?`,
+      frech: `📬 ${from} will was von dir: „${what}“ bis ${when}. Eintragen, bevor du's vergisst? 😏`,
+      cool: `📬 ${from}: „${what}“ bis ${when}. Eintragen?`,
+    }),
+    mailDeadlineDone: (from: string, what: string, when: string) => by({
+      nett: `📬 Aus der Mail von ${from} eingetragen: **${what}**, ${when}.`,
+      frech: `📬 Hab für dich die Mail von ${from} gelesen und eingetragen: **${what}**, ${when}. Gern geschehen. 💅`,
+      cool: `📬 Aus der Mail von ${from}: **${what}**, ${when}. Steht drin.`,
+    }),
     notFound: (what: string) => by({
       nett: `🤔 Ich finde nichts zu „${what}“ – meinst du was anderes?`,
       frech: `🤔 „${what}“? Gibt's bei mir nicht. Sicher, dass du das eingetragen hast? 👀`,
@@ -248,6 +258,11 @@ export function voice(tone: Tone | undefined) {
       nett: 'Nichts – du bist komplett auf dem Laufenden. ✨',
       frech: 'Nichts. Ich bin ehrlich beeindruckt. 😏',
       cool: 'Nix. Alles im Griff. 😎',
+    }),
+    hintReply: (from: string, about: string) => by({
+      nett: `✉️ ${from} wartet noch auf deine Antwort (${about}). Soll ich dir einen Entwurf schreiben?`,
+      frech: `✉️ ${from} wartet immer noch auf dich (${about}). Ghosting ist keine Lösung. 😏 Entwurf?`,
+      cool: `✉️ ${from} wartet auf Antwort (${about}). Entwurf?`,
     }),
     hintDone: (summary: string) => by({
       nett: `✓ Hab ich gemacht: ${summary}.`,

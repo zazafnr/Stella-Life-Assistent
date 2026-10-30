@@ -525,3 +525,13 @@ textarea.cookies { min-height: 90px; font-family: ui-monospace, monospace; font-
 .hint-actions .action-card { margin-top: 0; }
 .hint-actions .btn.small { min-height: 34px; padding: 0 14px; font-size: 14px; border-radius: 12px; }
 .hint-actions .link.small { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Inbox: „Wichtig für dich“ */
+.focus-list { display: flex; flex-direction: column; gap: 10px; }
+.focus-card { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: var(--radius); background: var(--surface);
+  border: 1.5px solid #F7C9DC; box-shadow: var(--shadow); animation: tone-in .35s ease-out both; }
+.focus-card .btn.small { min-height: 36px; padding: 0 14px; font-size: 14px; border-radius: 12px; display: inline-flex; align-items: center; gap: 6px; }
+.focus-card .link.small { display: inline-flex; align-items: center; gap: 4px; }
+.reply-editor { display: flex; flex-direction: column; gap: 10px; }
+.reply-editor textarea { width: 100%; font: inherit; font-size: 15px; line-height: 1.5; padding: 12px 14px; border-radius: 14px; border: 1.5px solid var(--border); background: var(--bg); color: var(--text); resize: vertical; }
+.reply-editor textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 4px rgba(31, 111, 235, .12); }

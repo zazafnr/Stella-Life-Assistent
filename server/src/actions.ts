@@ -14,6 +14,7 @@
 import { formatDateDe, type ActionEntry, type ActionGroup, type ActionStatus, type Item, type Memory, type PermissionLevel } from '@stella/shared';
 import { addMessage, db, enqueueJob, getItem, getUser, newId, now, type NewItem, type User } from './db.ts';
 import { addMemory, deleteMemory, getMemory, updateMemory, type NewMemory } from './memory.ts';
+import type { OutgoingMail } from './mail.ts';
 import { addItem, bookFor, changeItem, createStudyPlan } from './planner.ts';
 
 export const GROUPS: Record<ActionGroup, { label: string; help: string; default: PermissionLevel; levels: PermissionLevel[] }> = {
@@ -37,6 +38,11 @@ export const GROUPS: Record<ActionGroup, { label: string; help: string; default:
     help: 'Spam und Werbung in den Papierkorb (in der Inbox zurückholbar)',
     default: 'auto', levels: ['auto', 'never'],
   },
+  mail_send: {
+    label: 'Mails senden',
+    help: 'Antworten in deinem Namen – Stella zeigt dir den Text immer vorher',
+    default: 'ask', levels: ['ask', 'never'],
+  },
   memory: {
     label: 'Sich Dinge merken',
     help: 'lernt selbst über dich – alles siehst und änderst du unter „Was Stella weiß“',
@@ -45,7 +51,7 @@ export const GROUPS: Record<ActionGroup, { label: string; help: string; default:
 };
 
 /** Bereiche, in denen auch eine Bitte im Chat noch einmal bestätigt werden muss (z. B. später: Mails senden) */
-const SENSITIVE = new Set<ActionGroup>();
+const SENSITIVE = new Set<ActionGroup>(['mail_send']);
 
 export const isLevel = (v: unknown): v is PermissionLevel => v === 'auto' || v === 'notify' || v === 'ask' || v === 'never';
 export const isGroup = (v: unknown): v is ActionGroup => typeof v === 'string' && v in GROUPS;
@@ -69,6 +75,7 @@ export interface ActionParams {
   'item.delete': { id: string };
   'study_plan.create': { examId: string; material: string };
   'homework.solve': { itemId: string; again?: boolean };
+  'mail.send': OutgoingMail;
   'memory.add': NewMemory;
   'memory.update': { id: string; patch: Partial<Pick<Memory, 'text' | 'category' | 'schedule'>> };
   'memory.delete': { id: string };
@@ -161,6 +168,14 @@ const DEFS: { [T in ActionType]: Def<T> } = {
       }
       enqueueJob(u.id, item.attachments.length ? 'solve_homework' : 'book_page', { itemId: item.id });
       return { result: { ok: true, info: 'Wird im Hintergrund gelöst, der Nutzer bekommt eine Nachricht.' }, changed: [item] };
+    },
+  },
+  'mail.send': {
+    group: () => 'mail_send',
+    summary: (_u, p) => `Mail an ${p.to} senden („${p.subject}“)`,
+    run: (u, p) => {
+      enqueueJob(u.id, 'send_mail', p);
+      return { result: { queued: true } };
     },
   },
   'memory.add': {

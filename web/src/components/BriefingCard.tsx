@@ -9,7 +9,7 @@ import { Rich } from './Rich.tsx';
 const ICON: Record<string, string> = { school: '🏫', due: '📌', plan: '🗓️', tomorrow: '🌙', done: '✅', inbox: '✉️' };
 
 /** Oben auf „Heute“: morgens der Überblick, den ganzen Tag „Mir ist aufgefallen“ */
-export function BriefingCard({ onChat }: { onChat: () => void }) {
+export function BriefingCard({ onOpen }: { onOpen: (tab: 'chat' | 'inbox') => void }) {
   const lastSync = useStore((s) => s.lastSync);
   const [b, setB] = useState<Briefing | null>(null);
   const [gone, setGone] = useState<string[]>([]);
@@ -43,14 +43,14 @@ export function BriefingCard({ onChat }: { onChat: () => void }) {
       {hints.length > 0 && (
         <>
           <span className="eyebrow" style={{ color: 'var(--pink-text)', marginTop: sections.length ? 6 : 0 }}>Mir ist aufgefallen</span>
-          {hints.map((h) => <HintRow key={h.key} hint={h} onChat={onChat} onGone={() => setGone((g) => [...g, h.key])} />)}
+          {hints.map((h) => <HintRow key={h.key} hint={h} onOpen={onOpen} onGone={() => setGone((g) => [...g, h.key])} />)}
         </>
       )}
     </section>
   );
 }
 
-function HintRow({ hint, onGone, onChat }: { hint: Hint; onGone: () => void; onChat: () => void }) {
+function HintRow({ hint, onGone, onOpen }: { hint: Hint; onGone: () => void; onOpen: (tab: 'chat' | 'inbox') => void }) {
   const action = useStore((s) => (hint.actionId ? s.actions[hint.actionId] : undefined));
   const [busy, setBusy] = useState(false);
 
@@ -78,8 +78,8 @@ function HintRow({ hint, onGone, onChat }: { hint: Hint; onGone: () => void; onC
       <div className="hint-actions">
         {hint.actionId && action?.status === 'proposed' ? <ActionCard id={hint.actionId} />
           : hint.actionLabel ? <button type="button" className="btn small" disabled={busy} onClick={() => void accept()}>{hint.actionLabel}</button>
-            : hint.key.startsWith('exam_no_material') || hint.key.startsWith('no_source')
-              ? <button type="button" className="btn small" onClick={() => { void api(`/api/hints/${encodeURIComponent(hint.key)}/accept`, { method: 'POST' }).catch(() => {}); onChat(); }}>{hint.key.startsWith('no_source') ? 'Foto schicken' : 'Stoff sagen'}</button> : null}
+            : hint.open
+              ? <button type="button" className="btn small" onClick={() => { void api(`/api/hints/${encodeURIComponent(hint.key)}/accept`, { method: 'POST' }).catch(() => {}); onOpen(hint.open!.tab); }}>{hint.open.label}</button> : null}
         <button type="button" className="link small muted" onClick={() => void dismiss()} aria-label="Hinweis ausblenden"><Icon name="close" size={14} /> Passt schon</button>
       </div>
     </div>

@@ -12,12 +12,14 @@
 //   iCloud: account.apple.com → Anmeldung & Sicherheit → "App-spezifische Passwörter"
 
 import { ImapFlow } from 'imapflow';
+import nodemailer from 'nodemailer';
 import { simpleParser } from 'mailparser';
 import { getSecret, setSecret } from './auth.ts';
-import { addMessage, db, getUser, newId, now } from './db.ts';
+import { addMessage, db, getUser, newId, now, type User } from './db.ts';
 import { complete, LlmUnavailable, llmAvailable } from './llm.ts';
 import { accessToken } from './oauth.ts';
-import { levelFor } from './actions.ts';
+import { levelFor, perform } from './actions.ts';
+import { formatDateDe, todayIn, voice } from '@stella/shared';
 import { pushToUser } from './push.ts';
 
 export type MailProvider = 'gmail' | 'icloud' | 'other';
@@ -100,8 +102,38 @@ function socialSource(address: string): string | null {
   return SOCIAL_DOMAINS.find(([re]) => re.test(domain))?.[1] ?? null;
 }
 
-async function classify(mails: NewMail[]): Promise<Map<number, { category: Category; summary: string; confidence: number }>> {
-  const result = new Map<number, { category: Category; summary: string; confidence: number }>();
+export interface Deadline { date: string; time: string | null; what: string }
+
+export interface Verdict {
+  category: Category;
+  summary: string;
+  confidence: number;
+  /** warum wichtig (kurz), nur bei wichtigen */
+  reason?: string;
+  /** Frist oder Termin, der in der Mail steht */
+  deadline?: Deadline | null;
+  /** erwartet der Absender eine Antwort? */
+  needsReply?: boolean;
+}
+
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+const HHMM = /^\d{2}:\d{2}$/;
+
+/** KI-Antwort prüfen: nur gültige Felder übernehmen */
+export function cleanVerdict(r: Record<string, unknown>, today: string): Verdict | null {
+  if (!['important', 'normal', 'newsletter', 'spam'].includes(String(r.category))) return null;
+  const d = r.deadline as Record<string, unknown> | null | undefined;
+  const deadline = d && YMD.test(String(d.date)) && String(d.date) >= today && String(d.what ?? '').trim()
+    ? { date: String(d.date), time: HHMM.test(String(d.time)) ? String(d.time) : null, what: String(d.what).trim().slice(0, 120) }
+    : null;
+  return {
+    category: r.category as Category, summary: String(r.summary ?? '').slice(0, 200), confidence: Number(r.confidence) || 0,
+    reason: r.reason ? String(r.reason).slice(0, 120) : undefined, deadline, needsReply: r.needsReply === true,
+  };
+}
+
+async function classify(mails: NewMail[], today: string): Promise<Map<number, Verdict>> {
+  const result = new Map<number, Verdict>();
   for (const m of mails) {
     const social = socialSource(m.fromAddress);
     if (social) result.set(m.uid, { category: 'social', summary: m.subject, confidence: 1 });
@@ -115,24 +147,26 @@ async function classify(mails: NewMail[]): Promise<Map<number, { category: Categ
         { role: 'system', content: 'Du sortierst E-Mails für einen Schüler in Österreich. Antworte nur mit JSON.' },
         {
           role: 'user',
-          content: `Ordne jede Mail ein:
+          content: `Heute ist ${today}. Ordne jede Mail ein:
 - "important": braucht Aufmerksamkeit (Schule, Lehrer, Familie, Freunde, Termine, Rechnungen, Sicherheit, persönliche Nachrichten)
 - "normal": okay, aber nicht dringend (Bestätigungen, Infos)
 - "newsletter": Werbung, Angebote, Newsletter, Rabatte
 - "spam": Betrug, Phishing, offensichtlicher Müll
-Dazu eine Zusammenfassung auf Deutsch (max. 15 Wörter) und "confidence" 0–1.
+Dazu: "summary" auf Deutsch (max. 15 Wörter), "confidence" 0–1,
+bei important zusätzlich "reason" (warum wichtig, max. 8 Wörter, z. B. "Klassenvorstand, Frist Freitag"),
+"deadline" falls eine Frist/ein Termin genannt ist ({"date": "YYYY-MM-DD", "time": "HH:MM" oder null, "what": "was zu tun ist, max. 8 Wörter"}, sonst null),
+"needsReply" true, wenn der Absender eine Antwort erwartet.
 
-${JSON.stringify(rest.map((m) => ({ id: m.uid, from: m.from, subject: m.subject, text: m.snippet.slice(0, 600), unsubscribeLink: m.hasUnsubscribe })))}
+${JSON.stringify(rest.map((m) => ({ id: m.uid, from: m.from, subject: m.subject, text: m.snippet.slice(0, 900), unsubscribeLink: m.hasUnsubscribe })))}
 
-Format: {"mails": [{"id": 123, "category": "newsletter", "summary": "…", "confidence": 0.9}]}`,
+Format: {"mails": [{"id": 123, "category": "important", "summary": "…", "confidence": 0.9, "reason": "…", "deadline": null, "needsReply": false}]}`,
         },
       ], undefined, { json: true, timeoutMs: 90_000, background: true });
       const text = message.content ?? '';
-      const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as { mails?: { id: number; category: Category; summary: string; confidence: number }[] };
+      const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as { mails?: Record<string, unknown>[] };
       for (const r of parsed.mails ?? []) {
-        if (rest.some((m) => m.uid === r.id) && ['important', 'normal', 'newsletter', 'spam'].includes(r.category)) {
-          result.set(r.id, { category: r.category, summary: String(r.summary ?? ''), confidence: Number(r.confidence) || 0 });
-        }
+        const v = cleanVerdict(r, today);
+        if (v && rest.some((m) => m.uid === Number(r.id))) result.set(Number(r.id), v);
       }
     } catch (err) {
       if (!(err instanceof LlmUnavailable)) console.warn('Mail-Einordnung fehlgeschlagen:', (err as Error).message);
@@ -187,7 +221,7 @@ async function checkAccount(userId: string, account: MailAccount) {
       });
     }
 
-    const verdicts = await classify(mails);
+    const verdicts = await classify(mails, todayIn(user.timeZone));
     const trash = autoTrash ? await trashPath(c) : null;
     const trashed: NewMail[] = [];
     for (const m of mails) {
@@ -202,16 +236,24 @@ async function checkAccount(userId: string, account: MailAccount) {
       } else if (v.category === 'important') {
         action = 'notify';
       }
+      const eventId = newId();
+      const relevant = v.category === 'important' || v.category === 'normal';
       db.prepare('INSERT INTO inbox_events (id, user_id, source, sender, text, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(newId(), userId, v.category === 'social' ? 'social' : 'email', m.from, m.subject, JSON.stringify({
+        .run(eventId, userId, v.category === 'social' ? 'social' : 'email', m.from, m.subject, JSON.stringify({
           accountId: account.id, account: account.label, category: v.category, summary: v.summary, action,
           messageId: m.messageId, fromAddress: m.fromAddress, platform: socialSource(m.fromAddress),
+          reason: v.reason ?? null, deadline: v.deadline ?? null, needsReply: !!v.needsReply,
+          // Text nur von relevanten Mails behalten – für Antwort-Entwürfe
+          snippet: relevant ? m.snippet : null,
         }), m.date);
       if (action === 'notify') {
-        const text = `📧 Wichtige Mail (${account.label}) von **${m.from}**: ${v.summary || m.subject}`;
+        const extra = [v.reason, v.needsReply ? 'Antwort nötig' : null].filter(Boolean).join(' · ');
+        const text = `📧 Wichtige Mail (${account.label}) von **${m.from}**: ${v.summary || m.subject}${extra ? ` _(${extra})_` : ''}`;
         addMessage(userId, 'assistant', text);
         await pushToUser(userId, { title: `Mail von ${m.from}`, body: v.summary || m.subject, tag: `mail-${account.id}-${m.uid}` });
       }
+      // Frist in der Mail → Eintrag (je nach Recht sofort oder als Vorschlag)
+      if (v.deadline && relevant) offerDeadline(user, eventId, m.from, v.deadline);
     }
     db.prepare('UPDATE mail_state SET last_uid = ?, checked_at = ?, last_error = NULL WHERE user_id = ? AND account_id = ?')
       .run(maxUid, now(), userId, account.id);
@@ -219,6 +261,25 @@ async function checkAccount(userId: string, account: MailAccount) {
     lock.release();
     await c.logout().catch(() => {});
   }
+}
+
+/** Frist aus einer Mail als Eintrag anbieten – läuft über die Rechte für den Planer */
+export function offerDeadline(user: User, eventId: string, from: string, d: Deadline) {
+  const when = `${formatDateDe(d.date)}${d.time ? ` um ${d.time}` : ''}`;
+  const v = voice(user.settings.tone);
+  const r = perform(user, 'item.create', {
+    kind: d.time ? 'event' : 'todo', title: d.what, due: d.date, time: d.time, detail: `aus der Mail von ${from}`, source: 'mail',
+  }, { source: 'auto', quiet: true, question: v.mailDeadlineAsk(from, d.what, when) });
+  if (r.status === 'done') addMessage(user.id, 'assistant', v.mailDeadlineDone(from, d.what, when), { actionId: r.actionId });
+  if (r.status !== 'refused') setEventField(user.id, eventId, { deadlineActionId: r.actionId });
+}
+
+/** einzelnes Feld im gespeicherten Mail-Eintrag setzen */
+export function setEventField(userId: string, eventId: string, fields: Record<string, unknown>) {
+  const row = db.prepare('SELECT payload FROM inbox_events WHERE user_id = ? AND id = ?').get(userId, eventId) as { payload: string } | undefined;
+  if (!row) return false;
+  db.prepare('UPDATE inbox_events SET payload = ? WHERE user_id = ? AND id = ?').run(JSON.stringify({ ...JSON.parse(row.payload), ...fields }), userId, eventId);
+  return true;
 }
 
 export async function checkAllMail(userId: string) {
@@ -260,4 +321,63 @@ export async function restoreMail(userId: string, eventId: string) {
     await c.logout().catch(() => {});
   }
   db.prepare('UPDATE inbox_events SET payload = ? WHERE id = ?').run(JSON.stringify({ ...payload, action: 'restored' }), eventId);
+}
+
+// ---------- Antworten: Entwurf und Senden ----------
+
+const SMTP: Record<MailProvider, (a: MailAccount) => { host: string; port: number; secure: boolean }> = {
+  gmail: () => ({ host: 'smtp.gmail.com', port: 465, secure: true }),
+  icloud: () => ({ host: 'smtp.mail.me.com', port: 587, secure: false }),
+  other: (a) => ({ host: a.host.replace(/^imap\./i, 'smtp.'), port: 587, secure: false }),
+};
+
+export interface OutgoingMail { accountId: string; to: string; subject: string; body: string; inReplyTo?: string | null; eventId?: string | null }
+
+export async function sendMail(userId: string, m: OutgoingMail) {
+  const account = listAccounts(userId).find((a) => a.id === m.accountId);
+  if (!account) throw new Error('Postfach nicht gefunden');
+  const auth = account.oauth
+    ? { type: 'OAuth2' as const, user: account.user, accessToken: await accessToken(account) }
+    : { user: account.user, pass: account.pass };
+  const transport = nodemailer.createTransport({ ...SMTP[account.provider](account), auth });
+  await transport.sendMail({
+    from: account.user, to: m.to, subject: m.subject, text: m.body,
+    ...(m.inReplyTo ? { inReplyTo: m.inReplyTo, references: m.inReplyTo } : {}),
+  });
+  if (m.eventId) setEventField(userId, m.eventId, { replied: now(), handled: 1 });
+}
+
+type EventRow = { id: string; sender: string | null; text: string | null; payload: string };
+
+export function getMailEvent(userId: string, eventId: string) {
+  const r = db.prepare(`SELECT id, sender, text, payload FROM inbox_events WHERE user_id = ? AND id = ? AND source = 'email'`).get(userId, eventId) as EventRow | undefined;
+  return r ? { ...r, payload: JSON.parse(r.payload) as Record<string, any> } : null;
+}
+
+/** Antwort im Namen des Nutzers entwerfen – Sie-Form für Lehrer:innen, du für Freunde/Familie. Kostet eine KI-Anfrage. */
+export async function draftReply(user: User, eventId: string, instruction = '', memories = ''): Promise<OutgoingMail> {
+  const ev = getMailEvent(user.id, eventId);
+  if (!ev) throw new Error('Mail nicht gefunden');
+  const p = ev.payload;
+  if (!p.fromAddress) throw new Error('Absender-Adresse fehlt');
+  const { message } = await complete([
+    {
+      role: 'system',
+      content: `Du schreibst E-Mail-Antworten im Namen von ${user.name} (Schüler:in in Österreich). Höflich und kurz, passend zum Absender: ` +
+        'Lehrer:innen, Schule, Ämter, Firmen in der Sie-Form mit Anrede und Gruß; Freunde und Familie locker in der Du-Form. ' +
+        'Erfinde keine Fakten oder Zusagen – wo etwas fehlt, schreib eine neutrale Formulierung. Antworte nur mit dem Text der Mail, ohne Betreff.',
+    },
+    {
+      role: 'user',
+      content: `Mail von ${ev.sender} <${p.fromAddress}>\nBetreff: ${ev.text}\n\n${String(p.snippet ?? p.summary ?? '').slice(0, 1500)}\n\n` +
+        `${memories ? `Was du über ${user.name} weißt:\n${memories}\n\n` : ''}` +
+        `${instruction ? `Was ${user.name} antworten möchte: ${instruction}` : 'Schreib eine passende, kurze Antwort.'}`,
+    },
+  ], undefined, { timeoutMs: 90_000 });
+  const body = (message.content ?? '').trim().replace(/^betreff:.*\n+/iu, '');
+  if (!body) throw new Error('Kein Entwurf bekommen – bitte nochmal versuchen');
+  const subject = /^re:/iu.test(String(ev.text)) ? String(ev.text) : `Re: ${ev.text ?? ''}`;
+  const draft: OutgoingMail = { accountId: p.accountId, to: p.fromAddress, subject, body, inReplyTo: p.messageId ?? null, eventId };
+  setEventField(user.id, eventId, { draft: { subject, body } });
+  return draft;
 }
