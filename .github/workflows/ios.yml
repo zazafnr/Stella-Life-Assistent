@@ -127,10 +127,11 @@ jobs:
           shoot settings today settings
           DEVICE=$(xcrun simctl list devices | grep "$UDID" | sed -E 's/^ *([^(]+) \(.*/\1/' | xargs)
           python3 - "$OUT" "$DEVICE" <<'PY'
-          import json, os, sys, datetime
+          import json, os, sys, datetime, subprocess
           out, device = sys.argv[1], sys.argv[2]
+          message = subprocess.check_output(["git", "log", "-1", "--format=%s"]).decode().strip()
           json.dump({
-              "commit": os.environ["GITHUB_SHA"], "branch": os.environ["GITHUB_REF_NAME"],
+              "commit": os.environ["GITHUB_SHA"], "branch": os.environ["GITHUB_REF_NAME"], "message": message,
               "run": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
               "device": device, "createdAt": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
               "screens": ["today", "chat", "planner", "inbox", "weekplan", "settings"],
