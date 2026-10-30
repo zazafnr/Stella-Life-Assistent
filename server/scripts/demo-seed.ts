@@ -68,14 +68,15 @@ const matheBlocks = plan.blocks.filter((b) => b.parentId === mathe.id);
 if (matheBlocks.length) perform(user(), 'week_plan.apply', { blocks: matheBlocks }, { source: 'chat', quiet: true });
 
 // Chat über die echten Wege (ohne KI)
-const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
+addMessage(uid, 'assistant', '☀️ Guten Morgen, Lukas! Heute hast du bis 12:35 Schule, um 16:30 lernst du Mathe (Ableitungen). Morgen fällt Physik aus. 💫');
 await handleChat(user(), 'Deutsch HÜ bis morgen Erörterung S. 45', null);
 await handleChat(user(), 'erinnere mich in 2 Stunden an Mama anrufen', null);
 await handleChat(user(), 'merk dir, dass ich am Freitag nach der Schule zu Oma fahre', null);
 await handleChat(user(), 'plan meine Woche', null);
-db.prepare('UPDATE messages SET created_at = ? WHERE user_id = ? AND created_at > ?').run(ago(1), uid, ago(5));
-addMessage(uid, 'assistant', '☀️ Guten Morgen, Lukas! Heute hast du bis 12:35 Schule, um 16:30 lernst du Mathe (Ableitungen). Morgen fällt Physik aus. 💫');
-db.prepare(`UPDATE messages SET created_at = ? WHERE user_id = ? AND text LIKE '☀️%'`).run(ago(240), uid);
+// über den Vormittag verteilen, Reihenfolge bleibt (das Briefing zuerst)
+const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
+const rows = db.prepare('SELECT id FROM messages WHERE user_id = ? ORDER BY created_at, rowid').all(uid) as { id: string }[];
+rows.forEach((r, i) => db.prepare('UPDATE messages SET created_at = ? WHERE id = ?').run(ago(i === 0 ? 240 : (rows.length - i) * 3), r.id));
 
 // Inbox
 const inbox = (source: string, sender: string, text: string, payload: Record<string, unknown>, hoursAgo: number) =>

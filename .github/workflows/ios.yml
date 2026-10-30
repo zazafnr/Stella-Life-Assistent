@@ -53,6 +53,8 @@ jobs:
           print((pro or phones)[-1]["udid"])')
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
           xcrun simctl list devices | grep "$UDID"
+          # schon jetzt hochfahren – läuft parallel zum Build, spart den langsamen Erststart
+          xcrun simctl boot "$UDID" || true
 
       - name: Für den iPhone-Simulator kompilieren
         working-directory: ios/Stella.swiftpm
@@ -70,6 +72,33 @@ jobs:
         if: failure()
         working-directory: ios/Stella.swiftpm
         run: grep -E "error:" build.log | sort -u | head -80 || true
+
+      # ---------- Live-Simulator: Build zu Appetize hochladen (nur mit Secret APPETIZE_API_TOKEN) ----------
+      - name: Live-Simulator auf Appetize aktualisieren
+        continue-on-error: true
+        env:
+          APPETIZE_API_TOKEN: ${{ secrets.APPETIZE_API_TOKEN }}
+          APPETIZE_PUBLIC_KEY: ${{ vars.APPETIZE_PUBLIC_KEY }}
+        run: |
+          if [ -z "$APPETIZE_API_TOKEN" ]; then echo "Kein APPETIZE_API_TOKEN – übersprungen"; exit 0; fi
+          APP=$(find ios/Stella.swiftpm/build/Build/Products -maxdepth 2 -name "*.app" -path "*iphonesimulator*" | head -1)
+          (cd "$(dirname "$APP")" && zip -qry "$RUNNER_TEMP/Stella-sim.zip" "$(basename "$APP")")
+          KEY="$APPETIZE_PUBLIC_KEY"
+          if [ -z "$KEY" ]; then
+            # dieselbe App wiederverwenden, damit der Link gleich bleibt
+            KEY=$(curl -sf -H "X-API-KEY: $APPETIZE_API_TOKEN" https://api.appetize.io/v1/apps | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)
+          apps = d.get("data", d) if isinstance(d, dict) else d
+          hit = [a for a in apps if a.get("bundle") == "app.stella.ios" and a.get("platform") == "ios"]
+          print(hit[0]["publicKey"] if hit else "")' || true)
+          fi
+          URL=https://api.appetize.io/v1/apps${KEY:+/$KEY}
+          RES=$(curl -sf -X POST "$URL" -H "X-API-KEY: $APPETIZE_API_TOKEN" \
+            -F "file=@$RUNNER_TEMP/Stella-sim.zip" -F "platform=ios" -F "note=Stella ${GITHUB_SHA::7}")
+          KEY=$(echo "$RES" | python3 -c 'import json, sys; print(json.load(sys.stdin)["publicKey"])')
+          echo "https://appetize.io/app/$KEY" > "$RUNNER_TEMP/appetize-url"
+          echo "Live-Simulator: https://appetize.io/app/$KEY" | tee -a "$GITHUB_STEP_SUMMARY"
 
       # ---------- Klick-Vorschau ----------
       - uses: actions/setup-node@v4
@@ -114,8 +143,9 @@ jobs:
           TOKEN=$(cat "$RUNNER_TEMP/token")
           shoot() { # name tab [open]
             xcrun simctl terminate "$UDID" "$BUNDLE" 2>/dev/null || true
-            xcrun simctl launch "$UDID" "$BUNDLE" -server http://localhost:8790 -demoToken "$TOKEN" -tab "$2" ${3:+-open "$3"} >/dev/null
-            sleep 9
+            xcrun simctl launch "$UDID" "$BUNDLE" -AppleLanguages "(de-AT)" -AppleLocale de_AT \
+              -server http://localhost:8790 -demoToken "$TOKEN" -tab "$2" ${3:+-open "$3"} >/dev/null
+            sleep 7
             xcrun simctl io "$UDID" screenshot --type=png "$OUT/$1.png" >/dev/null
             sips -s format jpeg -s formatOptions 82 -Z 1400 "$OUT/$1.png" --out "$OUT/$1.jpg" >/dev/null && rm "$OUT/$1.png"
           }
@@ -135,6 +165,7 @@ jobs:
               "run": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
               "device": device, "createdAt": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
               "screens": ["today", "chat", "planner", "inbox", "weekplan", "settings"],
+              "appetize": open(f"{os.environ['RUNNER_TEMP']}/appetize-url").read().strip() if os.path.exists(f"{os.environ['RUNNER_TEMP']}/appetize-url") else None,
           }, open(f"{out}/meta.json", "w"), indent=2)
           PY
           ls -la "$OUT"

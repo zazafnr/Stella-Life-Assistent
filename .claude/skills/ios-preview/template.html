@@ -88,6 +88,13 @@
   .pick small { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }
   .hint { color: var(--muted); font-size: 13px; margin: 0; max-width: 52ch; }
   .hint kbd { font: 600 12px var(--body); padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+  .live {
+    display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; margin-top: 6px;
+    padding: 10px 16px; border-radius: 14px; background: var(--blue); color: #fff; font-weight: 600; text-decoration: none;
+  }
+  .live:hover { filter: brightness(1.08); }
+  .live:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+  .live small { font-weight: 500; opacity: .85; }
   .stale { padding: 10px 14px; border-radius: 14px; background: var(--blue-tint); color: var(--text); font-size: 14px; margin: 0; }
   @media (prefers-reduced-motion: reduce) { .screen img { transition: none; } }
 </style>
@@ -97,6 +104,7 @@
     <h1>Stella auf dem iPhone</h1>
     <div class="meta" id="meta"></div>
     <p class="what" id="what"></p>
+    <a class="live" id="live" target="_blank" rel="noopener" hidden>Live ausprobieren <small>echte App im Simulator, Appetize</small></a>
   </header>
 
   <div class="stage">
@@ -193,6 +201,10 @@
   const what = document.getElementById('what');
   if (META.message) { what.innerHTML = '<span>Letzte Änderung: </span>'; what.append(META.message); }
   else what.hidden = true;
+  if (META.appetize && /^https:\/\/appetize\.io\//.test(META.appetize)) {
+    const live = document.getElementById('live');
+    live.href = META.appetize; live.hidden = false;
+  }
 
   show(location.hash.slice(1));
 </script>
