@@ -33,7 +33,7 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Stella"
     },
-    "mac": { "target": ["dmg"], "icon": "build/icon.png", "category": "public.app-category.productivity", "artifactName": "Stella-${version}-Mac.${ext}" },
+    "mac": { "extendInfo": { "NSMicrophoneUsageDescription": "Stella nimmt deine Sprachnachrichten auf, damit du nicht tippen musst." }, "target": ["dmg"], "icon": "build/icon.png", "category": "public.app-category.productivity", "artifactName": "Stella-${version}-Mac.${ext}" },
     "linux": { "target": ["AppImage"], "icon": "build/icon.png", "category": "Utility", "artifactName": "Stella-${version}-Linux.${ext}" },
     "publish": null
   }

@@ -4,6 +4,8 @@ import Security
 struct APIError: LocalizedError {
     var message: String
     var status: Int
+    /** Sprachnachricht: Abschreiben ging nicht, die Aufnahme liegt aber auf dem Server („Nochmal versuchen“) */
+    var audioId: String? = nil
     var errorDescription: String? { message }
     var isAuth: Bool { status == 401 }
     var isOffline: Bool { status == 0 }
@@ -86,8 +88,8 @@ final class API: @unchecked Sendable {
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
-            let msg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"]
-            throw APIError(message: msg ?? "Fehler \(status)", status: status)
+            let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            throw APIError(message: obj?["error"] as? String ?? "Fehler \(status)", status: status, audioId: obj?["audioId"] as? String)
         }
         return data
     }

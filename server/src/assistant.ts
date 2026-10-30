@@ -44,18 +44,20 @@ const touched = (t: Turn, ...items: (Item | null)[]) => items.forEach((i) => i &
 const v = (t: Turn) => voice(t.user.settings.tone);
 
 /** `conversationId`: in welchem Chat geschrieben wird (alter Chat fortsetzen); ohne Angabe der neueste von heute. */
-export async function handleChat(user: User, text: string, clientId: string | null, imageIds: string[] = [], conversationId: string | null = null): Promise<ChatResponse> {
+export async function handleChat(user: User, text: string, clientId: string | null, imageIds: string[] = [], conversationId: string | null = null,
+  extra: { attachments?: Attachment[] } = {}): Promise<ChatResponse> {
   if (clientId && findMessageByClientId(user.id, clientId)) return { messages: [], items: [] }; // schon verarbeitet
   const convId = (conversationId && getConversation(user.id, conversationId)?.id) || todayConversation(user.id)!;
   // alles, was während dieser Anfrage geschrieben wird (auch in Hilfsfunktionen), landet in diesem Chat
-  const res = await chatContext.run({ userId: user.id, conversationId: convId }, () => handleChatIn(user, text, clientId, imageIds, convId));
+  const res = await chatContext.run({ userId: user.id, conversationId: convId }, () => handleChatIn(user, text, clientId, imageIds, convId, extra.attachments ?? []));
   void maybeTitle(user.id, convId).catch(() => {});
   return { ...res, conversationId: convId };
 }
 
-async function handleChatIn(user: User, text: string, clientId: string | null, imageIds: string[], convId: string): Promise<ChatResponse> {
+async function handleChatIn(user: User, text: string, clientId: string | null, imageIds: string[], convId: string, extra: Attachment[]): Promise<ChatResponse> {
   const images: Attachment[] = imageIds.map((id) => ({ id, kind: 'image', caption: 'Foto' }));
-  const userMessage = addMessage(user.id, 'user', text, { clientId, attachments: images });
+  // `images` sind Fotos zum Lösen; `extra` (z. B. die Sprachnachricht) hängt nur an der Nachricht
+  const userMessage = addMessage(user.id, 'user', text, { clientId, attachments: [...images, ...extra] });
 
   const t: Turn = { user, conversationId: convId, today: todayIn(user.timeZone), replies: [], changed: new Map(), images };
   const intent = interpret(text, t.today, timeIn(user.timeZone));

@@ -291,6 +291,76 @@ final class Store {
         }
     }
 
+    // MARK: Sprachnachrichten
+
+    /** Aufnahme schicken: Stella schreibt sie ab und behandelt den Text wie eine getippte Nachricht */
+    func sendVoice(fileURL: URL, seconds: Int) async {
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        guard let data = try? Data(contentsOf: fileURL), !data.isEmpty else { return }
+        let clientId = UUID().uuidString
+        let local = ChatMessage(id: "local-\(clientId)", clientId: clientId, role: "user", text: "🎤 Sprachnachricht …",
+                                attachments: [], createdAt: ISO.string(Date()), pending: true)
+        messages.append(local)
+        thinking = true
+        defer { thinking = false }
+        var path = "/api/chat/audio?clientId=\(clientId)&duration=\(seconds)"
+        if let c = conversationId { path += "&conversationId=\(c)" }
+        var req = api.request("POST", path)
+        req.setValue("audio/mp4", forHTTPHeaderField: "Content-Type")
+        req.httpBody = data
+        do {
+            let res = try JSONDecoder().decode(AudioResponse.self, from: try await api.raw(req))
+            finishVoice(local.id, res)
+        } catch {
+            voiceFailed(local.id, error)
+        }
+    }
+
+    /** „Nochmal versuchen“: die gespeicherte Aufnahme erneut abschreiben lassen */
+    func retryVoice(_ localId: String) async {
+        guard let i = messages.firstIndex(where: { $0.id == localId }), let audioId = messages[i].failedAudioId else { return }
+        struct Body: Encodable { var audioId: String; var clientId: String?; var conversationId: String? }
+        thinking = true
+        defer { thinking = false }
+        do {
+            let res: AudioResponse = try await api.send("POST", "/api/chat/audio/retry",
+                                                        body: Body(audioId: audioId, clientId: messages[i].clientId, conversationId: conversationId))
+            finishVoice(localId, res)
+        } catch {
+            voiceFailed(localId, error)
+        }
+    }
+
+    private func finishVoice(_ localId: String, _ res: AudioResponse) {
+        messages.removeAll { $0.id == localId }
+        if let c = res.conversationId, c != conversationId {
+            conversationId = c
+            if !pinned { current = c }
+        }
+        if let u = res.userMessage { merge(messages: [u]) }
+        merge(messages: res.messages)
+        merge(items: res.items)
+        online = true
+        persist()
+        Haptics.soft()
+    }
+
+    private func voiceFailed(_ localId: String, _ error: Error) {
+        if let e = error as? APIError, let audioId = e.audioId, let i = messages.firstIndex(where: { $0.id == localId }) {
+            // Abschreiben ging nicht, die Aufnahme liegt aber auf dem Server → bleibt mit „Nochmal versuchen“ stehen
+            messages[i].pending = false
+            messages[i].text = "🎤 Sprachnachricht – nicht abgeschrieben"
+            messages[i].failedAudioId = audioId
+            messages.append(ChatMessage(id: "err-\(UUID().uuidString)", clientId: nil, role: "assistant", text: "😕 \(e.message)",
+                                        attachments: [], createdAt: ISO.string(Date())))
+        } else {
+            messages.removeAll { $0.id == localId }
+            messages.append(ChatMessage(id: "err-\(UUID().uuidString)", clientId: nil, role: "assistant",
+                                        text: "😕 \(error.localizedDescription)", attachments: [], createdAt: ISO.string(Date())))
+        }
+        persist()
+    }
+
     private func flushOutbox() async {
         guard !outbox.isEmpty else { return }
         struct Body: Encodable { var text: String; var clientId: String; var conversationId: String? }

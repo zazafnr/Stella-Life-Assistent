@@ -31,6 +31,7 @@ import { buildBriefing } from './briefing.ts';
 import { cleanBlocks, planWeek } from './weekplan.ts';
 import { acceptHint, dismissHint } from './hints.ts';
 import { registerAdminRoutes } from './admin.ts';
+import { registerAudioRoutes } from './audio.ts';
 import { currentConversation, listConversations, registerConversationRoutes } from './conversations.ts';
 import { addMemory, cleanSchedule, deleteMemory, isCategory, listMemories, MEMORY_CATEGORIES, updateMemory } from './memory.ts';
 
@@ -40,6 +41,7 @@ app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLi
 
 app.setErrorHandler((err, _req, reply) => {
   if (err instanceof HttpError) return reply.code(err.status).send({ error: err.message });
+  if ((err as { statusCode?: number }).statusCode === 413) return reply.code(413).send({ error: 'Das ist zu groß (Sprachnachrichten: höchstens 2 Minuten bzw. 10 MB).' });
   app.log.error(err);
   return reply.code(500).send({ error: 'Interner Fehler' });
 });
@@ -167,6 +169,7 @@ app.register(async (api) => {
   });
 
   registerAdminRoutes(api);
+  registerAudioRoutes(api);
 
   api.get('/api/me', async (req) => publicUser(req.user));
 

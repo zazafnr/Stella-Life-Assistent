@@ -10,6 +10,11 @@ struct ChatView: View {
     @State private var showCamera = false
     @State private var viewing: String?
     @State private var showHistory = false
+    @State private var recorder = VoiceRecorder()
+    @State private var pressing = false
+    @State private var cancelling = false
+    @State private var showMicDenied = false
+    @Environment(\.openURL) private var openURL
     @FocusState private var focused: Bool
 
     private let suggestions = ["Latein HÜ S. 45 Nr. 3 Freitag", "Freitag 15 Uhr Friseur", "erinnere mich in 2 Stunden an die Wäsche", "Hab ich was vergessen?", "Briefing"]
@@ -26,6 +31,18 @@ struct ChatView: View {
         }
         .sheet(isPresented: $showHistory) {
             ChatHistorySheet()
+        }
+        .onAppear { recorder.onLimit = { finishRecording(cancel: false) } }
+        .onChange(of: recorder.denied) { _, denied in
+            if denied { showMicDenied = true; recorder.denied = false }
+        }
+        .alert("Mikrofon nicht erlaubt", isPresented: $showMicDenied) {
+            Button("Einstellungen") {
+                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+            }
+            Button("Abbrechen", role: .cancel) {}
+        } message: {
+            Text("Für Sprachnachrichten braucht Stella das Mikrofon. Du kannst es in den iOS-Einstellungen erlauben.")
         }
         .sheet(isPresented: $showCamera) {
             CameraPicker { image in images.append(image) }
@@ -180,41 +197,46 @@ struct ChatView: View {
                 }
             }
             HStack(alignment: .bottom, spacing: 8) {
-                Menu {
-                    PhotosPicker(selection: $photos, maxSelectionCount: 4, matching: .images) {
-                        Label("Fotos", systemImage: "photo.on.rectangle")
+                if recorder.isRecording {
+                    recordingBar
+                } else {
+                    Menu {
+                        PhotosPicker(selection: $photos, maxSelectionCount: 4, matching: .images) {
+                            Label("Fotos", systemImage: "photo.on.rectangle")
+                        }
+                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                            Button { showCamera = true } label: { Label("Kamera", systemImage: "camera") }
+                        }
+                    } label: {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Theme.blue)
+                            .frame(width: 40, height: 40)
+                            .background(Theme.blueTint, in: Circle())
                     }
-                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                        Button { showCamera = true } label: { Label("Kamera", systemImage: "camera") }
-                    }
-                } label: {
-                    Image(systemName: "camera.fill")
+                    .accessibilityLabel("Foto anhängen")
+
+                    TextField("Schreib Stella …", text: $text, axis: .vertical)
+                        .lineLimit(1...5)
+                        .focused($focused)
                         .font(.system(size: 16))
-                        .foregroundStyle(Theme.blue)
-                        .frame(width: 40, height: 40)
-                        .background(Theme.blueTint, in: Circle())
+                        .padding(.vertical, 10)
+                        .submitLabel(.send)
+                        .onSubmit(send)
                 }
-                .accessibilityLabel("Foto anhängen")
 
-                TextField("Schreib Stella …", text: $text, axis: .vertical)
-                    .lineLimit(1...5)
-                    .focused($focused)
-                    .font(.system(size: 16))
-                    .padding(.vertical, 10)
-                    .submitLabel(.send)
-                    .onSubmit(send)
-
-                Button(action: send) {
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 40, height: 40)
-                        .background(canSend ? Theme.blue : Theme.blue.opacity(0.35), in: Circle())
-                        .scaleEffect(canSend ? 1 : 0.92)
-                        .animation(.spring(response: 0.3), value: canSend)
+                if canSend {
+                    Button(action: send) {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 40, height: 40)
+                            .background(Theme.blue, in: Circle())
+                    }
+                    .accessibilityLabel("Senden")
+                } else {
+                    micButton
                 }
-                .disabled(!canSend)
-                .accessibilityLabel("Senden")
             }
             .padding(6)
             .background(.white, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -224,6 +246,73 @@ struct ChatView: View {
             .frame(maxWidth: 800)
         }
         .animation(.easeOut(duration: 0.2), value: focused)
+    }
+
+    // MARK: Sprachnachricht
+
+    /** Gedrückt halten = aufnehmen, loslassen = senden, nach links wischen = abbrechen */
+    private var micButton: some View {
+        Image(systemName: "mic.fill")
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 40, height: 40)
+            .background(recorder.isRecording ? (cancelling ? Theme.faint : Theme.pink) : Theme.blue, in: Circle())
+            .scaleEffect(recorder.isRecording ? 1.3 : 1)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: recorder.isRecording)
+            .contentShape(Circle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { drag in
+                        if !pressing {
+                            pressing = true
+                            focused = false
+                            Haptics.soft()
+                            recorder.begin()
+                        }
+                        cancelling = drag.translation.width < -80
+                    }
+                    .onEnded { drag in
+                        pressing = false
+                        finishRecording(cancel: drag.translation.width < -80)
+                        cancelling = false
+                    }
+            )
+            .accessibilityLabel("Sprachnachricht – gedrückt halten zum Aufnehmen")
+            .accessibilityAddTraits(.isButton)
+    }
+
+    private var recordingBar: some View {
+        HStack(spacing: 10) {
+            Circle().fill(cancelling ? Theme.faint : Theme.pink).frame(width: 10, height: 10)
+                .opacity(recorder.seconds % 2 == 0 ? 1 : 0.4)
+            Text(String(format: "%d:%02d", recorder.seconds / 60, recorder.seconds % 60))
+                .font(.system(size: 16, weight: .semibold).monospacedDigit())
+                .foregroundStyle(Theme.text)
+            HStack(spacing: 3) {
+                ForEach(0..<7, id: \.self) { i in
+                    let weight = [0.2, 0.5, 0.8, 1, 0.8, 0.5, 0.2][i]
+                    Capsule().fill(Theme.blue).frame(width: 4, height: 4 + recorder.level * weight * 22)
+                }
+            }
+            .frame(height: 30)
+            .animation(.easeOut(duration: 0.08), value: recorder.level)
+            Spacer(minLength: 0)
+            Text(cancelling ? "loslassen = abbrechen" : "← wischen zum Abbrechen")
+                .font(.system(size: 13))
+                .foregroundStyle(cancelling ? Theme.pinkText : Theme.muted)
+                .lineLimit(1)
+        }
+        .padding(.leading, 8)
+        .frame(height: 40)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func finishRecording(cancel: Bool) {
+        guard let rec = recorder.end(cancel: cancel) else {
+            if recorder.tooShort { Haptics.soft() }
+            return
+        }
+        Task { await store.sendVoice(fileURL: rec.url, seconds: rec.seconds) }
     }
 
     private var canSend: Bool { !text.trimmingCharacters(in: .whitespaces).isEmpty || !images.isEmpty }
@@ -243,14 +332,15 @@ struct ChatView: View {
 struct Bubble: View {
     var message: ChatMessage
     var onImage: (String) -> Void
+    @Environment(Store.self) private var store
 
     var body: some View {
         HStack {
             if message.isUser { Spacer(minLength: 48) }
             VStack(alignment: message.isUser ? .trailing : .leading, spacing: 6) {
-                if !message.attachments.isEmpty {
+                if message.attachments.contains(where: { $0.kind != "audio" }) {
                     HStack(spacing: 6) {
-                        ForEach(message.attachments) { a in
+                        ForEach(message.attachments.filter { $0.kind != "audio" }) { a in
                             Button { onImage(a.id) } label: {
                                 AuthImage(id: a.id)
                                     .frame(width: message.attachments.count == 1 ? 220 : 120, height: message.attachments.count == 1 ? 260 : 140)
@@ -261,11 +351,20 @@ struct Bubble: View {
                 }
                 if !message.text.isEmpty {
                     VStack(alignment: .trailing, spacing: 4) {
+                        ForEach(message.attachments.filter { $0.kind == "audio" }) { a in
+                            VoiceBubbleButton(id: a.id, onUser: message.isUser)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                         Text(Self.markdown(message.text))
                             .font(.system(size: 16))
                             .foregroundStyle(message.isUser ? .white : Theme.text)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .fixedSize(horizontal: false, vertical: true)
+                        if message.failedAudioId != nil {
+                            Button("Nochmal versuchen") { Task { await store.retryVoice(message.id) } }
+                                .buttonStyle(SoftButton(filled: false))
+                                .disabled(store.thinking)
+                        }
                         if let id = message.actionId { ActionCardView(id: id) }
                         HStack(spacing: 4) {
                             Text(time)
@@ -435,5 +534,42 @@ struct ActionCardView: View {
             do { try await store.decide(id, decision) } catch { self.error = error.localizedDescription }
             busy = false
         }
+    }
+}
+
+/** Play-Knopf mit Wellen für eine Sprachnachricht */
+struct VoiceBubbleButton: View {
+    var id: String
+    var onUser: Bool
+    @State private var playback = VoicePlayback()
+
+    var body: some View {
+        Button {
+            Task { await playback.toggle(id: id) }
+        } label: {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle().fill(onUser ? Color.white.opacity(0.25) : Theme.blueTint).frame(width: 34, height: 34)
+                    if playback.loading {
+                        ProgressView().controlSize(.small).tint(onUser ? .white : Theme.blue)
+                    } else {
+                        Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(onUser ? .white : Theme.blue)
+                    }
+                }
+                HStack(spacing: 2) {
+                    ForEach(0..<10, id: \.self) { i in
+                        Capsule().frame(width: 3, height: CGFloat([5, 9, 14, 8, 16, 11, 6, 13, 9, 5][i]))
+                    }
+                }
+                .foregroundStyle((onUser ? Color.white : Theme.blue).opacity(0.6))
+                Text(playback.failed ? "nicht verfügbar" : "Sprachnachricht")
+                    .font(.system(size: 13))
+                    .foregroundStyle(onUser ? .white.opacity(0.85) : Theme.muted)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(playback.isPlaying ? "Pausieren" : "Sprachnachricht abspielen")
     }
 }

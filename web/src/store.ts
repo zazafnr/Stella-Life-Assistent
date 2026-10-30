@@ -86,7 +86,7 @@ export const getState = () => state;
 
 // ---------- HTTP ----------
 
-export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
+export class ApiError extends Error { constructor(public status: number, message: string, public data: Record<string, unknown> = {}) { super(message); } }
 
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
@@ -95,7 +95,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   const res = await fetch(path, { ...init, headers, body: init.json !== undefined ? JSON.stringify(init.json) : init.body });
   if (res.status === 401 && state.token) { logoutLocal(); throw new ApiError(401, 'Bitte neu anmelden.'); }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? `Fehler ${res.status}`);
+  if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? `Fehler ${res.status}`, data as Record<string, unknown>);
   return data as T;
 }
 
@@ -253,6 +253,63 @@ export async function sendMessage(text: string, images: string[] = []) {
     }
   }
   queueOffline(text, clientId, createdAt);
+}
+
+// ---------- Sprachnachrichten ----------
+
+type AudioResponse = ChatResponse & { transcript: string; audioId: string };
+
+function finishAudio(localId: string, res: AudioResponse) {
+  set((s) => ({ messages: s.messages.filter((m) => m.id !== localId) }));
+  if (res.conversationId && res.conversationId !== state.conversationId) set({ conversationId: res.conversationId, current: state.pinned ? state.current : res.conversationId });
+  mergeItems(res.items);
+  mergeMessages(res.userMessage ? [res.userMessage, ...res.messages] : res.messages);
+  set({ online: true });
+}
+
+/** Aufnahme schicken: Stella schreibt sie ab und behandelt den Text wie eine getippte Nachricht. */
+export async function sendAudio(blob: Blob, seconds: number) {
+  if (!navigator.onLine) throw new Error('Sprachnachrichten brauche ich mit Internet – tipp es kurz oder versuch es gleich nochmal.');
+  const clientId = crypto.randomUUID();
+  const local: ChatMessage = { id: `local-${clientId}`, clientId, role: 'user', text: '🎤 Sprachnachricht …', attachments: [], createdAt: new Date().toISOString(), pending: true };
+  set((s) => ({ messages: [...s.messages, local], thinking: true }));
+  try {
+    const q = new URLSearchParams({ clientId, duration: String(seconds) });
+    if (state.conversationId) q.set('conversationId', state.conversationId);
+    finishAudio(local.id, await api<AudioResponse>(`/api/chat/audio?${q}`, { method: 'POST', body: blob, headers: { 'Content-Type': blob.type || 'audio/webm' } }));
+  } catch (err) {
+    const audioId = err instanceof ApiError ? (err.data.audioId as string | undefined) : undefined;
+    if (audioId) {
+      // Abschreiben ging nicht, die Aufnahme liegt aber auf dem Server → Nachricht bleibt mit „Nochmal versuchen“ stehen
+      set((s) => ({ messages: s.messages.map((m) => (m.id === local.id ? { ...m, pending: false, text: '🎤 Sprachnachricht – nicht abgeschrieben', failedAudioId: audioId } : m)) }));
+    } else {
+      set((s) => ({ messages: s.messages.filter((m) => m.id !== local.id) }));
+    }
+    throw err;
+  } finally {
+    set({ thinking: false });
+  }
+}
+
+/** „Nochmal versuchen“: die gespeicherte Aufnahme erneut abschreiben lassen. */
+export async function retryAudio(localId: string) {
+  const msg = state.messages.find((m) => m.id === localId);
+  if (!msg?.failedAudioId) return;
+  set({ thinking: true });
+  try {
+    finishAudio(localId, await api<AudioResponse>('/api/chat/audio/retry', {
+      method: 'POST', json: { audioId: msg.failedAudioId, clientId: msg.clientId, conversationId: state.conversationId },
+    }));
+  } finally {
+    set({ thinking: false });
+  }
+}
+
+/** Aufnahme (mit Login) holen, zum Abspielen */
+export async function fetchFileUrl(id: string): Promise<string> {
+  const r = await fetch(`/api/files/${id}`, { headers: { Authorization: `Bearer ${state.token}` } });
+  if (!r.ok) throw new Error('Aufnahme nicht verfügbar');
+  return URL.createObjectURL(await r.blob());
 }
 
 function queueOffline(text: string, clientId: string, createdAt: string) {

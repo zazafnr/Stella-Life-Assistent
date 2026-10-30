@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { addDays, dayLabel as chatDayLabel, todayIn, type Conversation } from '@stella/shared';
-import { compressImage, newConversation, openConversation, sendMessage, useStore } from '../store.ts';
-import { AuthImage, Lightbox, Rich } from './Rich.tsx';
+import { compressImage, newConversation, openConversation, retryAudio, sendAudio, sendMessage, useStore } from '../store.ts';
+import { MAX_SECONDS, recordingSupported, startRecording, type Recording } from '../audio.ts';
+import { AudioPlayer, AuthImage, Lightbox, Rich } from './Rich.tsx';
 import { ItemStatus } from './Today.tsx';
 import { ActionCard } from './ActionCard.tsx';
 import { Icon } from '../ui/Icon.tsx';
@@ -32,6 +33,11 @@ export function Chat() {
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [history, setHistory] = useState(false);
+  const [recording, setRecording] = useState<{ rec: Recording; startedAt: number } | null>(null);
+  const [seconds, setSeconds] = useState(0);
+  const [level, setLevel] = useState(0);
+  const recordingRef = useRef<typeof recording>(null);
+  recordingRef.current = recording;
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -57,6 +63,33 @@ export function Chat() {
     }
   }
 
+  // Zeit und Pegel der laufenden Aufnahme
+  useEffect(() => {
+    if (!recording) return;
+    const t = setInterval(() => { setSeconds(Math.round((Date.now() - recording.startedAt) / 1000)); setLevel(recording.rec.level()); }, 100);
+    return () => clearInterval(t);
+  }, [recording]);
+  // nur beim Verlassen des Chats eine laufende Aufnahme verwerfen
+  useEffect(() => () => recordingRef.current?.rec.cancel(), []);
+
+  async function record() {
+    setError('');
+    try {
+      const rec = await startRecording(() => void stopAndSend());
+      setSeconds(0);
+      setRecording({ rec, startedAt: Date.now() });
+    } catch (err) { setError((err as Error).message); }
+  }
+  async function stopAndSend() {
+    const r = recordingRef.current;
+    if (!r) return;
+    setRecording(null);
+    try {
+      const { blob, seconds: secs } = await r.rec.finish();
+      await sendAudio(blob, secs);
+    } catch (err) { setError((err as Error).message); }
+  }
+  function cancelRecording() { recording?.rec.cancel(); setRecording(null); }
   async function addPhotos(files: FileList | null) {
     if (!files) return;
     try {
@@ -109,8 +142,13 @@ export function Chat() {
                   {showDay && <div className="day-sep">{day}</div>}
                   <div className={`bubble-row ${m.role}`}>
                     <div className={`bubble ${m.role}${m.pending ? ' pending' : ''}`}>
+                      {m.attachments.filter((a) => a.kind === 'audio').map((a) => <AudioPlayer key={a.id} id={a.id} />)}
                       {m.text && <Rich text={m.text} />}
-                      {m.attachments.map((a) => <AuthImage key={a.id} id={a.id} alt={a.caption} onOpen={setLightbox} />)}
+                      {m.failedAudioId && (
+                        <button type="button" className="btn small secondary" disabled={thinking}
+                          onClick={() => void retryAudio(m.id).catch((err: Error) => setError(err.message))}>Nochmal versuchen</button>
+                      )}
+                      {m.attachments.filter((a) => a.kind !== 'audio').map((a) => <AuthImage key={a.id} id={a.id} alt={a.caption} onOpen={setLightbox} />)}
                       {m.actionId && <ActionCard id={m.actionId} />}
                       <span className="meta">{m.pending ? 'wird gesendet' : timeLabel(m.createdAt)}</span>
                     </div>
@@ -143,6 +181,16 @@ export function Chat() {
           </div>
         )}
         <div className="composer-wrap">
+          {recording ? (
+            <div className="composer recording" role="status" aria-label="Aufnahme läuft">
+              <button type="button" className="attach" aria-label="Aufnahme verwerfen" onClick={cancelRecording}><Icon name="close" size={20} /></button>
+              <span className="rec-dot" aria-hidden="true" />
+              <span className="rec-time">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}</span>
+              <span className="rec-level" aria-hidden="true">{[0.2, 0.5, 0.8, 1, 0.8, 0.5, 0.2].map((w, i) => <i key={i} style={{ height: 4 + Math.round(level * w * 22) }} />)}</span>
+              <span className="small muted grow">{seconds >= MAX_SECONDS - 10 ? 'gleich Schluss …' : 'Sprich einfach los'}</span>
+              <button type="button" className="send" aria-label="Aufnahme senden" onClick={() => void stopAndSend()}><Icon name="send" size={20} stroke={2.4} /></button>
+            </div>
+          ) : (
           <form className="composer" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
             <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { void addPhotos(e.target.files); e.target.value = ''; }} />
             <button type="button" className="attach" aria-label="Foto der Aufgabe" onClick={() => fileRef.current?.click()}><Icon name="camera" size={20} /></button>
@@ -158,8 +206,11 @@ export function Chat() {
                 if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void submit(); }
               }}
             />
-            <button type="submit" className="send" disabled={!text.trim() && !photos.length} aria-label="Senden"><Icon name="send" size={20} stroke={2.4} /></button>
+            {!text.trim() && !photos.length && recordingSupported()
+              ? <button type="button" className="send mic" aria-label="Sprachnachricht aufnehmen" onClick={() => void record()}><Icon name="mic" size={20} stroke={2.2} /></button>
+              : <button type="submit" className="send" disabled={!text.trim() && !photos.length} aria-label="Senden"><Icon name="send" size={20} stroke={2.4} /></button>}
           </form>
+          )}
         </div>
         {lightbox && <Lightbox url={lightbox} onClose={() => setLightbox(null)} />}
         {history && <Sheet title="Chats" onClose={() => setHistory(false)}><ChatHistory inSheet onNew={() => void startNew()} onPick={() => setHistory(false)} /></Sheet>}

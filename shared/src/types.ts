@@ -6,7 +6,7 @@ export type ItemStatus = 'open' | 'done' | 'cancelled';
 
 export interface Attachment {
   id: string;
-  kind: 'image';
+  kind: 'image' | 'audio';
   caption?: string;
 }
 
@@ -40,6 +40,8 @@ export interface ChatMessage {
   createdAt: string;
   /** offline in der App erzeugt, noch nicht synchronisiert */
   pending?: boolean;
+  /** nur im Gerät: Sprachnachricht, die Stella nicht abschreiben konnte – die Aufnahme liegt auf dem Server, „Nochmal versuchen“ nutzt diese Id */
+  failedAudioId?: string;
   /** gehört zu einer Aktion (Vorschlag mit Ja/Nein oder Erledigtes mit „Rückgängig“) */
   actionId?: string;
 }

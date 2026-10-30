@@ -1,6 +1,6 @@
 // Stella für den PC: eigenes Fenster mit der Stella-Oberfläche, Symbol in der Taskleiste,
 // Windows-/macOS-Mitteilungen und Start mit dem System.
-const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, nativeImage, session, shell } = require('electron');
 const path = require('path');
 const config = require('./config.js');
 
@@ -232,6 +232,10 @@ ipcMain.handle('stella:set-server', (_e, raw) => {
 ipcMain.on('stella:retry', () => win?.loadURL(config.serverUrl()).catch(() => {}));
 
 app.whenReady().then(() => {
+  // Mikrofon für Sprachnachrichten (und Mitteilungen): nur für die eigene Stella-Seite, sonst nichts
+  session.defaultSession.setPermissionRequestHandler((wc, _permission, callback) => callback(sameOrigin(wc.getURL())));
+  session.defaultSession.setPermissionCheckHandler((_wc, _permission, origin) => sameOrigin(origin));
+
   buildAppMenu();
   createWindow();
   buildTray();

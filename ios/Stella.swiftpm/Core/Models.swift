@@ -43,6 +43,8 @@ struct ChatMessage: Codable, Hashable, Identifiable {
     var pending: Bool?
     /** Karte mit Ja/Nein oder „Rückgängig“ */
     var actionId: String?
+    /** nur im Gerät: Sprachnachricht, die Stella nicht abschreiben konnte – „Nochmal versuchen“ nutzt diese Id */
+    var failedAudioId: String?
 
     var isUser: Bool { role == "user" }
 }
@@ -109,6 +111,16 @@ struct Conversation: Codable, Hashable, Identifiable {
     var lastMessage: String?
     var updatedAt: String
     var count: Int
+}
+
+/** Antwort auf eine Sprachnachricht: wie ChatResponse, dazu das Transkript und die Id der Aufnahme */
+struct AudioResponse: Codable {
+    var messages: [ChatMessage]
+    var items: [Item]
+    var userMessage: ChatMessage?
+    var conversationId: String?
+    var transcript: String
+    var audioId: String
 }
 
 struct NewConversation: Codable {
