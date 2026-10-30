@@ -11,7 +11,7 @@ interface InboxEntry { source: string; category: string | null; action: string |
 
 const KIND_ICON: Record<string, [IconName, string]> = {
   homework: ['book', 'pink'], exam: ['exam', 'pink'], assignment: ['sheet', 'blue'], event: ['calendar', 'blue'],
-  todo: ['check', 'blue'], study: ['sparkle', 'blue'],
+  todo: ['check', 'blue'], study: ['sparkle', 'blue'], reminder: ['bell', 'pink'],
 };
 
 function greeting() {

@@ -85,7 +85,43 @@ export function voice(tone: Tone | undefined) {
       cool: `🧠 Lernen: ${label}. 45 min, dann Pause.`,
     }),
 
+    reminderNow: (label: string) => by({
+      nett: `⏰ Erinnerung: ${label}`,
+      frech: `⏰ Hey! ${label}. Jetzt, nicht gleich. 😏`,
+      cool: `⏰ ${label}.`,
+    }),
+
     // ----- Bestätigungen im Chat -----
+    remindSet: (when: string, what: string) => by({
+      nett: `⏰ Mach ich! Ich erinnere dich ${when} an „${what}“.`,
+      frech: `⏰ ${when} nerv ich dich wegen „${what}“. Versprochen. 😏`,
+      cool: `⏰ ${when}: „${what}“. Steht.`,
+    }),
+    moved: (title: string, when: string) => by({
+      nett: `📅 **${title}** ist jetzt ${when}.`,
+      frech: `📅 **${title}** auf ${when} geschoben. Aufschieben kannst du gut. 😏`,
+      cool: `📅 **${title}** → ${when}.`,
+    }),
+    deleted: (title: string) => by({
+      nett: `🗑️ **${title}** ist gelöscht.`,
+      frech: `🗑️ **${title}** ist weg. Als wär's nie passiert. 💅`,
+      cool: `🗑️ **${title}** gelöscht.`,
+    }),
+    remembered: (fact: string) => by({
+      nett: `💭 Gemerkt: ${fact}`,
+      frech: `💭 Notiert in meinem Elefantengedächtnis: ${fact} 🐘`,
+      cool: `💭 Gemerkt: ${fact}`,
+    }),
+    forgotten: (fact: string) => by({
+      nett: `🫧 Vergessen: ${fact}`,
+      frech: `🫧 ${fact}? Nie gehört. 😇`,
+      cool: `🫧 Weg: ${fact}`,
+    }),
+    notFound: (what: string) => by({
+      nett: `🤔 Ich finde nichts zu „${what}“ – meinst du was anderes?`,
+      frech: `🤔 „${what}“? Gibt's bei mir nicht. Sicher, dass du das eingetragen hast? 👀`,
+      cool: `🤔 Nix gefunden zu „${what}“.`,
+    }),
     noted: (what: string) => by({
       nett: `✅ Notiert: ${what}`,
       frech: pick([`✅ Schon wieder was? Na gut, notiert: ${what}`, `✅ Notiert: ${what}. Ich mach das, du machst den Rest. 😏`], what),

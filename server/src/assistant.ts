@@ -2,7 +2,7 @@
 
 import {
   addDays, formatDateDe, interpret, nextSchoolDay, parseEntry, splitTopics, timeIn, todayIn, toneInstruction, voice, WEEKDAYS_DE, weekdayOf,
-  type Attachment, type ChatMessage, type ChatResponse, type Item, type ItemKind, type ParsedEntry,
+  type Attachment, type ChatMessage, type ChatResponse, type Intent, type Item, type ItemKind, type ItemQuery, type MemoryCategory, type ParsedEntry,
 } from '@stella/shared';
 import {
   addAttachment, addMessage, clearPending, db, enqueueJob, findMessageByClientId, getItem, getPending, listItems,
@@ -10,11 +10,11 @@ import {
 } from './db.ts';
 import { PROVIDERS } from './books.ts';
 import { lessonsFor } from './untis.ts';
-import { getAction, lastUndoable, levelFor, perform, undo, type ActionParams, type ActionType, type Performed } from './actions.ts';
+import { getAction, lastChatItemId, lastUndoable, levelFor, perform, record, undo, type ActionParams, type ActionType, type Performed } from './actions.ts';
 import { buildLagebild, lagebildPrompt } from './context.ts';
 import { briefingText } from './briefing.ts';
 import { findHints, markDelivered as markHintDelivered } from './hints.ts';
-import { cleanSchedule, findMemory, isCategory } from './memory.ts';
+import { cleanSchedule, findMemory, isCategory, listMemories } from './memory.ts';
 import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type ToolDef } from './llm.ts';
 import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
 
@@ -29,6 +29,8 @@ interface Turn {
 
 const say = (t: Turn, text: string, attachments: ChatMessage['attachments'] = []) =>
   t.replies.push(addMessage(t.user.id, 'assistant', text, { attachments }));
+/** Antwort mit Aktions-Karte („Rückgängig“) */
+const sayA = (t: Turn, text: string, actionId?: string) => t.replies.push(addMessage(t.user.id, 'assistant', text, { actionId }));
 /** Nachrichten aus Aktionen (Rückfragen, „✓ erledigt“) direkt in die Chat-Antwort */
 const sayAction = (t: Turn) => (text: string, actionId: string) => { t.replies.push(addMessage(t.user.id, 'assistant', text, { actionId })); };
 /** Satzende ohne doppelten Punkt nach "Freitag, 30.10." */
@@ -42,7 +44,7 @@ export async function handleChat(user: User, text: string, clientId: string | nu
   const userMessage = addMessage(user.id, 'user', text, { clientId, attachments: images });
 
   const t: Turn = { user, today: todayIn(user.timeZone), replies: [], changed: new Map(), images };
-  const intent = interpret(text, t.today);
+  const intent = interpret(text, t.today, timeIn(user.timeZone));
   const pending = getPending(user.id);
 
   let handled = false;
@@ -57,6 +59,12 @@ export async function handleChat(user: User, text: string, clientId: string | nu
   if (!handled) {
     switch (intent?.type) {
       case 'create': await onCreate(t, intent.entry); break;
+      case 'move': await onMove(t, intent, text); break;
+      case 'delete': onDelete(t, intent.query); break;
+      case 'remind': onRemind(t, intent); break;
+      case 'remember': onRemember(t, intent.text); break;
+      case 'forget': onForget(t, intent.text); break;
+      case 'correct': if (!onCorrect(t, intent)) await runAgent(t); break;
       case 'done': onDone(t, intent.subject, intent.kind); break;
       case 'agenda': say(t, agendaText(user, t.today, intent.days)); break;
       default: await runAgent(t);
@@ -144,7 +152,9 @@ async function onCreate(t: Turn, e: ParsedEntry) {
   }
   const item = addParsedEntry(t.user, e);
   touched(t, item);
-  const when = formatDateDe(item.due!, t.today);
+  // ins Protokoll, damit „Rückgängig“ und „nein, Donnerstag“ funktionieren
+  const actionId = record(t.user, 'item.create', { kind: item.kind, title: item.title, due: item.due, time: item.time }, { id: item.id }, { id: item.id });
+  const when = `${formatDateDe(item.due!, t.today)}${item.time ? ` um ${item.time}` : ''}`;
   const evening = t.user.settings.eveningTime ?? '19:00';
 
   if (item.kind === 'homework') {
@@ -164,13 +174,13 @@ async function onCreate(t: Turn, e: ParsedEntry) {
         ? `_(Kein Datum dabei – ich hab die nächste ${item.subject}-Stunde laut WebUntis genommen.)_`
         : `_(Kein Datum erkannt – ich hab den nächsten Schultag genommen. Schreib z. B. „${item.subject ?? ''} HÜ bis Freitag“, wenn's anders ist.)_`);
     }
-    say(t, parts.join(' '));
+    sayA(t, parts.join(' '), actionId);
     if (t.images.length) requestSolve(t, item);
     return;
   }
 
   if (item.kind === 'exam') {
-    say(t, v(t).examNoted(item.title, dot(formatDateDe(item.due!))));
+    sayA(t, v(t).examNoted(item.title, dot(formatDateDe(item.due!))), actionId);
     if (item.material) {
       await makePlan(t, item.id, item.material);
     } else {
@@ -180,7 +190,99 @@ async function onCreate(t: Turn, e: ParsedEntry) {
     return;
   }
 
-  say(t, dot(v(t).noted(`**${item.title}**${item.detail ? ` – ${item.detail}` : ''}, ${when}`)));
+  sayA(t, dot(v(t).noted(`**${item.title}**${item.detail ? ` – ${item.detail}` : ''}, ${when}`)), actionId);
+}
+
+// ---------- Verschieben, löschen, erinnern, merken, korrigieren ----------
+
+/** Welcher offene Eintrag ist gemeint? Fach/Art/Wörter, bei Gleichstand der nächste fällige */
+function findItem(t: Turn, q: ItemQuery): Item | null {
+  const candidates = listItems(t.user.id, { from: addDays(t.today, -14) }).filter((i) => i.kind !== 'study' || q.words.length);
+  let best: { item: Item; score: number } | null = null;
+  for (const i of candidates) {
+    const hay = `${i.title} ${i.detail ?? ''} ${i.subject ?? ''}`.toLowerCase();
+    if (q.subject && i.subject !== q.subject) continue;
+    if (q.kind && i.kind !== q.kind) continue;
+    const hits = q.words.filter((w) => hay.includes(w)).length;
+    if (q.words.length && !hits) continue;
+    const score = (q.subject ? 3 : 0) + (q.kind ? 2 : 0) + hits * 2 - (i.due && i.due < t.today ? 1 : 0);
+    if (!best || score > best.score || (score === best.score && (i.due ?? '9') < (best.item.due ?? '9'))) best = { item: i, score };
+  }
+  return best?.item ?? null;
+}
+
+const queryLabel = (q: ItemQuery) => [q.subject, q.kind && { homework: 'HÜ', exam: 'Test', assignment: 'Abgabe', event: 'Termin', todo: 'To-do', study: 'Lernen', reminder: 'Erinnerung' }[q.kind], ...q.words].filter(Boolean).join(' ');
+const whenLabel = (t: Turn, due: string | null, time: string | null) => [due ? formatDateDe(due, t.today) : null, time ? `um ${time}` : null].filter(Boolean).join(' ');
+
+function changeTo(t: Turn, item: Item, due: string | null, time: string | null) {
+  const r = perform(t.user, 'item.update', { id: item.id, patch: { ...(due ? { due } : {}), ...(time ? { time } : {}) } }, { source: 'chat', quiet: true, say: sayAction(t) });
+  touched(t, ...r.changed);
+  if (r.status === 'refused') { say(t, `🙅 ${r.reason}`); return; }
+  if (r.status === 'done') sayA(t, v(t).moved(item.title, whenLabel(t, due ?? item.due, time ?? item.time)), r.actionId);
+}
+
+async function onMove(t: Turn, intent: Extract<Intent, { type: 'move' }>, text: string) {
+  const item = findItem(t, intent.query);
+  if (item) { changeTo(t, item, intent.due, intent.time); return; }
+  // "Latein HÜ auf Freitag" ohne vorhandene HÜ ist eher eine neue HÜ
+  const entry = parseEntry(text.replace(/\bauf\b/iu, 'bis'), t.today);
+  if (entry) { await onCreate(t, entry); return; }
+  say(t, v(t).notFound(queryLabel(intent.query)));
+}
+
+function onDelete(t: Turn, q: ItemQuery) {
+  const item = findItem(t, q);
+  if (!item) { say(t, v(t).notFound(queryLabel(q))); return; }
+  const r = perform(t.user, 'item.delete', { id: item.id }, { source: 'chat', quiet: true, say: sayAction(t) });
+  touched(t, ...r.changed);
+  if (r.status === 'refused') say(t, `🙅 ${r.reason}`);
+  else if (r.status === 'done') sayA(t, v(t).deleted(item.title), r.actionId);
+}
+
+function onRemind(t: Turn, intent: Extract<Intent, { type: 'remind' }>) {
+  const r = perform(t.user, 'item.create', { kind: 'reminder', title: intent.text, due: intent.due, time: intent.time, source: 'chat' },
+    { source: 'chat', quiet: true, say: sayAction(t) });
+  touched(t, ...r.changed);
+  if (r.status === 'refused') say(t, `🙅 ${r.reason}`);
+  else if (r.status === 'done') sayA(t, v(t).remindSet(whenLabel(t, intent.due, intent.time), intent.text), r.actionId);
+}
+
+/** grobe Einordnung für „merk dir …“ – die KI sortiert in der Nacht nicht um, der Nutzer kann ändern */
+function guessCategory(text: string): MemoryCategory {
+  const s = text.toLowerCase();
+  if (/allergi|krank|asthma|brille|medikament|vegetar|vegan|unverträg/u.test(s)) return 'health';
+  if (/(jeden|immer|jede woche|montags|dienstags|mittwochs|donnerstags|freitags|samstags|sonntags).*\d|training|probe\b/u.test(s)) return 'routine';
+  if (/geburtstag|freund|freundin|mama|papa|mutter|vater|bruder|schwester|oma|opa|lehrer|lehrerin|frau |herr |klassenvorst/u.test(s)) return 'person';
+  if (/\b(mag|liebe|lieber|hasse|am liebsten|lieblings)/u.test(s)) return 'preference';
+  if (/\b(will|möchte|ziel|schaffen)\b/u.test(s)) return 'goal';
+  if (/schule|fach|note|klasse|schularbeit|hü\b/u.test(s)) return 'school';
+  return 'other';
+}
+
+function onRemember(t: Turn, text: string) {
+  const r = perform(t.user, 'memory.add', { category: guessCategory(text), text, source: 'user' }, { source: 'chat', quiet: true, say: sayAction(t) });
+  if (r.status === 'refused') say(t, `🙅 ${r.reason}`);
+  else if (r.status === 'done') sayA(t, v(t).remembered(text), r.actionId);
+}
+
+function onForget(t: Turn, text: string) {
+  const words = text.toLowerCase().split(/[\s,.!?]+/u).filter((w) => w.length > 2 && !['dem', 'den', 'die', 'das', 'mit', 'ich', 'mein', 'meine'].includes(w));
+  const m = listMemories(t.user.id)
+    .map((x) => ({ x, hits: words.filter((w) => x.text.toLowerCase().includes(w)).length }))
+    .filter((r) => r.hits > 0).sort((a, b) => b.hits - a.hits)[0]?.x;
+  if (!m) { say(t, v(t).notFound(text)); return; }
+  const r = perform(t.user, 'memory.delete', { id: m.id }, { source: 'chat', quiet: true, say: sayAction(t) });
+  if (r.status === 'refused') say(t, `🙅 ${r.reason}`);
+  else if (r.status === 'done') sayA(t, v(t).forgotten(m.text), r.actionId);
+}
+
+/** „nein, Donnerstag“ → der zuletzt angelegte/geänderte Eintrag. false = nichts Passendes, KI fragen */
+function onCorrect(t: Turn, intent: Extract<Intent, { type: 'correct' }>): boolean {
+  const id = lastChatItemId(t.user.id);
+  const item = id ? getItem(t.user.id, id) : null;
+  if (!item || item.deleted) return false;
+  changeTo(t, item, intent.due, intent.time);
+  return true;
 }
 
 function onDone(t: Turn, subject: string | null, kind: ItemKind | null) {
@@ -276,7 +378,7 @@ async function refineFocuses(exam: Item, material: string, dates: string[]): Pro
 
 // ---------- KI-Agent ----------
 
-const KINDS = ['homework', 'exam', 'assignment', 'event', 'todo', 'study'];
+const KINDS = ['homework', 'exam', 'assignment', 'event', 'todo', 'study', 'reminder'];
 
 const TOOLS: ToolDef[] = [
   {
@@ -287,7 +389,7 @@ const TOOLS: ToolDef[] = [
       parameters: {
         type: 'object',
         properties: {
-          kind: { type: 'string', enum: KINDS, description: 'homework=Hausübung, exam=Test/Schularbeit/Prüfung, assignment=Referat/Abgabe, event=Termin, todo=Aufgabe' },
+          kind: { type: 'string', enum: KINDS, description: 'homework=Hausübung, exam=Test/Schularbeit/Prüfung, assignment=Referat/Abgabe, event=Termin, todo=Aufgabe, reminder=Erinnerung genau zur Uhrzeit (time nötig)' },
           title: { type: 'string', description: 'kurz, z. B. "Mathe Schularbeit" oder "Zahnarzt"' },
           subject: { type: 'string', description: 'Schulfach, falls zutreffend' },
           detail: { type: 'string' },

@@ -285,6 +285,27 @@ export function perform<T extends ActionType>(user: User, type: T, params: Actio
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+/** Schon Erledigtes ins Protokoll eintragen (z. B. Kurznotiz über den schnellen Weg), damit „Rückgängig“ geht */
+export function record<T extends ActionType>(user: User, type: T, params: ActionParams[T], undoData: unknown, result: unknown = null): string {
+  const id = newId();
+  const t = now();
+  db.prepare(`INSERT INTO actions (id, user_id, type, summary, params, status, source, undo, result, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, 'done', 'chat', ?, ?, ?, ?)`)
+    .run(id, user.id, type, DEFS[type].summary(user, params), JSON.stringify(params), JSON.stringify(undoData), JSON.stringify(result), t, t);
+  return id;
+}
+
+/** Eintrag der letzten Chat-Aktion (für Korrekturen wie „nein, Donnerstag“) */
+export function lastChatItemId(userId: string, withinMs = 15 * 60_000): string | null {
+  const since = new Date(Date.now() - withinMs).toISOString();
+  const r = db.prepare(`SELECT type, params, result FROM actions WHERE user_id = ? AND source = 'chat' AND status = 'done'
+    AND type IN ('item.create', 'item.update') AND created_at > ? ORDER BY created_at DESC LIMIT 1`).get(userId, since) as
+    { type: string; params: string; result: string | null } | undefined;
+  if (!r) return null;
+  if (r.type === 'item.update') return (JSON.parse(r.params) as { id: string }).id;
+  return (JSON.parse(r.result ?? 'null') as { id?: string } | null)?.id ?? null;
+}
+
 /** Vorschlag annehmen (Karte „Ja“) */
 export function approve(userId: string, id: string): { entry: ActionEntry; changed: Item[] } {
   const r = getRow(userId, id);

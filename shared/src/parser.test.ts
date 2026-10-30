@@ -119,3 +119,37 @@ test('Französisch-HÜ aus dem scook-Buch', () => {
   assert.equal(e.subject, 'Französisch');
   assert.equal(e.exercises, '16');
 });
+
+test('Phase 3: verschieben und löschen sind Befehle, keine neuen Einträge', () => {
+  assert.deepEqual(interpret('verschieb die Mathe HÜ auf Montag', WED), {
+    type: 'move', query: { subject: 'Mathe', kind: 'homework', words: [] }, due: '2026-11-02', time: null,
+  });
+  assert.deepEqual(interpret('Zahnarzt auf 16 Uhr verschieben', WED), {
+    type: 'move', query: { subject: null, kind: null, words: ['zahnarzt'] }, due: null, time: '16:00',
+  });
+  assert.equal(interpret('lösch die Deutsch HÜ', WED)?.type, 'delete');
+  assert.deepEqual(interpret('Zahnarzt absagen', WED), { type: 'delete', query: { subject: null, kind: null, words: ['zahnarzt'] } });
+  assert.equal(interpret('Latein HÜ S. 45 Nr. 3 Freitag', WED)?.type, 'create', 'Kurznotizen bleiben Kurznotizen');
+});
+
+test('Phase 3: Erinnerungen mit relativer und fester Zeit', () => {
+  assert.deepEqual(interpret('erinnere mich in 2 Stunden an die Wäsche', WED, '20:30'), { type: 'remind', due: '2026-10-28', time: '22:30', text: 'Die Wäsche' });
+  assert.deepEqual(interpret('in 30 min Pizza aus dem Ofen', WED, '23:50'), { type: 'remind', due: '2026-10-29', time: '00:20', text: 'Pizza aus dem Ofen' });
+  assert.deepEqual(interpret('erinnere mich morgen um 7 an Turnsachen', WED), { type: 'remind', due: '2026-10-29', time: '07:00', text: 'Turnsachen' });
+  assert.deepEqual(interpret('erinnere mich um 18 Uhr an Mama anrufen', WED, '19:00'), { type: 'remind', due: '2026-10-29', time: '18:00', text: 'Mama anrufen' });
+});
+
+test('Phase 3: Alltagstermine, Gedächtnis und Korrekturen', () => {
+  const e = interpret('Freitag 15 Uhr Friseur', WED);
+  assert.equal(e?.type, 'create');
+  assert.deepEqual(e?.type === 'create' && [e.entry.kind, e.entry.title, e.entry.due, e.entry.time], ['event', 'Friseur', '2026-10-30', '15:00']);
+  const g = interpret('Geburtstag Mia 15.11.', WED);
+  assert.deepEqual(g?.type === 'create' && [g.entry.kind, g.entry.title, g.entry.due], ['todo', 'Geburtstag Mia', '2026-11-15']);
+  assert.deepEqual(interpret('merk dir, dass ich Erdnussallergie habe', WED), { type: 'remember', text: 'Ich habe Erdnussallergie' });
+  assert.deepEqual(interpret('merk dir: Frau Huber ist meine Klassenvorständin', WED), { type: 'remember', text: 'Frau Huber ist meine Klassenvorständin' });
+  assert.deepEqual(interpret('vergiss das mit dem Training', WED), { type: 'forget', text: 'dem Training' });
+  assert.deepEqual(interpret('nein, Donnerstag', WED), { type: 'correct', due: '2026-10-29', time: null });
+  assert.deepEqual(interpret('doch erst um 16 Uhr', WED), { type: 'correct', due: null, time: '16:00' });
+  assert.equal(interpret('Einkaufen: Milch, Brot', WED), null, 'ohne Datum → KI');
+  assert.equal(interpret('Wann ist eigentlich die nächste Mathe SA?', WED), null);
+});

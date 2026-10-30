@@ -11,7 +11,7 @@ struct ChatView: View {
     @State private var viewing: String?
     @FocusState private var focused: Bool
 
-    private let suggestions = ["Was steht an?", "Latein HÜ S. 45 Nr. 3 Freitag", "Mathe SA 12.11.", "Was hab ich morgen?"]
+    private let suggestions = ["Latein HÜ S. 45 Nr. 3 Freitag", "Freitag 15 Uhr Friseur", "erinnere mich in 2 Stunden an die Wäsche", "Hab ich was vergessen?", "Briefing"]
 
     var body: some View {
         ZStack(alignment: .top) {

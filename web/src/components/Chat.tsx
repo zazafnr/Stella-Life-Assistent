@@ -7,7 +7,7 @@ import { ActionCard } from './ActionCard.tsx';
 import { Icon } from '../ui/Icon.tsx';
 import { Sky, StarMark } from '../ui/Decor.tsx';
 
-const SUGGESTIONS = ['Französisch HÜ S. 45 Nr. 16 Freitag', 'Mathe SA 12.11.', 'was steht an?', 'Latein HÜ erledigt'];
+const SUGGESTIONS = ['Französisch HÜ S. 45 Nr. 16 Freitag', 'Freitag 15 Uhr Friseur', 'erinnere mich in 2 Stunden an die Wäsche', 'Hab ich was vergessen?', 'Briefing'];
 
 function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });

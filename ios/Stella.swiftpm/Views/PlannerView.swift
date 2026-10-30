@@ -17,7 +17,7 @@ struct PlannerView: View {
             case .all: return true
             case .homework: return i.kind == "homework" || i.kind == "assignment"
             case .exams: return i.kind == "exam" || i.kind == "study"
-            case .other: return i.kind == "event" || i.kind == "todo"
+            case .other: return i.kind == "event" || i.kind == "todo" || i.kind == "reminder"
             }
         }
     }

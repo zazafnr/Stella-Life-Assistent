@@ -63,6 +63,10 @@ export function planReminders(
     case 'study':
       out.push({ date: item.due, time: item.time ?? prefs.studyTime, message: v.studyTime(label), withAttachments: false });
       break;
+    case 'reminder':
+      // genau zur gewünschten Zeit
+      out.push({ date: item.due, time: item.time ?? '09:00', message: v.reminderNow(label), withAttachments: false });
+      break;
   }
   return out;
 }

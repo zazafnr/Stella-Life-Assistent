@@ -355,6 +355,7 @@ struct KindIcon: View {
         case "assignment": return ("doc.text.fill", false)
         case "event": return ("calendar", false)
         case "study": return ("sparkles", false)
+        case "reminder": return ("bell.fill", true)
         default: return ("checkmark.circle", false)
         }
     }
