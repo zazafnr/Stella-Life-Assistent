@@ -112,6 +112,27 @@ und Routinen, morgen fällig (mit Stand), was Stella über Nacht erledigt hat, w
 dann die Hinweise als eigene Karten. Zeit: automatisch 45 min vor der ersten Stunde, fest oder aus.
 Im Chat jederzeit mit „Briefing“, die Hinweise allein mit „Hab ich was vergessen?“.
 
+**Natürliche Sprache** (`shared/src/parser.ts`, `server/src/assistant.ts`) – ohne KI erkannt:
+verschieben („verschieb die Mathe HÜ auf Montag“), absagen/löschen, Erinnerungen („erinnere mich
+in 2 Stunden an …“, eigene Art `reminder`), „merk dir, dass …“, „vergiss …“, Korrekturen („nein,
+Donnerstag“) und Alltagstermine. Jede Bestätigung hat „Rückgängig“. Alles andere geht an die KI.
+
+**Intelligente Inbox** (`server/src/mail.ts`) – die Mail-Analyse liefert Kategorie, Grund
+(„Klassenvorstand“), Frist und ob eine Antwort nötig ist. Fristen werden je nach Planer-Recht
+eingetragen oder vorgeschlagen. Antworten entwirft die KI (Sie-Form bei Schule und Ämtern),
+gesendet wird über SMTP – immer erst nach ausdrücklichem „Senden“ (Bereich `mail_send`, heikel:
+nur „fragen“ oder „nie“). Oben in der Inbox: „Wichtig für dich“.
+
+**Plan my week** (`server/src/weekplan.ts`) – verteilt Lernen für Tests, HÜs und Abgaben auf die
+freien Zeitfenster aus dem Lagebild. Regeln statt KI: Test 3 Einheiten à 45 min (Schularbeit 4),
+HÜ 30 min am Vortag, Abgabe 2×60 min; Start zur Viertelstunde, 10 min Puffer, höchstens 2 h pro
+Schultag (2,5 h am Wochenende), nichts am Testtag, am Vortag „Alles wiederholen“, Dringendes
+zuerst. Die Lernzeit kommt aus dem Gedächtnis („lernt lieber abends“) oder den Einstellungen; nur
+langen Stoff teilt die KI in Lerneinheiten. Übernehmen ist die Aktion `week_plan.apply` (mit
+Rückgängig), im Chat („Plan meine Woche“) immer als Karte. Sonntag 18–20:30 bietet Stella den Plan
+für die neue Woche von selbst an. Verpasste Blöcke plant sie neu ein, wenn sie den Planer ändern
+darf – sonst bleibt es beim Hinweis.
+
 ## 8. Fahrplan
 
 **Phase 1: dieser Stand** ✅
@@ -120,8 +141,11 @@ Chat, Kurznotizen (auch offline), Planer, Erinnerungen, Lernpläne, Push, Kalend
 **Phase 2: Postfach, Schule+** ✅
 E-Mail (Gmail, iCloud), Inbox mit Social-Media-Benachrichtigungen, scook, HÜ-Autopilot mit FreeNotes, Fotos im Chat, WebUntis.
 
-**Phase 3: als Nächstes**
-- Morgen-Briefing um 6:45: Was heute ansteht, welche HÜ fällig ist, wichtige Mails, Entfall.
+**Phase 3: Assistentin** ✅
+Lagebild, Aktionen mit Rechte-Stufen und Rückgängig, selbstlernendes Gedächtnis, Hinweise,
+Morning Briefing, natürliche Sprache, intelligente Inbox, Plan my week (siehe Abschnitt 7).
+
+**Als Nächstes**
 - Arbeitsblätter direkt ausfüllen: Foto → FreeNotes legt den Scan als Seite an und schreibt die Antworten in die Lücken (FreeNotes kann das schon lokal).
 - Lernplan-Abfrage: Stella fragt dich in der Lernzeit kurz Vokabeln oder Fragen zum Stoff ab.
 - Chat-Befehl „nochmal lösen“ / „Lösung zeigen“.
