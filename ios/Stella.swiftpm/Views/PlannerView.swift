@@ -8,6 +8,7 @@ struct PlannerView: View {
     @State private var lessons: [Lesson] = []
     @State private var openItem: Item?
     @State private var showAdd = false
+    @State private var planning = false
 
     enum Filter: String, CaseIterable, Identifiable {
         case all = "Alles", homework = "HÜs", exams = "Tests", other = "Termine"
@@ -41,6 +42,25 @@ struct PlannerView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         header
                         weekStrip
+                        Button { planning = true } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(Theme.pinkText)
+                                    .frame(width: 40, height: 40)
+                                    .background(Theme.pinkTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Woche planen").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
+                                    Text("Stella verteilt Lernen und HÜs auf deine freien Zeiten")
+                                        .font(.system(size: 13)).foregroundStyle(Theme.muted)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.faint)
+                            }
+                            .card(padding: 14)
+                        }
+                        .buttonStyle(PressableStyle())
                         Picker("Filter", selection: $filter) {
                             ForEach(Filter.allCases) { Text($0.rawValue).tag($0) }
                         }
@@ -67,6 +87,7 @@ struct PlannerView: View {
             .toolbar(.hidden, for: .navigationBar)
             .sheet(item: $openItem) { ItemDetail(item: $0) }
             .sheet(isPresented: $showAdd) { QuickAdd().presentationDetents([.height(260)]) }
+            .sheet(isPresented: $planning) { WeekPlanSheet() }
             .task(id: monday) { await load() }
         }
     }

@@ -287,6 +287,38 @@ export function voice(tone: Tone | undefined) {
       cool: busy ? 'Packst du. ✌️' : 'Chill. ✌️',
     }),
 
+    // ----- Plan my week -----
+    weekPlanIntro: (n: number) => by({
+      nett: `🗓️ Hier ist mein Vorschlag für deine Woche – ${n} ${n === 1 ? 'Block' : 'Blöcke'} in deinen freien Zeiten:`,
+      frech: `🗓️ Ich hab deine Woche mal sortiert, bevor's peinlich wird: ${n} ${n === 1 ? 'Block' : 'Blöcke'}. 😏`,
+      cool: `🗓️ Deine Woche, geplant: ${n} ${n === 1 ? 'Block' : 'Blöcke'}.`,
+    }),
+    weekPlanEmpty: () => by({
+      nett: 'Für die nächsten 7 Tage gibt es nichts zu planen – keine Tests, keine offenen HÜs. Genieß es! 🌸',
+      frech: 'Nichts zu planen. Keine Tests, keine HÜs. Wer bist du und was hast du mit dir gemacht? 😏',
+      cool: 'Nix zu planen diese Woche. 😎',
+    }),
+    weekPlanQuestion: () => by({
+      nett: 'Soll ich das so eintragen? Einzelne Blöcke kannst du im Planer unter „Woche planen“ abwählen. 💫',
+      frech: 'Eintragen? Wenn dir was nicht passt: Planer → „Woche planen“, abwählen. 😏',
+      cool: 'Eintragen? Anpassen geht im Planer unter „Woche planen“.',
+    }),
+    weekPlanOffer: () => by({
+      nett: '🌙 Neue Woche steht vor der Tür – ich hab dir schon mal einen Plan gemacht:',
+      frech: '🌙 Sonntagabend-Panik? Nicht mit mir. Hier ist dein Plan:',
+      cool: '🌙 Neue Woche. Plan steht:',
+    }),
+    weekPlanDone: (n: number) => by({
+      nett: `✓ ${n} ${n === 1 ? 'Block ist' : 'Blöcke sind'} eingetragen. Du schaffst das! 💫`,
+      frech: `✓ ${n} ${n === 1 ? 'Block' : 'Blöcke'} drin. Jetzt nur noch auch machen. 😏`,
+      cool: `✓ ${n} ${n === 1 ? 'Block' : 'Blöcke'} eingetragen.`,
+    }),
+    replanned: (title: string, when: string) => by({
+      nett: `🔁 „${title}“ hat nicht geklappt – kein Problem, ich hab's auf ${when} verschoben.`,
+      frech: `🔁 „${title}“ geschwänzt? 😏 Hab's auf ${when} geschoben.`,
+      cool: `🔁 „${title}“ verschoben auf ${when}.`,
+    }),
+
     toneChanged: () => by({
       nett: 'Okay! Ab jetzt bin ich wieder ganz lieb zu dir. 🌸',
       frech: 'Oh, frech darf ich sein? Das wird lustig. 😏',

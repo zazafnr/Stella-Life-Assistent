@@ -11,7 +11,8 @@ import {
 import { PROVIDERS } from './books.ts';
 import { lessonsFor } from './untis.ts';
 import { getAction, lastChatItemId, lastUndoable, levelFor, perform, record, undo, type ActionParams, type ActionType, type Performed } from './actions.ts';
-import { buildLagebild, lagebildPrompt } from './context.ts';
+import { buildLagebild, isoWeekday, lagebildPrompt } from './context.ts';
+import { offerWeekPlan, planWeek } from './weekplan.ts';
 import { briefingText } from './briefing.ts';
 import { findHints, markDelivered as markHintDelivered } from './hints.ts';
 import { cleanSchedule, findMemory, isCategory, listMemories } from './memory.ts';
@@ -52,6 +53,7 @@ export async function handleChat(user: User, text: string, clientId: string | nu
   if (/^\s*(bitte\s+)?(mach\s+(das|es)\s+)?r(ü|ue)ckg(ä|ae)ngig\b|^\s*undo\b/iu.test(text)) handled = undoLast(t);
   if (!handled && BRIEFING_RE.test(text)) { say(t, briefingText(t.user)); handled = true; }
   if (!handled && FORGOT_RE.test(text)) handled = await answerForgot(t);
+  if (!handled && WEEK_RE.test(text)) handled = await answerWeek(t, text);
   if (!handled && pending && intent?.type !== 'create') handled = await answerPending(t, pending, text);
   if (pending && !handled) clearPending(user.id);
 
@@ -76,6 +78,22 @@ export async function handleChat(user: User, text: string, clientId: string | nu
 
 const BRIEFING_RE = /^\s*(\W*)(morning[- ]?)?briefing\b|^\s*(tages)?(überblick|ueberblick)\b|^\s*was (steht|ist) heute (an|los)\b/iu;
 const FORGOT_RE = /hab(e)? ich (was|etwas|irgendwas) vergessen|was (hab|habe) ich vergessen/iu;
+
+const WEEK_RE = /\bplan(e|st)?\s+(mir\s+)?(meine|die|diese|nächste|naechste)\s+(\w+\s+)?woche\b|\bwochenplan|\bwoche\s+(planen|durchplanen)|\bplan my week\b/iu;
+
+/** „Plan meine Woche“ – Vorschlag als Karte, Übernehmen mit Ja */
+async function answerWeek(t: Turn, text: string): Promise<boolean> {
+  const next = /nächste|naechste/iu.test(text);
+  const plan = await planWeek(t.user, next ? { from: addDays(t.today, 8 - isoWeekday(t.today)) } : {});
+  const v = voice(t.user.settings.tone);
+  if (!plan.blocks.length) {
+    say(t, plan.notes.length ? `${v.weekPlanEmpty()}\n\n${plan.notes.map((n) => `⚠️ ${n}`).join('\n')}` : v.weekPlanEmpty());
+    return true;
+  }
+  const { result } = offerWeekPlan(t.user, plan, { intro: v.weekPlanIntro(plan.blocks.length), source: 'chat', say: sayAction(t) });
+  if (result.status === 'refused') say(t, result.reason);
+  return true;
+}
 
 /** „Was hab ich vergessen?“ – alle aktuellen Hinweise, mit Vorschlägen als Karten */
 async function answerForgot(t: Turn): Promise<boolean> {

@@ -254,6 +254,8 @@ export interface UserSettings {
   tone?: Tone;
   /** Morning Briefing: "auto" = vor der ersten Stunde, "HH:MM" = feste Zeit, "off" = aus */
   briefing?: string;
+  /** Sonntagabend den Wochenplan anbieten: "sunday" (Standard) oder "off" */
+  weekPlan?: 'sunday' | 'off';
   /** was Stella von sich aus darf (je Bereich), siehe actions.ts */
   permissions?: Partial<Record<ActionGroup, PermissionLevel>>;
 }

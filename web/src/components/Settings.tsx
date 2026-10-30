@@ -115,6 +115,12 @@ export function Settings({ back }: { back: () => void }) {
 
         <Group title="Zeiten & Ziele">
           <BriefingRow value={me.settings.briefing ?? 'auto'} onSave={(v) => void patch({ briefing: v }, v === 'off' ? 'Briefing aus' : 'Gespeichert')} />
+          <label className="list-row">
+            <span className="grow"><span className="list-title">Wochenplan am Sonntag</span>
+              <span className="list-sub">Sonntagabend schlägt Stella einen Plan für die neue Woche vor</span></span>
+            <Switch label="Wochenplan am Sonntag" checked={me.settings.weekPlan !== 'off'}
+              onChange={(on) => void patch({ weekPlan: on ? 'sunday' : 'off' }, on ? 'Kommt Sonntagabend' : 'Kein Wochenplan mehr am Sonntag')} />
+          </label>
           <TimeRow label="Erinnerung am Vorabend" value={me.settings.eveningTime ?? '19:00'} onSave={(v) => void patch({ eveningTime: v })} />
           <TimeRow label="Lernzeit" value={me.settings.studyTime ?? '16:30'} onSave={(v) => void patch({ studyTime: v })} />
           <label className="list-row">

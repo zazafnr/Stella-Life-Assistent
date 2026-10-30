@@ -11,7 +11,7 @@
 // das führt Stella aus, außer der Bereich steht auf „nie“ oder ist als heikel markiert.
 // Was Stella von sich aus tut (Autopilot, Hinweise, Gelerntes), folgt immer der Stufe.
 
-import { formatDateDe, type ActionEntry, type ActionGroup, type ActionStatus, type Item, type Memory, type PermissionLevel } from '@stella/shared';
+import { formatDateDe, type ActionEntry, type ActionGroup, type ActionStatus, type Item, type Memory, type PermissionLevel, type PlanBlock } from '@stella/shared';
 import { addMessage, db, enqueueJob, getItem, getUser, newId, now, type NewItem, type User } from './db.ts';
 import { addMemory, deleteMemory, getMemory, updateMemory, type NewMemory } from './memory.ts';
 import type { OutgoingMail } from './mail.ts';
@@ -74,6 +74,7 @@ export interface ActionParams {
   'item.update': { id: string; patch: ItemPatch };
   'item.delete': { id: string };
   'study_plan.create': { examId: string; material: string };
+  'week_plan.apply': { blocks: PlanBlock[] };
   'homework.solve': { itemId: string; again?: boolean };
   'mail.send': OutgoingMail;
   'memory.add': NewMemory;
@@ -149,6 +150,17 @@ const DEFS: { [T in ActionType]: Def<T> } = {
     undo: (u, d: { examId: string; material: string | null; sessions: string[] }) =>
       [...d.sessions.map((id) => changeItem(u, id, { deleted: true })), changeItem(u, d.examId, { material: d.material })]
         .filter((i): i is Item => !!i),
+  },
+  'week_plan.apply': {
+    group: () => 'planner',
+    summary: (_u, p) => `Woche planen (${p.blocks.length} ${p.blocks.length === 1 ? 'Block' : 'Blöcke'})`,
+    run: (u, p) => {
+      const items = p.blocks.map((b) => addItem(u, {
+        kind: 'study', subject: b.subject, title: b.title, detail: b.focus, due: b.date, time: b.start, parentId: b.parentId, source: 'plan',
+      }));
+      return { result: { count: items.length }, undo: { ids: items.map((i) => i.id) }, changed: items };
+    },
+    undo: (u, d: { ids: string[] }) => d.ids.map((id) => changeItem(u, id, { deleted: true })).filter((i): i is Item => !!i),
   },
   'homework.solve': {
     group: () => 'homework',
@@ -266,6 +278,8 @@ export interface PerformOptions {
   quiet?: boolean;
   /** statt addMessage – z. B. damit die Nachricht in der Chat-Antwort mitkommt */
   say?: (text: string, actionId: string) => void;
+  /** immer erst als Karte vorschlagen (z. B. ein ganzer Wochenplan), außer der Bereich steht auf „nie“ */
+  confirm?: boolean;
 }
 
 export function perform<T extends ActionType>(user: User, type: T, params: ActionParams[T], opts: PerformOptions): Performed {
@@ -278,7 +292,7 @@ export function perform<T extends ActionType>(user: User, type: T, params: Actio
   const summary = def.summary(user, params);
   const id = newId();
   const t = now();
-  const mustAsk = level === 'ask' && (opts.source === 'auto' || SENSITIVE.has(group));
+  const mustAsk = !!opts.confirm || (level === 'ask' && (opts.source === 'auto' || SENSITIVE.has(group)));
   db.prepare('INSERT INTO actions (id, user_id, type, summary, params, status, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .run(id, user.id, type, summary, JSON.stringify(params), mustAsk ? 'proposed' : 'done', opts.source, t, t);
 

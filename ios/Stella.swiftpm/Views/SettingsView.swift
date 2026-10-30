@@ -58,6 +58,17 @@ struct SettingsView: View {
 
                     Section {
                         BriefingSetting(value: me.settings.briefing ?? "auto") { v in await save(["briefing": .string(v)]) }
+                        Toggle(isOn: Binding(
+                            get: { me.settings.weekPlan != "off" },
+                            set: { on in Task { await save(["weekPlan": .string(on ? "sunday" : "off")]) } }
+                        )) {
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Wochenplan am Sonntag")
+                                    Text("Sonntagabend schlägt Stella einen Plan vor").font(.system(size: 12)).foregroundStyle(Theme.muted)
+                                }
+                            } icon: { Image(systemName: "calendar.badge.clock") }
+                        }
                         timeRow("Abend-Erinnerung", symbol: "moon.stars", value: me.settings.eveningTime ?? "19:00") { t in
                             await save(["eveningTime": .string(t)])
                         }

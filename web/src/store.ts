@@ -19,6 +19,7 @@ export interface Me {
     books?: BookConfig[]; homeworkAutopilot?: boolean; mailAutoTrash?: boolean; tone?: Tone;
     permissions?: Partial<Record<ActionGroup, PermissionLevel>>;
     briefing?: string;
+    weekPlan?: 'sunday' | 'off';
   };
   integrations: {
     books: Record<BookProvider, { connected: boolean; cookies: boolean; email: string | null }>;

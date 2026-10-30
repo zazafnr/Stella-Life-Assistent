@@ -132,6 +132,30 @@ struct UserSettings: Codable, Hashable {
     var tone: String?
     /** Morning Briefing: "auto", "off" oder "HH:MM" */
     var briefing: String?
+    /** Sonntagabend Wochenplan anbieten: "sunday" oder "off" */
+    var weekPlan: String?
+}
+
+/** Ein Block im Wochenplan-Vorschlag */
+struct PlanBlock: Codable, Hashable, Identifiable {
+    var key: String
+    var date: String
+    var start: String
+    var end: String
+    var title: String
+    var focus: String?
+    var subject: String?
+    var parentId: String
+    /** "exam", "homework" oder "assignment" */
+    var why: String
+    var id: String { key }
+}
+
+struct WeekPlan: Codable {
+    var from: String
+    var to: String
+    var blocks: [PlanBlock]
+    var notes: [String]
 }
 
 /** Etwas, das Stella bemerkt hat („Was hast du vergessen?“) */

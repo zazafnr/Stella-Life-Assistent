@@ -535,3 +535,23 @@ textarea.cookies { min-height: 90px; font-family: ui-monospace, monospace; font-
 .reply-editor { display: flex; flex-direction: column; gap: 10px; }
 .reply-editor textarea { width: 100%; font: inherit; font-size: 15px; line-height: 1.5; padding: 12px 14px; border-radius: 14px; border: 1.5px solid var(--border); background: var(--bg); color: var(--text); resize: vertical; }
 .reply-editor textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 4px rgba(31, 111, 235, .12); }
+
+/* Planer: „Woche planen“ */
+.plan-cta { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 16px; border-radius: var(--radius); border: 0; background: var(--surface);
+  box-shadow: var(--shadow); color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: transform .15s ease; }
+.plan-cta:active { transform: scale(.98); }
+.plan-cta .icon-tile { width: 40px; height: 40px; border-radius: 12px; }
+.plan-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.plan-day { display: flex; flex-direction: column; gap: 8px; }
+.plan-block { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border-radius: 16px; border: 1.5px solid transparent;
+  background: var(--surface); box-shadow: var(--shadow); color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  border-left: 5px solid var(--blue); transition: opacity .2s ease, transform .15s ease; }
+.plan-block.pink { border-left-color: #E5568C; }
+.plan-block.green { border-left-color: #22A06B; }
+.plan-block.off { opacity: .45; }
+.plan-block.off strong { text-decoration: line-through; }
+.plan-block:active { transform: scale(.98); }
+.plan-time { display: flex; flex-direction: column; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 46px; }
+.plan-check { width: 24px; height: 24px; border-radius: 8px; border: 2px solid var(--border-strong); display: grid; place-items: center; flex: none; color: #fff; }
+.plan-check.on { background: var(--blue); border-color: var(--blue); }
+.plan-notes { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 14px; background: #FFF4E5; color: #8A5300; font-size: 14px; }

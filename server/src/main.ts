@@ -28,6 +28,7 @@ import { finishGoogle, finishTarget, googleAuthUrl, googleConfigured, readState,
 import { approve, GROUPS, isGroup, isLevel, levelFor, listActions, perform, reject, undo } from './actions.ts';
 import { LlmUnavailable } from './llm.ts';
 import { buildBriefing } from './briefing.ts';
+import { cleanBlocks, planWeek } from './weekplan.ts';
 import { acceptHint, dismissHint } from './hints.ts';
 import { addMemory, cleanSchedule, deleteMemory, isCategory, listMemories, MEMORY_CATEGORIES, updateMemory } from './memory.ts';
 
@@ -202,6 +203,10 @@ app.register(async (api) => {
       const v = str(b.briefing);
       if (v !== 'auto' && v !== 'off' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) throw new HttpError(400, 'Briefing: "auto", "off" oder HH:MM');
       patch.briefing = v;
+    }
+    if (b.weekPlan !== undefined) {
+      if (b.weekPlan !== 'sunday' && b.weekPlan !== 'off') throw new HttpError(400, 'Wochenplan: "sunday" oder "off"');
+      patch.weekPlan = b.weekPlan;
     }
     if (b.tone !== undefined) {
       if (!isTone(b.tone)) throw new HttpError(400, 'Ton muss nett, frech oder cool sein');
@@ -544,6 +549,20 @@ app.register(async (api) => {
 
   // ----- Morning Briefing & Hinweise -----
   api.get('/api/briefing', async (req) => buildBriefing(req.user));
+
+  // ----- Plan my week: Vorschlag ansehen, Blöcke abwählen, übernehmen -----
+  api.get('/api/weekplan', async (req) => {
+    const q = req.query as Record<string, string>;
+    const from = /^\d{4}-\d{2}-\d{2}$/.test(q.from ?? '') ? q.from : undefined;
+    return planWeek(req.user, { from });
+  });
+  api.post('/api/weekplan/apply', async (req) => {
+    const blocks = cleanBlocks(req.user.id, (req.body as Record<string, unknown> | undefined)?.blocks);
+    if (!blocks.length) throw new HttpError(400, 'Keine Blöcke ausgewählt');
+    const r = perform(req.user, 'week_plan.apply', { blocks }, { source: 'chat', quiet: true });
+    if (r.status === 'refused') throw new HttpError(403, r.reason);
+    return { ok: true, actionId: r.actionId, items: r.changed };
+  });
   api.post('/api/hints/:key/accept', async (req: FastifyRequest<{ Params: { key: string } }>) => {
     try {
       const r = acceptHint(req.user, req.params.key);

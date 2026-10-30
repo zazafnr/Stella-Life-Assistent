@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { addDays, formatDateDe, todayIn, weekdayOf, type Item } from '@stella/shared';
 import { api, deleteItem, patchItem, useStore } from '../store.ts';
 import { AuthImage, Lightbox } from './Rich.tsx';
 import { Icon } from '../ui/Icon.tsx';
 import { Confetti, Sky, showToast } from '../ui/Decor.tsx';
+import { WeekPlanSheet } from './WeekPlanSheet.tsx';
 
 interface Lesson { date: string; start: string; end: string; subject: string | null; code: string | null; status: string; info: string | null }
 
@@ -36,6 +37,7 @@ export function Planner() {
   const [justDone, setJustDone] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [planning, setPlanning] = useState(false);
 
   const monday = addDays(day, -((weekdayOf(day) + 6) % 7));
   const week = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
@@ -107,6 +109,7 @@ export function Planner() {
   };
 
   const kw = isoWeek(monday);
+  const closePlanning = useCallback(() => setPlanning(false), []);
 
   return (
     <div className="page">
@@ -130,6 +133,15 @@ export function Planner() {
             </button>
           ))}
         </div>
+
+        <button type="button" className="plan-cta rise" onClick={() => setPlanning(true)}>
+          <span className="icon-tile pink"><Icon name="sparkle" size={20} /></span>
+          <span className="plan-text">
+            <strong>Woche planen</strong>
+            <span className="small muted">Stella verteilt Lernen und HÜs auf deine freien Zeiten</span>
+          </span>
+          <Icon name="chevron" size={18} />
+        </button>
 
         <div className="segmented rise" role="tablist" aria-label="Filter">
           {FILTERS.map(([f, label]) => (
@@ -183,6 +195,7 @@ export function Planner() {
         )}
       </div>
       {lightbox && <Lightbox url={lightbox} onClose={() => setLightbox(null)} />}
+      {planning && <WeekPlanSheet today={today} onClose={closePlanning} />}
     </div>
   );
 }

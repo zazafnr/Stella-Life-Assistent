@@ -134,3 +134,30 @@ export interface Briefing {
   time: string | null;
   sent: boolean;
 }
+
+/** Ein Block im Wochenplan – wird beim Übernehmen ein Eintrag (Art „study“) */
+export interface PlanBlock {
+  /** stabil je Vorschlag, z. B. "<parentId>:2" – damit Ab-/Anwählen eindeutig ist */
+  key: string;
+  date: string;
+  start: string;
+  end: string;
+  title: string;
+  /** Schwerpunkt, z. B. „Mitose“ oder „Alles wiederholen“ */
+  focus: string | null;
+  subject: string | null;
+  /** Test, HÜ oder Abgabe, für die der Block ist */
+  parentId: string;
+  why: 'exam' | 'homework' | 'assignment';
+}
+
+/** „Plan my week“: Vorschlag für die nächsten 7 Tage */
+export interface WeekPlan {
+  from: string;
+  to: string;
+  blocks: PlanBlock[];
+  /** was nicht ganz aufgeht („Für Bio reicht es nur für 2 Einheiten“) */
+  notes: string[];
+  /** Zeit, die schon fest eingeplant ist (Minuten je Tag) – für die Wochenansicht */
+  load: { date: string; freeMinutes: number; plannedMinutes: number }[];
+}
