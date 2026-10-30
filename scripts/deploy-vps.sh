@@ -10,7 +10,9 @@
 set -euo pipefail
 
 OPS=${OPS:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/coinchecker/deploy/ops}
-DOMAIN=${STELLA_DOMAIN:-stella.5-189-157-214.sslip.io}
+DOMAIN=${STELLA_DOMAIN:-stella.evolsior.com}
+# die frühere Adresse bleibt als Zweitname erreichbar (ältere App-Versionen, Kurzbefehle)
+ALIASES=${STELLA_ALIASES-stella.5-189-157-214.sslip.io}
 UPLOAD=/root/stella-upload
 SRC=/root/stella-src
 CHUNK=${CHUNK_BYTES:-100000}
@@ -44,7 +46,7 @@ echo "==> Zusammensetzen und prüfen"
 "$OPS" exec "rm -rf $SRC && mkdir -p $SRC && tar -xf $UPLOAD/stella.tar -C $SRC && rm -rf $UPLOAD" >/dev/null
 
 echo "==> Installieren (asynchron)"
-resp=$("$OPS" exec "cd $SRC && STELLA_DOMAIN=$DOMAIN bash deploy/install-vps.sh" --async)
+resp=$("$OPS" exec "cd $SRC && STELLA_DOMAIN=$DOMAIN STELLA_ALIASES=\"$ALIASES\" bash deploy/install-vps.sh" --async)
 job=$(node -e 'const d=JSON.parse(process.argv[1]);console.log(d.job_id||(d.result&&d.result.job_id)||"")' "$resp")
 [[ -n $job ]] || { echo "Keine Job-Id erhalten: $resp" >&2; exit 1; }
 "$OPS" job "$job" --wait || { echo "Installation fehlgeschlagen (Job $job)." >&2; exit 1; }

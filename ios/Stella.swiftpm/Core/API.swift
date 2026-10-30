@@ -17,7 +17,7 @@ struct APIError: LocalizedError {
 /** Zugang zum Stella-Server. Der Login-Token liegt im Schlüsselbund. */
 final class API: @unchecked Sendable {
     static let shared = API()
-    static let defaultServer = "https://stella.5-189-157-214.sslip.io"
+    static let defaultServer = "https://stella.evolsior.com"
 
     private let session: URLSession = {
         let c = URLSessionConfiguration.default

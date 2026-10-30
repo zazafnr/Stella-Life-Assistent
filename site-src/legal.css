@@ -1,0 +1,12 @@
+.legal { padding-block: clamp(48px, 8vw, 100px) clamp(64px, 10vw, 140px); display: grid; gap: clamp(56px, 8vw, 110px); }
+.doc { max-width: 720px; display: grid; gap: 16px; scroll-margin-top: 100px; }
+.doc h1 { font-size: clamp(44px, 7vw, 88px); letter-spacing: -.05em; margin-bottom: 8px; }
+.doc h2 { font-size: 20px; letter-spacing: -.02em; line-height: 1.2; margin-top: 18px; }
+.doc p, .doc li { color: #C9C9D1; }
+.doc ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.doc a { border-bottom: 1px solid var(--line-2); }
+.doc a:hover { border-color: #fff; }
+.muted { color: var(--muted) !important; }
+.todo { background: rgba(255,214,10,.16); color: #FFE27A; border-radius: 6px; padding: 1px 7px; font-weight: 500; }
+.notice { max-width: 720px; padding: 16px 20px; border-radius: 16px; background: rgba(255,255,255,.05); box-shadow: inset 0 0 0 1px var(--line-2); color: var(--muted); font-size: 15px; }
+.notice b { color: #fff; }

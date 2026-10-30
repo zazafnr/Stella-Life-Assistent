@@ -3,7 +3,7 @@ const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
-const DEFAULT_SERVER = 'https://stella.5-189-157-214.sslip.io';
+const DEFAULT_SERVER = 'https://stella.evolsior.com';
 const file = () => path.join(app.getPath('userData'), 'stella-desktop.json');
 
 function read() {
