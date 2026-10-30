@@ -18,10 +18,11 @@ import { findHints, markDelivered as markHintDelivered } from './hints.ts';
 import { cleanSchedule, findMemory, isCategory, listMemories } from './memory.ts';
 import { draftReply } from './mail.ts';
 import { maybeTitle } from './conversations.ts';
-import { afterWorkTime, describeUser, isSchool } from './profile.ts';
+import { afterWorkTime, describeUser, hasFeature, isSchool } from './profile.ts';
 import { matchOpenItems, openItems } from './lists.ts';
 import { activeGoals, amountText, describeCadence, extractGoal, extractLog, GOAL_RE, looksLikeGoal, matchGoal, parseLogQuick, progress, weekTarget, type NewGoal } from './goals.ts';
 import { resolvePlace } from './places.ts';
+import { euro, spendingCard, spendingFacts, spendingPeriod, SPEND_RE } from './finance.ts';
 import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type ToolDef } from './llm.ts';
 import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
 
@@ -73,8 +74,9 @@ async function handleChatIn(user: User, text: string, clientId: string | null, i
   if (!handled && FORGOT_RE.test(text)) handled = await answerForgot(t);
   if (!handled && INBOX_RE.test(text)) handled = answerInbox(t);
   if (!handled && WEEK_RE.test(text)) handled = await answerWeek(t, text);
-  if (!handled && GOAL_START_RE.test(text) && (looksLikeGoal(text) || GOAL_EXPLICIT_RE.test(text))) handled = await onGoalCreate(t, text);
-  if (!handled && !images.length) handled = await onGoalLog(t, text);
+  if (!handled && hasFeature(user, 'goals') && GOAL_START_RE.test(text) && (looksLikeGoal(text) || GOAL_EXPLICIT_RE.test(text))) handled = await onGoalCreate(t, text);
+  if (!handled && !images.length && hasFeature(user, 'goals')) handled = await onGoalLog(t, text);
+  if (!handled && hasFeature(user, 'finance') && SPEND_RE.test(text)) handled = onSpending(t, text);
   if (handled && pending) clearPending(user.id);
   if (!handled && pending && intent?.type !== 'create') handled = await answerPending(t, pending, text);
   if (pending && !handled) clearPending(user.id);
@@ -314,6 +316,15 @@ function onListAdd(t: Turn, intent: Extract<Intent, { type: 'list_add' }>) {
   const res = r.result as { added: string[]; skipped: string[] };
   if (!res.added.length) say(t, v(t).listAlready(res.skipped.join(', ')));
   else sayA(t, v(t).listAdded(res.added.join(', '), res.added.length), r.actionId);
+}
+
+/** „Wie viel hab ich diese Woche ausgegeben?“ → Summe als Karte mit den Kategorien */
+function onSpending(t: Turn, text: string): boolean {
+  const range = spendingPeriod(text, t.today);
+  const card = spendingCard(t.user, range, range.label);
+  const words = card.count ? v(t).spendingSome(card.label, euro(card.totalCents, card.currency), card.count) : v(t).spendingNone(card.label);
+  t.replies.push(addMessage(t.user.id, 'assistant', words, { card }));
+  return true;
 }
 
 /** „ich will 3x pro Woche laufen gehen“ → Ziel anlegen (Karte mit Rückgängig) */
@@ -608,6 +619,21 @@ const TOOLS: ToolDef[] = [
   {
     type: 'function',
     function: {
+      name: 'spending_summary',
+      description: 'Ausgaben (Kartenzahlungen aus Apple Pay) in einem Zeitraum: Summe, Kategorien, häufigste Händler. Optional nur eine Kategorie.',
+      parameters: {
+        type: 'object',
+        properties: {
+          from: { type: 'string', description: 'YYYY-MM-DD, Standard: Monatsanfang' },
+          to: { type: 'string', description: 'YYYY-MM-DD, Standard: heute' },
+          category: { type: 'string', description: 'Lebensmittel, Essen & Trinken, Transport, Shopping, Freizeit, Abos, Gesundheit oder Sonstiges' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'health_summary',
       description: 'Schritte/Schlaf/Aktivität der letzten Tage (aus Apple Health über Kurzbefehle).',
       parameters: { type: 'object', properties: { days: { type: 'number' } } },
@@ -760,6 +786,12 @@ async function runTool(t: Turn, name: string, args: Record<string, any>): Promis
     }
     case 'timetable':
       return lessonsFor(u.id, args.from ?? t.today, args.to ?? addDays(t.today, 1));
+    case 'spending_summary': {
+      const ymd = /^\d{4}-\d{2}-\d{2}$/;
+      const to = ymd.test(String(args.to ?? '')) ? String(args.to) : t.today;
+      const from = ymd.test(String(args.from ?? '')) ? String(args.from) : `${t.today.slice(0, 7)}-01`;
+      return spendingFacts(u, from, to, args.category);
+    }
     case 'health_summary': {
       const days = Math.min(Number(args.days ?? 7), 60);
       return db.prepare('SELECT date, steps, sleep_hours, active_minutes FROM health_days WHERE user_id = ? AND date >= ? ORDER BY date')

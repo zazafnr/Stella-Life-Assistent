@@ -19,6 +19,8 @@ const { addItem } = await import('../src/planner.ts');
 const { addMemory } = await import('../src/memory.ts');
 const { addListItems, shoppingListId } = await import('../src/lists.ts');
 const goalsMod = await import('../src/goals.ts');
+const finMod = await import('../src/finance.ts');
+const { applyProfile } = await import('../src/profile.ts');
 const { handleChat } = await import('../src/assistant.ts');
 const { perform } = await import('../src/actions.ts');
 const { buildWeekPlan } = await import('../src/weekplan.ts');
@@ -87,6 +89,29 @@ await handleChat(user(), 'plan meine Woche', null);
 const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
 const rows = db.prepare('SELECT id FROM messages WHERE user_id = ? ORDER BY created_at, rowid').all(uid) as { id: string }[];
 rows.forEach((r, i) => db.prepare('UPDATE messages SET created_at = ? WHERE id = ?').run(ago(i === 0 ? 240 : (rows.length - i) * 3), r.id));
+
+// Alle Funktionen an, damit Ziele und Ausgaben in der Vorschau zu sehen sind
+applyProfile(user(), { situation: 'school', features: ['mails', 'planner', 'homework', 'shopping', 'goals', 'finance', 'health'] });
+
+// Ausgaben (Apple Pay) mit Abo und Budget
+{
+  const at = (daysAgo: number, hour = 12) => new Date(Date.now() - daysAgo * 86_400_000 - (12 - hour) * 3600_000).toISOString();
+  const pay = (amount: string, merchant: string, daysAgo: number, card = 'Visa') => finMod.recordPayment(user(), { amount, merchant, card, date: at(daysAgo) });
+  await pay('4,80', 'Café Central', 0);
+  await pay('23,40', 'BILLA 1234 WIEN', 1);
+  await pay('12,99', 'Netflix', 1);
+  await pay('2,40', 'Wiener Linien', 2);
+  await pay('36,90', 'H&M', 3);
+  await pay('7,50', 'Kino Village', 4);
+  await pay('18,20', 'Lieferando', 5);
+  await pay('41,10', 'Hofer', 6);
+  await pay('12,99', 'Netflix', 32);
+  await pay('12,99', 'Netflix', 63);
+  await pay('29,90', 'Zalando', 12);
+  await pay('9,60', 'dm drogerie markt', 9);
+  finMod.setBudget(uid, 'Essen & Trinken', 3000);
+  finMod.setBudget(uid, 'Lebensmittel', 12000);
+}
 
 // Ziele mit Verlauf (Karte auf „Heute“ und Ziele-Ansicht)
 {

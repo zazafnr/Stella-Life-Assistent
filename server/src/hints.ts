@@ -15,6 +15,7 @@ import { addMessage, db, getUser, now, setPending, type PendingType, type User }
 import { bookFor } from './planner.ts';
 import { pushToUser } from './push.ts';
 import { nextLessonDate } from './untis.ts';
+import { budgetStatus, euro } from './finance.ts';
 import { activeGoals, parseGoalQuick, staleGoals } from './goals.ts';
 
 export interface FoundHint extends Hint {
@@ -135,13 +136,13 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
   }
 
   // Ziele ohne Eintrag seit zwei Wochen (höchstens einmal im Monat je Ziel)
-  for (const { goal, weeks } of staleGoals(user, lb.today)) {
+  for (const { goal, weeks } of hasFeature(user, 'goals') ? staleGoals(user, lb.today) : []) {
     out.push({ key: `goal_stale:${goal.id}:${lb.today.slice(0, 7)}`, priority: 'normal', text: v.goalStale(goal.title, weeks), open: { tab: 'goals', label: 'Ziele ansehen' } });
   }
 
   // Gedächtnis-Einträge der Kategorie „Ziel“: einmal anbieten, sie als echtes Ziel anzulegen
   const haveGoal = new Set(activeGoals(user.id).map((g) => g.title.toLowerCase()));
-  for (const m of lb.memories.filter((x) => x.category === 'goal').slice(0, 3)) {
+  for (const m of (hasFeature(user, 'goals') ? lb.memories : []).filter((x) => x.category === 'goal').slice(0, 3)) {
     const bare = m.text.replace(/^\s*(ich\s+)?(will|möchte|moechte|werde|plane|mein ziel( ist)?)[:,]?\s+/iu, '').trim();
     const parsed = parseGoalQuick(`ich will ${bare}`);
     const title = (parsed?.title ?? bare).replace(/[.!]+$/u, '').slice(0, 80);
@@ -151,6 +152,19 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
       action: { type: 'goal.create', params: { ...parsed, title: title.charAt(0).toUpperCase() + title.slice(1) }, label: 'Als Ziel anlegen' },
     });
     break;
+  }
+
+  // Monatsbudget je Kategorie: Hinweis ab 80 % und noch einmal bei 100 %
+  if (hasFeature(user, 'finance')) {
+    const month = lb.today.slice(0, 7);
+    for (const b of budgetStatus(user, month)) {
+      const percent = Math.floor((b.spentCents / b.limitCents) * 100);
+      if (percent < 80) continue;
+      out.push({
+        key: `budget:${b.category}:${month}:${percent >= 100 ? 100 : 80}`, priority: 'normal',
+        text: v.hintBudget(b.category, percent, euro(b.spentCents), euro(b.limitCents)), open: { tab: 'finance', label: 'Ausgaben ansehen' },
+      });
+    }
   }
 
   // bekannter Zustand: Vorschlag schon verschickt / weggeklickt / abgelehnt

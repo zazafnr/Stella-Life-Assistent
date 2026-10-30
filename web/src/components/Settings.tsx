@@ -8,12 +8,13 @@ import { Mail } from './settings/Mail.tsx';
 import { Untis } from './settings/Untis.tsx';
 import { Handwriting } from './settings/Handwriting.tsx';
 import { Server } from './settings/Server.tsx';
+import { FinanceSetup } from './settings/Finance.tsx';
 import { ActionLog, MemoryView, Permissions } from './settings/Assistant.tsx';
 import { Icon, type IconName } from '../ui/Icon.tsx';
 import { Sheet, Sky, StarMark, Switch, showToast } from '../ui/Decor.tsx';
 import { VERSION } from '../version.ts';
 
-type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server' | 'delete';
+type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'finance' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server' | 'delete';
 
 interface AiStatusData { configured: boolean; chain: string[]; visionChain: string[]; coolingDown: string[]; usedToday: number; dailyLimit: number }
 
@@ -48,6 +49,7 @@ export function Settings({ back, openOnboarding }: { back: () => void; openOnboa
     },
     { id: 'notes', icon: 'pen', tile: 'blue', title: 'FreeNotes & Handschrift', sub: 'HÜs in deine Hefte schreiben', status: i.freeNotes ? ['Verbunden', 'ok'] : ['Einrichten', 'todo'] },
     { id: 'health', icon: 'heart', tile: 'pink', title: 'Health, SMS & Kalender', sub: 'Kurzbefehle und Kalender-Abo', status: ['Anleitung', 'todo'] },
+    { id: 'finance', icon: 'wallet', tile: 'green', title: 'Ausgaben', sub: 'Apple Pay → Stella', status: ['Anleitung', 'todo'] },
     {
       id: 'notify', icon: 'bell', tile: 'green', title: 'Mitteilungen', sub: 'Erinnerungen auf diesem Gerät',
       status: perm === 'granted' ? ['An', 'ok'] : perm === 'denied' ? ['Blockiert', 'warn'] : ['Einschalten', 'todo'],
@@ -59,6 +61,7 @@ export function Settings({ back, openOnboarding }: { back: () => void; openOnboa
     if (r.id === 'books' || r.id === 'untis' || r.id === 'notes') return school;
     if (r.id === 'mail') return meHas(me, 'mails');
     if (r.id === 'health') return meHas(me, 'health');
+    if (r.id === 'finance') return meHas(me, 'finance');
     return true;
   });
 
@@ -192,6 +195,7 @@ export function Settings({ back, openOnboarding }: { back: () => void; openOnboa
       {sheet === 'mail' && <Sheet title="E-Mail" onClose={() => setSheet(null)}><Mail me={me} /></Sheet>}
       {sheet === 'notes' && <Sheet title="FreeNotes & Handschrift" onClose={() => setSheet(null)}><Handwriting me={me} /></Sheet>}
       {sheet === 'health' && <Sheet title="Health, SMS & Kalender" onClose={() => setSheet(null)}><Shortcuts me={me} /></Sheet>}
+      {sheet === 'finance' && <Sheet title="Ausgaben" onClose={() => setSheet(null)}><FinanceSetup me={me} /></Sheet>}
       {sheet === 'notify' && <Sheet title="Mitteilungen" onClose={() => setSheet(null)}><Notifications onChange={() => setPerm(pushPermission())} /></Sheet>}
       {sheet === 'ai' && ai && <Sheet title="KI" onClose={() => setSheet(null)}><AiDetails ai={ai} /></Sheet>}
       {sheet === 'perms' && <Sheet title="Was Stella selbst darf" onClose={() => setSheet(null)}><Permissions /></Sheet>}

@@ -150,9 +150,20 @@ struct QuickActions: Codable {
 /** Karte unter einer Stella-Nachricht (derzeit: Läden in der Nähe) */
 struct MessageCard: Codable, Hashable {
     var type: String
-    var category: String
+    /** Läden-Karte */
+    var category: String?
     var label: String
     var itemId: String?
+    /** Ausgaben-Karte */
+    var currency: String?
+    var totalCents: Int?
+    var count: Int?
+    var categories: [SpendingLine]?
+}
+
+struct SpendingLine: Codable, Hashable {
+    var category: String
+    var cents: Int
 }
 
 struct ListEntry: Codable, Hashable, Identifiable {
@@ -222,6 +233,58 @@ struct GoalLogEntry: Codable, Hashable, Identifiable {
 
 struct GoalsResponse: Codable { var goals: [GoalProgress] }
 struct GoalResponse: Codable { var goal: GoalProgress }
+
+/** Eine Kartenzahlung (nur Betrag, Händler und Kartenname – nie die Nummer). Heißt nicht „Transaction“, weil SwiftUI das schon hat. */
+struct Payment: Codable, Hashable, Identifiable {
+    var id: String
+    var amountCents: Int
+    var currency: String
+    var merchant: String
+    var category: String
+    var cardLabel: String?
+    var occurredAt: String
+    var day: String
+    var source: String
+}
+
+struct BudgetLine: Codable, Hashable {
+    var category: String
+    var limitCents: Int
+    var spentCents: Int
+}
+
+struct SubscriptionLine: Codable, Hashable, Identifiable {
+    var merchant: String
+    var amountCents: Int
+    var currency: String
+    var lastDay: String
+    var nextDay: String
+    var count: Int
+    var id: String { "\(merchant)-\(amountCents)" }
+}
+
+struct CategorySum: Codable, Hashable, Identifiable {
+    var category: String
+    var cents: Int
+    var count: Int
+    var id: String { category }
+}
+
+struct FinanceMonth: Codable, Hashable {
+    var month: String
+    var currency: String
+    var totalCents: Int
+    var previousTotalCents: Int
+    var count: Int
+    var otherCurrency: Int
+    var categories: [CategorySum]
+    var budgets: [BudgetLine]
+    var transactions: [Payment]
+    var subscriptions: [SubscriptionLine]
+}
+
+struct PaymentResponse: Codable { var transaction: Payment }
+struct TestPaymentResponse: Codable { var duplicate: Bool; var message: String }
 
 struct ListsResponse: Codable { var lists: [StellaList] }
 struct ListResponse: Codable { var list: StellaList }

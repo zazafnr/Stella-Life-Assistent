@@ -453,6 +453,7 @@ struct Bubble: View {
                         }
                         if let id = message.actionId { ActionCardView(id: id) }
                         if let card = message.card, card.type == "places" { PlacesCardView(card: card) }
+                        if let card = message.card, card.type == "spending" { SpendingCardView(card: card) }
                         HStack(spacing: 4) {
                             Text(time)
                             if message.pending == true { Image(systemName: "clock") }

@@ -31,6 +31,7 @@ import { buildBriefing } from './briefing.ts';
 import { cleanBlocks, planWeek } from './weekplan.ts';
 import { acceptHint, dismissHint } from './hints.ts';
 import { registerAdminRoutes } from './admin.ts';
+import { registerFinanceRoutes, recordPayment } from './finance.ts';
 import { registerGoalRoutes } from './goals.ts';
 import { registerListRoutes } from './lists.ts';
 import { registerPlaceRoutes } from './places.ts';
@@ -134,6 +135,9 @@ app.register(async (ingest) => {
     return { ok: true };
   });
 
+  // Apple-Kurzbefehl-Automation „Transaktion“ (Wallet): jede Kartenzahlung → Ausgaben
+  ingest.post('/api/ingest/:token/payment', async (req) => recordPayment(req.user, req.body));
+
   // Apple-Kurzbefehl-Automation "Wenn ich eine Nachricht erhalte" → SMS/iMessage weiterleiten
   ingest.post('/api/ingest/:token/:source', async (req: FastifyRequest<{ Params: { token: string; source: string } }>) => {
     const b = req.body as Record<string, unknown>;
@@ -171,6 +175,7 @@ app.register(async (api) => {
   registerAdminRoutes(api);
   registerListRoutes(api);
   registerGoalRoutes(api);
+  registerFinanceRoutes(api);
   registerPlaceRoutes(api);
   registerQuickRoutes(api);
   registerProfileRoutes(api, publicUser);

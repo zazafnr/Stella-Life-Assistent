@@ -171,6 +171,25 @@ export function voice(tone: Tone | undefined) {
       frech: `🎯 **${title}**, ${rhythm}. Mal sehen, wie lange der Elan hält. 😏`,
       cool: `🎯 Ziel steht: **${title}**, ${rhythm}.`,
     }),
+    spendingSome: (label: string, total: string, count: number) => by({
+      nett: `💶 **${label}** hast du ${total} ausgegeben (${count} ${count === 1 ? 'Zahlung' : 'Zahlungen'}).`,
+      frech: `💶 **${label}**: ${total} weg, ${count} ${count === 1 ? 'Zahlung' : 'Zahlungen'}. Der Geldbeutel sagt Hallo. 😏`,
+      cool: `💶 ${label}: ${total} (${count}×).`,
+    }),
+    spendingNone: (label: string) => by({
+      nett: `💶 **${label}** habe ich noch keine Ausgaben gesehen. Ist der Apple-Pay-Kurzbefehl eingerichtet? Die Anleitung steht in den Einstellungen unter „Ausgaben“.`,
+      frech: `💶 **${label}** nichts ausgegeben? Oder der Kurzbefehl fehlt – dann steht die Anleitung in den Einstellungen unter „Ausgaben“. 😏`,
+      cool: `💶 ${label}: nix gesehen. Kurzbefehl eingerichtet? Einstellungen → Ausgaben.`,
+    }),
+    hintBudget: (category: string, percent: number, spent: string, limit: string) => by({
+      nett: percent >= 100
+        ? `💶 Dein Budget für **${category}** ist aufgebraucht: ${spent} von ${limit}.`
+        : `💶 Du hast schon ${percent} % deines Budgets für **${category}** verbraucht (${spent} von ${limit}).`,
+      frech: percent >= 100
+        ? `💶 **${category}**: ${spent} von ${limit} – Budget gesprengt. Respekt. 😏`
+        : `💶 **${category}**: schon ${percent} % weg (${spent} von ${limit}). Langsam, langsam. 😏`,
+      cool: percent >= 100 ? `💶 ${category}: Budget leer (${spent}/${limit}).` : `💶 ${category}: ${percent} % vom Budget (${spent}/${limit}).`,
+    }),
     goalExists: (title: string) => by({
       nett: `🎯 **${title}** gibt es schon – schreib einfach, wenn du etwas geschafft hast, dann trage ich es ein.`,
       frech: `🎯 **${title}** gibt es schon. Doppelt gemoppelt hält nicht fitter. 😏`,

@@ -10,6 +10,7 @@ import { HttpError } from './auth.ts';
 import { isoWeekday } from './context.ts';
 import { addMessage, db, getUser, newId, notifyOnce, now, type User } from './db.ts';
 import { complete, groqAvailable, llmAvailable } from './llm.ts';
+import { hasFeature } from './profile.ts';
 import { pushToUser } from './push.ts';
 
 type Row = { id: string; title: string; why: string | null; metric: string; unit: string; target: number; cadence: string; minutes: number | null; check_in: string | null; status: string; created_at: string };
@@ -253,7 +254,7 @@ export function checkInText(user: User, g: GoalProgress): string {
 /** Läuft im Scheduler: zur gewählten Zeit einmal am Tag erinnern */
 export async function sendGoalCheckIns(userId: string) {
   const user = getUser(userId);
-  if (!user) return;
+  if (!user || !hasFeature(user, 'goals')) return;
   const today = todayIn(user.timeZone);
   const nowHhmm = timeIn(user.timeZone);
   for (const g of activeGoals(userId)) {
@@ -266,7 +267,7 @@ export async function sendGoalCheckIns(userId: string) {
 
 /** Zeilen für das Briefing: sonntags der Wochenrückblick, sonst nichts */
 export function goalBriefingLines(user: User, today: string): string[] {
-  if (isoWeekday(today) !== 7) return [];
+  if (isoWeekday(today) !== 7 || !hasFeature(user, 'goals')) return [];
   return listGoals(user, false, today).filter((g) => g.status === 'active')
     .map((g) => `${g.title}: ${amountText(g, g.weekValue)} von ${amountText(g, g.weekTarget)}${g.weekValue >= g.weekTarget ? ' ✓' : ''}`);
 }

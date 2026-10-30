@@ -84,9 +84,11 @@ struct RootView: View {
                     .tabItem { Label("Planer", systemImage: "calendar") }
                     .tag(Tab.planner)
                     .badge(store.openHomework)
-                GoalsView()
-                    .tabItem { Label("Ziele", systemImage: "target") }
-                    .tag(Tab.goals)
+                if store.me?.has("goals") != false {
+                    GoalsView()
+                        .tabItem { Label("Ziele", systemImage: "target") }
+                        .tag(Tab.goals)
+                }
                 if store.me?.has("mails") != false {
                     InboxView()
                         .tabItem { Label("Inbox", systemImage: "tray") }

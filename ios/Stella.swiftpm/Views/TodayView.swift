@@ -9,6 +9,7 @@ struct TodayView: View {
     @State private var inbox: [InboxEntry] = []
     @State private var showSettings = Demo.opens("settings")
     @State private var showHealth = false
+    @State private var showFinance = Demo.opens("finance")
     @State private var openItem: Item?
 
     private var today: String { Day.today }
@@ -22,9 +23,12 @@ struct TodayView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         header.rise(0)
-                        BriefingCardView(onOpen: { go($0 == "inbox" ? .inbox : ($0 == "goals" ? .goals : .chat)) })
+                        BriefingCardView(onOpen: { tab in
+                            if tab == "finance" { showFinance = true } else { go(tab == "inbox" ? .inbox : (tab == "goals" ? .goals : .chat)) }
+                        })
                         if store.me?.has("shopping") == true { ShoppingCardView() }
-                        GoalsCardView(go: { go(.goals) })
+                        if store.me?.has("finance") == true { FinanceCardView(open: { showFinance = true }) }
+                        if store.me?.has("goals") != false { GoalsCardView(go: { go(.goals) }) }
                         dueCard.rise(1)
                         HStack(spacing: 14) {
                             examCard
@@ -46,6 +50,7 @@ struct TodayView: View {
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showHealth) { HealthSheet(goal: goal) }
+            .sheet(isPresented: $showFinance) { FinanceSheet() }
             .sheet(item: $openItem) { ItemDetail(item: $0) }
             .task { await reload() }
         }

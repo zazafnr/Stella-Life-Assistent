@@ -12,7 +12,7 @@ import {
 } from '@stella/shared';
 import { levelFor, perform } from './actions.ts';
 import { activeGoals, countLogs, getGoal, weekStart } from './goals.ts';
-import { afterWorkTime } from './profile.ts';
+import { afterWorkTime, hasFeature } from './profile.ts';
 import { buildLagebild, freeSlots, isoWeekday, toHhmm, toMin, type DayContext, type Interval, type Lagebild } from './context.ts';
 import { addMessage, db, getItem, getUser, type User } from './db.ts';
 import { isDelivered, markDelivered } from './hints.ts';
@@ -248,7 +248,7 @@ export function buildWeekPlan(user: User, opts: PlanOptions = {}, lb: Lagebild =
 
   // Ziele mit Zeitbedarf („3× pro Woche laufen, 45 Minuten“): fehlende Einheiten dieser Woche verteilen – nach allem mit Frist
   const lastDay = states.at(-1)?.day.date;
-  for (const g of lastDay ? activeGoals(user.id) : []) {
+  for (const g of lastDay && hasFeature(user, 'goals') ? activeGoals(user.id) : []) {
     const per = /^weekly:(\d+)$/.exec(g.cadence)?.[1];
     if (!per || !g.minutes) continue;
     const minutes = g.minutes;

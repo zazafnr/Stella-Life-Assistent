@@ -34,12 +34,9 @@ export interface Item {
 }
 
 /** Karte unter einer Stella-Nachricht (z. B. Läden in der Nähe) */
-export interface MessageCard {
-  type: 'places';
-  category: string;
-  label: string;
-  itemId: string | null;
-}
+export type MessageCard =
+  | { type: 'places'; category: string; label: string; itemId: string | null }
+  | { type: 'spending'; label: string; from: string; to: string; currency: string; totalCents: number; count: number; categories: { category: string; cents: number }[] };
 
 export interface ChatMessage {
   id: string;
@@ -149,7 +146,7 @@ export interface Hint {
   /** schon als Vorschlag-Karte verschickt */
   actionId?: string;
   /** statt Aktion: woanders weitermachen (Rückfrage im Chat beantworten, Antwort in der Inbox schreiben) */
-  open?: { tab: 'chat' | 'inbox' | 'goals'; label: string };
+  open?: { tab: 'chat' | 'inbox' | 'goals' | 'finance'; label: string };
   itemId?: string;
 }
 
@@ -302,4 +299,54 @@ export interface GoalProgress extends Goal {
   /** die letzten 8 Wochen, älteste zuerst (die letzte ist die aktuelle) */
   history: number[];
   recent: GoalLog[];
+}
+
+// ---------- Ausgaben (Apple Pay) ----------
+
+export const FINANCE_CATEGORIES = ['Lebensmittel', 'Essen & Trinken', 'Transport', 'Shopping', 'Freizeit', 'Abos', 'Gesundheit', 'Sonstiges'] as const;
+export type FinanceCategory = (typeof FINANCE_CATEGORIES)[number];
+
+export interface Transaction {
+  id: string;
+  amountCents: number;
+  currency: string;
+  merchant: string;
+  category: FinanceCategory;
+  /** Kartenname, nie die Nummer */
+  cardLabel: string | null;
+  occurredAt: string;
+  /** Tag in der Zeitzone der Person (YYYY-MM-DD) */
+  day: string;
+  source: string;
+}
+
+export interface BudgetStatus {
+  category: FinanceCategory;
+  limitCents: number;
+  spentCents: number;
+}
+
+export interface Subscription {
+  merchant: string;
+  amountCents: number;
+  currency: string;
+  lastDay: string;
+  /** voraussichtlich nächste Abbuchung */
+  nextDay: string;
+  count: number;
+}
+
+export interface FinanceMonth {
+  /** YYYY-MM */
+  month: string;
+  currency: string;
+  totalCents: number;
+  previousTotalCents: number;
+  count: number;
+  /** Buchungen in anderen Währungen – nicht in der Summe */
+  otherCurrency: number;
+  categories: { category: FinanceCategory; cents: number; count: number }[];
+  budgets: BudgetStatus[];
+  transactions: Transaction[];
+  subscriptions: Subscription[];
 }

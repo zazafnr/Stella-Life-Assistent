@@ -709,3 +709,22 @@ textarea.cookies { min-height: 90px; font-family: ui-monospace, monospace; font-
 .goal-form { display: flex; flex-direction: column; gap: 14px; }
 .goal-form select, .goal-form input[type="time"] { min-height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--border-strong); background: var(--surface); font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) { .goal-bar > div { animation: none; } }
+
+/* Ausgaben */
+.fin-month { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 6px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); }
+.fin-month .icon-btn:disabled { opacity: .3; }
+.fin-total { display: flex; flex-direction: column; gap: 4px; }
+.fin-sum { font-size: 34px; }
+.fin-cats, .fin-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.fin-cat { display: flex; flex-direction: column; gap: 6px; width: 100%; padding: 0; border: 0; background: none; color: inherit; text-align: left; font-size: 14px; }
+.fin-cats .progress { display: block; }
+.fin-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; flex-shrink: 0; }
+.fin-list li { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.fin-list .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.fin-tx { display: flex; align-items: center; width: 100%; gap: 0; padding: 4px 0; border: 0; background: none; color: inherit; text-align: left; font-size: 14px; }
+.fin-tx .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; margin-right: 10px; }
+.fin-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.fin-choices .chip { display: inline-flex; align-items: center; }
+.fin-choices .chip.active { background: var(--tint); border-color: var(--blue); color: var(--blue); font-weight: 600; }
+.fin-chat-card { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding: 12px; border-radius: 16px; background: rgba(230, 240, 255, .7); }
+.fin-chat-card .fin-sum { font-size: 26px; }

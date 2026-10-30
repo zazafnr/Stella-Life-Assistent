@@ -344,6 +344,38 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX goal_logs_goal ON goal_logs(goal_id, date);
   `,
+  `
+  -- Paket 9: Ausgaben über Apple Pay (nur Betrag, Händler und Kartenname – nie Kartennummern)
+  CREATE TABLE transactions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    amount_cents INTEGER NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'EUR',
+    merchant TEXT NOT NULL,
+    merchant_key TEXT NOT NULL,
+    category TEXT NOT NULL,
+    card_label TEXT,
+    occurred_at TEXT NOT NULL,
+    day TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'applepay',
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX transactions_user_day ON transactions(user_id, day);
+  CREATE INDEX transactions_user_merchant ON transactions(user_id, merchant_key);
+  CREATE TABLE merchant_categories (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    merchant TEXT NOT NULL,
+    category TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'user',
+    PRIMARY KEY (user_id, merchant)
+  );
+  CREATE TABLE budgets (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category TEXT NOT NULL,
+    amount_cents INTEGER NOT NULL,
+    PRIMARY KEY (user_id, category)
+  );
+  `,
 ];
 
 function migrate() {

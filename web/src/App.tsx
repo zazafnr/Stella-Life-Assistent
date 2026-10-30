@@ -5,6 +5,7 @@ import { Chat } from './components/Chat.tsx';
 import { Planner } from './components/Planner.tsx';
 import { Inbox } from './components/Inbox.tsx';
 import { Goals } from './components/Goals.tsx';
+import { Finance } from './components/Finance.tsx';
 import { Health } from './components/Health.tsx';
 import { Settings } from './components/Settings.tsx';
 import { Intro, dismissBoot, introShown } from './components/Intro.tsx';
@@ -12,7 +13,7 @@ import { Onboarding } from './components/Onboarding.tsx';
 import { Icon, type IconName } from './ui/Icon.tsx';
 import { Sky, StarMark, showToast } from './ui/Decor.tsx';
 
-export type Tab = 'today' | 'chat' | 'planner' | 'goals' | 'inbox' | 'health' | 'settings';
+export type Tab = 'today' | 'chat' | 'planner' | 'goals' | 'inbox' | 'health' | 'finance' | 'settings';
 
 const TABS: [Tab, IconName, string][] = [
   ['today', 'sparkle', 'Heute'],
@@ -21,7 +22,7 @@ const TABS: [Tab, IconName, string][] = [
   ['goals', 'target', 'Ziele'],
   ['inbox', 'inbox', 'Inbox'],
 ];
-const ALL: Tab[] = ['today', 'chat', 'planner', 'goals', 'inbox', 'health', 'settings'];
+const ALL: Tab[] = ['today', 'chat', 'planner', 'goals', 'inbox', 'health', 'finance', 'settings'];
 
 function initialTab(): Tab {
   const hash = location.hash.slice(1) as Tab;
@@ -84,13 +85,14 @@ export function App() {
       <div className="desktop-drag" aria-hidden="true" />
       <nav className="sidebar" aria-label="Navigation">
         <div className="brand"><span style={{ color: 'var(--pink)' }}><StarMark size={18} /></span>Stella</div>
-        {TABS.filter(([t]) => t !== 'inbox' || meHas(me, 'mails')).map(([t, icon, label]) => (
+        {TABS.filter(([t]) => (t !== 'inbox' || meHas(me, 'mails')) && (t !== 'goals' || meHas(me, 'goals'))).map(([t, icon, label]) => (
           <button key={t} type="button" className={tab === t ? 'side-link active' : 'side-link'} onClick={() => setTab(t)} aria-current={tab === t ? 'page' : undefined}>
             <Icon name={icon} size={19} />{label}
             {t === 'planner' && openHomework > 0 && <span className="side-badge">{openHomework}</span>}
           </button>
         ))}
         {meHas(me, 'health') && <button type="button" className={tab === 'health' ? 'side-link active' : 'side-link'} onClick={() => setTab('health')}><Icon name="heart" size={19} />Gesundheit</button>}
+        {meHas(me, 'finance') && <button type="button" className={tab === 'finance' ? 'side-link active' : 'side-link'} onClick={() => setTab('finance')}><Icon name="wallet" size={19} />Ausgaben</button>}
         <div className="side-spacer" />
         <button type="button" className={tab === 'settings' ? 'side-link active' : 'side-link'} onClick={() => setTab('settings')}><Icon name="gear" size={19} />Einstellungen</button>
       </nav>
@@ -103,11 +105,12 @@ export function App() {
         {tab === 'goals' && <Goals />}
         {tab === 'inbox' && <Inbox />}
         {tab === 'health' && <Health back={() => setTab('today')} />}
+        {tab === 'finance' && <Finance back={() => setTab('today')} go={setTab} />}
         {tab === 'settings' && <Settings back={() => setTab('today')} openOnboarding={(startAt) => setOnboarding({ startAt })} />}
       </main>
 
       <nav className="tabbar" aria-label="Navigation">
-        {TABS.filter(([t]) => t !== 'inbox' || meHas(me, 'mails')).map(([t, icon, label]) => (
+        {TABS.filter(([t]) => (t !== 'inbox' || meHas(me, 'mails')) && (t !== 'goals' || meHas(me, 'goals'))).map(([t, icon, label]) => (
           <button key={t} type="button" className={tab === t ? 'tab active' : 'tab'} onClick={() => setTab(t)} aria-current={tab === t ? 'page' : undefined}>
             <Icon name={icon} size={22} />{label}
           </button>

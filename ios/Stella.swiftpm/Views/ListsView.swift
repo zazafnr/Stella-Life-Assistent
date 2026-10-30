@@ -271,7 +271,7 @@ struct PlacesCardView: View {
         do {
             let c = try await location.request()
             phase = .loading
-            let path = "/api/places?category=\(card.category)&lat=\(c.latitude)&lon=\(c.longitude)"
+            let path = "/api/places?category=\(card.category ?? "")&lat=\(c.latitude)&lon=\(c.longitude)"
             data = try await API.shared.get(path)
             // beim Einkaufen kommt die Einkaufsliste gleich mit
             if card.category == "supermarket", let r: ListsResponse = try? await API.shared.get("/api/lists") { shopping = r.lists.first }

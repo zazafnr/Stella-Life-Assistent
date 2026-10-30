@@ -144,6 +144,17 @@ Zeitblöcken im Wochenplan (`PlanBlock.why = 'goal'`, nur bei Zielen mit „Minu
 übernommen werden sie als To-dos), einem Hinweis nach 14 Tagen ohne Eintrag und dem einmaligen
 Angebot, Gedächtnis-Einträge der Kategorie „Ziel“ in echte Ziele umzuwandeln.
 
+**Ausgaben** (`server/src/finance.ts`, Tabellen `transactions`, `merchant_categories`, `budgets`) – ein
+Apple-Kurzbefehl („Transaktion“ aus Wallet → Inhalte von URL abrufen) schickt jede Kartenzahlung an
+`POST /api/ingest/<token>/payment`. Gespeichert werden nur Betrag, Händler und Kartenname, nie
+Kartennummern. Die Kategorie kommt zuerst aus der eigenen Zuordnung des Händlers (auch das, was Groq
+früher gelernt hat), dann aus festen Regeln für bekannte Händler, erst danach fragt Groq – einmal pro
+neuem Händler, das Ergebnis wird gemerkt. Wer eine Kategorie ändert, ändert sie für den ganzen Händler.
+Dieselbe Zahlung innerhalb von 2 Minuten zählt einmal. Dazu: Monatsbudget je Kategorie (Hinweis ab 80 %
+und bei 100 %), Abo-Erkennung (gleicher Händler und Betrag im Monatsabstand), im Chat „Wie viel hab ich
+diese Woche ausgegeben?“ als Karte und das KI-Werkzeug `spending_summary`. Die Funktion gehört zum Profil
+(„Finanzen“) und ist ohne Profil aus.
+
 ## 8. Fahrplan
 
 > **Stella v2** (Registrierung für alle Lebenslagen, Groq, Chats nach Tagen, Sprache, Listen, Ziele,

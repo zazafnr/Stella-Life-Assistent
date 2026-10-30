@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addDays, diffDays, formatDateDe, todayIn, type GoalProgress, type Item } from '@stella/shared';
+import { addDays, diffDays, formatDateDe, todayIn, type FinanceMonth, type GoalProgress, type Item } from '@stella/shared';
 import { api, meHas, useStore } from '../store.ts';
 import type { Tab } from '../App.tsx';
 import { Icon, type IconName } from '../ui/Icon.tsx';
@@ -7,6 +7,7 @@ import { Confetti, Ring, Sky, StarMark } from '../ui/Decor.tsx';
 import { BriefingCard } from './BriefingCard.tsx';
 import { ListsSheet } from './Lists.tsx';
 import { WeekBar, amount } from './Goals.tsx';
+import { euro } from './Finance.tsx';
 
 interface Lesson { date: string; start: string; subject: string | null; code: string | null; status: string }
 interface InboxEntry { source: string; category: string | null; action: string | null; createdAt: string }
@@ -59,10 +60,17 @@ export function Today({ go }: { go: (t: Tab) => void }) {
   };
   useEffect(loadShopCount, [me?.settings.profile]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [spent, setSpent] = useState<{ cents: number; currency: string; count: number } | null>(null);
+  useEffect(() => {
+    if (!meHas(me, 'finance')) { setSpent(null); return; }
+    api<FinanceMonth>('/api/finance').then((r) => setSpent({ cents: r.totalCents, currency: r.currency, count: r.count })).catch(() => {});
+  }, [me?.settings.profile]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [goalList, setGoalList] = useState<GoalProgress[]>([]);
   useEffect(() => {
+    if (!meHas(me, 'goals')) { setGoalList([]); return; }
     api<{ goals: GoalProgress[] }>('/api/goals').then((r) => setGoalList(r.goals.filter((g) => g.status === 'active'))).catch(() => {});
-  }, []);
+  }, [me?.settings.profile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     api<Lesson[]>(`/api/timetable?from=${tomorrow}&to=${tomorrow}`).then(setLessons).catch(() => setLessons([]));
@@ -196,6 +204,17 @@ export function Today({ go }: { go: (t: Tab) => void }) {
               })}
             </div>
           </section>
+        )}
+
+        {spent && (
+          <button type="button" className="card interactive row" onClick={() => go('finance')}>
+            <span className="icon-tile green"><Icon name="wallet" size={20} /></span>
+            <span style={{ flex: 1 }}>
+              <strong style={{ fontWeight: 600, display: 'block' }}>Ausgaben diesen Monat</strong>
+              <span className="small muted">{spent.count ? `${euro(spent.cents, spent.currency)} · ${spent.count} ${spent.count === 1 ? 'Zahlung' : 'Zahlungen'}` : 'noch keine Zahlungen – Einrichtung unter Einstellungen'}</span>
+            </span>
+            <Icon name="chevron" size={16} />
+          </button>
         )}
 
         {goalList.length > 0 && (

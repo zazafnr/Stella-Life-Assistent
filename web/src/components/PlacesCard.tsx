@@ -10,7 +10,7 @@ const isApple = /iPhone|iPad|Macintosh/.test(navigator.userAgent);
  * „Läden in der Nähe“ unter der Erinnerung an eine Erledigung. Der Standort wird nur hier und nur einmal abgefragt –
  * von selbst, wenn du ihn dieser App schon erlaubt hast, sonst erst nach einem Tipp. Er wird nirgends gespeichert.
  */
-export function PlacesCard({ card }: { card: MessageCard }) {
+export function PlacesCard({ card }: { card: Extract<MessageCard, { type: 'places' }> }) {
   const [state, setState] = useState<'idle' | 'locating' | 'loading' | 'done' | 'error'>('idle');
   const [data, setData] = useState<NearbyPlaces | null>(null);
   const [error, setError] = useState('');

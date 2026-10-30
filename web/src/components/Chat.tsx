@@ -9,6 +9,7 @@ import { Icon } from '../ui/Icon.tsx';
 import { CloudSky, Sheet, StarMark, showToast } from '../ui/Decor.tsx';
 import { ListsSheet } from './Lists.tsx';
 import { PlacesCard } from './PlacesCard.tsx';
+import { SpendingCard } from './Finance.tsx';
 
 interface QuickAction { id: string; icon: string; label: string; kind: 'text' | 'send' | 'camera' | 'mic' | 'list'; text?: string }
 
@@ -190,6 +191,7 @@ export function Chat() {
                       {m.attachments.filter((a) => a.kind !== 'audio').map((a) => <AuthImage key={a.id} id={a.id} alt={a.caption} onOpen={setLightbox} />)}
                       {m.actionId && <ActionCard id={m.actionId} />}
                       {m.card?.type === 'places' && <PlacesCard card={m.card} />}
+                      {m.card?.type === 'spending' && <SpendingCard card={m.card} />}
                       <span className="meta">{m.pending ? 'wird gesendet' : timeLabel(m.createdAt)}</span>
                     </div>
                   </div>
