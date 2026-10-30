@@ -1,0 +1,16 @@
+{
+  "commit": "6ab5e7a07b0d0b21fbb77b2e6f9b06eb48de9874",
+  "branch": "claude/determined-brown-7l04hi",
+  "message": "Skill ios-preview: klickbare iOS-Vorschau in der Claude-App",
+  "run": "https://github.com/zazafnr/Stella-Life-Assistent/actions/runs/41067397716",
+  "device": "iPhone 16 Pro",
+  "createdAt": "2026-10-30T14:06:59+00:00",
+  "screens": [
+    "today",
+    "chat",
+    "planner",
+    "inbox",
+    "weekplan",
+    "settings"
+  ]
+}
