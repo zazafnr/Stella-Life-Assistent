@@ -4,8 +4,10 @@ import SwiftUI
 struct LaunchView: View {
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Theme.skyTop, Theme.skyMid, Theme.bg], startPoint: .top, endPoint: .bottom)
+            LinearGradient(colors: [Theme.skyTop, Theme.skyMid, .white], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
+            Cloud(width: 110).position(x: 70, y: 110)
+            Cloud(width: 140).position(x: UIScreen.main.bounds.width - 60, y: 190)
             VStack(spacing: 6) {
                 HoppingStar(size: 56)
                     .padding(.bottom, 10)

@@ -37,10 +37,11 @@ export function register(name: string, email: string, password: string, timeZone
   if (userCount() > 0 && !config.allowRegistration) throw new HttpError(403, 'Registrierung ist geschlossen.');
   if (password.length < 8) throw new HttpError(400, 'Passwort muss mindestens 8 Zeichen haben.');
   const id = newId();
+  const role = userCount() === 0 ? 'owner' : 'user';
   try {
-    db.prepare('INSERT INTO users (id, name, email, password_hash, time_zone, ingest_token, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    db.prepare('INSERT INTO users (id, name, email, password_hash, time_zone, ingest_token, created_at, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(id, name.trim(), email.trim().toLowerCase(), hashPassword(password), timeZone || config.defaultTimeZone,
-        randomBytes(24).toString('base64url'), now());
+        randomBytes(24).toString('base64url'), now(), role);
   } catch {
     throw new HttpError(409, 'Diese E-Mail ist schon registriert.');
   }

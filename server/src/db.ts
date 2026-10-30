@@ -209,6 +209,36 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (user_id, key)
   );
   `,
+  `
+  -- Paket 1: Rolle (der erste Nutzer ist Owner), KI-Zähler je Anbieter und Nutzer, Server-Schlüssel ohne Nutzerbezug
+  ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user';
+  UPDATE users SET role = 'owner' WHERE rowid = (SELECT rowid FROM users ORDER BY created_at ASC, rowid ASC LIMIT 1);
+  CREATE TABLE llm_usage_v2 (
+    day TEXT NOT NULL,
+    provider TEXT NOT NULL DEFAULT 'openrouter',
+    user_id TEXT NOT NULL DEFAULT '',
+    requests INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, provider, user_id)
+  );
+  INSERT INTO llm_usage_v2 (day, requests) SELECT day, requests FROM llm_usage;
+  DROP TABLE llm_usage;
+  ALTER TABLE llm_usage_v2 RENAME TO llm_usage;
+  -- secrets bekommt einen Bereich "__system__" (Server-Schlüssel); dafür fällt der Fremdschlüssel weg,
+  -- das Löschen mit dem Konto übernimmt ein Trigger
+  CREATE TABLE secrets_v2 (
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    value TEXT NOT NULL,
+    PRIMARY KEY (user_id, name)
+  );
+  INSERT INTO secrets_v2 (user_id, name, value) SELECT user_id, name, value FROM secrets;
+  DROP TABLE secrets;
+  ALTER TABLE secrets_v2 RENAME TO secrets;
+  CREATE TRIGGER secrets_on_user_delete AFTER DELETE ON users BEGIN
+    DELETE FROM secrets WHERE user_id = OLD.id;
+    DELETE FROM llm_usage WHERE user_id = OLD.id;
+  END;
+  `,
 ];
 
 function migrate() {
@@ -267,9 +297,11 @@ export interface User {
   timeZone: string;
   settings: UserSettings;
   ingestToken: string;
+  /** der erste Nutzer ist 'owner' (darf Server-Schlüssel eintragen), alle anderen 'user' */
+  role: 'owner' | 'user';
 }
 
-type UserRow = { id: string; name: string; email: string; time_zone: string; settings: string; ingest_token: string };
+type UserRow = { id: string; name: string; email: string; time_zone: string; settings: string; ingest_token: string; role: string };
 function readSettings(json: string): UserSettings {
   const s = JSON.parse(json) as UserSettings;
   if (!s.books && s.digi4schoolBooks) s.books = s.digi4schoolBooks.map((b) => ({ ...b, provider: 'digi4school' }));
@@ -280,6 +312,7 @@ function readSettings(json: string): UserSettings {
 const toUser = (r: UserRow): User => ({
   id: r.id, name: r.name, email: r.email, timeZone: r.time_zone,
   settings: readSettings(r.settings), ingestToken: r.ingest_token,
+  role: r.role === 'owner' ? 'owner' : 'user',
 });
 
 export function allUserIds(): string[] {
