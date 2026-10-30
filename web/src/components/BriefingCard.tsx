@@ -6,10 +6,10 @@ import { showToast } from '../ui/Decor.tsx';
 import { ActionCard } from './ActionCard.tsx';
 import { Rich } from './Rich.tsx';
 
-const ICON: Record<string, string> = { school: '🏫', due: '📌', plan: '🗓️', tomorrow: '🌙', done: '✅', inbox: '✉️' };
+const ICON: Record<string, string> = { school: '🏫', due: '📌', plan: '🗓️', tomorrow: '🌙', done: '✅', inbox: '✉️', goals: '🎯', finance: '💶' };
 
 /** Oben auf „Heute“: morgens der Überblick, den ganzen Tag „Mir ist aufgefallen“ */
-export function BriefingCard({ onOpen }: { onOpen: (tab: 'chat' | 'inbox') => void }) {
+export function BriefingCard({ onOpen }: { onOpen: (tab: 'chat' | 'inbox' | 'goals' | 'finance') => void }) {
   const lastSync = useStore((s) => s.lastSync);
   const [b, setB] = useState<Briefing | null>(null);
   const [gone, setGone] = useState<string[]>([]);
@@ -50,7 +50,7 @@ export function BriefingCard({ onOpen }: { onOpen: (tab: 'chat' | 'inbox') => vo
   );
 }
 
-function HintRow({ hint, onGone, onOpen }: { hint: Hint; onGone: () => void; onOpen: (tab: 'chat' | 'inbox') => void }) {
+function HintRow({ hint, onGone, onOpen }: { hint: Hint; onGone: () => void; onOpen: (tab: 'chat' | 'inbox' | 'goals' | 'finance') => void }) {
   const action = useStore((s) => (hint.actionId ? s.actions[hint.actionId] : undefined));
   const [busy, setBusy] = useState(false);
 

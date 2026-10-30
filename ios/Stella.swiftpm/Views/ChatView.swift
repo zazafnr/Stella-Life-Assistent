@@ -10,6 +10,7 @@ struct ChatView: View {
     @State private var showCamera = false
     @State private var viewing: String?
     @State private var showHistory = false
+    @State private var showList = false
     @State private var recorder = VoiceRecorder()
     @State private var pressing = false
     @State private var cancelling = false
@@ -45,6 +46,9 @@ struct ChatView: View {
         .task { await store.loadQuick() }
         .sheet(isPresented: $showHistory) {
             ChatHistorySheet()
+        }
+        .sheet(isPresented: $showList) {
+            ShoppingListSheet()
         }
         .onAppear { recorder.onLimit = { finishRecording(cancel: false) } }
         .onChange(of: recorder.denied) { _, denied in
@@ -316,6 +320,8 @@ struct ChatView: View {
             Task { await store.send(text: a.text ?? a.label) }
         case "camera":
             showCamera = true
+        case "list":
+            showList = true
         case "mic":
             hint = "Halte den Mikrofon-Knopf unten rechts gedrückt"
             Task {
@@ -446,6 +452,8 @@ struct Bubble: View {
                                 .disabled(store.thinking)
                         }
                         if let id = message.actionId { ActionCardView(id: id) }
+                        if let card = message.card, card.type == "places" { PlacesCardView(card: card) }
+                        if let card = message.card, card.type == "spending" { SpendingCardView(card: card) }
                         HStack(spacing: 4) {
                             Text(time)
                             if message.pending == true { Image(systemName: "clock") }

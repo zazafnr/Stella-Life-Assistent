@@ -60,7 +60,7 @@ test('Schnellaktionen nach Tageszeit: morgens Briefing zuerst, abends „Hab ich
 test('leerer Chat: genau vier große Karten, jede mit Aktion', () => {
   const { cards } = quickActions(getUser(job.id)!, 9);
   assert.equal(cards.length, 4);
-  for (const c of cards) assert.ok(['text', 'send', 'camera', 'mic'].includes(c.kind) && c.label && c.symbol && c.icon);
+  for (const c of cards) assert.ok(['text', 'send', 'camera', 'mic', 'list'].includes(c.kind) && c.label && c.symbol && c.icon);
   assert.ok(quickActions(getUser(job.id)!, 9).actions.filter((a) => a.kind === 'send').every((a) => !!a.text));
 });
 

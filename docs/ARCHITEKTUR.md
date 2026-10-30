@@ -133,6 +133,38 @@ Rückgängig), im Chat („Plan meine Woche“) immer als Karte. Sonntag 18–20
 für die neue Woche von selbst an. Verpasste Blöcke plant sie neu ein, wenn sie den Planer ändern
 darf – sonst bleibt es beim Hinweis.
 
+**Ziele** (`server/src/goals.ts`, Tabellen `goals` und `goal_logs`) – „Ich will 3x pro Woche laufen
+gehen“ liest Groq als JSON heraus (Rückfall ohne KI: Muster im Satz), `goal.create` legt es mit
+Karte und Rückgängig an. „War heute 5 km laufen“ ordnet Stella über den Namen, dann über die
+Einheit und zuletzt per Groq dem Ziel zu (`goal.log`; bei zwei Zielen mit gleicher Einheit fragt
+sie nach, statt zu raten). Gezählt wird immer Montag bis Sonntag gegen das Wochenziel, dazu der
+Verlauf der letzten 8 Wochen – bewusst ohne Punkte, Serien oder Abzeichen. Stella unterstützt
+mit einer Erinnerung zur gewählten Zeit (einmal am Tag), dem Wochenrückblick im Sonntags-Briefing,
+Zeitblöcken im Wochenplan (`PlanBlock.why = 'goal'`, nur bei Zielen mit „Minuten pro Einheit“;
+übernommen werden sie als To-dos), einem Hinweis nach 14 Tagen ohne Eintrag und dem einmaligen
+Angebot, Gedächtnis-Einträge der Kategorie „Ziel“ in echte Ziele umzuwandeln.
+
+**Ausgaben** (`server/src/finance.ts`, Tabellen `transactions`, `merchant_categories`, `budgets`) – ein
+Apple-Kurzbefehl („Transaktion“ aus Wallet → Inhalte von URL abrufen) schickt jede Kartenzahlung an
+`POST /api/ingest/<token>/payment`. Gespeichert werden nur Betrag, Händler und Kartenname, nie
+Kartennummern. Die Kategorie kommt zuerst aus der eigenen Zuordnung des Händlers (auch das, was Groq
+früher gelernt hat), dann aus festen Regeln für bekannte Händler, erst danach fragt Groq – einmal pro
+neuem Händler, das Ergebnis wird gemerkt. Wer eine Kategorie ändert, ändert sie für den ganzen Händler.
+Dieselbe Zahlung innerhalb von 2 Minuten zählt einmal. Dazu: Monatsbudget je Kategorie (Hinweis ab 80 %
+und bei 100 %), Abo-Erkennung (gleicher Händler und Betrag im Monatsabstand), im Chat „Wie viel hab ich
+diese Woche ausgegeben?“ als Karte und das KI-Werkzeug `spending_summary`. Die Funktion gehört zum Profil
+(„Finanzen“) und ist ohne Profil aus.
+
+**Was Stella vorhat** (`server/src/stellaplan.ts`) – eine Liste aus den vorhandenen Quellen statt einer
+neuen Datenhaltung: Morning Briefing, Sonntags-Wochenplan, Erinnerungen und Lerneinheiten der nächsten
+7 Tage, Daueraufträge, Ziele mit Check-in, die drei Automatiken (Werbung löschen, HÜ-Autopilot,
+nächtliches Lernen) und offene Vorschläge. Jeder Eintrag bringt seine Steuerung mit (Ein/Aus, Uhrzeit,
+Löschen, Ja/Nein, Link zu „Was Stella selbst darf“); `POST /api/stella/plan/:id` setzt sie um und
+schreibt eine Aktion ins Protokoll – deshalb geht „Rückgängig“. **Daueraufträge** („erinnere mich jeden
+Montag an den Müll“) sind normale Erinnerungen mit `items.recurrence` (`daily`, `weekly:1,3`,
+`monthly:15`): nach dem Erinnern – oder wenn man sie abhakt – rückt der Eintrag zum nächsten Termin vor
+und plant die nächste Erinnerung (`advanceRecurring`); pausiert sind sie ohne Erinnerung.
+
 ## 8. Fahrplan
 
 > **Stella v2** (Registrierung für alle Lebenslagen, Groq, Chats nach Tagen, Sprache, Listen, Ziele,

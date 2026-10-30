@@ -8,6 +8,11 @@ struct Attachment: Codable, Hashable, Identifiable {
     var caption: String?
 }
 
+struct PlaceRef: Codable, Hashable {
+    var category: String
+    var label: String
+}
+
 struct Item: Codable, Hashable, Identifiable {
     var id: String
     var kind: String
@@ -25,6 +30,8 @@ struct Item: Codable, Hashable, Identifiable {
     var attachments: [Attachment]
     var updatedAt: String
     var deleted: Bool
+    /** Erledigung mit Ort: beim Erinnern zeigt Stella Läden in der Nähe */
+    var place: PlaceRef?
 
     var isOpen: Bool { status == "open" }
     var isDone: Bool { status == "done" }
@@ -45,6 +52,8 @@ struct ChatMessage: Codable, Hashable, Identifiable {
     var actionId: String?
     /** nur im Gerät: Sprachnachricht, die Stella nicht abschreiben konnte – „Nochmal versuchen“ nutzt diese Id */
     var failedAudioId: String?
+    /** Karte unter der Nachricht, z. B. „Läden in der Nähe“ */
+    var card: MessageCard?
 
     var isUser: Bool { role == "user" }
 }
@@ -136,6 +145,195 @@ struct QuickAction: Codable, Hashable, Identifiable {
 struct QuickActions: Codable {
     var actions: [QuickAction]
     var cards: [QuickAction]
+}
+
+/** Karte unter einer Stella-Nachricht (derzeit: Läden in der Nähe) */
+struct MessageCard: Codable, Hashable {
+    var type: String
+    /** Läden-Karte */
+    var category: String?
+    var label: String
+    var itemId: String?
+    /** Ausgaben-Karte */
+    var currency: String?
+    var totalCents: Int?
+    var count: Int?
+    var categories: [SpendingLine]?
+}
+
+struct SpendingLine: Codable, Hashable {
+    var category: String
+    var cents: Int
+}
+
+struct ListEntry: Codable, Hashable, Identifiable {
+    var id: String
+    var text: String
+    var qty: String?
+    var done: Bool
+    var addedVia: String
+    var createdAt: String
+}
+
+struct StellaList: Codable, Hashable, Identifiable {
+    var id: String
+    var name: String
+    var kind: String
+    var items: [ListEntry]
+}
+
+/** Ein Ziel mit Stand diese Woche (Montag bis Sonntag) und Verlauf der letzten 8 Wochen */
+struct GoalProgress: Codable, Hashable, Identifiable {
+    var id: String
+    var title: String
+    var why: String?
+    var metric: String
+    var unit: String
+    /** pro Tag (cadence daily) bzw. pro Woche */
+    var target: Double
+    /** daily | weekly:n | custom */
+    var cadence: String
+    var minutes: Int?
+    var checkIn: String?
+    /** active | paused | done */
+    var status: String
+    var createdAt: String
+    var weekValue: Double
+    var weekTarget: Double
+    /** älteste Woche zuerst, die letzte ist die aktuelle */
+    var history: [Double]
+    var recent: [GoalLogEntry]
+
+    var isActive: Bool { status == "active" }
+
+    static func number(_ v: Double) -> String {
+        let r = (v * 10).rounded() / 10
+        let text = r == r.rounded() ? String(Int(r)) : String(r)
+        return text.replacingOccurrences(of: ".", with: ",")
+    }
+
+    /** „3×“ bei Einheiten, sonst „12 km“ */
+    func amount(_ v: Double) -> String {
+        unit == "x" ? "\(Self.number(v))×" : "\(Self.number(v)) \(unit)"
+    }
+
+    var rhythm: String {
+        if cadence == "daily" { return "täglich" }
+        if cadence.hasPrefix("weekly:"), let n = Int(cadence.dropFirst(7)) { return "\(n)× pro Woche" }
+        return "\(Self.number(target)) \(unit) pro Woche"
+    }
+}
+
+struct GoalLogEntry: Codable, Hashable, Identifiable {
+    var id: String
+    var date: String
+    var value: Double
+    var note: String?
+}
+
+struct GoalsResponse: Codable { var goals: [GoalProgress] }
+struct GoalResponse: Codable { var goal: GoalProgress }
+
+/** Eine Kartenzahlung (nur Betrag, Händler und Kartenname – nie die Nummer). Heißt nicht „Transaction“, weil SwiftUI das schon hat. */
+struct Payment: Codable, Hashable, Identifiable {
+    var id: String
+    var amountCents: Int
+    var currency: String
+    var merchant: String
+    var category: String
+    var cardLabel: String?
+    var occurredAt: String
+    var day: String
+    var source: String
+}
+
+struct BudgetLine: Codable, Hashable {
+    var category: String
+    var limitCents: Int
+    var spentCents: Int
+}
+
+struct SubscriptionLine: Codable, Hashable, Identifiable {
+    var merchant: String
+    var amountCents: Int
+    var currency: String
+    var lastDay: String
+    var nextDay: String
+    var count: Int
+    var id: String { "\(merchant)-\(amountCents)" }
+}
+
+struct CategorySum: Codable, Hashable, Identifiable {
+    var category: String
+    var cents: Int
+    var count: Int
+    var id: String { category }
+}
+
+struct FinanceMonth: Codable, Hashable {
+    var month: String
+    var currency: String
+    var totalCents: Int
+    var previousTotalCents: Int
+    var count: Int
+    var otherCurrency: Int
+    var categories: [CategorySum]
+    var budgets: [BudgetLine]
+    var transactions: [Payment]
+    var subscriptions: [SubscriptionLine]
+}
+
+struct PaymentResponse: Codable { var transaction: Payment }
+struct TestPaymentResponse: Codable { var duplicate: Bool; var message: String }
+
+/** Ein Punkt in „Was Stella vorhat“ – die Steuerung kommt vom Server (toggle, time, remove, decision, link) */
+struct PlanControl: Codable, Hashable {
+    var type: String
+    var on: Bool?
+    var label: String?
+    var value: String?
+    var target: String?
+}
+
+struct PlanEntry: Codable, Hashable, Identifiable {
+    var id: String
+    var kind: String
+    /** week | regular | longterm */
+    var group: String
+    var title: String
+    var when: String
+    var at: String?
+    var recurrence: String?
+    var enabled: Bool
+    var controls: [PlanControl]
+}
+
+struct PlanResponse: Codable { var entries: [PlanEntry]; var soon: [PlanEntry] }
+struct PlanChangeResponse: Codable { var actionId: String; var entries: [PlanEntry]; var soon: [PlanEntry] }
+
+struct ListsResponse: Codable { var lists: [StellaList] }
+struct ListResponse: Codable { var list: StellaList }
+
+struct NearbyPlace: Codable, Hashable, Identifiable {
+    var name: String
+    var distanceM: Int
+    var openingHours: String?
+    /** nil = unbekannt */
+    var openNow: Bool?
+    var address: String?
+    var lat: Double
+    var lon: Double
+    var appleMapsUrl: String
+    var osmUrl: String
+    var id: String { "\(lat),\(lon)" }
+}
+
+struct NearbyPlaces: Codable {
+    var category: String
+    var label: String
+    var plural: String
+    var emoji: String
+    var places: [NearbyPlace]
 }
 
 struct NewConversation: Codable {

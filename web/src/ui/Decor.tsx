@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from './Icon.tsx';
 
 /** Himmel mit Wolken und Sternschnuppe – liegt oben hinter dem Inhalt. */
@@ -67,7 +68,8 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
-  return (
+  // über ein Portal ganz nach oben: eine Seite mit Animation (eigener Stapel) darf das Sheet nicht verdecken
+  return createPortal(
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <span className="sheet-grabber" aria-hidden="true" />
@@ -77,7 +79,8 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

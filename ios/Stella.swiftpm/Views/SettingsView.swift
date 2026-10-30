@@ -55,6 +55,9 @@ struct SettingsView: View {
                     }
 
                     Section {
+                        NavigationLink { StellaPlanView() } label: {
+                            row("Was Stella vorhat", symbol: "calendar.badge.clock", tint: Theme.green, detail: nil)
+                        }
                         NavigationLink { PermissionsView() } label: {
                             row("Was Stella selbst darf", symbol: "checkmark.shield", tint: Theme.blue, detail: nil)
                         }
@@ -114,6 +117,13 @@ struct SettingsView: View {
                         if me.isSchool {
                             connection("Handschrift", symbol: "pencil.and.scribble", on: me.integrations.handwritingFont, detail: "eigene Schrift für das Heft")
                             connection("FreeNotes", symbol: "ipad.and.iphone", on: me.integrations.freeNotes ?? false, detail: "Heft auf dem iPad")
+                        }
+                        if me.has("finance") {
+                            NavigationLink { FinanceSetupView() } label: {
+                                Label("Ausgaben über Apple Pay", systemImage: "creditcard")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(Theme.blue)
+                            }
                         }
                         NavigationLink {
                             ConnectionsView()

@@ -12,10 +12,12 @@
 // Was Stella von sich aus tut (Autopilot, Hinweise, Gelerntes), folgt immer der Stufe.
 
 import { formatDateDe, type ActionEntry, type ActionGroup, type ActionStatus, type Item, type Memory, type PermissionLevel, type PlanBlock } from '@stella/shared';
-import { addMessage, db, enqueueJob, getItem, getUser, newId, now, type NewItem, type User } from './db.ts';
+import { addMessage, db, enqueueJob, getItem, getUser, newId, now, updateUserSettings, type NewItem, type User } from './db.ts';
 import { addMemory, deleteMemory, getMemory, updateMemory, type NewMemory } from './memory.ts';
 import type { OutgoingMail } from './mail.ts';
 import { addItem, bookFor, changeItem, createStudyPlan } from './planner.ts';
+import { addListItems, removeListItems, setListItemsDone, shoppingListId } from './lists.ts';
+import { cleanGoal, createGoal, deleteGoal, deleteLog, getGoal, logGoal, updateGoal, type NewGoal } from './goals.ts';
 
 export const GROUPS: Record<ActionGroup, { label: string; help: string; default: PermissionLevel; levels: PermissionLevel[] }> = {
   planner: {
@@ -67,7 +69,7 @@ export function levelFor(user: User, group: ActionGroup): PermissionLevel {
 
 // ---------- Aktionstypen ----------
 
-type ItemPatch = Partial<Pick<Item, 'title' | 'detail' | 'notes' | 'due' | 'time' | 'status' | 'material' | 'subject' | 'kind' | 'deleted'>>;
+type ItemPatch = Partial<Pick<Item, 'title' | 'detail' | 'notes' | 'due' | 'time' | 'status' | 'material' | 'subject' | 'kind' | 'deleted' | 'recurrencePaused'>>;
 
 export interface ActionParams {
   'item.create': NewItem;
@@ -80,8 +82,53 @@ export interface ActionParams {
   'memory.add': NewMemory;
   'memory.update': { id: string; patch: Partial<Pick<Memory, 'text' | 'category' | 'schedule'>> };
   'memory.delete': { id: string };
+  'list.add': { items: { text: string; qty?: string | null }[] };
+  'list.check': { ids: string[]; names?: string[]; done: boolean };
+  'goal.create': NewGoal;
+  'goal.log': { goalId: string; value: number; date: string; note?: string | null };
+  'goal.update': { id: string; patch: { status?: 'active' | 'paused' | 'done'; checkIn?: string | null } };
+  'plan.setting': { key: PlanSettingKey; value: string };
 }
 export type ActionType = keyof ActionParams;
+
+/** Schalter, die „Was Stella vorhat“ ein-/ausschaltet (mit Rückgängig) */
+export type PlanSettingKey = 'briefing' | 'weekPlan' | 'perm:homework' | 'perm:mail_sort' | 'perm:memory';
+
+export function planSettingValue(user: User, key: PlanSettingKey): string {
+  if (key === 'briefing') return user.settings.briefing ?? 'auto';
+  if (key === 'weekPlan') return user.settings.weekPlan ?? 'sunday';
+  return levelFor(user, key.slice(5) as ActionGroup);
+}
+
+/** Setzt den Schalter und gibt den früheren Wert zurück */
+export function applyPlanSetting(userId: string, key: PlanSettingKey, value: string): string {
+  const user = getUser(userId);
+  if (!user) throw new Error('Nutzer nicht gefunden');
+  const prev = planSettingValue(user, key);
+  if (key === 'briefing') {
+    if (value !== 'auto' && value !== 'off' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) throw new Error('Briefing: "auto", "off" oder HH:MM');
+    updateUserSettings(userId, { briefing: value });
+  } else if (key === 'weekPlan') {
+    if (value !== 'sunday' && value !== 'off') throw new Error('Wochenplan: "sunday" oder "off"');
+    updateUserSettings(userId, { weekPlan: value });
+  } else {
+    const group = key.slice(5) as ActionGroup;
+    if (!isGroup(group) || !GROUPS[group].levels.includes(value as PermissionLevel)) throw new Error(`Ungültiges Recht: ${group}`);
+    const patch: Parameters<typeof updateUserSettings>[1] = { permissions: { ...user.settings.permissions, [group]: value as PermissionLevel } };
+    // die alten Schalter mitziehen, damit ältere Apps dasselbe anzeigen
+    if (group === 'homework') patch.homeworkAutopilot = value !== 'never';
+    if (group === 'mail_sort') patch.mailAutoTrash = value !== 'never';
+    updateUserSettings(userId, patch);
+  }
+  return prev;
+}
+
+const settingSummary = (key: PlanSettingKey, value: string): string => {
+  if (key === 'briefing') return value === 'off' ? 'Morning Briefing ausschalten' : value === 'auto' ? 'Morning Briefing einschalten' : `Morning Briefing auf ${value} Uhr legen`;
+  if (key === 'weekPlan') return value === 'off' ? 'Wochenplan-Vorschlag am Sonntag ausschalten' : 'Wochenplan-Vorschlag am Sonntag einschalten';
+  const group = key.slice(5) as ActionGroup;
+  return `${GROUPS[group]?.label ?? group}: ${value === 'never' ? 'ausschalten' : 'einschalten'}`;
+};
 
 interface Def<T extends ActionType> {
   group: (p: ActionParams[T]) => ActionGroup;
@@ -156,7 +203,7 @@ const DEFS: { [T in ActionType]: Def<T> } = {
     summary: (_u, p) => `Woche planen (${p.blocks.length} ${p.blocks.length === 1 ? 'Block' : 'Blöcke'})`,
     run: (u, p) => {
       const items = p.blocks.map((b) => addItem(u, {
-        kind: 'study', subject: b.subject, title: b.title, detail: b.focus, due: b.date, time: b.start, parentId: b.parentId, source: 'plan',
+        kind: b.why === 'goal' ? 'todo' : 'study', subject: b.subject, title: b.title, detail: b.focus, due: b.date, time: b.start, parentId: b.parentId, source: 'plan',
       }));
       return { result: { count: items.length }, undo: { ids: items.map((i) => i.id) }, changed: items };
     },
@@ -189,6 +236,67 @@ const DEFS: { [T in ActionType]: Def<T> } = {
       enqueueJob(u.id, 'send_mail', p);
       return { result: { queued: true } };
     },
+  },
+  'list.add': {
+    group: () => 'planner',
+    summary: (_u, p) => `${p.items.map((i) => i.text).join(', ')} auf die Einkaufsliste setzen`,
+    run: (u, p) => {
+      const { created, skipped } = addListItems(u.id, shoppingListId(u.id), p.items, 'chat');
+      return { result: { added: created.map((i) => i.text), skipped, ids: created.map((i) => i.id) }, undo: { ids: created.map((i) => i.id) } };
+    },
+    undo: (u, d: { ids: string[] }) => { removeListItems(u.id, d.ids); },
+  },
+  'list.check': {
+    group: () => 'planner',
+    summary: (_u, p) => `${(p.names ?? [`${p.ids.length} Einträge`]).join(', ')} ${p.done ? 'abhaken' : 'wieder öffnen'}`,
+    run: (u, p) => {
+      const prev = setListItemsDone(u.id, p.ids, p.done);
+      return { result: { count: prev.length }, undo: { prev } };
+    },
+    undo: (u, d: { prev: { id: string; done: boolean }[] }) => {
+      for (const x of d.prev) setListItemsDone(u.id, [x.id], x.done);
+    },
+  },
+  'goal.create': {
+    group: () => 'planner',
+    summary: (_u, p) => `Ziel „${p.title}“ anlegen`,
+    run: (u, p) => {
+      const goal = createGoal(u.id, cleanGoal({ ...p }));
+      return { result: { id: goal.id, title: goal.title }, undo: { id: goal.id } };
+    },
+    undo: (u, d: { id: string }) => { deleteGoal(u.id, d.id); },
+  },
+  'goal.log': {
+    group: () => 'planner',
+    summary: (u, p) => `${getGoal(u.id, p.goalId)?.title ?? 'Ziel'}: Fortschritt eintragen`,
+    run: (u, p) => {
+      const log = logGoal(u.id, p.goalId, p.value, p.date, p.note ?? null);
+      return { result: { id: log.id }, undo: { id: log.id } };
+    },
+    undo: (u, d: { id: string }) => { deleteLog(u.id, d.id); },
+  },
+  'goal.update': {
+    group: () => 'planner',
+    summary: (u, p) => {
+      const title = getGoal(u.id, p.id)?.title ?? 'Ziel';
+      return p.patch.status === 'paused' ? `Ziel „${title}“ pausieren` : p.patch.status === 'active' ? `Ziel „${title}“ fortsetzen` : p.patch.status === 'done' ? `Ziel „${title}“ als erreicht markieren` : `Erinnerung für Ziel „${title}“ ändern`;
+    },
+    run: (u, p) => {
+      const before = getGoal(u.id, p.id);
+      if (!before) throw new Error('Ziel nicht gefunden');
+      updateGoal(u.id, p.id, p.patch);
+      return { result: { ok: true }, undo: { id: p.id, prev: { status: before.status, checkIn: before.checkIn } } };
+    },
+    undo: (u, d: { id: string; prev: { status: 'active' | 'paused' | 'done'; checkIn: string | null } }) => { updateGoal(u.id, d.id, d.prev); },
+  },
+  'plan.setting': {
+    group: () => 'planner',
+    summary: (_u, p) => settingSummary(p.key, p.value),
+    run: (u, p) => {
+      const prev = applyPlanSetting(u.id, p.key, p.value);
+      return { result: { ok: true }, undo: { key: p.key, prev } };
+    },
+    undo: (u, d: { key: PlanSettingKey; prev: string }) => { applyPlanSetting(u.id, d.key, d.prev); },
   },
   'memory.add': {
     group: () => 'memory',

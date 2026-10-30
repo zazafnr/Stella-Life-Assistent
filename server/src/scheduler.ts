@@ -13,7 +13,9 @@ import { titleOldChats } from './conversations.ts';
 import { checkAllMail, listAccounts, purgeMailBodies, sendMail } from './mail.ts';
 import { syncUntis } from './untis.ts';
 import { fetchBookPage } from './books.ts';
+import { advanceRecurring } from './planner.ts';
 import { solveHomework } from './homework.ts';
+import { sendGoalCheckIns } from './goals.ts';
 import { pushToUser } from './push.ts';
 
 type ReminderRow = { id: string; user_id: string; item_id: string | null; message: string; with_attachments: number; always: number };
@@ -29,7 +31,7 @@ const JOB_HANDLERS: Record<string, (userId: string, payload: any) => Promise<voi
   },
 };
 
-async function sendDueReminders() {
+export async function sendDueReminders() {
   const ts = now();
   const due = db.prepare(`SELECT r.* FROM reminders r LEFT JOIN items i ON i.id = r.item_id
       WHERE r.sent_at IS NULL AND r.fire_at <= ?
@@ -41,8 +43,13 @@ async function sendDueReminders() {
     const attachments = r.with_attachments && item ? item.attachments : [];
     let text = r.message;
     if (item?.kind === 'homework' && !r.always) text += '\nSchreib mir „erledigt“, wenn du fertig bist. 😉';
-    addMessage(r.user_id, 'assistant', text, { attachments });
+    // Erledigung mit Ort: eine Karte „Läden in der Nähe“ – der Standort wird erst beim Öffnen und nur einmal abgefragt
+    const card = item?.place ? { type: 'places' as const, category: item.place.category, label: item.place.label, itemId: item.id } : undefined;
+    addMessage(r.user_id, 'assistant', text, { attachments, card });
     await pushToUser(r.user_id, { title: 'Stella', body: r.message, url: '/', tag: r.item_id ?? r.id });
+    // Dauerauftrag: die nächste Erinnerung gleich anlegen
+    const owner = item?.recurrence ? getUser(r.user_id) : null;
+    if (item && owner) advanceRecurring(owner, item);
   }
   // Erinnerungen zu erledigten Einträgen still verwerfen
   db.prepare(`UPDATE reminders SET sent_at = ? WHERE sent_at IS NULL AND fire_at <= ?`).run(ts, ts);
@@ -88,6 +95,7 @@ async function periodic() {
     await every(`learn:${userId}`, 30 * 60_000, () => nightlyLearning(userId)).catch((err) => console.warn('Lernen:', err.message));
     await every(`briefing:${userId}`, 2 * 60_000, async () => { await maybeSendBriefing(userId); }).catch((err) => console.warn('Briefing:', err.message));
     await every(`hints:${userId}`, 10 * 60_000, () => deliverHints(userId)).catch((err) => console.warn('Hinweise:', err.message));
+    await every(`goals:${userId}`, 2 * 60_000, () => sendGoalCheckIns(userId)).catch((err) => console.warn('Ziele:', err.message));
     await every(`replan:${userId}`, 30 * 60_000, async () => { replanMissed(userId); }).catch((err) => console.warn('Neu planen:', err.message));
     await every(`weekplan:${userId}`, 10 * 60_000, () => maybeOfferWeek(userId)).catch((err) => console.warn('Wochenplan:', err.message));
     if (hasSecret(userId, 'webuntis')) {

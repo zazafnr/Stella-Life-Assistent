@@ -12,8 +12,8 @@ export interface QuickAction {
   /** SF-Symbol der iOS-App */
   symbol: string;
   label: string;
-  /** text = in die Eingabe einfügen, send = sofort schicken, camera = Kamera öffnen, mic = Aufnahme starten */
-  kind: 'text' | 'send' | 'camera' | 'mic';
+  /** text = in die Eingabe einfügen, send = sofort schicken, camera = Kamera öffnen, mic = Aufnahme starten, list = Einkaufsliste öffnen */
+  kind: 'text' | 'send' | 'camera' | 'mic' | 'list';
   text?: string;
 }
 
@@ -22,7 +22,7 @@ const ALL: (QuickAction & { needs?: Parameters<typeof hasFeature>[1] })[] = [
   { id: 'photo', icon: 'camera', symbol: 'camera.fill', label: 'Foto schicken', kind: 'camera', needs: 'homework' },
   { id: 'homework', icon: 'book', symbol: 'book.fill', label: 'HÜ eintragen', kind: 'text', text: 'Mathe HÜ S. ', needs: 'homework' },
   { id: 'voice', icon: 'mic', symbol: 'mic.fill', label: 'Sprachnachricht', kind: 'mic' },
-  { id: 'shopping', icon: 'plus', symbol: 'cart.fill', label: 'Einkaufsliste', kind: 'send', text: 'Was steht auf der Einkaufsliste?', needs: 'shopping' },
+  { id: 'shopping', icon: 'plus', symbol: 'cart.fill', label: 'Einkaufsliste', kind: 'list', needs: 'shopping' },
   { id: 'week', icon: 'calendar', symbol: 'calendar.badge.clock', label: 'Woche planen', kind: 'send', text: 'Plan meine Woche', needs: 'planner' },
   { id: 'mail', icon: 'mail', symbol: 'envelope.fill', label: 'Was ist neu in der Mail?', kind: 'send', text: 'Was ist neu in der Mail?', needs: 'mails' },
   { id: 'goal', icon: 'star', symbol: 'star.fill', label: 'Ziel-Update', kind: 'text', text: 'Ziel-Update: ', needs: 'goals' },

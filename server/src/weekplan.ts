@@ -11,13 +11,15 @@ import {
   type Item, type Memory, type PlanBlock, type WeekPlan,
 } from '@stella/shared';
 import { levelFor, perform } from './actions.ts';
+import { activeGoals, countLogs, getGoal, weekStart } from './goals.ts';
+import { afterWorkTime, hasFeature } from './profile.ts';
 import { buildLagebild, freeSlots, isoWeekday, toHhmm, toMin, type DayContext, type Interval, type Lagebild } from './context.ts';
 import { addMessage, db, getItem, getUser, type User } from './db.ts';
 import { isDelivered, markDelivered } from './hints.ts';
 import { complete, llmAvailable } from './llm.ts';
 import { pushToUser } from './push.ts';
 
-const MINUTES = { exam: 45, homework: 30, assignment: 60 } as const;
+const MINUTES = { exam: 45, homework: 30, assignment: 60, goal: 30 } as const;
 /** Pause zwischen zwei Dingen */
 const GAP = 10;
 /** höchstens so viel Geplantes pro Tag */
@@ -244,6 +246,41 @@ export function buildWeekPlan(user: User, opts: PlanOptions = {}, lb: Lagebild =
     }
   }
 
+  // Ziele mit Zeitbedarf („3× pro Woche laufen, 45 Minuten“): fehlende Einheiten dieser Woche verteilen – nach allem mit Frist
+  const lastDay = states.at(-1)?.day.date;
+  for (const g of lastDay && hasFeature(user, 'goals') ? activeGoals(user.id) : []) {
+    const per = /^weekly:(\d+)$/.exec(g.cadence)?.[1];
+    if (!per || !g.minutes) continue;
+    const minutes = g.minutes;
+    const planned = (db.prepare(`SELECT COUNT(*) AS n FROM items WHERE user_id = ? AND parent_id = ? AND deleted = 0 AND status = 'open' AND due >= ? AND due <= ?`)
+      .get(user.id, g.id, from, to) as { n: number }).n;
+    const need = Number(per) - countLogs(g.id, weekStart(from), from > lb.today ? addDays(from, -1) : lb.today) - planned;
+    if (need <= 0) continue;
+    needs.push({
+      deadline: addDays(to, 1),
+      run: () => {
+        let n = 0;
+        const used = new Set<DayState>();
+        for (const candidates of spread(states, need)) {
+          for (const s of candidates) {
+            if (used.has(s)) continue;
+            const at = slotIn(s, minutes, afterWorkTime(user));
+            if (!at) continue;
+            take(s, at, minutes);
+            used.add(s);
+            blocks.push({
+              key: `${g.id}:${weekStart(from)}:${n}`, date: s.day.date, start: at, end: toHhmm(toMin(at) + minutes),
+              title: `Ziel: ${g.title}`, focus: g.why, subject: null, parentId: g.id, why: 'goal',
+            });
+            n++;
+            break;
+          }
+        }
+        if (n < need) notes.push(`Für „${g.title}“ finde ich diese Woche nur ${n} von ${need} freien Terminen.`);
+      },
+    });
+  }
+
   // Dringendes zuerst
   for (const n of needs.sort((a, b) => a.deadline.localeCompare(b.deadline))) n.run();
 
@@ -293,15 +330,16 @@ export function cleanBlocks(userId: string, raw: unknown): PlanBlock[] {
   const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
   const out: PlanBlock[] = [];
   for (const r of raw.slice(0, 60) as Record<string, unknown>[]) {
-    const parent = typeof r.parentId === 'string' ? getItem(userId, r.parentId) : null;
-    if (!parent || parent.deleted) continue;
+    const goal = r.why === 'goal' && typeof r.parentId === 'string' ? getGoal(userId, r.parentId) : null;
+    const parent = goal ? null : typeof r.parentId === 'string' ? getItem(userId, r.parentId) : null;
+    if (!goal && (!parent || parent.deleted)) continue;
     if (typeof r.date !== 'string' || !ymd.test(r.date) || typeof r.start !== 'string' || !hhmm.test(r.start)) continue;
-    const why = r.why === 'homework' || r.why === 'assignment' ? r.why : 'exam';
-    const end = typeof r.end === 'string' && hhmm.test(r.end) ? r.end : toHhmm(toMin(r.start) + MINUTES[why]);
+    const why = goal ? 'goal' : r.why === 'homework' || r.why === 'assignment' ? r.why : 'exam';
+    const end = typeof r.end === 'string' && hhmm.test(r.end) ? r.end : toHhmm(toMin(r.start) + (goal?.minutes ?? MINUTES[why]));
     out.push({
       key: String(r.key ?? '').slice(0, 80), date: r.date, start: r.start, end,
-      title: String(r.title ?? parent.title).slice(0, 160), focus: r.focus ? String(r.focus).slice(0, 200) : null,
-      subject: parent.subject, parentId: parent.id, why,
+      title: String(r.title ?? goal?.title ?? parent!.title).slice(0, 160), focus: r.focus ? String(r.focus).slice(0, 200) : null,
+      subject: parent?.subject ?? null, parentId: (goal ?? parent!).id, why,
     });
   }
   return out;

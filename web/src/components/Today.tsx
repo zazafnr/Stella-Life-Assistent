@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addDays, diffDays, formatDateDe, todayIn, type Item } from '@stella/shared';
-import { api, useStore } from '../store.ts';
+import { addDays, diffDays, formatDateDe, todayIn, type FinanceMonth, type GoalProgress, type Item } from '@stella/shared';
+import { api, meHas, useStore } from '../store.ts';
 import type { Tab } from '../App.tsx';
 import { Icon, type IconName } from '../ui/Icon.tsx';
 import { Confetti, Ring, Sky, StarMark } from '../ui/Decor.tsx';
 import { BriefingCard } from './BriefingCard.tsx';
+import { ListsSheet } from './Lists.tsx';
+import { WeekBar, amount } from './Goals.tsx';
+import { euro } from './Finance.tsx';
+import { StellaPlanCard } from './StellaPlan.tsx';
 
 interface Lesson { date: string; start: string; subject: string | null; code: string | null; status: string }
 interface InboxEntry { source: string; category: string | null; action: string | null; createdAt: string }
@@ -47,6 +51,27 @@ export function Today({ go }: { go: (t: Tab) => void }) {
   const [lessons, setLessons] = useState<Lesson[] | null>(null);
   const [steps, setSteps] = useState<number | null>(null);
   const [inbox, setInbox] = useState<InboxEntry[]>([]);
+  const [listOpen, setListOpen] = useState(false);
+  const [shopCount, setShopCount] = useState<number | null>(null);
+
+  const loadShopCount = () => {
+    if (!meHas(me, 'shopping')) return;
+    api<{ lists: { kind: string; items: { done: boolean }[] }[] }>('/api/lists')
+      .then((r) => setShopCount(r.lists.find((l) => l.kind === 'shopping')?.items.filter((i) => !i.done).length ?? 0)).catch(() => {});
+  };
+  useEffect(loadShopCount, [me?.settings.profile]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [spent, setSpent] = useState<{ cents: number; currency: string; count: number } | null>(null);
+  useEffect(() => {
+    if (!meHas(me, 'finance')) { setSpent(null); return; }
+    api<FinanceMonth>('/api/finance').then((r) => setSpent({ cents: r.totalCents, currency: r.currency, count: r.count })).catch(() => {});
+  }, [me?.settings.profile]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [goalList, setGoalList] = useState<GoalProgress[]>([]);
+  useEffect(() => {
+    if (!meHas(me, 'goals')) { setGoalList([]); return; }
+    api<{ goals: GoalProgress[] }>('/api/goals').then((r) => setGoalList(r.goals.filter((g) => g.status === 'active'))).catch(() => {});
+  }, [me?.settings.profile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     api<Lesson[]>(`/api/timetable?from=${tomorrow}&to=${tomorrow}`).then(setLessons).catch(() => setLessons([]));
@@ -94,6 +119,20 @@ export function Today({ go }: { go: (t: Tab) => void }) {
         </header>
 
         <BriefingCard onOpen={go} />
+
+        {meHas(me, 'shopping') && (
+          <button type="button" className="card interactive row" style={{ justifyContent: 'space-between', gap: 12 }} onClick={() => setListOpen(true)}>
+            <span className="row" style={{ gap: 12 }}>
+              <span className="icon-tile blue" style={{ width: 40, height: 40, borderRadius: 13 }}><Icon name="plus" size={20} /></span>
+              <span style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                <span style={{ fontWeight: 600 }}>Einkaufsliste</span>
+                <span className="small muted">{shopCount === null ? 'antippen zum Öffnen' : shopCount === 0 ? 'nichts zu besorgen' : `${shopCount} ${shopCount === 1 ? 'Eintrag' : 'Einträge'} offen`}</span>
+              </span>
+            </span>
+            <Icon name="chevron" size={16} />
+          </button>
+        )}
+        {listOpen && <ListsSheet onClose={() => { setListOpen(false); loadShopCount(); }} />}
 
         <section className="card" aria-label={dueLabel}>
           <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
@@ -166,6 +205,34 @@ export function Today({ go }: { go: (t: Tab) => void }) {
               })}
             </div>
           </section>
+        )}
+
+        <StellaPlanCard go={go} />
+
+        {spent && (
+          <button type="button" className="card interactive row" onClick={() => go('finance')}>
+            <span className="icon-tile green"><Icon name="wallet" size={20} /></span>
+            <span style={{ flex: 1 }}>
+              <strong style={{ fontWeight: 600, display: 'block' }}>Ausgaben diesen Monat</strong>
+              <span className="small muted">{spent.count ? `${euro(spent.cents, spent.currency)} · ${spent.count} ${spent.count === 1 ? 'Zahlung' : 'Zahlungen'}` : 'noch keine Zahlungen – Einrichtung unter Einstellungen'}</span>
+            </span>
+            <Icon name="chevron" size={16} />
+          </button>
+        )}
+
+        {goalList.length > 0 && (
+          <button type="button" className="card interactive" onClick={() => go('goals')} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <span className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0 }}>Deine Ziele</h2><Icon name="chevron" size={16} /></span>
+            {goalList.slice(0, 3).map((g) => (
+              <span key={g.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span className="row" style={{ justifyContent: 'space-between', fontSize: 14 }}>
+                  <span style={{ fontWeight: 600 }}>{g.title}</span>
+                  <span className="muted small">{amount(g, g.weekValue)} von {amount(g, g.weekTarget)}</span>
+                </span>
+                <WeekBar goal={g} />
+              </span>
+            ))}
+          </button>
         )}
 
         <button type="button" className="card interactive row" onClick={() => go('inbox')}>

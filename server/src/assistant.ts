@@ -1,7 +1,7 @@
 // Stellas "Gehirn": erst schnelle Regeln (offline-fähig, kostenlos), dann die KI mit Werkzeugen.
 
 import {
-  addDays, formatDateDe, interpret, nextSchoolDay, parseEntry, splitTopics, STYLE_RULES, timeIn, todayIn, toneInstruction, voice, WEEKDAYS_DE, weekdayOf,
+  addDays, formatDateDe, interpret, placeKind, nextSchoolDay, parseEntry, splitTopics, STYLE_RULES, timeIn, todayIn, toneInstruction, voice, WEEKDAYS_DE, weekdayOf,
   type Attachment, type ChatMessage, type ChatResponse, type Intent, type Item, type ItemKind, type ItemQuery, type MemoryCategory, type ParsedEntry,
 } from '@stella/shared';
 import {
@@ -18,7 +18,12 @@ import { findHints, markDelivered as markHintDelivered } from './hints.ts';
 import { cleanSchedule, findMemory, isCategory, listMemories } from './memory.ts';
 import { draftReply } from './mail.ts';
 import { maybeTitle } from './conversations.ts';
-import { describeUser, isSchool } from './profile.ts';
+import { afterWorkTime, describeUser, hasFeature, isSchool } from './profile.ts';
+import { matchOpenItems, openItems } from './lists.ts';
+import { activeGoals, amountText, describeCadence, extractGoal, extractLog, GOAL_RE, looksLikeGoal, matchGoal, parseLogQuick, progress, weekTarget, type NewGoal } from './goals.ts';
+import { resolvePlace } from './places.ts';
+import { describeRecurrence, nextOccurrence } from '@stella/shared';
+import { euro, spendingCard, spendingFacts, spendingPeriod, SPEND_RE } from './finance.ts';
 import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type ToolDef } from './llm.ts';
 import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
 
@@ -70,6 +75,10 @@ async function handleChatIn(user: User, text: string, clientId: string | null, i
   if (!handled && FORGOT_RE.test(text)) handled = await answerForgot(t);
   if (!handled && INBOX_RE.test(text)) handled = answerInbox(t);
   if (!handled && WEEK_RE.test(text)) handled = await answerWeek(t, text);
+  if (!handled && hasFeature(user, 'goals') && GOAL_START_RE.test(text) && (looksLikeGoal(text) || GOAL_EXPLICIT_RE.test(text))) handled = await onGoalCreate(t, text);
+  if (!handled && !images.length && hasFeature(user, 'goals')) handled = await onGoalLog(t, text);
+  if (!handled && hasFeature(user, 'finance') && SPEND_RE.test(text)) handled = onSpending(t, text);
+  if (handled && pending) clearPending(user.id);
   if (!handled && pending && intent?.type !== 'create') handled = await answerPending(t, pending, text);
   if (pending && !handled) clearPending(user.id);
 
@@ -81,6 +90,11 @@ async function handleChatIn(user: User, text: string, clientId: string | null, i
       case 'move': await onMove(t, intent, text); break;
       case 'delete': onDelete(t, intent.query); break;
       case 'remind': onRemind(t, intent); break;
+      case 'recurring': onRecurring(t, intent); break;
+      case 'list_add': onListAdd(t, intent); break;
+      case 'list_show': onListShow(t); break;
+      case 'list_done': if (!onListDone(t, intent)) await runAgent(t); break;
+      case 'errand': await onErrand(t, intent); break;
       case 'remember': onRemember(t, intent.text); break;
       case 'forget': onForget(t, intent.text); break;
       case 'correct': if (!onCorrect(t, intent)) await runAgent(t); break;
@@ -94,6 +108,8 @@ async function handleChatIn(user: User, text: string, clientId: string | null, i
 
 const BRIEFING_RE = /^\s*(\W*)(morning[- ]?)?briefing\b|^\s*(tages)?(überblick|ueberblick)\b|^\s*was (steht|ist) heute (an|los)\b/iu;
 const INBOX_RE = /^\s*(\W*)(was (ist|gibt'?s) neu(es)? (in|bei) (der |meiner |meinen |deiner )?(mail|mails|post|inbox)|(gibt'?s |hab ich )?neue (mail|mails|post)|mail-?übersicht|hab ich post)\b/iu;
+const GOAL_START_RE = GOAL_RE;
+const GOAL_EXPLICIT_RE = /^\s*(mein\s+ziel|ziel\s*[:,])/iu;
 const FORGOT_RE = /hab(e)? ich (was|etwas|irgendwas) vergessen|was (hab|habe) ich vergessen/iu;
 
 const WEEK_RE = /\bplan(e|st)?\s+(mir\s+)?(meine|die|diese|nächste|naechste)\s+(\w+\s+)?woche\b|\bwochenplan|\bwoche\s+(planen|durchplanen)|\bplan my week\b/iu;
@@ -291,6 +307,111 @@ function onRemind(t: Turn, intent: Extract<Intent, { type: 'remind' }>) {
   touched(t, ...r.changed);
   if (r.status === 'refused') say(t, `🙅 ${r.reason}`);
   else if (r.status === 'done') sayA(t, v(t).remindSet(whenLabel(t, intent.due, intent.time), intent.text), r.actionId);
+}
+
+/** „erinnere mich jeden Montag an den Müll“ → Dauerauftrag: nach jedem Erinnern rückt er zum nächsten Termin vor */
+function onRecurring(t: Turn, intent: Extract<Intent, { type: 'recurring' }>) {
+  const time = intent.time ?? '08:00';
+  let due = nextOccurrence(intent.recurrence, t.today);
+  if (due === t.today && time <= timeIn(t.user.timeZone)) due = nextOccurrence(intent.recurrence, addDays(t.today, 1));
+  const r = perform(t.user, 'item.create', { kind: 'reminder', title: intent.text, due, time, recurrence: intent.recurrence, source: 'chat' },
+    { source: 'chat', quiet: true, say: sayAction(t) });
+  touched(t, ...r.changed);
+  if (r.status === 'refused') say(t, `🙅 ${r.reason}`);
+  else if (r.status === 'done') sayA(t, v(t).recurringSet(`${describeRecurrence(intent.recurrence)} um ${time}`, intent.text), r.actionId);
+}
+
+// ---------- Einkaufsliste und Erledigungen ----------
+
+function onListAdd(t: Turn, intent: Extract<Intent, { type: 'list_add' }>) {
+  const r = perform(t.user, 'list.add', { items: intent.items }, { source: 'chat', quiet: true, say: sayAction(t) });
+  if (r.status === 'refused') { say(t, `🙅 ${r.reason}`); return; }
+  if (r.status !== 'done') return;
+  const res = r.result as { added: string[]; skipped: string[] };
+  if (!res.added.length) say(t, v(t).listAlready(res.skipped.join(', ')));
+  else sayA(t, v(t).listAdded(res.added.join(', '), res.added.length), r.actionId);
+}
+
+/** „Wie viel hab ich diese Woche ausgegeben?“ → Summe als Karte mit den Kategorien */
+function onSpending(t: Turn, text: string): boolean {
+  const range = spendingPeriod(text, t.today);
+  const card = spendingCard(t.user, range, range.label);
+  const words = card.count ? v(t).spendingSome(card.label, euro(card.totalCents, card.currency), card.count) : v(t).spendingNone(card.label);
+  t.replies.push(addMessage(t.user.id, 'assistant', words, { card }));
+  return true;
+}
+
+/** „ich will 3x pro Woche laufen gehen“ → Ziel anlegen (Karte mit Rückgängig) */
+async function onGoalCreate(t: Turn, text: string): Promise<boolean> {
+  const g = await extractGoal(t.user, text);
+  if (!g) return false;
+  if (activeGoals(t.user.id).some((x) => x.title.toLowerCase() === g.title.toLowerCase())) { say(t, v(t).goalExists(g.title)); return true; }
+  const r = perform(t.user, 'goal.create', g as NewGoal, { source: 'chat', quiet: true, say: sayAction(t) });
+  if (r.status === 'refused') { say(t, `🙅 ${r.reason}`); return true; }
+  if (r.status !== 'done') return true;
+  sayA(t, v(t).goalSet(g.title, describeCadence(g)), r.actionId);
+  return true;
+}
+
+/** „war heute 5 km laufen“ → dem passenden Ziel zuordnen; false, wenn das gar nicht nach Fortschritt klingt */
+async function onGoalLog(t: Turn, text: string): Promise<boolean> {
+  const goals = activeGoals(t.user.id);
+  if (!goals.length) return false;
+  const quick = parseLogQuick(text, t.today);
+  if (!quick) return false;
+  let hit: { goal: (typeof goals)[number]; value: number; date: string; note: string | null } | null = null;
+  const named = matchGoal(goals, text);
+  if (named) {
+    const unit = named.unit.toLowerCase();
+    if (unit === 'x') hit = { goal: named, value: 1, date: quick.date, note: quick.unit && quick.unit !== 'x' ? text.trim().slice(0, 200) : null };
+    else if (quick.unit === unit) hit = { goal: named, value: quick.value, date: quick.date, note: null };
+  } else if (quick.unit && quick.unit !== 'x') {
+    const byUnit = goals.filter((g) => g.unit.toLowerCase() === quick.unit);
+    if (byUnit.length === 1) hit = { goal: byUnit[0]!, value: quick.value, date: quick.date, note: null };
+    else if (byUnit.length > 1) { say(t, v(t).goalUnclear()); return true; }
+  }
+  hit ??= await extractLog(t.user, text, goals, t.today);
+  if (!hit) return false;
+  const r = perform(t.user, 'goal.log', { goalId: hit.goal.id, value: hit.value, date: hit.date, note: hit.note }, { source: 'chat', quiet: true, say: sayAction(t) });
+  if (r.status === 'refused') { say(t, `🙅 ${r.reason}`); return true; }
+  if (r.status !== 'done') return true;
+  const p = progress(t.user, hit.goal, t.today);
+  sayA(t, v(t).goalLogged(hit.goal.title, amountText(hit.goal, hit.value), `${amountText(hit.goal, p.weekValue)} von ${amountText(hit.goal, weekTarget(hit.goal))}`), r.actionId);
+  return true;
+}
+
+function onListShow(t: Turn) {
+  const open = openItems(t.user.id);
+  if (!open.length) { say(t, v(t).listEmpty()); return; }
+  const lines = open.slice(0, 8).map((i) => `- ${i.text}${i.qty ? ` (${i.qty})` : ''}`).join('\n');
+  say(t, v(t).listShow(open.length, lines) + (open.length > 8 ? `\n… und ${open.length - 8} weitere in der Liste.` : ''));
+}
+
+/** „Milch hab ich“ / „hab eingekauft“ – false, wenn nichts auf der Liste dazu passt (dann antwortet die KI) */
+function onListDone(t: Turn, intent: Extract<Intent, { type: 'list_done' }>): boolean {
+  const open = openItems(t.user.id);
+  if (intent.items === 'all') {
+    if (!open.length) return false;
+    const r = perform(t.user, 'list.check', { ids: open.map((i) => i.id), names: [`${open.length} Einträge`], done: true }, { source: 'chat', quiet: true, say: sayAction(t) });
+    if (r.status === 'done') sayA(t, v(t).listAllChecked(open.length), r.actionId);
+    return true;
+  }
+  const { matched, missing } = matchOpenItems(t.user.id, intent.items);
+  if (!matched.length) return false;
+  const r = perform(t.user, 'list.check', { ids: matched.map((i) => i.id), names: matched.map((i) => i.text), done: true }, { source: 'chat', quiet: true, say: sayAction(t) });
+  if (r.status === 'done') sayA(t, v(t).listChecked(matched.map((i) => i.text).join(', ')) + (missing.length ? `\n${v(t).listNoMatch(missing.join(', '))}` : ''), r.actionId);
+  return true;
+}
+
+/** „nach der Arbeit Blumen kaufen“: Erinnerung zur passenden Zeit, mit dem passenden Laden */
+async function onErrand(t: Turn, intent: Extract<Intent, { type: 'errand' }>) {
+  const place = intent.place ?? await resolvePlace(t.user.id, intent.text);
+  const time = intent.when === 'after_work' ? afterWorkTime(t.user) : intent.when === 'after_school' ? '15:00' : '19:00';
+  const due = time > timeIn(t.user.timeZone) ? t.today : addDays(t.today, 1);
+  const r = perform(t.user, 'item.create', { kind: 'reminder', title: intent.text, due, time, source: 'chat', place }, { source: 'chat', quiet: true, say: sayAction(t) });
+  touched(t, ...r.changed);
+  if (r.status === 'refused') say(t, `🙅 ${r.reason}`);
+  else if (r.status === 'done') sayA(t, v(t).errandSet(whenLabel(t, due, time), intent.text, place ? placeKind(place.category)?.plural ?? null : null), r.actionId);
 }
 
 /** grobe Einordnung für „merk dir …“ – die KI sortiert in der Nacht nicht um, der Nutzer kann ändern */
@@ -512,6 +633,21 @@ const TOOLS: ToolDef[] = [
   {
     type: 'function',
     function: {
+      name: 'spending_summary',
+      description: 'Ausgaben (Kartenzahlungen aus Apple Pay) in einem Zeitraum: Summe, Kategorien, häufigste Händler. Optional nur eine Kategorie.',
+      parameters: {
+        type: 'object',
+        properties: {
+          from: { type: 'string', description: 'YYYY-MM-DD, Standard: Monatsanfang' },
+          to: { type: 'string', description: 'YYYY-MM-DD, Standard: heute' },
+          category: { type: 'string', description: 'Lebensmittel, Essen & Trinken, Transport, Shopping, Freizeit, Abos, Gesundheit oder Sonstiges' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'health_summary',
       description: 'Schritte/Schlaf/Aktivität der letzten Tage (aus Apple Health über Kurzbefehle).',
       parameters: { type: 'object', properties: { days: { type: 'number' } } },
@@ -664,6 +800,12 @@ async function runTool(t: Turn, name: string, args: Record<string, any>): Promis
     }
     case 'timetable':
       return lessonsFor(u.id, args.from ?? t.today, args.to ?? addDays(t.today, 1));
+    case 'spending_summary': {
+      const ymd = /^\d{4}-\d{2}-\d{2}$/;
+      const to = ymd.test(String(args.to ?? '')) ? String(args.to) : t.today;
+      const from = ymd.test(String(args.from ?? '')) ? String(args.from) : `${t.today.slice(0, 7)}-01`;
+      return spendingFacts(u, from, to, args.category);
+    }
     case 'health_summary': {
       const days = Math.min(Number(args.days ?? 7), 60);
       return db.prepare('SELECT date, steps, sleep_hours, active_minutes FROM health_days WHERE user_id = ? AND date >= ? ORDER BY date')

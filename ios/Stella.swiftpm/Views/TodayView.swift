@@ -9,6 +9,8 @@ struct TodayView: View {
     @State private var inbox: [InboxEntry] = []
     @State private var showSettings = Demo.opens("settings")
     @State private var showHealth = false
+    @State private var showFinance = Demo.opens("finance")
+    @State private var showPlan = Demo.opens("plan")
     @State private var openItem: Item?
 
     private var today: String { Day.today }
@@ -22,7 +24,13 @@ struct TodayView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         header.rise(0)
-                        BriefingCardView(onOpen: { go($0 == "inbox" ? .inbox : .chat) })
+                        BriefingCardView(onOpen: { tab in
+                            if tab == "finance" { showFinance = true } else { go(tab == "inbox" ? .inbox : (tab == "goals" ? .goals : .chat)) }
+                        })
+                        if store.me?.has("shopping") == true { ShoppingCardView() }
+                        StellaPlanCardView(open: { showPlan = true })
+                        if store.me?.has("finance") == true { FinanceCardView(open: { showFinance = true }) }
+                        if store.me?.has("goals") != false { GoalsCardView(go: { go(.goals) }) }
                         dueCard.rise(1)
                         HStack(spacing: 14) {
                             examCard
@@ -44,6 +52,8 @@ struct TodayView: View {
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showHealth) { HealthSheet(goal: goal) }
+            .sheet(isPresented: $showFinance) { FinanceSheet() }
+            .sheet(isPresented: $showPlan) { NavigationStack { StellaPlanView(go: { go($0) }) } }
             .sheet(item: $openItem) { ItemDetail(item: $0) }
             .task { await reload() }
         }
@@ -411,7 +421,7 @@ struct BriefingCardView: View {
     @State private var briefing: Briefing?
     @State private var gone: Set<String> = []
 
-    private let icons = ["school": "🏫", "due": "📌", "plan": "🗓️", "tomorrow": "🌙", "done": "✅", "inbox": "✉️"]
+    private let icons = ["school": "🏫", "due": "📌", "plan": "🗓️", "tomorrow": "🌙", "done": "✅", "inbox": "✉️", "goals": "🎯"]
 
     var body: some View {
         let morning = Calendar.current.component(.hour, from: Date()) < 12

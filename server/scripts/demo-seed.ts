@@ -17,6 +17,11 @@ const { hashPassword, register } = await import('../src/auth.ts');
 const { addMessage, createConversation, db, getUser, newId, updateUserSettings } = await import('../src/db.ts');
 const { addItem } = await import('../src/planner.ts');
 const { addMemory } = await import('../src/memory.ts');
+const { addListItems, shoppingListId } = await import('../src/lists.ts');
+const goalsMod = await import('../src/goals.ts');
+const finMod = await import('../src/finance.ts');
+const { nextOccurrence } = await import('@stella/shared');
+const { applyProfile } = await import('../src/profile.ts');
 const { handleChat } = await import('../src/assistant.ts');
 const { perform } = await import('../src/actions.ts');
 const { buildWeekPlan } = await import('../src/weekplan.ts');
@@ -85,6 +90,47 @@ await handleChat(user(), 'plan meine Woche', null);
 const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
 const rows = db.prepare('SELECT id FROM messages WHERE user_id = ? ORDER BY created_at, rowid').all(uid) as { id: string }[];
 rows.forEach((r, i) => db.prepare('UPDATE messages SET created_at = ? WHERE id = ?').run(ago(i === 0 ? 240 : (rows.length - i) * 3), r.id));
+
+// Alle Funktionen an, damit Ziele und Ausgaben in der Vorschau zu sehen sind
+applyProfile(user(), { situation: 'school', features: ['mails', 'planner', 'homework', 'shopping', 'goals', 'finance', 'health'] });
+
+// Daueraufträge und eine einmalige Erinnerung („Was Stella vorhat“)
+addItem(user(), { kind: 'reminder', title: 'Müll rausbringen', due: nextOccurrence('weekly:1', addDays(today, 1)), time: '07:45', recurrence: 'weekly:1', source: 'chat' });
+addItem(user(), { kind: 'reminder', title: 'Vitamine nehmen', due: addDays(today, 1), time: '08:00', recurrence: 'daily', source: 'chat' });
+addItem(user(), { kind: 'reminder', title: 'Zahnarzt anrufen', due: addDays(today, 2), time: '15:30', source: 'chat' });
+
+// Ausgaben (Apple Pay) mit Abo und Budget
+{
+  const at = (daysAgo: number, hour = 12) => new Date(Date.now() - daysAgo * 86_400_000 - (12 - hour) * 3600_000).toISOString();
+  const pay = (amount: string, merchant: string, daysAgo: number, card = 'Visa') => finMod.recordPayment(user(), { amount, merchant, card, date: at(daysAgo) });
+  await pay('4,80', 'Café Central', 0);
+  await pay('23,40', 'BILLA 1234 WIEN', 1);
+  await pay('12,99', 'Netflix', 1);
+  await pay('2,40', 'Wiener Linien', 2);
+  await pay('36,90', 'H&M', 3);
+  await pay('7,50', 'Kino Village', 4);
+  await pay('18,20', 'Lieferando', 5);
+  await pay('41,10', 'Hofer', 6);
+  await pay('12,99', 'Netflix', 32);
+  await pay('12,99', 'Netflix', 63);
+  await pay('29,90', 'Zalando', 12);
+  await pay('9,60', 'dm drogerie markt', 9);
+  finMod.setBudget(uid, 'Essen & Trinken', 3000);
+  finMod.setBudget(uid, 'Lebensmittel', 12000);
+}
+
+// Ziele mit Verlauf (Karte auf „Heute“ und Ziele-Ansicht)
+{
+  const run = goalsMod.createGoal(uid, goalsMod.cleanGoal({ title: 'Laufen gehen', why: 'fitter werden', cadence: 'weekly:3', target: 3, minutes: 45, checkIn: 'So 18:00' }));
+  [[-1, 1], [-2, 1], [-3, 1], [-8, 1], [-9, 1], [-15, 1], [-16, 1], [-17, 1], [-22, 1], [-30, 1], [-31, 1], [-38, 1], [-45, 1], [-46, 1]]
+    .forEach(([off, v]) => { if (addDays(today, off!) < today) goalsMod.logGoal(uid, run.id, v!, addDays(today, off!)); });
+  goalsMod.logGoal(uid, run.id, 1, today, 'Runde um den See');
+  const read = goalsMod.createGoal(uid, goalsMod.cleanGoal({ title: 'Lesen', cadence: 'custom', target: 100, unit: 'Seiten', metric: 'Seiten', why: 'abschalten vor dem Schlafen' }));
+  [[0, 24], [-1, 30], [-3, 18], [-8, 40], [-10, 55], [-16, 70], [-24, 90], [-31, 35]].forEach(([off, v]) => goalsMod.logGoal(uid, read.id, v!, addDays(today, off!)));
+}
+
+// Einkaufsliste (Karte auf „Heute“ und Listen-Ansicht)
+addListItems(uid, shoppingListId(uid), [{ text: 'Milch', qty: '2 Liter' }, { text: 'Eier' }, { text: 'Butter' }, { text: 'Äpfel', qty: '1 kg' }], 'chat');
 
 // ein älterer Chat mit Titel (Verlauf: „Chats“)
 const twoDaysAgo = (min: number) => new Date(Date.now() - 2 * 86_400_000 + min * 60_000).toISOString();

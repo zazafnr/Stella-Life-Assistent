@@ -8,16 +8,17 @@ import { Mail } from './settings/Mail.tsx';
 import { Untis } from './settings/Untis.tsx';
 import { Handwriting } from './settings/Handwriting.tsx';
 import { Server } from './settings/Server.tsx';
+import { FinanceSetup } from './settings/Finance.tsx';
 import { ActionLog, MemoryView, Permissions } from './settings/Assistant.tsx';
 import { Icon, type IconName } from '../ui/Icon.tsx';
 import { Sheet, Sky, StarMark, Switch, showToast } from '../ui/Decor.tsx';
 import { VERSION } from '../version.ts';
 
-type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server' | 'delete';
+type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'finance' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server' | 'delete';
 
 interface AiStatusData { configured: boolean; chain: string[]; visionChain: string[]; coolingDown: string[]; usedToday: number; dailyLimit: number }
 
-export function Settings({ back, openOnboarding }: { back: () => void; openOnboarding: (startAt: 'welcome' | 'situation') => void }) {
+export function Settings({ back, openOnboarding, openPlan }: { back: () => void; openOnboarding: (startAt: 'welcome' | 'situation') => void; openPlan: () => void }) {
   const me = useStore((s) => s.me);
   const online = useStore((s) => s.online);
   const waiting = useStore((s) => Object.values(s.actions).filter((a) => a.status === 'proposed').length);
@@ -48,6 +49,7 @@ export function Settings({ back, openOnboarding }: { back: () => void; openOnboa
     },
     { id: 'notes', icon: 'pen', tile: 'blue', title: 'FreeNotes & Handschrift', sub: 'HÜs in deine Hefte schreiben', status: i.freeNotes ? ['Verbunden', 'ok'] : ['Einrichten', 'todo'] },
     { id: 'health', icon: 'heart', tile: 'pink', title: 'Health, SMS & Kalender', sub: 'Kurzbefehle und Kalender-Abo', status: ['Anleitung', 'todo'] },
+    { id: 'finance', icon: 'wallet', tile: 'green', title: 'Ausgaben', sub: 'Apple Pay → Stella', status: ['Anleitung', 'todo'] },
     {
       id: 'notify', icon: 'bell', tile: 'green', title: 'Mitteilungen', sub: 'Erinnerungen auf diesem Gerät',
       status: perm === 'granted' ? ['An', 'ok'] : perm === 'denied' ? ['Blockiert', 'warn'] : ['Einschalten', 'todo'],
@@ -59,6 +61,7 @@ export function Settings({ back, openOnboarding }: { back: () => void; openOnboa
     if (r.id === 'books' || r.id === 'untis' || r.id === 'notes') return school;
     if (r.id === 'mail') return meHas(me, 'mails');
     if (r.id === 'health') return meHas(me, 'health');
+    if (r.id === 'finance') return meHas(me, 'finance');
     return true;
   });
 
@@ -118,6 +121,11 @@ export function Settings({ back, openOnboarding }: { back: () => void; openOnboa
         </Group>
 
         <Group title="Stella als Assistentin">
+          <button type="button" className="list-row" onClick={openPlan}>
+            <span className="icon-tile green" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="calendar" size={18} /></span>
+            <span className="grow"><span className="list-title">Was Stella vorhat</span><span className="list-sub">Erinnerungen, Daueraufträge, Automatiken – ändern oder abstellen</span></span>
+            <Icon name="chevron" size={16} />
+          </button>
           <button type="button" className="list-row" onClick={() => setSheet('perms')}>
             <span className="icon-tile blue" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="shield" size={18} /></span>
             <span className="grow"><span className="list-title">Was Stella selbst darf</span><span className="list-sub">HÜs lösen, Planer ändern, Werbung löschen …</span></span>
@@ -192,6 +200,7 @@ export function Settings({ back, openOnboarding }: { back: () => void; openOnboa
       {sheet === 'mail' && <Sheet title="E-Mail" onClose={() => setSheet(null)}><Mail me={me} /></Sheet>}
       {sheet === 'notes' && <Sheet title="FreeNotes & Handschrift" onClose={() => setSheet(null)}><Handwriting me={me} /></Sheet>}
       {sheet === 'health' && <Sheet title="Health, SMS & Kalender" onClose={() => setSheet(null)}><Shortcuts me={me} /></Sheet>}
+      {sheet === 'finance' && <Sheet title="Ausgaben" onClose={() => setSheet(null)}><FinanceSetup me={me} /></Sheet>}
       {sheet === 'notify' && <Sheet title="Mitteilungen" onClose={() => setSheet(null)}><Notifications onChange={() => setPerm(pushPermission())} /></Sheet>}
       {sheet === 'ai' && ai && <Sheet title="KI" onClose={() => setSheet(null)}><AiDetails ai={ai} /></Sheet>}
       {sheet === 'perms' && <Sheet title="Was Stella selbst darf" onClose={() => setSheet(null)}><Permissions /></Sheet>}

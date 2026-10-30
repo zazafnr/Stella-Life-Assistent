@@ -106,6 +106,11 @@ export function voice(tone: Tone | undefined) {
       frech: `⏰ ${when} nerv ich dich wegen „${what}“. Versprochen. 😏`,
       cool: `⏰ ${when}: „${what}“. Steht.`,
     }),
+    recurringSet: (when: string, what: string) => by({
+      nett: `🔁 Mach ich! ${when} erinnere ich dich an „${what}“. Unter „Was Stella vorhat“ kannst du es jederzeit ändern oder abstellen.`,
+      frech: `🔁 ${when} nerv ich dich wegen „${what}“ – ab jetzt für immer. 😏 (Abstellen geht unter „Was Stella vorhat“.)`,
+      cool: `🔁 ${when}: „${what}“. Steht. Ändern: „Was Stella vorhat“.`,
+    }),
     moved: (title: string, when: string) => by({
       nett: `📅 **${title}** ist jetzt ${when}.`,
       frech: `📅 **${title}** auf ${when} geschoben. Aufschieben kannst du gut. 😏`,
@@ -116,6 +121,46 @@ export function voice(tone: Tone | undefined) {
       frech: `🗑️ **${title}** ist weg. Als wär's nie passiert. 💅`,
       cool: `🗑️ **${title}** gelöscht.`,
     }),
+    listAdded: (items: string, count: number) => by({
+      nett: `🛒 Auf die Einkaufsliste: ${items}${count > 1 ? '' : ''}.`,
+      frech: `🛒 ${items} – steht drauf. Vergiss es bloß nicht wieder. 😏`,
+      cool: `🛒 Drauf: ${items}.`,
+    }),
+    listAlready: (items: string) => by({
+      nett: `🛒 ${items} steht schon auf der Liste.`,
+      frech: `🛒 ${items} steht schon drauf – so vergesslich bin nicht mal ich. 😏`,
+      cool: `🛒 ${items} ist schon drauf.`,
+    }),
+    listShow: (count: number, lines: string) => by({
+      nett: `🛒 **Einkaufsliste** (${count}):\n${lines}`,
+      frech: `🛒 **Einkaufsliste** (${count}) – viel Spaß beim Einkaufen:\n${lines}`,
+      cool: `🛒 Einkaufsliste (${count}):\n${lines}`,
+    }),
+    listEmpty: () => by({
+      nett: '🛒 Die Einkaufsliste ist leer – nichts zu besorgen. ✨',
+      frech: '🛒 Leer. Ausnahmsweise hast du alles. 😏',
+      cool: '🛒 Liste leer. Läuft.',
+    }),
+    listChecked: (items: string) => by({
+      nett: `✅ Abgehakt: ${items}`,
+      frech: `✅ ${items} – erledigt. Geht doch. 😏`,
+      cool: `✅ ${items} ✔`,
+    }),
+    listAllChecked: (count: number) => by({
+      nett: `✅ Alles abgehakt (${count}). Gut gemacht! 💫`,
+      frech: `✅ Alles abgehakt (${count}). Wer hätte das gedacht. 😏`,
+      cool: `✅ Alles durch (${count}).`,
+    }),
+    listNoMatch: (items: string) => by({
+      nett: `🤔 „${items}“ finde ich nicht auf der Einkaufsliste.`,
+      frech: `🤔 „${items}“? Steht nicht drauf. 🙄`,
+      cool: `🤔 „${items}“ steht nicht drauf.`,
+    }),
+    errandSet: (when: string, what: string, place: string | null) => by({
+      nett: `⏰ Mach ich! ${when} erinnere ich dich an „${what}“${place ? ` und zeig dir ${place} in der Nähe` : ''}.`,
+      frech: `⏰ ${when} nerv ich dich wegen „${what}“${place ? ` – inklusive ${place} in der Nähe` : ''}. 😏`,
+      cool: `⏰ ${when}: „${what}“${place ? ` + ${place} in der Nähe` : ''}. Steht.`,
+    }),
     inboxNone: () => by({
       nett: '📭 In deiner Inbox ist nichts Wichtiges – alles ruhig. 💫',
       frech: '📭 Nichts Wichtiges in der Inbox. Ausnahmsweise darfst du entspannen. 😏',
@@ -125,6 +170,55 @@ export function voice(tone: Tone | undefined) {
       nett: `📬 ${count === 1 ? '**1 wichtige Mail**' : `**${count} wichtige Mails**`}:\n${lines}`,
       frech: `📬 ${count === 1 ? '**1 wichtige Mail**' : `**${count} wichtige Mails**`} – die lesen sich nicht von selbst:\n${lines}`,
       cool: `📬 ${count === 1 ? '1 wichtige Mail' : `${count} wichtige Mails`}:\n${lines}`,
+    }),
+    goalSet: (title: string, rhythm: string) => by({
+      nett: `🎯 Neues Ziel: **${title}** – ${rhythm}. Ich helfe dir dran zu bleiben. 💫`,
+      frech: `🎯 **${title}**, ${rhythm}. Mal sehen, wie lange der Elan hält. 😏`,
+      cool: `🎯 Ziel steht: **${title}**, ${rhythm}.`,
+    }),
+    spendingSome: (label: string, total: string, count: number) => by({
+      nett: `💶 **${label}** hast du ${total} ausgegeben (${count} ${count === 1 ? 'Zahlung' : 'Zahlungen'}).`,
+      frech: `💶 **${label}**: ${total} weg, ${count} ${count === 1 ? 'Zahlung' : 'Zahlungen'}. Der Geldbeutel sagt Hallo. 😏`,
+      cool: `💶 ${label}: ${total} (${count}×).`,
+    }),
+    spendingNone: (label: string) => by({
+      nett: `💶 **${label}** habe ich noch keine Ausgaben gesehen. Ist der Apple-Pay-Kurzbefehl eingerichtet? Die Anleitung steht in den Einstellungen unter „Ausgaben“.`,
+      frech: `💶 **${label}** nichts ausgegeben? Oder der Kurzbefehl fehlt – dann steht die Anleitung in den Einstellungen unter „Ausgaben“. 😏`,
+      cool: `💶 ${label}: nix gesehen. Kurzbefehl eingerichtet? Einstellungen → Ausgaben.`,
+    }),
+    hintBudget: (category: string, percent: number, spent: string, limit: string) => by({
+      nett: percent >= 100
+        ? `💶 Dein Budget für **${category}** ist aufgebraucht: ${spent} von ${limit}.`
+        : `💶 Du hast schon ${percent} % deines Budgets für **${category}** verbraucht (${spent} von ${limit}).`,
+      frech: percent >= 100
+        ? `💶 **${category}**: ${spent} von ${limit} – Budget gesprengt. Respekt. 😏`
+        : `💶 **${category}**: schon ${percent} % weg (${spent} von ${limit}). Langsam, langsam. 😏`,
+      cool: percent >= 100 ? `💶 ${category}: Budget leer (${spent}/${limit}).` : `💶 ${category}: ${percent} % vom Budget (${spent}/${limit}).`,
+    }),
+    goalExists: (title: string) => by({
+      nett: `🎯 **${title}** gibt es schon – schreib einfach, wenn du etwas geschafft hast, dann trage ich es ein.`,
+      frech: `🎯 **${title}** gibt es schon. Doppelt gemoppelt hält nicht fitter. 😏`,
+      cool: `🎯 **${title}** gibt es schon.`,
+    }),
+    goalLogged: (title: string, amount: string, stand: string) => by({
+      nett: `✅ **${title}**: ${amount} eingetragen. Diese Woche: ${stand}. 💫`,
+      frech: `✅ **${title}**: ${amount} – ${stand} diese Woche. Geht doch. 😏`,
+      cool: `✅ **${title}** +${amount}. Woche: ${stand}.`,
+    }),
+    goalUnclear: () => by({
+      nett: '🤔 Zu welchem Ziel gehört das? Sag mir den Namen, dann trage ich es ein.',
+      frech: '🤔 Und welches Ziel soll das sein? Ich kann nicht hellsehen. 😏',
+      cool: '🤔 Welches Ziel?',
+    }),
+    goalStale: (title: string, weeks: number) => by({
+      nett: `🎯 Bei **${title}** hast du seit ${weeks} Wochen nichts eingetragen. Soll ich es pausieren oder anpassen?`,
+      frech: `🎯 **${title}** liegt seit ${weeks} Wochen brach. Aufgeben ist okay – dann sag's mir. 😏`,
+      cool: `🎯 **${title}**: seit ${weeks} Wochen nix. Pausieren oder anpassen?`,
+    }),
+    goalFromMemory: (title: string) => by({
+      nett: `🎯 Du hast mir mal gesagt: „${title}“. Soll ich daraus ein richtiges Ziel machen, bei dem ich dich unterstütze?`,
+      frech: `🎯 „${title}“ – das wolltest du mal. Soll ich daraus ein Ziel machen, oder war's nur Gerede? 😏`,
+      cool: `🎯 „${title}“ – als Ziel anlegen?`,
     }),
     remembered: (fact: string) => by({
       nett: `💭 Gemerkt: ${fact}`,

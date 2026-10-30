@@ -290,6 +290,97 @@ const MIGRATIONS: string[] = [
     sent_at TEXT NOT NULL
   );
   `,
+  `
+  -- Paket 7: Einkaufsliste/Listen, Erledigungen mit Ort, Laden-Cache, Karten unter Nachrichten
+  CREATE TABLE lists (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'custom',
+    created_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX lists_one_shopping ON lists(user_id) WHERE kind = 'shopping';
+  CREATE TABLE list_items (
+    id TEXT PRIMARY KEY,
+    list_id TEXT NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+    text TEXT NOT NULL,
+    qty TEXT,
+    done INTEGER NOT NULL DEFAULT 0,
+    added_via TEXT NOT NULL DEFAULT 'chat',
+    created_at TEXT NOT NULL,
+    done_at TEXT
+  );
+  CREATE INDEX list_items_list ON list_items(list_id, done, created_at);
+  ALTER TABLE items ADD COLUMN place TEXT;
+  ALTER TABLE messages ADD COLUMN card TEXT;
+  CREATE TABLE place_words (word TEXT PRIMARY KEY, category TEXT);
+  CREATE TABLE places_cache (key TEXT PRIMARY KEY, data TEXT NOT NULL, fetched_at TEXT NOT NULL);
+  `,
+  `
+  -- Paket 8: Ziele mit Fortschritt (keine Punkte, Serien oder Abzeichen)
+  CREATE TABLE goals (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    why TEXT,
+    metric TEXT NOT NULL DEFAULT 'Einheiten',
+    unit TEXT NOT NULL DEFAULT 'x',
+    target REAL NOT NULL DEFAULT 1,
+    cadence TEXT NOT NULL DEFAULT 'weekly:1',
+    minutes INTEGER,
+    check_in TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX goals_user ON goals(user_id, status);
+  CREATE TABLE goal_logs (
+    id TEXT PRIMARY KEY,
+    goal_id TEXT NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+    date TEXT NOT NULL,
+    value REAL NOT NULL DEFAULT 1,
+    note TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX goal_logs_goal ON goal_logs(goal_id, date);
+  `,
+  `
+  -- Paket 9: Ausgaben über Apple Pay (nur Betrag, Händler und Kartenname – nie Kartennummern)
+  CREATE TABLE transactions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    amount_cents INTEGER NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'EUR',
+    merchant TEXT NOT NULL,
+    merchant_key TEXT NOT NULL,
+    category TEXT NOT NULL,
+    card_label TEXT,
+    occurred_at TEXT NOT NULL,
+    day TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'applepay',
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX transactions_user_day ON transactions(user_id, day);
+  CREATE INDEX transactions_user_merchant ON transactions(user_id, merchant_key);
+  CREATE TABLE merchant_categories (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    merchant TEXT NOT NULL,
+    category TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'user',
+    PRIMARY KEY (user_id, merchant)
+  );
+  CREATE TABLE budgets (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category TEXT NOT NULL,
+    amount_cents INTEGER NOT NULL,
+    PRIMARY KEY (user_id, category)
+  );
+  `,
+  `
+  -- Paket 10: Daueraufträge („erinnere mich jeden Montag an den Müll“)
+  ALTER TABLE items ADD COLUMN recurrence TEXT;
+  ALTER TABLE items ADD COLUMN recurrence_paused INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 function migrate() {
@@ -394,7 +485,7 @@ export function updateUserSettings(id: string, patch: Partial<UserSettings>, tim
 type ItemRow = {
   id: string; kind: string; subject: string | null; title: string; detail: string | null; notes: string | null;
   page: string | null; exercises: string | null; book: string | null; due: string | null; time: string | null; status: string;
-  material: string | null; parent_id: string | null; attachments: string; updated_at: string; deleted: number;
+  material: string | null; parent_id: string | null; attachments: string; updated_at: string; deleted: number; place?: string | null; recurrence?: string | null; recurrence_paused?: number;
 };
 
 export const toItem = (r: ItemRow): Item => ({
@@ -402,23 +493,27 @@ export const toItem = (r: ItemRow): Item => ({
   page: r.page, exercises: r.exercises, due: r.due, time: r.time, status: r.status as ItemStatus,
   material: r.material, parentId: r.parent_id, attachments: JSON.parse(r.attachments),
   updatedAt: r.updated_at, deleted: !!r.deleted,
+  ...(r.place ? { place: JSON.parse(r.place) as Item['place'] } : {}),
+  ...(r.recurrence ? { recurrence: r.recurrence, recurrencePaused: !!r.recurrence_paused } : {}),
 });
 
 export interface NewItem {
   kind: ItemKind; title: string; subject?: string | null; detail?: string | null; notes?: string | null;
   page?: string | null; exercises?: string | null; book?: string | null; due?: string | null; time?: string | null;
   material?: string | null; parentId?: string | null; source?: string; externalId?: string | null;
+  place?: { category: string; label: string } | null;
+  recurrence?: string | null;
 }
 
 export function createItem(userId: string, n: NewItem): Item {
   const id = newId();
   const ts = now();
   db.prepare(`INSERT INTO items (id, user_id, kind, subject, title, detail, notes, page, exercises, book, due, time,
-      material, parent_id, source, external_id, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      material, parent_id, source, external_id, created_at, updated_at, place, recurrence)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(id, userId, n.kind, n.subject ?? null, n.title, n.detail ?? null, n.notes ?? null, n.page ?? null,
       n.exercises ?? null, n.book ?? null, n.due ?? null, n.time ?? null, n.material ?? null, n.parentId ?? null,
-      n.source ?? 'chat', n.externalId ?? null, ts, ts);
+      n.source ?? 'chat', n.externalId ?? null, ts, ts, n.place ? JSON.stringify(n.place) : null, n.recurrence ?? null);
   return getItem(userId, id)!;
 }
 
@@ -439,6 +534,7 @@ export function getItemRaw(userId: string, id: string) {
 const ITEM_COLUMNS: Record<string, string> = {
   kind: 'kind', subject: 'subject', title: 'title', detail: 'detail', notes: 'notes', page: 'page',
   exercises: 'exercises', due: 'due', time: 'time', status: 'status', material: 'material', deleted: 'deleted',
+  recurrence: 'recurrence', recurrencePaused: 'recurrence_paused',
 };
 
 export function updateItem(userId: string, id: string, patch: Partial<Item>): Item | null {
@@ -532,11 +628,12 @@ export function backfillConversations() {
 }
 backfillConversations();
 
-type MsgRow = { id: string; client_id: string | null; role: string; text: string; attachments: string; created_at: string; action_id?: string | null };
+type MsgRow = { id: string; client_id: string | null; role: string; text: string; attachments: string; created_at: string; action_id?: string | null; card?: string | null };
 const toMessage = (r: MsgRow): ChatMessage => ({
   id: r.id, clientId: r.client_id, role: r.role as ChatMessage['role'], text: r.text,
   attachments: JSON.parse(r.attachments), createdAt: r.created_at,
   ...(r.action_id ? { actionId: r.action_id } : {}),
+  ...(r.card ? { card: JSON.parse(r.card) as ChatMessage['card'] } : {}),
 });
 
 export function findMessageByClientId(userId: string, clientId: string): ChatMessage | null {
@@ -549,13 +646,13 @@ export function findMessageByClientId(userId: string, clientId: string): ChatMes
  * sonst im neuesten Chat von heute – so auch alles, was Stella von sich aus schickt (Briefing, Hinweise, Erinnerungen).
  */
 export function addMessage(userId: string, role: ChatMessage['role'], text: string,
-  opts: { clientId?: string | null; attachments?: Attachment[]; createdAt?: string; actionId?: string; conversationId?: string } = {}): ChatMessage {
+  opts: { clientId?: string | null; attachments?: Attachment[]; createdAt?: string; actionId?: string; conversationId?: string; card?: ChatMessage['card'] } = {}): ChatMessage {
   const id = newId();
   const ctx = chatContext.getStore();
   const conversationId = opts.conversationId ?? (ctx?.userId === userId ? ctx.conversationId : todayConversation(userId)!);
   const createdAt = opts.createdAt ?? now();
-  db.prepare('INSERT INTO messages (id, user_id, client_id, role, text, attachments, created_at, action_id, conversation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(id, userId, opts.clientId ?? null, role, text, JSON.stringify(opts.attachments ?? []), createdAt, opts.actionId ?? null, conversationId);
+  db.prepare('INSERT INTO messages (id, user_id, client_id, role, text, attachments, created_at, action_id, conversation_id, card) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, userId, opts.clientId ?? null, role, text, JSON.stringify(opts.attachments ?? []), createdAt, opts.actionId ?? null, conversationId, opts.card ? JSON.stringify(opts.card) : null);
   db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ? AND updated_at < ?').run(createdAt, conversationId, createdAt);
   return toMessage(db.prepare('SELECT * FROM messages WHERE id = ?').get(id) as MsgRow);
 }

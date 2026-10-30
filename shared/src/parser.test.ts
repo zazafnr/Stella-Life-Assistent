@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { interpret, normalizeSubject, parseEntry } from './parser.ts';
+import { interpret, normalizeSubject, parseEntry, type Intent } from './parser.ts';
+import { placeFor } from './places.ts';
 import { buildStudyPlan, planReminders } from './planning.ts';
 import { nextWeekday, zonedToUtc } from './dates.ts';
+import { describeRecurrence, nextOccurrence, parseRecurrence } from './recurrence.ts';
 
 const WED = '2026-10-28'; // Mittwoch
 
@@ -152,4 +154,106 @@ test('Phase 3: Alltagstermine, Gedächtnis und Korrekturen', () => {
   assert.deepEqual(interpret('doch erst um 16 Uhr', WED), { type: 'correct', due: null, time: '16:00' });
   assert.equal(interpret('Einkaufen: Milch, Brot', WED), null, 'ohne Datum → KI');
   assert.equal(interpret('Wann ist eigentlich die nächste Mathe SA?', WED), null);
+});
+
+// ---------- Einkaufsliste und Erledigungen (Paket 7) ----------
+
+const TODAY = '2026-10-28';
+const items = (s: string) => {
+  const i = interpret(s, TODAY);
+  assert.equal(i?.type, 'list_add', `„${s}“ → ${JSON.stringify(i)}`);
+  return (i as Extract<Intent, { type: 'list_add' }>).items;
+};
+
+test('Einkaufsliste: „schreib Milch auf die Einkaufsliste“ und mehrere Dinge in einem Satz', () => {
+  assert.deepEqual(items('schreib Milch auf die Einkaufsliste'), [{ text: 'Milch', qty: null }]);
+  assert.deepEqual(items('Schreib Eier, Butter und Brot auf die Einkaufsliste'), [{ text: 'Eier', qty: null }, { text: 'Butter', qty: null }, { text: 'Brot', qty: null }]);
+  assert.deepEqual(items('wir brauchen Eier und Butter'), [{ text: 'Eier', qty: null }, { text: 'Butter', qty: null }]);
+  assert.deepEqual(items('setz bitte die Milch auf die Liste'), [{ text: 'Milch', qty: null }]);
+  assert.deepEqual(items('Einkaufsliste: Nudeln, 2 Liter Milch, 500 g Mehl'), [{ text: 'Nudeln', qty: null }, { text: 'Milch', qty: '2 Liter' }, { text: 'Mehl', qty: '500 g' }]);
+  assert.deepEqual(items('trag zwei Packungen Butter in die Einkaufsliste'), [{ text: 'Butter', qty: '2 Packungen' }]);
+});
+
+test('Einkaufsliste anzeigen und abhaken', () => {
+  for (const s of ['was steht auf der Einkaufsliste?', 'Einkaufsliste', 'zeig mir die Einkaufsliste', 'was fehlt noch auf der Liste?']) assert.equal(interpret(s, TODAY)?.type, 'list_show', s);
+  assert.deepEqual(interpret('Milch hab ich', TODAY), { type: 'list_done', items: ['Milch'] });
+  assert.deepEqual(interpret('Eier und Butter hab ich', TODAY), { type: 'list_done', items: ['Eier', 'Butter'] });
+  assert.deepEqual(interpret('hab eingekauft', TODAY), { type: 'list_done', items: 'all' });
+  assert.deepEqual(interpret('alles eingekauft', TODAY), { type: 'list_done', items: 'all' });
+});
+
+test('Einkaufsliste: Sätze, die nichts mit Einkaufen zu tun haben, bleiben bei der KI', () => {
+  for (const s of ['ich brauche Hilfe bei Mathe', 'wir brauchen Zeit und Ruhe', 'das hab ich', 'Latein HÜ hab ich', 'wie wird das Wetter morgen']) {
+    const i = interpret(s, TODAY);
+    assert.ok(!i || !['list_add', 'list_show', 'list_done', 'errand'].includes(i.type), `${s} → ${JSON.stringify(i)}`);
+  }
+});
+
+test('Erledigung mit Ort: „nach der Arbeit Blumen kaufen“ → Blumenladen', () => {
+  assert.deepEqual(interpret('nach der Arbeit Blumen für meine Frau kaufen', TODAY),
+    { type: 'errand', text: 'Blumen für meine Frau kaufen', place: { category: 'florist', label: 'Blumenladen' }, when: 'after_work' });
+  assert.deepEqual(interpret('Ich muss nach der Arbeit noch zur Apotheke und Tabletten holen', TODAY)?.type, 'errand');
+  assert.deepEqual(interpret('Brot kaufen auf dem Heimweg', TODAY),
+    { type: 'errand', text: 'Brot kaufen', place: { category: 'bakery', label: 'Bäckerei' }, when: 'after_work' });
+  assert.equal((interpret('heute Abend Paket abholen', TODAY) as Extract<Intent, { type: 'errand' }>).place?.category, 'post');
+  assert.equal(interpret('Blumen kaufen', TODAY)?.type === 'errand', false, 'ohne Zeitangabe bleibt es ein normaler Satz');
+  const unknown = interpret('nach der Schule ein Geschenk besorgen', TODAY) as Extract<Intent, { type: 'errand' }>;
+  assert.equal(unknown.type, 'errand');
+  assert.equal(unknown.place, null, 'unbekanntes Wort → kein Laden (Groq schlägt später vor)');
+  assert.equal(unknown.when, 'after_school');
+});
+
+test('Orte: Wort → Geschäft, auch als Wortanfang', () => {
+  assert.equal(placeFor('Blumenstrauß besorgen')?.category, 'florist');
+  assert.equal(placeFor('Hustensaft holen')?.category, 'pharmacy');
+  assert.equal(placeFor('Ladekabel kaufen')?.category, 'electronics');
+  assert.equal(placeFor('Schrauben und Dübel')?.category, 'diy');
+  assert.equal(placeFor('Zeitung holen')?.category, 'tobacco');
+  assert.equal(placeFor('Tanken')?.category, 'fuel');
+  assert.equal(placeFor('Geschenk'), null);
+});
+
+test('Daueraufträge: „erinnere mich jeden Montag an den Müll“, „jeden Tag um 8 Tabletten“, „jeden 15.“', () => {
+  const rec = (text: string) => interpret(text, TODAY, '12:00') as Extract<Intent, { type: 'recurring' }>;
+  assert.deepEqual(rec('erinnere mich jeden Montag an den Müll'), { type: 'recurring', recurrence: 'weekly:1', time: null, text: 'Müll' });
+  assert.deepEqual(rec('jeden Tag um 8 Tabletten'), { type: 'recurring', recurrence: 'daily', time: '08:00', text: 'Tabletten' });
+  assert.deepEqual(rec('Erinnere mich täglich um 21:30 an das Vokabeln-Wiederholen'), { type: 'recurring', recurrence: 'daily', time: '21:30', text: 'Vokabeln-Wiederholen' });
+  assert.equal(rec('erinnere mich jeden Montag und Donnerstag um 17 Uhr ans Training').recurrence, 'weekly:1,4');
+  assert.equal(rec('erinnere mich dienstags an die Biotonne').recurrence, 'weekly:2');
+  assert.equal(rec('erinnere mich montags, mittwochs und freitags an die Pflanzen').recurrence, 'weekly:1,3,5');
+  assert.equal(rec('erinnere mich werktags um 7 an die Medikamente').recurrence, 'weekly:1,2,3,4,5');
+  assert.equal(rec('erinnere mich jedes Wochenende an Wäsche').recurrence, 'weekly:6,7');
+  assert.deepEqual(rec('erinnere mich jeden Monat am 15. an die Miete'), { type: 'recurring', recurrence: 'monthly:15', time: null, text: 'Miete' });
+  assert.equal(rec('erinnere mich jeden 1. an das Abo').recurrence, 'monthly:1');
+  assert.equal(rec('jeden Sonntag um 18 Uhr Wochenplan ansehen').recurrence, 'weekly:7');
+
+  // einmalige Erinnerungen und normale Einträge bleiben, was sie waren
+  assert.equal(interpret('erinnere mich am Montag an den Müll', TODAY, '12:00')?.type === 'recurring', false);
+  assert.equal(interpret('erinnere mich in 2 Stunden an die Pizza', TODAY, '12:00')?.type, 'remind');
+  assert.equal(interpret('Latein HÜ jeden Montag', TODAY, '12:00')?.type === 'recurring', false, 'ohne „erinnere mich“ und ohne Uhrzeit kein Dauerauftrag');
+});
+
+test('Rhythmus: nächster Termin, Wochentage, Monatsende, Beschreibung', () => {
+  const next = (r: string, from: string) => nextOccurrence(r, from);
+  assert.equal(next('daily', '2026-10-30'), '2026-10-30');
+  assert.equal(next('weekly:1', '2026-10-30'), '2026-11-02', 'Freitag → nächster Montag');
+  assert.equal(next('weekly:1', '2026-11-02'), '2026-11-02', 'ab einschließlich');
+  assert.equal(next('weekly:1,4', '2026-10-30'), '2026-11-02');
+  assert.equal(next('weekly:5,6', '2026-10-30'), '2026-10-30');
+  assert.equal(next('weekly:7', '2026-10-30'), '2026-11-01');
+  assert.equal(next('monthly:15', '2026-10-30'), '2026-11-15');
+  assert.equal(next('monthly:15', '2026-10-15'), '2026-10-15');
+  assert.equal(next('monthly:31', '2026-11-01'), '2026-11-30', 'kürzerer Monat → letzter Tag');
+  assert.equal(next('monthly:31', '2026-12-31'), '2026-12-31');
+  assert.equal(next('monthly:1', '2026-12-15'), '2027-01-01', 'über den Jahreswechsel');
+  assert.equal(next('Quatsch', '2026-10-30'), '2026-10-30');
+  assert.equal(parseRecurrence('weekly:3,1,3')?.kind === 'weekly' && (parseRecurrence('weekly:3,1,3') as { days: number[] }).days.join(), '1,3');
+  assert.equal(parseRecurrence('weekly:8'), null);
+  assert.equal(parseRecurrence('monthly:32'), null);
+  assert.equal(describeRecurrence('daily'), 'täglich');
+  assert.equal(describeRecurrence('weekly:1'), 'jeden Montag');
+  assert.equal(describeRecurrence('weekly:1,4'), 'jeden Montag und Donnerstag');
+  assert.equal(describeRecurrence('weekly:1,3,5'), 'jeden Montag, Mittwoch und Freitag');
+  assert.equal(describeRecurrence('weekly:1,2,3,4,5'), 'werktags');
+  assert.equal(describeRecurrence('monthly:15'), 'jeden Monat am 15.');
 });

@@ -93,7 +93,7 @@ struct WeekPlanSheet: View {
 
     private func row(_ b: PlanBlock) -> some View {
         let on = !off.contains(b.key)
-        let color = b.why == "exam" ? Theme.pinkText : b.why == "assignment" ? Theme.green : Theme.blue
+        let color = b.why == "exam" ? Theme.pinkText : b.why == "assignment" ? Theme.green : b.why == "goal" ? Color(hex: 0x8B6FE8) : Theme.blue
         return Button {
             withAnimation(.spring(response: 0.3)) {
                 if on { off.insert(b.key) } else { off.remove(b.key) }

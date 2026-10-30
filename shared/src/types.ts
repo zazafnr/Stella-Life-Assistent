@@ -29,7 +29,18 @@ export interface Item {
   attachments: Attachment[];
   updatedAt: string;
   deleted: boolean;
+  /** Erledigung mit Ort: beim Erinnern zeigt Stella Läden in der Nähe */
+  place?: { category: string; label: string } | null;
+  /** Dauerauftrag: daily | weekly:1,3 | monthly:15 – nach dem Erinnern rückt der Eintrag zum nächsten Termin vor */
+  recurrence?: string | null;
+  /** Dauerauftrag pausiert: keine Erinnerungen, bis er wieder eingeschaltet wird */
+  recurrencePaused?: boolean;
 }
+
+/** Karte unter einer Stella-Nachricht (z. B. Läden in der Nähe) */
+export type MessageCard =
+  | { type: 'places'; category: string; label: string; itemId: string | null }
+  | { type: 'spending'; label: string; from: string; to: string; currency: string; totalCents: number; count: number; categories: { category: string; cents: number }[] };
 
 export interface ChatMessage {
   id: string;
@@ -44,6 +55,7 @@ export interface ChatMessage {
   failedAudioId?: string;
   /** gehört zu einer Aktion (Vorschlag mit Ja/Nein oder Erledigtes mit „Rückgängig“) */
   actionId?: string;
+  card?: MessageCard;
 }
 
 /** Wie viel Stella von sich aus tun darf */
@@ -138,7 +150,7 @@ export interface Hint {
   /** schon als Vorschlag-Karte verschickt */
   actionId?: string;
   /** statt Aktion: woanders weitermachen (Rückfrage im Chat beantworten, Antwort in der Inbox schreiben) */
-  open?: { tab: 'chat' | 'inbox'; label: string };
+  open?: { tab: 'chat' | 'inbox' | 'goals' | 'finance'; label: string };
   itemId?: string;
 }
 
@@ -171,7 +183,7 @@ export interface PlanBlock {
   subject: string | null;
   /** Test, HÜ oder Abgabe, für die der Block ist */
   parentId: string;
-  why: 'exam' | 'homework' | 'assignment';
+  why: 'exam' | 'homework' | 'assignment' | 'goal';
 }
 
 /** „Plan my week“: Vorschlag für die nächsten 7 Tage */
@@ -216,3 +228,156 @@ export function profileHas(profile: UserProfile | undefined, feature: Feature): 
 export const profileIsSchool = (profile: UserProfile | undefined) => !profile || profile.situation === 'school';
 /** Schule oder Studium: Tests, Lerneinheiten, Lernpläne */
 export const profileIsLearner = (profile: UserProfile | undefined) => !profile || profile.situation === 'school' || profile.situation === 'university';
+
+// ---------- Listen und Läden (Paket 7) ----------
+
+export interface ListItem {
+  id: string;
+  text: string;
+  qty: string | null;
+  done: boolean;
+  addedVia: string;
+  createdAt: string;
+}
+
+export interface StellaList {
+  id: string;
+  name: string;
+  kind: 'shopping' | 'custom';
+  items: ListItem[];
+}
+
+export interface NearbyPlace {
+  name: string;
+  distanceM: number;
+  openingHours: string | null;
+  /** null = unbekannt */
+  openNow: boolean | null;
+  address: string | null;
+  lat: number;
+  lon: number;
+  appleMapsUrl: string;
+  osmUrl: string;
+}
+
+export interface NearbyPlaces {
+  category: string;
+  label: string;
+  plural: string;
+  emoji: string;
+  places: NearbyPlace[];
+}
+
+// ---------- Ziele (Paket 8) ----------
+
+export interface Goal {
+  id: string;
+  title: string;
+  why: string | null;
+  /** was gezählt wird, z. B. „km“ oder „Einheiten“ */
+  metric: string;
+  unit: string;
+  /** pro Tag (cadence daily) bzw. pro Woche (sonst) */
+  target: number;
+  /** daily | weekly:n | custom */
+  cadence: string;
+  /** Zeit pro Einheit in Minuten – für den Wochenplaner */
+  minutes: number | null;
+  /** z. B. „So 18:00“ oder „18:00“ */
+  checkIn: string | null;
+  status: 'active' | 'paused' | 'done';
+  createdAt: string;
+}
+
+export interface GoalLog {
+  id: string;
+  date: string;
+  value: number;
+  note: string | null;
+}
+
+export interface GoalProgress extends Goal {
+  /** Stand diese Woche (Montag bis Sonntag) */
+  weekValue: number;
+  weekTarget: number;
+  /** die letzten 8 Wochen, älteste zuerst (die letzte ist die aktuelle) */
+  history: number[];
+  recent: GoalLog[];
+}
+
+// ---------- Ausgaben (Apple Pay) ----------
+
+export const FINANCE_CATEGORIES = ['Lebensmittel', 'Essen & Trinken', 'Transport', 'Shopping', 'Freizeit', 'Abos', 'Gesundheit', 'Sonstiges'] as const;
+export type FinanceCategory = (typeof FINANCE_CATEGORIES)[number];
+
+export interface Transaction {
+  id: string;
+  amountCents: number;
+  currency: string;
+  merchant: string;
+  category: FinanceCategory;
+  /** Kartenname, nie die Nummer */
+  cardLabel: string | null;
+  occurredAt: string;
+  /** Tag in der Zeitzone der Person (YYYY-MM-DD) */
+  day: string;
+  source: string;
+}
+
+export interface BudgetStatus {
+  category: FinanceCategory;
+  limitCents: number;
+  spentCents: number;
+}
+
+export interface Subscription {
+  merchant: string;
+  amountCents: number;
+  currency: string;
+  lastDay: string;
+  /** voraussichtlich nächste Abbuchung */
+  nextDay: string;
+  count: number;
+}
+
+export interface FinanceMonth {
+  /** YYYY-MM */
+  month: string;
+  currency: string;
+  totalCents: number;
+  previousTotalCents: number;
+  count: number;
+  /** Buchungen in anderen Währungen – nicht in der Summe */
+  otherCurrency: number;
+  categories: { category: FinanceCategory; cents: number; count: number }[];
+  budgets: BudgetStatus[];
+  transactions: Transaction[];
+  subscriptions: Subscription[];
+}
+
+// ---------- „Was Stella vorhat“ ----------
+
+export type StellaPlanControl =
+  /** Ein/Aus (bei Daueraufträgen: Pausieren) */
+  | { type: 'toggle'; on: boolean; label: string }
+  /** Uhrzeit ändern (HH:MM) */
+  | { type: 'time'; value: string; label: string }
+  | { type: 'remove'; label: string }
+  /** offener Vorschlag: Ja oder Nein */
+  | { type: 'decision' }
+  | { type: 'link'; target: 'permissions' | 'goals' | 'planner' | 'inbox'; label: string };
+
+export interface StellaPlanEntry {
+  /** briefing | weekplan | perm:<Gruppe> | recurring:<id> | item:<id> | study:<id> | goal:<id> | proposal:<id> */
+  id: string;
+  kind: 'briefing' | 'weekplan' | 'automation' | 'recurring' | 'reminder' | 'study' | 'goal' | 'proposal';
+  group: 'week' | 'regular' | 'longterm';
+  title: string;
+  /** lesbar: „täglich um 07:00“, „Freitag, 30.10. um 17:30“ */
+  when: string;
+  /** nächster Zeitpunkt (lokal, YYYY-MM-DD HH:MM) – für „die nächsten Dinge“ */
+  at: string | null;
+  recurrence: string | null;
+  enabled: boolean;
+  controls: StellaPlanControl[];
+}
