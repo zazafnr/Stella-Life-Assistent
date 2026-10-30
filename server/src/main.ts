@@ -30,6 +30,7 @@ import { LlmUnavailable } from './llm.ts';
 import { buildBriefing } from './briefing.ts';
 import { cleanBlocks, planWeek } from './weekplan.ts';
 import { acceptHint, dismissHint } from './hints.ts';
+import { registerAdminRoutes } from './admin.ts';
 import { addMemory, cleanSchedule, deleteMemory, isCategory, listMemories, MEMORY_CATEGORIES, updateMemory } from './memory.ts';
 
 // trustProxy nur für Caddy auf derselben Maschine – sonst ließe sich die Absender-Adresse fälschen
@@ -46,7 +47,7 @@ const str = (v: unknown, max = 4000) => (typeof v === 'string' ? v.slice(0, max)
 
 function publicUser(user: User) {
   return {
-    id: user.id, name: user.name, email: user.email, timeZone: user.timeZone, settings: user.settings,
+    id: user.id, name: user.name, email: user.email, timeZone: user.timeZone, settings: user.settings, role: user.role,
     ingestUrl: `${config.publicUrl}/api/ingest/${user.ingestToken}`,
     integrations: {
       books: Object.fromEntries((Object.keys(PROVIDERS) as BookProvider[]).map((p) => {
@@ -163,6 +164,8 @@ app.register(async (api) => {
     logout((req.headers.authorization ?? '').slice(7));
     return { ok: true };
   });
+
+  registerAdminRoutes(api);
 
   api.get('/api/me', async (req) => publicUser(req.user));
 

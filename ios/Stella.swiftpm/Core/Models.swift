@@ -258,6 +258,8 @@ struct Me: Codable, Hashable {
     var settings: UserSettings
     var ingestUrl: String
     var integrations: Integrations
+    /** der erste Nutzer ist "owner" und sieht „Server“ in den Einstellungen */
+    var role: String?
 
     var firstName: String { name.split(separator: " ").first.map(String.init) ?? name }
 }

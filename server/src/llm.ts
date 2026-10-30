@@ -7,6 +7,7 @@
 
 import { config } from './config.ts';
 import { db } from './db.ts';
+import { recordKeyResult, serverKey } from './keys.ts';
 
 export interface ToolCall { id: string; type: 'function'; function: { name: string; arguments: string } }
 
@@ -46,7 +47,11 @@ let catalog: ModelInfo[] = [];
 let lastRefresh = 0;
 const cooldownUntil = new Map<string, number>();
 
-export const llmAvailable = () => !!config.openrouter.apiKey;
+/** Gibt es einen OpenRouter-Schlüssel (Umgebung oder in den Einstellungen)? */
+export const llmAvailable = () => !!serverKey('openrouter');
+export const groqAvailable = () => !!serverKey('groq');
+
+export type GroqTask = 'classify' | 'title' | 'extract';
 
 async function refreshCatalog(): Promise<ModelInfo[]> {
   if (Date.now() - lastRefresh < REFRESH_MS && catalog.length) return catalog;
@@ -99,6 +104,7 @@ export async function modelStatus() {
     coolingDown: [...cooldownUntil].filter(([, t]) => t > Date.now()).map(([m]) => m),
     usedToday: usageToday(),
     dailyLimit: config.openrouter.dailyLimit,
+    groq: { configured: groqAvailable(), models: config.groq.models, usedToday: usageTodayFor('groq') },
   };
 }
 
@@ -110,13 +116,22 @@ export class LlmUnavailable extends Error {}
 
 const utcDay = () => new Date().toISOString().slice(0, 10);
 
+/** Gratis-Anfragen bei OpenRouter heute (alle Nutzer zusammen – das Limit gilt pro Schlüssel). */
 export function usageToday(): number {
-  const row = db.prepare('SELECT requests FROM llm_usage WHERE day = ?').get(utcDay()) as { requests: number } | undefined;
-  return row?.requests ?? 0;
+  return usageTodayFor('openrouter');
 }
 
-function countRequest() {
-  db.prepare('INSERT INTO llm_usage (day, requests) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET requests = requests + 1').run(utcDay());
+export function usageTodayFor(provider: 'openrouter' | 'groq', userId?: string): number {
+  const row = (userId === undefined
+    ? db.prepare('SELECT COALESCE(SUM(requests), 0) AS n FROM llm_usage WHERE day = ? AND provider = ?').get(utcDay(), provider)
+    : db.prepare('SELECT COALESCE(SUM(requests), 0) AS n FROM llm_usage WHERE day = ? AND provider = ? AND user_id = ?').get(utcDay(), provider, userId)) as { n: number };
+  return row.n;
+}
+
+/** Zähler je Tag, Anbieter und Nutzer – die Grundlage für spätere Limits pro Nutzer. */
+function countRequest(provider: 'openrouter' | 'groq', userId = '') {
+  db.prepare(`INSERT INTO llm_usage (day, provider, user_id, requests) VALUES (?, ?, ?, 1)
+    ON CONFLICT(day, provider, user_id) DO UPDATE SET requests = requests + 1`).run(utcDay(), provider, userId);
 }
 
 function checkBudget(background: boolean) {
@@ -129,23 +144,73 @@ function checkBudget(background: boolean) {
 
 export interface CompletionResult { message: Extract<LlmMessage, { role: 'assistant' }>; model: string }
 
-export async function complete(messages: LlmMessage[], tools?: ToolDef[],
-  opts: { json?: boolean; vision?: boolean; timeoutMs?: number; background?: boolean; heavy?: boolean } = {}): Promise<CompletionResult> {
+export interface CompleteOptions {
+  json?: boolean; vision?: boolean; timeoutMs?: number; background?: boolean; heavy?: boolean;
+  /** 'groq' = günstiges Groq-Modell für Masse-Aufgaben (Rückfall auf OpenRouter bei 429/5xx/Fehler) */
+  provider?: 'openrouter' | 'groq';
+  task?: GroqTask;
+  /** für den Zähler pro Nutzer */
+  userId?: string;
+}
+
+// Groq: kurze Pause pro Modell nach 429, damit nicht jede Anfrage erst scheitert
+const groqCooldown = new Map<string, number>();
+
+async function completeGroq(messages: LlmMessage[], tools: ToolDef[] | undefined, opts: CompleteOptions): Promise<CompletionResult> {
+  const model = config.groq.models[opts.task ?? 'classify'];
+  if ((groqCooldown.get(model) ?? 0) > Date.now()) throw new Error(`${model} macht gerade Pause`);
+  countRequest('groq', opts.userId);
+  const res = await fetch(`${config.groq.baseUrl}/chat/completions`, {
+    method: 'POST',
+    signal: AbortSignal.timeout(opts.timeoutMs ?? 30_000),
+    headers: { Authorization: `Bearer ${serverKey('groq')}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      messages,
+      ...(tools?.length ? { tools, tool_choice: 'auto' } : {}),
+      ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
+      temperature: 0.2,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    if (res.status === 429) groqCooldown.set(model, Date.now() + Math.min(Number(res.headers.get('retry-after')) || 20, 120) * 1000);
+    if (res.status === 401 || res.status === 403) recordKeyResult('groq', false, 'Groq lehnt den Schlüssel ab');
+    throw new Error(`${model}: ${res.status} ${body.slice(0, 160)}`);
+  }
+  const json = (await res.json()) as { choices?: { message: CompletionResult['message'] }[] };
+  const message = json.choices?.[0]?.message;
+  if (!message) throw new Error(`${model}: leere Antwort`);
+  recordKeyResult('groq', true);
+  return { message, model: `groq/${model}` };
+}
+
+export async function complete(messages: LlmMessage[], tools?: ToolDef[], opts: CompleteOptions = {}): Promise<CompletionResult> {
+  const groqErrors: string[] = [];
+  if (opts.provider === 'groq' && groqAvailable()) {
+    try {
+      return await completeGroq(messages, tools, opts);
+    } catch (err) {
+      groqErrors.push(`groq: ${(err as Error).message}`);
+      if (!llmAvailable()) throw new LlmUnavailable(`Groq nicht erreichbar.\n${groqErrors.join('\n')}`);
+      // weiter mit der OpenRouter-Kette
+    }
+  }
   if (!llmAvailable()) throw new LlmUnavailable('Kein OPENROUTER_API_KEY gesetzt.');
-  const errors: string[] = [];
+  const errors: string[] = [...groqErrors];
 
   for (const model of await modelChain(opts.vision ? 'vision' : 'tools', opts.heavy)) {
     if ((cooldownUntil.get(model) ?? 0) > Date.now()) continue;
     if (isFree(model)) {
       checkBudget(!!opts.background);
-      countRequest();
+      countRequest('openrouter', opts.userId);
     }
     try {
       const res = await fetch(`${config.openrouter.baseUrl}/chat/completions`, {
         method: 'POST',
         signal: AbortSignal.timeout(opts.timeoutMs ?? 60_000),
         headers: {
-          Authorization: `Bearer ${config.openrouter.apiKey}`,
+          Authorization: `Bearer ${serverKey('openrouter')}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': config.publicUrl,
           'X-Title': 'Stella Life Assistant',
@@ -175,4 +240,41 @@ export async function complete(messages: LlmMessage[], tools?: ToolDef[],
     }
   }
   throw new LlmUnavailable(`Kein Modell erreichbar.\n${errors.join('\n')}`);
+}
+
+// ---------- Sprache → Text (Groq Whisper) ----------
+
+const AUDIO_EXT: Record<string, string> = {
+  'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/m4a': 'm4a', 'audio/aac': 'aac', 'audio/mpeg': 'mp3',
+  'audio/webm': 'webm', 'video/webm': 'webm', 'audio/ogg': 'ogg', 'audio/wav': 'wav', 'audio/x-wav': 'wav',
+};
+
+export async function transcribe(audio: Buffer, mime: string, opts: { userId?: string } = {}): Promise<string> {
+  const key = serverKey('groq');
+  if (!key) throw new LlmUnavailable('Spracherkennung ist noch nicht eingerichtet (Groq-Schlüssel fehlt).');
+  const type = mime.split(';')[0]!.trim().toLowerCase();
+  const form = new FormData();
+  form.append('file', new Blob([new Uint8Array(audio)], { type }), `sprache.${AUDIO_EXT[type] ?? 'm4a'}`);
+  form.append('model', config.groq.models.transcribe);
+  form.append('language', 'de');
+  form.append('response_format', 'json');
+  form.append('temperature', '0');
+  countRequest('groq', opts.userId);
+  let res: Response;
+  try {
+    res = await fetch(`${config.groq.baseUrl}/audio/transcriptions`, {
+      method: 'POST', signal: AbortSignal.timeout(60_000), headers: { Authorization: `Bearer ${key}` }, body: form,
+    });
+  } catch (err) {
+    throw new LlmUnavailable(`Spracherkennung nicht erreichbar: ${(err as Error).message}`);
+  }
+  if (!res.ok) {
+    const body = await res.text();
+    if (res.status === 401 || res.status === 403) recordKeyResult('groq', false, 'Groq lehnt den Schlüssel ab');
+    throw new LlmUnavailable(`Spracherkennung fehlgeschlagen (${res.status}) ${body.slice(0, 120)}`);
+  }
+  recordKeyResult('groq', true);
+  const text = ((await res.json()) as { text?: string }).text?.trim() ?? '';
+  if (!text) throw new LlmUnavailable('Ich konnte nichts verstehen – nochmal sprechen?');
+  return text;
 }

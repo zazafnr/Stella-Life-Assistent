@@ -7,12 +7,13 @@ import { Books } from './settings/Books.tsx';
 import { Mail } from './settings/Mail.tsx';
 import { Untis } from './settings/Untis.tsx';
 import { Handwriting } from './settings/Handwriting.tsx';
+import { Server } from './settings/Server.tsx';
 import { ActionLog, MemoryView, Permissions } from './settings/Assistant.tsx';
 import { Icon, type IconName } from '../ui/Icon.tsx';
 import { Sheet, Sky, StarMark, Switch, showToast } from '../ui/Decor.tsx';
 import { VERSION } from '../version.ts';
 
-type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'notify' | 'ai' | 'perms' | 'memory' | 'log';
+type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server';
 
 interface AiStatusData { configured: boolean; chain: string[]; visionChain: string[]; coolingDown: string[]; usedToday: number; dailyLimit: number }
 
@@ -131,6 +132,16 @@ export function Settings({ back }: { back: () => void }) {
           </label>
         </Group>
 
+        {me.role === 'owner' && (
+          <Group title="Server">
+            <button type="button" className="list-row" onClick={() => setSheet('server')}>
+              <span className="icon-tile blue" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="shield" size={18} /></span>
+              <span className="grow"><span className="list-title">Schlüssel & Absender</span><span className="list-sub">Groq, OpenRouter, E-Mail-Versand</span></span>
+              <Icon name="chevron" size={16} />
+            </button>
+          </Group>
+        )}
+
         {ai?.configured && (
           <button type="button" className="card interactive" onClick={() => setSheet('ai')} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -161,6 +172,7 @@ export function Settings({ back }: { back: () => void }) {
       {sheet === 'ai' && ai && <Sheet title="KI" onClose={() => setSheet(null)}><AiDetails ai={ai} /></Sheet>}
       {sheet === 'perms' && <Sheet title="Was Stella selbst darf" onClose={() => setSheet(null)}><Permissions /></Sheet>}
       {sheet === 'memory' && <Sheet title="Was Stella über dich weiß" onClose={() => setSheet(null)}><MemoryView /></Sheet>}
+      {sheet === 'server' && <Sheet title="Server" onClose={() => setSheet(null)}><Server /></Sheet>}
       {sheet === 'log' && <Sheet title="Was Stella getan hat" onClose={() => setSheet(null)}><ActionLog /></Sheet>}
     </div>
   );

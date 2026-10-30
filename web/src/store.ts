@@ -14,6 +14,8 @@ export interface BookConfig { subject: string; provider: BookProvider; url: stri
 
 export interface Me {
   id: string; name: string; email: string; timeZone: string; ingestUrl: string;
+  /** der erste Nutzer ist 'owner' und sieht „Server“ in den Einstellungen */
+  role?: 'owner' | 'user';
   settings: {
     eveningTime?: string; studyTime?: string; stepGoal?: number;
     books?: BookConfig[]; homeworkAutopilot?: boolean; mailAutoTrash?: boolean; tone?: Tone;

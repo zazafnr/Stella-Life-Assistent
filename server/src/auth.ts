@@ -106,6 +106,11 @@ export async function requireUser(req: FastifyRequest, reply: FastifyReply) {
   req.user = user;
 }
 
+/** Nur für den Owner (erster Nutzer): Server-Schlüssel und Einladungen. Läuft nach requireUser. */
+export async function requireOwner(req: FastifyRequest, reply: FastifyReply) {
+  if (req.user?.role !== 'owner') return reply.code(403).send({ error: 'Das darf nur der Owner dieses Servers.' });
+}
+
 export function userByIngestToken(token: string): User | null {
   const row = db.prepare('SELECT id FROM users WHERE ingest_token = ?').get(token) as { id: string } | undefined;
   return row ? getUser(row.id) : null;

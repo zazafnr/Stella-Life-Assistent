@@ -32,6 +32,18 @@ export const config = {
     /** Tageslimit für Gratis-Modelle: 50 ohne Guthaben, 1000 nach einmal 10 $ Aufladen */
     dailyLimit: Number(env.STELLA_LLM_DAILY_LIMIT ?? 50),
   },
+  /** Groq: günstige, schnelle Modelle für Masse-Aufgaben (Mails einordnen, Titel, Extraktion) und Whisper für Sprache */
+  groq: {
+    apiKey: env.GROQ_API_KEY ?? '',
+    baseUrl: env.GROQ_BASE_URL ?? 'https://api.groq.com/openai/v1',
+    /** Modellnamen nur hier, damit man sie tauschen kann */
+    models: {
+      classify: env.GROQ_MODEL_CLASSIFY ?? 'llama-3.1-8b-instant',
+      title: env.GROQ_MODEL_TITLE ?? 'llama-3.1-8b-instant',
+      extract: env.GROQ_MODEL_EXTRACT ?? 'llama-3.3-70b-versatile',
+      transcribe: env.GROQ_MODEL_TRANSCRIBE ?? 'whisper-large-v3-turbo',
+    },
+  },
   /** "Mit Google anmelden" für Gmail – OAuth-Client aus der Google Cloud Console */
   google: {
     clientId: env.GOOGLE_CLIENT_ID ?? '',

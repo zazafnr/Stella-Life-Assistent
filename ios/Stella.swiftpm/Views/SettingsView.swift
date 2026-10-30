@@ -135,6 +135,18 @@ struct SettingsView: View {
                         Text("Erinnerungen werden auf dem Gerät eingeplant und kommen auch ohne Internet pünktlich.")
                     }
 
+                    if me.role == "owner" {
+                        Section {
+                            NavigationLink { ServerKeysView() } label: {
+                                row("Schlüssel & Absender", symbol: "key.horizontal", tint: Theme.blue, detail: nil)
+                            }
+                        } header: {
+                            Text("Server")
+                        } footer: {
+                            Text("Groq, OpenRouter und der Mail-Absender für Bestätigungs-Codes – nur für dich als Owner sichtbar.")
+                        }
+                    }
+
                     if let ai {
                         Section {
                             VStack(alignment: .leading, spacing: 8) {
