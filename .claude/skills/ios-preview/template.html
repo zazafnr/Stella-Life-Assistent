@@ -1,0 +1,210 @@
+<title>Stella iOS-Vorschau</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@700;800&display=swap">
+<style>
+  /* Layout: links das iPhone mit dem Screen, rechts (am Handy darunter) die Screens zum Antippen.
+     Farben und Schriften aus Stellas eigener App (web/src/styles.css). */
+  :root {
+    --bg: #F5F9FF;
+    --sky: #CFE6FF;
+    --surface: #FFFFFF;
+    --text: #0F2A4A;
+    --muted: #5B7190;
+    --line: rgba(15, 42, 74, .10);
+    --blue: #1F6FEB;
+    --blue-tint: #EAF2FF;
+    --pink-text: #C0306E;
+    --frame: #0F1B2D;
+    --shadow: 0 24px 60px rgba(31, 111, 235, .18);
+    --display: "Inter Tight", "Inter", system-ui, -apple-system, sans-serif;
+    --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0B1626; --sky: #13284A; --surface: #13223A; --text: #E6EEF9; --muted: #93A6C2;
+      --line: rgba(230, 238, 249, .12); --blue: #5B9BFF; --blue-tint: #1A3156; --pink-text: #FF8DBB;
+      --frame: #02060C; --shadow: 0 24px 60px rgba(0, 0, 0, .45); color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0B1626; --sky: #13284A; --surface: #13223A; --text: #E6EEF9; --muted: #93A6C2;
+    --line: rgba(230, 238, 249, .12); --blue: #5B9BFF; --blue-tint: #1A3156; --pink-text: #FF8DBB;
+    --frame: #02060C; --shadow: 0 24px 60px rgba(0, 0, 0, .45); color-scheme: dark;
+  }
+
+  body {
+    background: linear-gradient(180deg, var(--sky) 0, var(--bg) 340px) var(--bg);
+    color: var(--text);
+    font: 15px/1.5 var(--body);
+    min-height: 100%;
+  }
+  .wrap {
+    max-width: 980px; margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 28px 40px;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+  header { display: flex; flex-direction: column; gap: 6px; }
+  h1 { font: 800 clamp(28px, 6vw, 40px)/1.05 var(--display); letter-spacing: -0.03em; margin: 0; text-wrap: balance; }
+  .meta { color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .meta strong { color: var(--text); font-weight: 600; }
+  .meta a { color: var(--blue); text-decoration: none; }
+  .meta a:hover { text-decoration: underline; }
+  .what { font-size: 15px; color: var(--text); margin: 4px 0 0; max-width: 62ch; }
+  .what span { color: var(--muted); }
+
+  .stage { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 36px; align-items: start; }
+  @media (max-width: 760px) { .stage { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 22px; } }
+
+  .phone {
+    position: relative; width: 100%; max-width: 380px; aspect-ratio: 1206 / 2622;
+    border-radius: 54px; padding: 11px; background: var(--frame); box-shadow: var(--shadow);
+  }
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 44px; overflow: hidden; background: #F5F9FF; }
+  .screen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .25s ease; }
+  .screen img.on { opacity: 1; }
+  /* unsichtbare Flächen über der Tab-Leiste im Screenshot */
+  .tabs-hit { position: absolute; left: 4%; right: 4%; bottom: 1.5%; height: 7.5%; display: grid; grid-template-columns: repeat(4, 1fr); }
+  .tabs-hit button { all: unset; cursor: pointer; border-radius: 30px; }
+  .tabs-hit button:focus-visible { outline: 3px solid var(--blue); outline-offset: -3px; }
+  .tabs-hit[hidden] { display: none !important; }
+
+  aside { display: flex; flex-direction: column; gap: 14px; width: 100%; min-width: 0; }
+  .label { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .pick {
+    all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px 8px 8px; border-radius: 16px; background: var(--surface); border: 1.5px solid var(--line);
+    transition: border-color .15s ease, transform .15s ease;
+  }
+  .pick:hover { border-color: var(--blue); }
+  .pick:active { transform: scale(.98); }
+  .pick:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+  .pick[aria-current="true"] { border-color: var(--blue); background: var(--blue-tint); }
+  .pick img { width: 34px; height: 72px; object-fit: cover; object-position: top; border-radius: 7px; flex: none; border: 1px solid var(--line); }
+  .pick b { display: block; font-weight: 600; font-size: 14px; }
+  .pick small { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }
+  .hint { color: var(--muted); font-size: 13px; margin: 0; max-width: 52ch; }
+  .hint kbd { font: 600 12px var(--body); padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+  .live {
+    display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; margin-top: 6px;
+    padding: 10px 16px; border-radius: 14px; background: var(--blue); color: #fff; font-weight: 600; text-decoration: none;
+  }
+  .live:hover { filter: brightness(1.08); }
+  .live:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+  .live small { font-weight: 500; opacity: .85; }
+  .stale { padding: 10px 14px; border-radius: 14px; background: var(--blue-tint); color: var(--text); font-size: 14px; margin: 0; }
+  @media (prefers-reduced-motion: reduce) { .screen img { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Stella auf dem iPhone</h1>
+    <div class="meta" id="meta"></div>
+    <p class="what" id="what"></p>
+    <a class="live" id="live" target="_blank" rel="noopener" hidden>Live ausprobieren <small>echte App im Simulator, Appetize</small></a>
+  </header>
+
+  <div class="stage">
+    <div class="phone" id="phone">
+      <div class="screen" id="screen"></div>
+      <div class="tabs-hit" id="tabs" aria-label="Tab-Leiste der App">
+        <button type="button" data-go="heute" aria-label="Heute"></button>
+        <button type="button" data-go="chat" aria-label="Chat"></button>
+        <button type="button" data-go="planer" aria-label="Planer"></button>
+        <button type="button" data-go="inbox" aria-label="Inbox"></button>
+      </div>
+    </div>
+
+    <aside>
+      <span class="label">Screens</span>
+      <div class="list" id="list"></div>
+      <p class="hint">Tipp unten auf die Tab-Leiste im iPhone wie in der echten App, oder wähl hier einen Screen. Am Computer gehen auch <kbd>←</kbd> <kbd>→</kbd>.
+        Die Bilder kommen aus dem iPhone-Simulator mit Beispieldaten – Knöpfe wie „Senden“ tun hier nichts.</p>
+    </aside>
+  </div>
+</div>
+
+<script>
+  const META = /*__META__*/{};
+  const SCREENS = [
+    { id: 'heute', file: 'today', name: 'Heute', sub: 'Überblick, Hinweise, Schritte', tab: true },
+    { id: 'chat', file: 'chat', name: 'Chat', sub: 'Stella mit Karten zum Bestätigen', tab: true },
+    { id: 'planer', file: 'planner', name: 'Planer', sub: 'Woche, Stundenplan, Einträge', tab: true },
+    { id: 'inbox', file: 'inbox', name: 'Inbox', sub: '„Wichtig für dich“ und mehr', tab: true },
+    { id: 'woche', file: 'weekplan', name: 'Woche planen', sub: 'Vorschlag mit Blöcken', tab: false },
+    { id: 'einstellungen', file: 'settings', name: 'Einstellungen', sub: 'Ton, Rechte, Briefing', tab: false },
+  ].filter((s) => !META.screens || META.screens.includes(s.file));
+
+  const v = (META.commit || '').slice(0, 7);
+  const src = (s) => `screens/${s.file}.jpg${v ? `?v=${v}` : ''}`;
+  const screenEl = document.getElementById('screen');
+  const list = document.getElementById('list');
+  const tabs = document.getElementById('tabs');
+
+  for (const s of SCREENS) {
+    const img = document.createElement('img');
+    img.src = src(s); img.alt = `Screen ${s.name}`; img.dataset.id = s.id;
+    screenEl.appendChild(img);
+
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'pick'; b.dataset.go = s.id;
+    b.innerHTML = `<img alt="" src="${src(s)}"><span><b></b><small></small></span>`;
+    b.querySelector('b').textContent = s.name;
+    b.querySelector('small').textContent = s.sub;
+    list.appendChild(b);
+  }
+
+  function show(id) {
+    const s = SCREENS.find((x) => x.id === id) || SCREENS[0];
+    if (!s) return;
+    for (const img of screenEl.querySelectorAll('img')) img.classList.toggle('on', img.dataset.id === s.id);
+    for (const b of list.querySelectorAll('.pick')) b.setAttribute('aria-current', String(b.dataset.go === s.id));
+    tabs.hidden = !s.tab;
+    if (location.hash.slice(1) !== s.id) history.replaceState(null, '', `#${s.id}`);
+  }
+  const current = () => SCREENS.findIndex((s) => s.id === location.hash.slice(1));
+
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-go]');
+    if (t) show(t.dataset.go);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const i = Math.max(0, current());
+    const n = (i + (e.key === 'ArrowRight' ? 1 : -1) + SCREENS.length) % SCREENS.length;
+    show(SCREENS[n].id);
+  });
+  // Wischen auf dem iPhone-Bild
+  let x0 = null;
+  screenEl.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  screenEl.addEventListener('touchend', (e) => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0; x0 = null;
+    if (Math.abs(dx) < 50) return;
+    const i = Math.max(0, current());
+    show(SCREENS[(i + (dx < 0 ? 1 : -1) + SCREENS.length) % SCREENS.length].id);
+  });
+  window.addEventListener('hashchange', () => show(location.hash.slice(1)));
+
+  // Kopfzeile: Stand, Gerät, Commit
+  const meta = document.getElementById('meta');
+  const when = META.createdAt ? new Date(META.createdAt) : null;
+  const parts = [];
+  if (when) parts.push(`Stand <strong>${when.toLocaleString('de-AT', { dateStyle: 'medium', timeStyle: 'short' })}</strong>`);
+  if (META.device) parts.push(META.device.replace(/[<>&]/g, ''));
+  if (v) parts.push(`Commit <a href="https://github.com/zazafnr/Stella-Life-Assistent/commit/${encodeURIComponent(META.commit)}" target="_blank" rel="noopener">${v}</a>`);
+  if (META.run) parts.push(`<a href="${encodeURI(META.run)}" target="_blank" rel="noopener">Build ansehen</a>`);
+  meta.innerHTML = parts.map((p) => `<span>${p}</span>`).join('');
+  const what = document.getElementById('what');
+  if (META.message) { what.innerHTML = '<span>Letzte Änderung: </span>'; what.append(META.message); }
+  else what.hidden = true;
+  if (META.appetize && /^https:\/\/appetize\.io\//.test(META.appetize)) {
+    const live = document.getElementById('live');
+    live.href = META.appetize; live.hidden = false;
+  }
+
+  show(location.hash.slice(1));
+</script>

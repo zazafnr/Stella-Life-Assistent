@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+<title>Stella – Server</title>
+<style>
+  :root { --bg:#F5F9FF; --text:#0F2A4A; --muted:#5B7190; --blue:#1F6FEB; --line:#DCE7F5; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:26px 28px; font-family:Inter, "Segoe UI", system-ui, sans-serif; color:var(--text); background:var(--bg); }
+  h1 { font-size:18px; margin:0 0 6px; }
+  p { color:var(--muted); font-size:14px; line-height:1.45; margin:0 0 18px; }
+  input { width:100%; font:inherit; padding:11px 14px; border-radius:12px; border:1.5px solid var(--line); background:#fff; color:var(--text); outline:none; }
+  input:focus { border-color:var(--blue); box-shadow:0 0 0 4px rgba(31,111,235,.12); }
+  .row { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+  button { font:inherit; font-weight:600; border:0; border-radius:12px; padding:10px 18px; cursor:pointer; }
+  .primary { background:var(--blue); color:#fff; }
+  .ghost { background:#E6EFFB; color:var(--text); }
+  .err { color:#C0306E; font-size:13px; min-height:18px; margin-top:8px; }
+</style>
+</head>
+<body>
+<h1>Server-Adresse</h1>
+<p>Wo läuft dein Stella? Normalerweise musst du hier nichts ändern.</p>
+<form id="f">
+  <input id="url" type="text" spellcheck="false" autocomplete="off" />
+  <div class="err" id="err"></div>
+  <div class="row">
+    <button class="ghost" type="button" id="reset">Standard</button>
+    <button class="primary" type="submit">Speichern</button>
+  </div>
+</form>
+<script>
+  const input = document.getElementById('url');
+  const err = document.getElementById('err');
+  window.stellaSetup.current().then((u) => { input.value = u; input.select(); });
+  document.getElementById('reset').addEventListener('click', () => { input.value = 'https://stella.5-189-157-214.sslip.io'; });
+  document.getElementById('f').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    err.textContent = '';
+    try { await window.stellaSetup.save(input.value); }
+    catch { err.textContent = 'Das sieht nicht wie eine Adresse aus.'; }
+  });
+</script>
+</body>
+</html>

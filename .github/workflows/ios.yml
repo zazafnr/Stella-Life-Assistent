@@ -1,0 +1,192 @@
+name: iOS-App
+
+# Kompiliert die Swift-Playgrounds-App auf einem Mac in der Cloud,
+# damit Fehler auffallen, bevor sie aufs iPhone/iPad kommt.
+# Danach: Build zu Appetize hochladen (Live-Simulator, immer derselbe Link).
+# Klick-Vorschau nur, wenn Appetize nicht geklappt hat oder ausdrücklich verlangt
+# (manuell starten mit screenshots = true): die App läuft im iPhone-Simulator gegen einen echten
+# Stella-Server mit Beispieldaten, jeder Screen wird fotografiert und auf den Branch ios-preview
+# gelegt. Der Skill .claude/skills/ios-preview macht daraus eine Seite in der Claude-App.
+on:
+  push:
+    paths:
+      - "ios/**"
+      - "server/scripts/demo-seed.ts"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+    inputs:
+      screenshots:
+        description: "Klick-Vorschau (Screenshots) erstellen, auch wenn Appetize klappt"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        xcode: ["26"]
+    name: build (Xcode ${{ matrix.xcode }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode ${{ matrix.xcode }} wählen
+        run: |
+          XC=$(ls -d /Applications/Xcode_${{ matrix.xcode }}*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+
+      - name: iPhone-Simulator wählen
+        id: sim
+        env:
+          SHOTS_LIKELY: ${{ secrets.APPETIZE_API_TOKEN == '' || inputs.screenshots == true }}
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)["devices"]
+          phones = [x for k, v in d.items() if "iOS" in k for x in v if x["name"].startswith("iPhone")]
+          pro = [x for x in phones if "Pro" in x["name"] and "Max" not in x["name"]]
+          print((pro or phones)[-1]["udid"])')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          xcrun simctl list devices | grep "$UDID"
+          # für Screenshots schon jetzt hochfahren – läuft parallel zum Build, spart den langsamen Erststart
+          if [ "$SHOTS_LIKELY" = "true" ]; then xcrun simctl boot "$UDID" || true; fi
+
+      - name: Für den iPhone-Simulator kompilieren
+        working-directory: ios/Stella.swiftpm
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -scheme Stella \
+            -destination 'id=${{ steps.sim.outputs.udid }}' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee build.log | grep -E "error:|warning:|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log
+
+      - name: Fehler-Zusammenfassung
+        if: failure()
+        working-directory: ios/Stella.swiftpm
+        run: grep -E "error:" build.log | sort -u | head -80 || true
+
+      # ---------- Live-Simulator: Build zu Appetize hochladen (nur mit Secret APPETIZE_API_TOKEN) ----------
+      - name: Live-Simulator auf Appetize aktualisieren
+        id: appetize
+        continue-on-error: true
+        env:
+          APPETIZE_API_TOKEN: ${{ secrets.APPETIZE_API_TOKEN }}
+          APPETIZE_PUBLIC_KEY: ${{ vars.APPETIZE_PUBLIC_KEY }}
+        run: |
+          if [ -z "$APPETIZE_API_TOKEN" ]; then echo "Kein APPETIZE_API_TOKEN – übersprungen"; exit 0; fi
+          APP=$(find ios/Stella.swiftpm/build/Build/Products -maxdepth 2 -name "*.app" -path "*iphonesimulator*" | head -1)
+          (cd "$(dirname "$APP")" && zip -qry "$RUNNER_TEMP/Stella-sim.zip" "$(basename "$APP")")
+          KEY="$APPETIZE_PUBLIC_KEY"
+          if [ -z "$KEY" ]; then
+            # dieselbe App wiederverwenden, damit der Link gleich bleibt
+            KEY=$(curl -sf -H "X-API-KEY: $APPETIZE_API_TOKEN" https://api.appetize.io/v1/apps | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)
+          apps = d.get("data", d) if isinstance(d, dict) else d
+          hit = [a for a in apps if a.get("bundle") == "app.stella.ios" and a.get("platform") == "ios"]
+          print(hit[0]["publicKey"] if hit else "")' || true)
+          fi
+          URL=https://api.appetize.io/v1/apps${KEY:+/$KEY}
+          RES=$(curl -sf -X POST "$URL" -H "X-API-KEY: $APPETIZE_API_TOKEN" \
+            -F "file=@$RUNNER_TEMP/Stella-sim.zip" -F "platform=ios" -F "note=Stella ${GITHUB_SHA::7}")
+          KEY=$(echo "$RES" | python3 -c 'import json, sys; print(json.load(sys.stdin)["publicKey"])')
+          echo "https://appetize.io/app/$KEY" > "$RUNNER_TEMP/appetize-url"
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+          echo "Live-Simulator: https://appetize.io/app/$KEY" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # ---------- Klick-Vorschau: nur wenn Appetize nicht geklappt hat oder verlangt ----------
+      - uses: actions/setup-node@v4
+        if: steps.appetize.outputs.ok != 'true' || inputs.screenshots == true
+        continue-on-error: true
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Stella-Server mit Beispieldaten starten
+        id: server
+        if: steps.appetize.outputs.ok != 'true' || inputs.screenshots == true
+        continue-on-error: true
+        env:
+          STELLA_DATA_DIR: ${{ runner.temp }}/demo
+          STELLA_SECRET: preview-secret-not-for-production
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          npm ci --no-audit --no-fund
+          mkdir -p "$STELLA_DATA_DIR"
+          npx tsx server/scripts/demo-seed.ts > "$RUNNER_TEMP/token"
+          cd server
+          PORT=8790 HOST=127.0.0.1 nohup npx tsx src/main.ts > "$RUNNER_TEMP/server.log" 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8790/api/status && exit 0
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/server.log"; exit 1
+
+      - name: Screens im Simulator fotografieren
+        id: shots
+        if: steps.server.outcome == 'success'
+        continue-on-error: true
+        env:
+          UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          OUT="$RUNNER_TEMP/preview"; mkdir -p "$OUT"
+          APP=$(find ios/Stella.swiftpm/build/Build/Products -maxdepth 2 -name "*.app" -path "*iphonesimulator*" | head -1)
+          echo "App: $APP"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time "9:41" --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3 || true
+          xcrun simctl install "$UDID" "$APP"
+          BUNDLE=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$APP/Info.plist")
+          TOKEN=$(cat "$RUNNER_TEMP/token")
+          shoot() { # name tab [open]
+            xcrun simctl terminate "$UDID" "$BUNDLE" 2>/dev/null || true
+            xcrun simctl launch "$UDID" "$BUNDLE" -AppleLanguages "(de-AT)" -AppleLocale de_AT \
+              -server http://localhost:8790 -demoToken "$TOKEN" -tab "$2" ${3:+-open "$3"} >/dev/null
+            sleep 7
+            xcrun simctl io "$UDID" screenshot --type=png "$OUT/$1.png" >/dev/null
+            sips -s format jpeg -s formatOptions 82 -Z 1400 "$OUT/$1.png" --out "$OUT/$1.jpg" >/dev/null && rm "$OUT/$1.png"
+          }
+          shoot today today
+          shoot chat chat
+          shoot planner planner
+          shoot inbox inbox
+          shoot weekplan planner weekplan
+          shoot settings today settings
+          DEVICE=$(xcrun simctl list devices | grep "$UDID" | sed -E 's/^ *([^(]+) \(.*/\1/' | xargs)
+          python3 - "$OUT" "$DEVICE" <<'PY'
+          import json, os, sys, datetime, subprocess
+          out, device = sys.argv[1], sys.argv[2]
+          message = subprocess.check_output(["git", "log", "-1", "--format=%s"]).decode().strip()
+          json.dump({
+              "commit": os.environ["GITHUB_SHA"], "branch": os.environ["GITHUB_REF_NAME"], "message": message,
+              "run": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              "device": device, "createdAt": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+              "screens": ["today", "chat", "planner", "inbox", "weekplan", "settings"],
+              "appetize": open(f"{os.environ['RUNNER_TEMP']}/appetize-url").read().strip() if os.path.exists(f"{os.environ['RUNNER_TEMP']}/appetize-url") else None,
+          }, open(f"{out}/meta.json", "w"), indent=2)
+          PY
+          ls -la "$OUT"
+
+      - name: Vorschau auf den Branch ios-preview legen
+        if: steps.shots.outcome == 'success'
+        continue-on-error: true
+        working-directory: ${{ runner.temp }}/preview
+        run: |
+          git init -q -b ios-preview
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "iOS-Vorschau für ${GITHUB_SHA::7} (${GITHUB_REF_NAME})"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ios-preview
+          echo "Vorschau aktualisiert: ${GITHUB_SHA::7}"

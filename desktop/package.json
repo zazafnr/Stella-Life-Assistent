@@ -1,0 +1,40 @@
+{
+  "name": "stella-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Stella Life Assistant für Windows, macOS und Linux",
+  "author": "Stella",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron scripts/smoke.js",
+    "dist:win": "electron-builder --win nsis zip --x64",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:linux": "electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "^45.1.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "app.stella.desktop",
+    "productName": "Stella",
+    "directories": { "output": "release", "buildResources": "build" },
+    "files": ["src/**/*", "build/icon.png", "build/tray.png", "build/tray@2x.png", "package.json"],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }, { "target": "zip", "arch": ["x64"] }],
+      "icon": "build/icon.ico",
+      "artifactName": "Stella-${version}-Windows.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Stella"
+    },
+    "mac": { "target": ["dmg"], "icon": "build/icon.png", "category": "public.app-category.productivity", "artifactName": "Stella-${version}-Mac.${ext}" },
+    "linux": { "target": ["AppImage"], "icon": "build/icon.png", "category": "Utility", "artifactName": "Stella-${version}-Linux.${ext}" },
+    "publish": null
+  }
+}

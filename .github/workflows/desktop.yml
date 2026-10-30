@@ -1,0 +1,65 @@
+name: PC-App
+
+# Baut die Windows-App auf einem echten Windows-Rechner. Installer und Programm-Icon
+# brauchen NSIS und rcedit, die es nur dort ohne Wine gibt.
+on:
+  push:
+    paths: ['desktop/**', '.github/workflows/desktop.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Installieren
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: Rauchtest in echtem Electron
+        working-directory: desktop
+        timeout-minutes: 5
+        run: npm run smoke
+
+      - name: Installer und ZIP bauen
+        working-directory: desktop
+        # Ohne Code-Signing-Zertifikat – Windows SmartScreen warnt beim ersten Start einmal.
+        run: npx electron-builder --win nsis zip --x64 --publish never
+
+      # Feste Download-Adresse: immer die neueste Version unter dem Tag "pc-app"
+      - name: Download-Seite aktualisieren
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete pc-app --yes --cleanup-tag 2>/dev/null || true
+          gh release create pc-app desktop/release/*.exe desktop/release/*.zip \
+            --target "${{ github.sha }}" --prerelease \
+            --title "Stella für Windows" \
+            --notes "Neueste PC-App von \`${{ github.ref_name }}\`. Die .exe herunterladen und doppelklicken – Windows fragt beim ersten Start einmal nach („Weitere Informationen“ → „Trotzdem ausführen“)."
+
+      # Zusätzlich als Actions-Artefakt – zählt zum Speicherkontingent des Kontos,
+      # deshalb darf es scheitern, ohne den Lauf rot zu machen.
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: Stella-Windows
+          path: |
+            desktop/release/*.exe
+            desktop/release/*.zip
+          retention-days: 7
+          if-no-files-found: error

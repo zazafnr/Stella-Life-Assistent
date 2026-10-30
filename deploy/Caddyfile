@@ -1,0 +1,4 @@
+{$STELLA_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy stella:8787
+}
