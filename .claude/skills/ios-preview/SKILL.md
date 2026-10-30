@@ -14,8 +14,13 @@ Zwei Wege, beide aus derselben iOS-CI:
 | wann | zum Ausprobieren | wenn das Appetize-Kontingent leer ist, oder für den schnellen Blick |
 
 Der Nutzer nimmt zuerst Appetize und nutzt die Klick-Vorschau, wenn das Monatskontingent
-aufgebraucht ist. Der Appetize-Link steht in `meta.json` (`appetize`) und als Knopf
-„Live ausprobieren“ oben auf der Vorschau-Seite.
+aufgebraucht ist. **Deshalb macht die CI Screenshots nur, wenn der Appetize-Upload gescheitert
+ist oder ausdrücklich verlangt** (manueller Lauf mit `screenshots: true`). Ein normaler Push lädt
+nur zu Appetize hoch, der neue Stand ist dort nach etwa 2 Minuten.
+
+Der Appetize-Link bleibt immer gleich. Er steht in der Zusammenfassung jedes Laufs
+(„Live-Simulator: …“) und, wenn Screenshots gemacht wurden, in `meta.json` (`appetize`) und als
+Knopf „Live ausprobieren“ auf der Vorschau-Seite.
 
 **Appetize einrichten (einmalig, macht der Nutzer):** Konto auf appetize.io anlegen, unter
 Account → API Token einen Token erzeugen und ihn im GitHub-Repo unter Settings → Secrets and
@@ -28,7 +33,8 @@ Dateien oder in Befehle schreiben, die hier laufen.
 ## Klick-Vorschau
 
 Die echte SwiftUI-App kann nicht in der Claude-App laufen. Stattdessen macht die iOS-CI
-(`.github/workflows/ios.yml`) bei jedem Push, der `ios/**` ändert, Folgendes:
+(`.github/workflows/ios.yml`) in diesen Fällen Folgendes: Appetize-Upload gescheitert oder
+kein Token, oder ein Lauf mit `screenshots: true`.
 
 1. Sie startet den echten Stella-Server mit Beispieldaten (`server/scripts/demo-seed.ts`).
 2. Sie öffnet die App im iPhone-Simulator, mit den Startargumenten `-server`, `-demoToken`, `-tab` und `-open` (siehe `ios/Stella.swiftpm/Core/Demo.swift`).
@@ -40,13 +46,15 @@ Link**. Wer die Seite offen hat, bekommt das Update automatisch.
 
 ## Ablauf
 
-1. **Ist die Vorschau aktuell?** Vergleiche `git log -1 --format=%H -- ios server/scripts/demo-seed.ts`
+0. **Will der Nutzer nur die App sehen und hat noch Appetize-Minuten?** Dann gib ihm einfach den
+   Appetize-Link (unten) und prüfe, ob der letzte iOS-Lauf grün ist. Keine Screenshots.
+
+1. **Screenshots brauchen einen Lauf.** Vergleiche `git log -1 --format=%H -- ios server/scripts/demo-seed.ts`
    auf dem Arbeitsbranch mit `commit` aus `meta.json` (Schritt 2 gibt es aus).
-   - Neuerer Commit und der iOS-Lauf ist noch nicht fertig (GitHub-MCP `actions_list`,
-     Workflow `ios.yml`): Sag das und warte auf das Ende des Laufs. Pollen ist dafür in
-     Ordnung, ein Lauf dauert etwa 5 Minuten.
-   - Neuerer Commit, aber kein Lauf dazu: Starte ihn mit `actions_run_trigger`
-     (`run_workflow`, `ios.yml`, Branch = Arbeitsbranch).
+   - Ist die Vorschau älter (der Normalfall, weil Pushes keine Screenshots machen): Starte
+     den Lauf mit `actions_run_trigger`. Parameter: `run_workflow`, `ios.yml`, Branch = Arbeitsbranch,
+     `inputs: {"screenshots": true}`. Sag dem Nutzer, dass es etwa 5 Minuten dauert, und warte
+     bis zum Ende. Prüfen geht mit `actions_list`, Warten mit `sleep` im Hintergrund.
    - Ist der Lauf grün, aber `ios-preview` unverändert: Ein Vorschau-Schritt ist gescheitert
      (sie laufen mit `continue-on-error`). Lies die Logs mit `get_job_logs` und behebe den Fehler.
 

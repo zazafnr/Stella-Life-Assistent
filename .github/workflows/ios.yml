@@ -2,9 +2,11 @@ name: iOS-App
 
 # Kompiliert die Swift-Playgrounds-App auf einem Mac in der Cloud,
 # damit Fehler auffallen, bevor sie aufs iPhone/iPad kommt.
-# Danach: Klick-Vorschau – die App läuft im iPhone-Simulator gegen einen echten Stella-Server
-# mit Beispieldaten, jeder Screen wird fotografiert und auf den Branch ios-preview gelegt.
-# Der Skill .claude/skills/ios-preview macht daraus eine Seite in der Claude-App.
+# Danach: Build zu Appetize hochladen (Live-Simulator, immer derselbe Link).
+# Klick-Vorschau nur, wenn Appetize nicht geklappt hat oder ausdrücklich verlangt
+# (manuell starten mit screenshots = true): die App läuft im iPhone-Simulator gegen einen echten
+# Stella-Server mit Beispieldaten, jeder Screen wird fotografiert und auf den Branch ios-preview
+# gelegt. Der Skill .claude/skills/ios-preview macht daraus eine Seite in der Claude-App.
 on:
   push:
     paths:
@@ -12,6 +14,11 @@ on:
       - "server/scripts/demo-seed.ts"
       - ".github/workflows/ios.yml"
   workflow_dispatch:
+    inputs:
+      screenshots:
+        description: "Klick-Vorschau (Screenshots) erstellen, auch wenn Appetize klappt"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -38,12 +45,10 @@ jobs:
           sudo xcode-select -s "$XC"
           xcodebuild -version
 
-      - name: Schemes anzeigen
-        working-directory: ios/Stella.swiftpm
-        run: xcodebuild -list
-
       - name: iPhone-Simulator wählen
         id: sim
+        env:
+          SHOTS_LIKELY: ${{ secrets.APPETIZE_API_TOKEN == '' || inputs.screenshots == true }}
         run: |
           UDID=$(xcrun simctl list devices available -j | python3 -c '
           import json, sys
@@ -53,8 +58,8 @@ jobs:
           print((pro or phones)[-1]["udid"])')
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
           xcrun simctl list devices | grep "$UDID"
-          # schon jetzt hochfahren – läuft parallel zum Build, spart den langsamen Erststart
-          xcrun simctl boot "$UDID" || true
+          # für Screenshots schon jetzt hochfahren – läuft parallel zum Build, spart den langsamen Erststart
+          if [ "$SHOTS_LIKELY" = "true" ]; then xcrun simctl boot "$UDID" || true; fi
 
       - name: Für den iPhone-Simulator kompilieren
         working-directory: ios/Stella.swiftpm
@@ -75,6 +80,7 @@ jobs:
 
       # ---------- Live-Simulator: Build zu Appetize hochladen (nur mit Secret APPETIZE_API_TOKEN) ----------
       - name: Live-Simulator auf Appetize aktualisieren
+        id: appetize
         continue-on-error: true
         env:
           APPETIZE_API_TOKEN: ${{ secrets.APPETIZE_API_TOKEN }}
@@ -98,10 +104,12 @@ jobs:
             -F "file=@$RUNNER_TEMP/Stella-sim.zip" -F "platform=ios" -F "note=Stella ${GITHUB_SHA::7}")
           KEY=$(echo "$RES" | python3 -c 'import json, sys; print(json.load(sys.stdin)["publicKey"])')
           echo "https://appetize.io/app/$KEY" > "$RUNNER_TEMP/appetize-url"
+          echo "ok=true" >> "$GITHUB_OUTPUT"
           echo "Live-Simulator: https://appetize.io/app/$KEY" | tee -a "$GITHUB_STEP_SUMMARY"
 
-      # ---------- Klick-Vorschau ----------
+      # ---------- Klick-Vorschau: nur wenn Appetize nicht geklappt hat oder verlangt ----------
       - uses: actions/setup-node@v4
+        if: steps.appetize.outputs.ok != 'true' || inputs.screenshots == true
         continue-on-error: true
         with:
           node-version: 22
@@ -109,6 +117,7 @@ jobs:
 
       - name: Stella-Server mit Beispieldaten starten
         id: server
+        if: steps.appetize.outputs.ok != 'true' || inputs.screenshots == true
         continue-on-error: true
         env:
           STELLA_DATA_DIR: ${{ runner.temp }}/demo
