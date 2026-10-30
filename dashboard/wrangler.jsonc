@@ -1,0 +1,9 @@
+{
+  // Cloudflare: dashboard.evolsior.com als Workers-Projekt mit statischen Dateien (nur dashboard/public/)
+  "name": "evolsior-dashboard",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "single-page-application"
+  }
+}
