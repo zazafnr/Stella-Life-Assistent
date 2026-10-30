@@ -8,6 +8,7 @@ import { BriefingCard } from './BriefingCard.tsx';
 import { ListsSheet } from './Lists.tsx';
 import { WeekBar, amount } from './Goals.tsx';
 import { euro } from './Finance.tsx';
+import { StellaPlanCard } from './StellaPlan.tsx';
 
 interface Lesson { date: string; start: string; subject: string | null; code: string | null; status: string }
 interface InboxEntry { source: string; category: string | null; action: string | null; createdAt: string }
@@ -205,6 +206,8 @@ export function Today({ go }: { go: (t: Tab) => void }) {
             </div>
           </section>
         )}
+
+        <StellaPlanCard go={go} />
 
         {spent && (
           <button type="button" className="card interactive row" onClick={() => go('finance')}>

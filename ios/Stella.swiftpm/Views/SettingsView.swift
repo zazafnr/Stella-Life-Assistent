@@ -55,6 +55,9 @@ struct SettingsView: View {
                     }
 
                     Section {
+                        NavigationLink { StellaPlanView() } label: {
+                            row("Was Stella vorhat", symbol: "calendar.badge.clock", tint: Theme.green, detail: nil)
+                        }
                         NavigationLink { PermissionsView() } label: {
                             row("Was Stella selbst darf", symbol: "checkmark.shield", tint: Theme.blue, detail: nil)
                         }

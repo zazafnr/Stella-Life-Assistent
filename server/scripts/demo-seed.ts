@@ -20,6 +20,7 @@ const { addMemory } = await import('../src/memory.ts');
 const { addListItems, shoppingListId } = await import('../src/lists.ts');
 const goalsMod = await import('../src/goals.ts');
 const finMod = await import('../src/finance.ts');
+const { nextOccurrence } = await import('@stella/shared');
 const { applyProfile } = await import('../src/profile.ts');
 const { handleChat } = await import('../src/assistant.ts');
 const { perform } = await import('../src/actions.ts');
@@ -92,6 +93,11 @@ rows.forEach((r, i) => db.prepare('UPDATE messages SET created_at = ? WHERE id =
 
 // Alle Funktionen an, damit Ziele und Ausgaben in der Vorschau zu sehen sind
 applyProfile(user(), { situation: 'school', features: ['mails', 'planner', 'homework', 'shopping', 'goals', 'finance', 'health'] });
+
+// Daueraufträge und eine einmalige Erinnerung („Was Stella vorhat“)
+addItem(user(), { kind: 'reminder', title: 'Müll rausbringen', due: nextOccurrence('weekly:1', addDays(today, 1)), time: '07:45', recurrence: 'weekly:1', source: 'chat' });
+addItem(user(), { kind: 'reminder', title: 'Vitamine nehmen', due: addDays(today, 1), time: '08:00', recurrence: 'daily', source: 'chat' });
+addItem(user(), { kind: 'reminder', title: 'Zahnarzt anrufen', due: addDays(today, 2), time: '15:30', source: 'chat' });
 
 // Ausgaben (Apple Pay) mit Abo und Budget
 {

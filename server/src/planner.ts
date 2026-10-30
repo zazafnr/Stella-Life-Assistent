@@ -1,7 +1,7 @@
 // Einträge anlegen/ändern inkl. Erinnerungen und Hintergrund-Jobs.
 
 import {
-  buildStudyPlan, DEFAULT_PREFS, planReminders, zonedToUtc, todayIn, type Item, type ParsedEntry,
+  addDays, buildStudyPlan, DEFAULT_PREFS, nextOccurrence, planReminders, zonedToUtc, todayIn, type Item, type ParsedEntry,
 } from '@stella/shared';
 import { nextLessonDate } from './untis.ts';
 import {
@@ -16,7 +16,7 @@ const prefsOf = (user: User) => ({
 
 export function scheduleReminders(user: User, item: Item) {
   clearOpenReminders(user.id, item.id);
-  if (item.status !== 'open' || item.deleted) return;
+  if (item.status !== 'open' || item.deleted || item.recurrencePaused) return;
   const today = todayIn(user.timeZone);
   for (const r of planReminders(item, today, prefsOf(user))) {
     const at = zonedToUtc(r.date, r.time, user.timeZone);
@@ -58,9 +58,22 @@ export function addParsedEntry(user: User, e: ParsedEntry): Item {
 }
 
 export function changeItem(user: User, id: string, patch: Partial<Item>): Item | null {
+  // Dauerauftrag „erledigt“ heißt: dieses Mal erledigt – er rückt zum nächsten Termin vor
+  if (patch.status === 'done') {
+    const cur = getItem(user.id, id);
+    if (cur?.recurrence && !cur.recurrencePaused && !cur.deleted) return advanceRecurring(user, cur);
+  }
   const item = updateItem(user.id, id, patch);
-  if (item && ('due' in patch || 'time' in patch || 'status' in patch || 'deleted' in patch)) scheduleReminders(user, item);
+  if (item && ('due' in patch || 'time' in patch || 'status' in patch || 'deleted' in patch || 'recurrencePaused' in patch)) scheduleReminders(user, item);
   return item;
+}
+
+/** Nach dem Erinnern (oder Abhaken) zum nächsten Termin des Rhythmus weiterrücken – frühestens ab morgen */
+export function advanceRecurring(user: User, item: Item): Item | null {
+  if (!item.recurrence || item.recurrencePaused || item.deleted) return null;
+  const tomorrow = addDays(todayIn(user.timeZone), 1);
+  const from = item.due && item.due >= tomorrow ? addDays(item.due, 1) : tomorrow;
+  return changeItem(user, item.id, { due: nextOccurrence(item.recurrence, from), status: 'open' });
 }
 
 /** Legt Lerneinheiten für einen Test an. `focuses` kann von der KI verfeinert sein. */

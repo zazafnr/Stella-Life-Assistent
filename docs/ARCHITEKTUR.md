@@ -155,6 +155,16 @@ und bei 100 %), Abo-Erkennung (gleicher Händler und Betrag im Monatsabstand), i
 diese Woche ausgegeben?“ als Karte und das KI-Werkzeug `spending_summary`. Die Funktion gehört zum Profil
 („Finanzen“) und ist ohne Profil aus.
 
+**Was Stella vorhat** (`server/src/stellaplan.ts`) – eine Liste aus den vorhandenen Quellen statt einer
+neuen Datenhaltung: Morning Briefing, Sonntags-Wochenplan, Erinnerungen und Lerneinheiten der nächsten
+7 Tage, Daueraufträge, Ziele mit Check-in, die drei Automatiken (Werbung löschen, HÜ-Autopilot,
+nächtliches Lernen) und offene Vorschläge. Jeder Eintrag bringt seine Steuerung mit (Ein/Aus, Uhrzeit,
+Löschen, Ja/Nein, Link zu „Was Stella selbst darf“); `POST /api/stella/plan/:id` setzt sie um und
+schreibt eine Aktion ins Protokoll – deshalb geht „Rückgängig“. **Daueraufträge** („erinnere mich jeden
+Montag an den Müll“) sind normale Erinnerungen mit `items.recurrence` (`daily`, `weekly:1,3`,
+`monthly:15`): nach dem Erinnern – oder wenn man sie abhakt – rückt der Eintrag zum nächsten Termin vor
+und plant die nächste Erinnerung (`advanceRecurring`); pausiert sind sie ohne Erinnerung.
+
 ## 8. Fahrplan
 
 > **Stella v2** (Registrierung für alle Lebenslagen, Groq, Chats nach Tagen, Sprache, Listen, Ziele,

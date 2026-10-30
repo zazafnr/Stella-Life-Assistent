@@ -13,6 +13,7 @@ import { titleOldChats } from './conversations.ts';
 import { checkAllMail, listAccounts, purgeMailBodies, sendMail } from './mail.ts';
 import { syncUntis } from './untis.ts';
 import { fetchBookPage } from './books.ts';
+import { advanceRecurring } from './planner.ts';
 import { solveHomework } from './homework.ts';
 import { sendGoalCheckIns } from './goals.ts';
 import { pushToUser } from './push.ts';
@@ -46,6 +47,9 @@ export async function sendDueReminders() {
     const card = item?.place ? { type: 'places' as const, category: item.place.category, label: item.place.label, itemId: item.id } : undefined;
     addMessage(r.user_id, 'assistant', text, { attachments, card });
     await pushToUser(r.user_id, { title: 'Stella', body: r.message, url: '/', tag: r.item_id ?? r.id });
+    // Dauerauftrag: die nächste Erinnerung gleich anlegen
+    const owner = item?.recurrence ? getUser(r.user_id) : null;
+    if (item && owner) advanceRecurring(owner, item);
   }
   // Erinnerungen zu erledigten Einträgen still verwerfen
   db.prepare(`UPDATE reminders SET sent_at = ? WHERE sent_at IS NULL AND fire_at <= ?`).run(ts, ts);

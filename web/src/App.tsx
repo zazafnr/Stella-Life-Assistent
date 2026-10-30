@@ -6,6 +6,7 @@ import { Planner } from './components/Planner.tsx';
 import { Inbox } from './components/Inbox.tsx';
 import { Goals } from './components/Goals.tsx';
 import { Finance } from './components/Finance.tsx';
+import { StellaPlan } from './components/StellaPlan.tsx';
 import { Health } from './components/Health.tsx';
 import { Settings } from './components/Settings.tsx';
 import { Intro, dismissBoot, introShown } from './components/Intro.tsx';
@@ -13,7 +14,7 @@ import { Onboarding } from './components/Onboarding.tsx';
 import { Icon, type IconName } from './ui/Icon.tsx';
 import { Sky, StarMark, showToast } from './ui/Decor.tsx';
 
-export type Tab = 'today' | 'chat' | 'planner' | 'goals' | 'inbox' | 'health' | 'finance' | 'settings';
+export type Tab = 'today' | 'chat' | 'planner' | 'goals' | 'inbox' | 'health' | 'finance' | 'plan' | 'settings';
 
 const TABS: [Tab, IconName, string][] = [
   ['today', 'sparkle', 'Heute'],
@@ -22,7 +23,7 @@ const TABS: [Tab, IconName, string][] = [
   ['goals', 'target', 'Ziele'],
   ['inbox', 'inbox', 'Inbox'],
 ];
-const ALL: Tab[] = ['today', 'chat', 'planner', 'goals', 'inbox', 'health', 'finance', 'settings'];
+const ALL: Tab[] = ['today', 'chat', 'planner', 'goals', 'inbox', 'health', 'finance', 'plan', 'settings'];
 
 function initialTab(): Tab {
   const hash = location.hash.slice(1) as Tab;
@@ -106,7 +107,8 @@ export function App() {
         {tab === 'inbox' && <Inbox />}
         {tab === 'health' && <Health back={() => setTab('today')} />}
         {tab === 'finance' && <Finance back={() => setTab('today')} go={setTab} />}
-        {tab === 'settings' && <Settings back={() => setTab('today')} openOnboarding={(startAt) => setOnboarding({ startAt })} />}
+        {tab === 'plan' && <StellaPlan back={() => setTab('today')} go={setTab} />}
+        {tab === 'settings' && <Settings back={() => setTab('today')} openOnboarding={(startAt) => setOnboarding({ startAt })} openPlan={() => setTab('plan')} />}
       </main>
 
       <nav className="tabbar" aria-label="Navigation">

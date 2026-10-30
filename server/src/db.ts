@@ -376,6 +376,11 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (user_id, category)
   );
   `,
+  `
+  -- Paket 10: Daueraufträge („erinnere mich jeden Montag an den Müll“)
+  ALTER TABLE items ADD COLUMN recurrence TEXT;
+  ALTER TABLE items ADD COLUMN recurrence_paused INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 function migrate() {
@@ -480,7 +485,7 @@ export function updateUserSettings(id: string, patch: Partial<UserSettings>, tim
 type ItemRow = {
   id: string; kind: string; subject: string | null; title: string; detail: string | null; notes: string | null;
   page: string | null; exercises: string | null; book: string | null; due: string | null; time: string | null; status: string;
-  material: string | null; parent_id: string | null; attachments: string; updated_at: string; deleted: number; place?: string | null;
+  material: string | null; parent_id: string | null; attachments: string; updated_at: string; deleted: number; place?: string | null; recurrence?: string | null; recurrence_paused?: number;
 };
 
 export const toItem = (r: ItemRow): Item => ({
@@ -489,6 +494,7 @@ export const toItem = (r: ItemRow): Item => ({
   material: r.material, parentId: r.parent_id, attachments: JSON.parse(r.attachments),
   updatedAt: r.updated_at, deleted: !!r.deleted,
   ...(r.place ? { place: JSON.parse(r.place) as Item['place'] } : {}),
+  ...(r.recurrence ? { recurrence: r.recurrence, recurrencePaused: !!r.recurrence_paused } : {}),
 });
 
 export interface NewItem {
@@ -496,17 +502,18 @@ export interface NewItem {
   page?: string | null; exercises?: string | null; book?: string | null; due?: string | null; time?: string | null;
   material?: string | null; parentId?: string | null; source?: string; externalId?: string | null;
   place?: { category: string; label: string } | null;
+  recurrence?: string | null;
 }
 
 export function createItem(userId: string, n: NewItem): Item {
   const id = newId();
   const ts = now();
   db.prepare(`INSERT INTO items (id, user_id, kind, subject, title, detail, notes, page, exercises, book, due, time,
-      material, parent_id, source, external_id, created_at, updated_at, place)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      material, parent_id, source, external_id, created_at, updated_at, place, recurrence)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(id, userId, n.kind, n.subject ?? null, n.title, n.detail ?? null, n.notes ?? null, n.page ?? null,
       n.exercises ?? null, n.book ?? null, n.due ?? null, n.time ?? null, n.material ?? null, n.parentId ?? null,
-      n.source ?? 'chat', n.externalId ?? null, ts, ts, n.place ? JSON.stringify(n.place) : null);
+      n.source ?? 'chat', n.externalId ?? null, ts, ts, n.place ? JSON.stringify(n.place) : null, n.recurrence ?? null);
   return getItem(userId, id)!;
 }
 
@@ -527,6 +534,7 @@ export function getItemRaw(userId: string, id: string) {
 const ITEM_COLUMNS: Record<string, string> = {
   kind: 'kind', subject: 'subject', title: 'title', detail: 'detail', notes: 'notes', page: 'page',
   exercises: 'exercises', due: 'due', time: 'time', status: 'status', material: 'material', deleted: 'deleted',
+  recurrence: 'recurrence', recurrencePaused: 'recurrence_paused',
 };
 
 export function updateItem(userId: string, id: string, patch: Partial<Item>): Item | null {

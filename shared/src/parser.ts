@@ -1,6 +1,7 @@
 // Versteht Schul-Kurznotizen wie "Latein Hü Seite 45 nr 3 Freitag" ohne KI.
 // Läuft auf dem Server UND offline in der App – spart außerdem KI-Anfragen.
 
+import { formatRecurrence, type Recurrence } from './recurrence.ts';
 import {
   addDays, makeYmd, nextSchoolDay, nextWeekday, weekdayNextWeek, type Ymd,
 } from './dates.ts';
@@ -39,6 +40,7 @@ export type Intent =
   | { type: 'delete'; query: ItemQuery }
   /** "erinnere mich in 2 Stunden an die Wäsche" */
   | { type: 'remind'; due: Ymd; time: string; text: string }
+  | { type: 'recurring'; recurrence: string; time: string | null; text: string }
   /** "merk dir, dass …" / "vergiss, dass …" */
   | { type: 'remember'; text: string }
   | { type: 'forget'; text: string }
@@ -280,6 +282,56 @@ const MOVE_RE = new RegExp(`${B}(verschieb(e|en|t)?|verleg(e|en|t)?|umlegen|lege
 const DELETE_RE = new RegExp(`${B}(lösch(e|en|t)?|loesch(e|en|t)?|entfern(e|en|t)?|streich(e|en|t)?|absagen|sag\\s+.+\\s+ab|abgesagt|fällt\\s+aus|faellt\\s+aus|fällt\\s+weg)${E}`, 'iu');
 const REMEMBER_RE = /^\s*(bitte\s+)?merk(e)?\s*(dir|dir\s+mal)\s*(,\s*)?(dass\s+|:\s*)?(.+)$/iu;
 const FORGET_RE = /^\s*(bitte\s+)?vergiss\s*(,\s*)?(dass\s+|das\s+mit\s+|:\s*)?(.+)$/iu;
+// ---------- Daueraufträge: „jeden Montag“, „täglich um 8“, „jeden 15.“ ----------
+
+const WD_NUMBER: Record<string, number> = { montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4, freitag: 5, samstag: 6, sonnabend: 6, sonntag: 7 };
+const WD = '(?:montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonnabend|sonntag)';
+const WD_LIST = `${WD}(?:\\s*(?:,|und|sowie|&)\\s*${WD})*`;
+const RECUR_DAILY_RE = new RegExp(`${B}(jeden\\s+tag|täglich|taeglich|jeden\\s+morgen|jeden\\s+abend)${E}`, 'iu');
+const RECUR_WEEKDAYS_RE = new RegExp(`${B}(werktags|wochentags|jeden\\s+werktag|unter\\s+der\\s+woche)${E}`, 'iu');
+const RECUR_WEEKEND_RE = new RegExp(`${B}(jedes\\s+wochenende|am\\s+wochenende|wochenends)${E}`, 'iu');
+const RECUR_WEEKLY_RE = new RegExp(`${B}(?:jeden|jedem|jede\\s+woche\\s+am|jede\\s+woche)\\s+(${WD_LIST})${E}`, 'iu');
+const RECUR_ADVERB_RE = new RegExp(`${B}((?:${WD}s)(?:\\s*(?:,|und|sowie|&)\\s*${WD}s)*)${E}`, 'iu');
+const RECUR_MONTHLY_RE = new RegExp(`${B}(?:(?:jeden\\s+monat|monatlich)\\s*(?:am\\s+|zum\\s+)?(\\d{1,2})\\.?|jeden\\s+(\\d{1,2})\\.?(?:\\s+(?:des\\s+)?monats?)?)${E}`, 'iu');
+
+function weekdaysIn(list: string): number[] {
+  return [...new Set([...list.toLowerCase().matchAll(/montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonnabend|sonntag/g)].map((m) => WD_NUMBER[m[0]]!))].sort((a, b) => a - b);
+}
+
+/** Rhythmus im Satz finden und aus dem Text schneiden */
+export function takeRecurrence(input: string): { recurrence: Recurrence; rest: string } | null {
+  const cut = (m: RegExpExecArray) => (input.slice(0, m.index) + ' ' + input.slice(m.index + m[0].length)).replace(/\s+/g, ' ').trim();
+  let m = RECUR_MONTHLY_RE.exec(input);
+  if (m) {
+    const day = Number(m[1] ?? m[2]);
+    if (day >= 1 && day <= 31) return { recurrence: { kind: 'monthly', day }, rest: cut(m) };
+  }
+  m = RECUR_WEEKLY_RE.exec(input);
+  if (m) return { recurrence: { kind: 'weekly', days: weekdaysIn(m[1]!) }, rest: cut(m) };
+  m = RECUR_ADVERB_RE.exec(input);
+  if (m) return { recurrence: { kind: 'weekly', days: weekdaysIn(m[1]!) }, rest: cut(m) };
+  m = RECUR_WEEKDAYS_RE.exec(input);
+  if (m) return { recurrence: { kind: 'weekly', days: [1, 2, 3, 4, 5] }, rest: cut(m) };
+  m = RECUR_WEEKEND_RE.exec(input);
+  if (m) return { recurrence: { kind: 'weekly', days: [6, 7] }, rest: cut(m) };
+  m = RECUR_DAILY_RE.exec(input);
+  if (m) return { recurrence: { kind: 'daily' }, rest: cut(m) };
+  return null;
+}
+
+/** „erinnere mich jeden Montag an den Müll“, „jeden Tag um 8 Tabletten“ – braucht „erinnere mich“ oder eine Uhrzeit */
+function recurringIntent(text: string, today: Ymd): Intent | null {
+  const prefix = REMIND_RE.exec(text);
+  const body = prefix ? prefix[4]! : text;
+  const found = takeRecurrence(body);
+  if (!found) return null;
+  const when = parseWhen(found.rest, today);
+  if (!prefix && !when.time) return null;
+  const what = when.rest.replace(/^\s*(und|dass|zu|bitte|um|an|daran)\s+/iu, '').replace(/^(den|die|das|der|meine|mein|meinen)\s+/iu, '').replace(/[.!?,]+$/u, '').trim();
+  if (what.length < 2) return null;
+  return { type: 'recurring', recurrence: formatRecurrence(found.recurrence), time: when.time, text: capitalize(what) };
+}
+
 const REMIND_RE = /^\s*(bitte\s+)?(erinner(e|n)?\s+mich|sag\s+mir\s+bescheid|remind\s+me)\b(.*)$/iu;
 const RELATIVE_RE = new RegExp(`${B}in\\s+(\\d+|einer|einem|einer\\s+halben|zwei|drei)\\s*(min|minuten|minute|std|stunden|stunde|h)${E}`, 'iu');
 const CORRECT_RE = /^\s*(nein|ne|nö|noe|nee|sorry|doch|lieber|eher|ich\s+meinte|meinte|falsch)?[\s,!.]*(?:(erst|schon|doch|lieber|eher)\s+)?(?:am|um|auf|bis)?\s*(.+?)\s*[!.]?$/iu;
@@ -407,6 +459,10 @@ export function interpret(input: string, today: Ymd, now = '12:00'): Intent | nu
   // Einkaufsliste und Erledigungen mit Ort („nach der Arbeit Blumen kaufen“)
   const listed = listIntent(text);
   if (listed) return listed;
+
+  // Daueraufträge vor den einmaligen Erinnerungen, sonst wird aus „jeden Montag“ ein einzelner Montag
+  const recurring = recurringIntent(text, today);
+  if (recurring) return recurring;
 
   // Erinnerungen: "erinnere mich in 2 Stunden an X", "in 30 min Pizza raus"
   m = REMIND_RE.exec(text);

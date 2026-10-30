@@ -4,6 +4,7 @@ import { interpret, normalizeSubject, parseEntry, type Intent } from './parser.t
 import { placeFor } from './places.ts';
 import { buildStudyPlan, planReminders } from './planning.ts';
 import { nextWeekday, zonedToUtc } from './dates.ts';
+import { describeRecurrence, nextOccurrence, parseRecurrence } from './recurrence.ts';
 
 const WED = '2026-10-28'; // Mittwoch
 
@@ -210,4 +211,49 @@ test('Orte: Wort → Geschäft, auch als Wortanfang', () => {
   assert.equal(placeFor('Zeitung holen')?.category, 'tobacco');
   assert.equal(placeFor('Tanken')?.category, 'fuel');
   assert.equal(placeFor('Geschenk'), null);
+});
+
+test('Daueraufträge: „erinnere mich jeden Montag an den Müll“, „jeden Tag um 8 Tabletten“, „jeden 15.“', () => {
+  const rec = (text: string) => interpret(text, TODAY, '12:00') as Extract<Intent, { type: 'recurring' }>;
+  assert.deepEqual(rec('erinnere mich jeden Montag an den Müll'), { type: 'recurring', recurrence: 'weekly:1', time: null, text: 'Müll' });
+  assert.deepEqual(rec('jeden Tag um 8 Tabletten'), { type: 'recurring', recurrence: 'daily', time: '08:00', text: 'Tabletten' });
+  assert.deepEqual(rec('Erinnere mich täglich um 21:30 an das Vokabeln-Wiederholen'), { type: 'recurring', recurrence: 'daily', time: '21:30', text: 'Vokabeln-Wiederholen' });
+  assert.equal(rec('erinnere mich jeden Montag und Donnerstag um 17 Uhr ans Training').recurrence, 'weekly:1,4');
+  assert.equal(rec('erinnere mich dienstags an die Biotonne').recurrence, 'weekly:2');
+  assert.equal(rec('erinnere mich montags, mittwochs und freitags an die Pflanzen').recurrence, 'weekly:1,3,5');
+  assert.equal(rec('erinnere mich werktags um 7 an die Medikamente').recurrence, 'weekly:1,2,3,4,5');
+  assert.equal(rec('erinnere mich jedes Wochenende an Wäsche').recurrence, 'weekly:6,7');
+  assert.deepEqual(rec('erinnere mich jeden Monat am 15. an die Miete'), { type: 'recurring', recurrence: 'monthly:15', time: null, text: 'Miete' });
+  assert.equal(rec('erinnere mich jeden 1. an das Abo').recurrence, 'monthly:1');
+  assert.equal(rec('jeden Sonntag um 18 Uhr Wochenplan ansehen').recurrence, 'weekly:7');
+
+  // einmalige Erinnerungen und normale Einträge bleiben, was sie waren
+  assert.equal(interpret('erinnere mich am Montag an den Müll', TODAY, '12:00')?.type === 'recurring', false);
+  assert.equal(interpret('erinnere mich in 2 Stunden an die Pizza', TODAY, '12:00')?.type, 'remind');
+  assert.equal(interpret('Latein HÜ jeden Montag', TODAY, '12:00')?.type === 'recurring', false, 'ohne „erinnere mich“ und ohne Uhrzeit kein Dauerauftrag');
+});
+
+test('Rhythmus: nächster Termin, Wochentage, Monatsende, Beschreibung', () => {
+  const next = (r: string, from: string) => nextOccurrence(r, from);
+  assert.equal(next('daily', '2026-10-30'), '2026-10-30');
+  assert.equal(next('weekly:1', '2026-10-30'), '2026-11-02', 'Freitag → nächster Montag');
+  assert.equal(next('weekly:1', '2026-11-02'), '2026-11-02', 'ab einschließlich');
+  assert.equal(next('weekly:1,4', '2026-10-30'), '2026-11-02');
+  assert.equal(next('weekly:5,6', '2026-10-30'), '2026-10-30');
+  assert.equal(next('weekly:7', '2026-10-30'), '2026-11-01');
+  assert.equal(next('monthly:15', '2026-10-30'), '2026-11-15');
+  assert.equal(next('monthly:15', '2026-10-15'), '2026-10-15');
+  assert.equal(next('monthly:31', '2026-11-01'), '2026-11-30', 'kürzerer Monat → letzter Tag');
+  assert.equal(next('monthly:31', '2026-12-31'), '2026-12-31');
+  assert.equal(next('monthly:1', '2026-12-15'), '2027-01-01', 'über den Jahreswechsel');
+  assert.equal(next('Quatsch', '2026-10-30'), '2026-10-30');
+  assert.equal(parseRecurrence('weekly:3,1,3')?.kind === 'weekly' && (parseRecurrence('weekly:3,1,3') as { days: number[] }).days.join(), '1,3');
+  assert.equal(parseRecurrence('weekly:8'), null);
+  assert.equal(parseRecurrence('monthly:32'), null);
+  assert.equal(describeRecurrence('daily'), 'täglich');
+  assert.equal(describeRecurrence('weekly:1'), 'jeden Montag');
+  assert.equal(describeRecurrence('weekly:1,4'), 'jeden Montag und Donnerstag');
+  assert.equal(describeRecurrence('weekly:1,3,5'), 'jeden Montag, Mittwoch und Freitag');
+  assert.equal(describeRecurrence('weekly:1,2,3,4,5'), 'werktags');
+  assert.equal(describeRecurrence('monthly:15'), 'jeden Monat am 15.');
 });

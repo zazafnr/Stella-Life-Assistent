@@ -33,6 +33,7 @@ import { acceptHint, dismissHint } from './hints.ts';
 import { registerAdminRoutes } from './admin.ts';
 import { registerFinanceRoutes, recordPayment } from './finance.ts';
 import { registerGoalRoutes } from './goals.ts';
+import { registerStellaPlanRoutes } from './stellaplan.ts';
 import { registerListRoutes } from './lists.ts';
 import { registerPlaceRoutes } from './places.ts';
 import { registerQuickRoutes } from './quick.ts';
@@ -176,6 +177,7 @@ app.register(async (api) => {
   registerListRoutes(api);
   registerGoalRoutes(api);
   registerFinanceRoutes(api);
+  registerStellaPlanRoutes(api);
   registerPlaceRoutes(api);
   registerQuickRoutes(api);
   registerProfileRoutes(api, publicUser);

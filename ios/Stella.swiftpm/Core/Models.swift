@@ -286,6 +286,31 @@ struct FinanceMonth: Codable, Hashable {
 struct PaymentResponse: Codable { var transaction: Payment }
 struct TestPaymentResponse: Codable { var duplicate: Bool; var message: String }
 
+/** Ein Punkt in „Was Stella vorhat“ – die Steuerung kommt vom Server (toggle, time, remove, decision, link) */
+struct PlanControl: Codable, Hashable {
+    var type: String
+    var on: Bool?
+    var label: String?
+    var value: String?
+    var target: String?
+}
+
+struct PlanEntry: Codable, Hashable, Identifiable {
+    var id: String
+    var kind: String
+    /** week | regular | longterm */
+    var group: String
+    var title: String
+    var when: String
+    var at: String?
+    var recurrence: String?
+    var enabled: Bool
+    var controls: [PlanControl]
+}
+
+struct PlanResponse: Codable { var entries: [PlanEntry]; var soon: [PlanEntry] }
+struct PlanChangeResponse: Codable { var actionId: String; var entries: [PlanEntry]; var soon: [PlanEntry] }
+
 struct ListsResponse: Codable { var lists: [StellaList] }
 struct ListResponse: Codable { var list: StellaList }
 

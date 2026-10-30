@@ -22,6 +22,7 @@ import { afterWorkTime, describeUser, hasFeature, isSchool } from './profile.ts'
 import { matchOpenItems, openItems } from './lists.ts';
 import { activeGoals, amountText, describeCadence, extractGoal, extractLog, GOAL_RE, looksLikeGoal, matchGoal, parseLogQuick, progress, weekTarget, type NewGoal } from './goals.ts';
 import { resolvePlace } from './places.ts';
+import { describeRecurrence, nextOccurrence } from '@stella/shared';
 import { euro, spendingCard, spendingFacts, spendingPeriod, SPEND_RE } from './finance.ts';
 import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type ToolDef } from './llm.ts';
 import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
@@ -89,6 +90,7 @@ async function handleChatIn(user: User, text: string, clientId: string | null, i
       case 'move': await onMove(t, intent, text); break;
       case 'delete': onDelete(t, intent.query); break;
       case 'remind': onRemind(t, intent); break;
+      case 'recurring': onRecurring(t, intent); break;
       case 'list_add': onListAdd(t, intent); break;
       case 'list_show': onListShow(t); break;
       case 'list_done': if (!onListDone(t, intent)) await runAgent(t); break;
@@ -305,6 +307,18 @@ function onRemind(t: Turn, intent: Extract<Intent, { type: 'remind' }>) {
   touched(t, ...r.changed);
   if (r.status === 'refused') say(t, `🙅 ${r.reason}`);
   else if (r.status === 'done') sayA(t, v(t).remindSet(whenLabel(t, intent.due, intent.time), intent.text), r.actionId);
+}
+
+/** „erinnere mich jeden Montag an den Müll“ → Dauerauftrag: nach jedem Erinnern rückt er zum nächsten Termin vor */
+function onRecurring(t: Turn, intent: Extract<Intent, { type: 'recurring' }>) {
+  const time = intent.time ?? '08:00';
+  let due = nextOccurrence(intent.recurrence, t.today);
+  if (due === t.today && time <= timeIn(t.user.timeZone)) due = nextOccurrence(intent.recurrence, addDays(t.today, 1));
+  const r = perform(t.user, 'item.create', { kind: 'reminder', title: intent.text, due, time, recurrence: intent.recurrence, source: 'chat' },
+    { source: 'chat', quiet: true, say: sayAction(t) });
+  touched(t, ...r.changed);
+  if (r.status === 'refused') say(t, `🙅 ${r.reason}`);
+  else if (r.status === 'done') sayA(t, v(t).recurringSet(`${describeRecurrence(intent.recurrence)} um ${time}`, intent.text), r.actionId);
 }
 
 // ---------- Einkaufsliste und Erledigungen ----------

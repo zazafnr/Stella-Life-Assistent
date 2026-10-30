@@ -18,7 +18,7 @@ type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'finance' | 'no
 
 interface AiStatusData { configured: boolean; chain: string[]; visionChain: string[]; coolingDown: string[]; usedToday: number; dailyLimit: number }
 
-export function Settings({ back, openOnboarding }: { back: () => void; openOnboarding: (startAt: 'welcome' | 'situation') => void }) {
+export function Settings({ back, openOnboarding, openPlan }: { back: () => void; openOnboarding: (startAt: 'welcome' | 'situation') => void; openPlan: () => void }) {
   const me = useStore((s) => s.me);
   const online = useStore((s) => s.online);
   const waiting = useStore((s) => Object.values(s.actions).filter((a) => a.status === 'proposed').length);
@@ -121,6 +121,11 @@ export function Settings({ back, openOnboarding }: { back: () => void; openOnboa
         </Group>
 
         <Group title="Stella als Assistentin">
+          <button type="button" className="list-row" onClick={openPlan}>
+            <span className="icon-tile green" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="calendar" size={18} /></span>
+            <span className="grow"><span className="list-title">Was Stella vorhat</span><span className="list-sub">Erinnerungen, Daueraufträge, Automatiken – ändern oder abstellen</span></span>
+            <Icon name="chevron" size={16} />
+          </button>
           <button type="button" className="list-row" onClick={() => setSheet('perms')}>
             <span className="icon-tile blue" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="shield" size={18} /></span>
             <span className="grow"><span className="list-title">Was Stella selbst darf</span><span className="list-sub">HÜs lösen, Planer ändern, Werbung löschen …</span></span>

@@ -106,6 +106,11 @@ export function voice(tone: Tone | undefined) {
       frech: `⏰ ${when} nerv ich dich wegen „${what}“. Versprochen. 😏`,
       cool: `⏰ ${when}: „${what}“. Steht.`,
     }),
+    recurringSet: (when: string, what: string) => by({
+      nett: `🔁 Mach ich! ${when} erinnere ich dich an „${what}“. Unter „Was Stella vorhat“ kannst du es jederzeit ändern oder abstellen.`,
+      frech: `🔁 ${when} nerv ich dich wegen „${what}“ – ab jetzt für immer. 😏 (Abstellen geht unter „Was Stella vorhat“.)`,
+      cool: `🔁 ${when}: „${what}“. Steht. Ändern: „Was Stella vorhat“.`,
+    }),
     moved: (title: string, when: string) => by({
       nett: `📅 **${title}** ist jetzt ${when}.`,
       frech: `📅 **${title}** auf ${when} geschoben. Aufschieben kannst du gut. 😏`,

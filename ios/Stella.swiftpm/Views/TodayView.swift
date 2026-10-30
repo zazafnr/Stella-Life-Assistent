@@ -10,6 +10,7 @@ struct TodayView: View {
     @State private var showSettings = Demo.opens("settings")
     @State private var showHealth = false
     @State private var showFinance = Demo.opens("finance")
+    @State private var showPlan = Demo.opens("plan")
     @State private var openItem: Item?
 
     private var today: String { Day.today }
@@ -27,6 +28,7 @@ struct TodayView: View {
                             if tab == "finance" { showFinance = true } else { go(tab == "inbox" ? .inbox : (tab == "goals" ? .goals : .chat)) }
                         })
                         if store.me?.has("shopping") == true { ShoppingCardView() }
+                        StellaPlanCardView(open: { showPlan = true })
                         if store.me?.has("finance") == true { FinanceCardView(open: { showFinance = true }) }
                         if store.me?.has("goals") != false { GoalsCardView(go: { go(.goals) }) }
                         dueCard.rise(1)
@@ -51,6 +53,7 @@ struct TodayView: View {
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showHealth) { HealthSheet(goal: goal) }
             .sheet(isPresented: $showFinance) { FinanceSheet() }
+            .sheet(isPresented: $showPlan) { NavigationStack { StellaPlanView(go: { go($0) }) } }
             .sheet(item: $openItem) { ItemDetail(item: $0) }
             .task { await reload() }
         }

@@ -31,6 +31,10 @@ export interface Item {
   deleted: boolean;
   /** Erledigung mit Ort: beim Erinnern zeigt Stella Läden in der Nähe */
   place?: { category: string; label: string } | null;
+  /** Dauerauftrag: daily | weekly:1,3 | monthly:15 – nach dem Erinnern rückt der Eintrag zum nächsten Termin vor */
+  recurrence?: string | null;
+  /** Dauerauftrag pausiert: keine Erinnerungen, bis er wieder eingeschaltet wird */
+  recurrencePaused?: boolean;
 }
 
 /** Karte unter einer Stella-Nachricht (z. B. Läden in der Nähe) */
@@ -349,4 +353,31 @@ export interface FinanceMonth {
   budgets: BudgetStatus[];
   transactions: Transaction[];
   subscriptions: Subscription[];
+}
+
+// ---------- „Was Stella vorhat“ ----------
+
+export type StellaPlanControl =
+  /** Ein/Aus (bei Daueraufträgen: Pausieren) */
+  | { type: 'toggle'; on: boolean; label: string }
+  /** Uhrzeit ändern (HH:MM) */
+  | { type: 'time'; value: string; label: string }
+  | { type: 'remove'; label: string }
+  /** offener Vorschlag: Ja oder Nein */
+  | { type: 'decision' }
+  | { type: 'link'; target: 'permissions' | 'goals' | 'planner' | 'inbox'; label: string };
+
+export interface StellaPlanEntry {
+  /** briefing | weekplan | perm:<Gruppe> | recurring:<id> | item:<id> | study:<id> | goal:<id> | proposal:<id> */
+  id: string;
+  kind: 'briefing' | 'weekplan' | 'automation' | 'recurring' | 'reminder' | 'study' | 'goal' | 'proposal';
+  group: 'week' | 'regular' | 'longterm';
+  title: string;
+  /** lesbar: „täglich um 07:00“, „Freitag, 30.10. um 17:30“ */
+  when: string;
+  /** nächster Zeitpunkt (lokal, YYYY-MM-DD HH:MM) – für „die nächsten Dinge“ */
+  at: string | null;
+  recurrence: string | null;
+  enabled: boolean;
+  controls: StellaPlanControl[];
 }
