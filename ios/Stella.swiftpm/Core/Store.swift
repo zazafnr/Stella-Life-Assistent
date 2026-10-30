@@ -17,6 +17,18 @@ final class Store {
     var online = true
     var thinking = false
     var loggedIn: Bool
+    /** Cache wiederhergestellt bzw. erster Abgleich fertig – davor zeigt die App den Ladebildschirm */
+    var ready = false
+    /** der Chat, dessen Nachrichten `messages` zeigt */
+    var conversationId: String?
+    /** true: ein älterer Chat wurde bewusst geöffnet – die Ansicht springt dann nicht von selbst auf den neuesten von heute */
+    var pinned = false
+    /** der neueste Chat von heute laut Server */
+    var current: String?
+    var conversations: [Conversation] = []
+    /** Chips über dem Eingabefeld und die vier Karten im leeren Chat – nach Profil und Tageszeit vom Server */
+    var quick = QuickActions(actions: Store.fallbackActions, cards: Store.fallbackActions)
+    @ObservationIgnored private var lastQuick = Date.distantPast
 
     @ObservationIgnored private var outbox: [Outbox] = []
     @ObservationIgnored private var loop: Task<Void, Never>?
@@ -27,6 +39,7 @@ final class Store {
         var clientId: String
         var text: String
         var createdAt: String
+        var conversationId: String?
     }
 
     private struct Cache: Codable {
@@ -36,11 +49,16 @@ final class Store {
         var outbox: [Outbox]
         var lastSync: String?
         var actions: [ActionEntry]?
+        var conversationId: String?
+        var pinned: Bool?
+        var current: String?
+        var conversations: [Conversation]?
     }
 
     init() {
         loggedIn = API.shared.token != nil
         restore()
+        ready = !loggedIn || me != nil
     }
 
     // MARK: Abgeleitete Listen
@@ -61,23 +79,59 @@ final class Store {
 
     // MARK: Anmeldung
 
-    func authenticate(register: Bool, name: String, email: String, password: String) async throws {
-        struct Body: Encodable { var name: String; var email: String; var password: String; var device: String; var timeZone: String }
+    /** Gibt die E-Mail-Adresse zurück, wenn erst ein Code aus der Bestätigungs-Mail eingegeben werden muss */
+    @discardableResult
+    func authenticate(register: Bool, name: String, email: String, password: String, invite: String = "") async throws -> String? {
+        struct Body: Encodable { var name: String; var email: String; var password: String; var device: String; var timeZone: String; var invite: String }
         let body = Body(name: name, email: email, password: password,
                         device: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone",
-                        timeZone: TimeZone.current.identifier)
-        let res: AuthResponse = try await api.send("POST", register ? "/api/auth/register" : "/api/auth/login", body: body)
-        api.token = res.token
-        me = res.user
+                        timeZone: TimeZone.current.identifier, invite: invite)
+        let res: SignupResponse = try await api.send("POST", register ? "/api/auth/register" : "/api/auth/login", body: body)
+        if res.needsVerification == true { return res.email ?? email }
+        guard let token = res.token, let user = res.user else { throw APIError(message: "Antwort vom Server nicht verstanden", status: -1) }
+        await beginSession(token: token, user: user)
+        return nil
+    }
+
+    func verify(email: String, code: String) async throws {
+        struct Body: Encodable { var email: String; var code: String; var device: String }
+        let res: AuthResponse = try await api.send("POST", "/api/auth/verify",
+            body: Body(email: email, code: code, device: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"))
+        await beginSession(token: res.token, user: res.user)
+    }
+
+    func resendCode(email: String) async throws {
+        struct Body: Encodable { var email: String }
+        _ = try await api.send("POST", "/api/auth/resend", body: Body(email: email), as: OK.self)
+    }
+
+    private func beginSession(token: String, user: Me) async {
+        api.token = token
+        me = user
         items = [:]
         messages = []
         outbox = []
         lastSync = nil
+        conversationId = nil
+        pinned = false
+        current = nil
+        conversations = []
         loggedIn = true
         persist()
         await sync()
         await Notifier.shared.requestPermission()
     }
+
+    /** Konto samt allen Daten löschen (Passwort zur Bestätigung) */
+    func deleteAccount(password: String) async throws {
+        struct Body: Encodable { var password: String }
+        _ = try await api.send("DELETE", "/api/me", body: Body(password: password), as: OK.self)
+        logoutLocal()
+    }
+
+    /** Einführung auf Wunsch (Einstellungen) – die erste kommt von selbst, solange `onboarding` auf „pending“ steht */
+    var onboardingRequest: OnboardingStart?
+    var activeOnboarding: OnboardingStart? { onboardingRequest ?? (me?.settings.onboarding == "pending" ? .welcome : nil) }
 
     func logout() async {
         _ = try? await api.send("POST", "/api/auth/logout", as: OK.self)
@@ -93,6 +147,10 @@ final class Store {
         lastSync = nil
         busyItems = []
         actions = [:]
+        conversationId = nil
+        pinned = false
+        current = nil
+        conversations = []
         loggedIn = false
         persist()
         Notifier.shared.clear()
@@ -106,6 +164,13 @@ final class Store {
     // MARK: Abgleich
 
     func start() {
+        if !ready {
+            // spätestens nach 4 s aufhören zu warten, auch wenn der Server nicht antwortet
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(4))
+                self?.ready = true
+            }
+        }
         loop?.cancel()
         loop = Task { [weak self] in
             while !Task.isCancelled {
@@ -122,23 +187,82 @@ final class Store {
 
     func sync() async {
         guard loggedIn else { return }
+        defer { ready = true }
         await flushOutbox()
-        let path = lastSync.map { "/api/sync?since=\($0.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? $0)" } ?? "/api/sync"
+        var query: [String] = []
+        if let since = lastSync { query.append("since=\(since.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? since)") }
+        if let held = conversationId { query.append("conversation=\(held)") }
+        let path = "/api/sync" + (query.isEmpty ? "" : "?" + query.joined(separator: "&"))
         do {
             let res: SyncResponse = try await api.get(path)
             if me == nil { await refreshMe() }
             merge(items: res.items)
+            // anderer Chat als der gehaltene (erster Abgleich, Chat verschwunden): Ansicht ersetzen statt mischen
+            let switched = res.conversationId != conversationId
+            let firstSync = lastSync == nil
+            if switched {
+                messages = []
+                conversationId = res.conversationId
+            }
             merge(messages: res.messages)
+            if switched, !firstSync, let id = res.conversationId,
+               let all: [ChatMessage] = try? await api.get("/api/conversations/\(id)/messages?limit=80") {
+                merge(messages: all)
+            }
+            current = res.current
+            if let list = res.conversations { conversations = list }
             if lastSync == nil { actions = [:] }
             for a in res.actions ?? [] { actions[a.id] = a }
             busyItems = Set(res.busyItems ?? [])
             lastSync = res.serverTime
             online = true
             persist()
+            // neuer Tag, nichts Älteres bewusst geöffnet → auf den neuesten Chat von heute wechseln
+            if !pinned, let cur = res.current, cur != conversationId { await openConversation(cur) }
             await planReminders()
         } catch {
             handle(error)
         }
+    }
+
+    // MARK: Schnellaktionen
+
+    private static let fallbackActions = [
+        QuickAction(id: "voice", symbol: "mic.fill", label: "Sprachnachricht", kind: "mic"),
+        QuickAction(id: "week", symbol: "calendar.badge.clock", label: "Woche planen", kind: "send", text: "Plan meine Woche"),
+        QuickAction(id: "forgot", symbol: "questionmark.bubble.fill", label: "Hab ich was vergessen?", kind: "send", text: "Hab ich was vergessen?"),
+        QuickAction(id: "briefing", symbol: "sun.max.fill", label: "Briefing", kind: "send", text: "Briefing"),
+    ]
+
+    /** höchstens alle 30 Minuten neu (die Reihenfolge ändert sich mit der Uhrzeit); `force` nach Profiländerung */
+    func loadQuick(force: Bool = false) async {
+        guard loggedIn, force || Date().timeIntervalSince(lastQuick) > 1800 else { return }
+        if let q: QuickActions = try? await api.get("/api/quick-actions") {
+            quick = q
+            lastQuick = Date()
+        }
+    }
+
+    // MARK: Chats
+
+    /** Einen Chat zeigen (alter Chat: lesbar und fortsetzbar) */
+    func openConversation(_ id: String) async {
+        guard let list: [ChatMessage] = try? await api.get("/api/conversations/\(id)/messages?limit=80") else { return }
+        messages = list
+        conversationId = id
+        pinned = id != current
+        persist()
+    }
+
+    /** „Neuer Chat“: ein leerer Chat von heute (ein schon leerer wird wiederverwendet) */
+    func newConversation() async {
+        guard let r: NewConversation = try? await api.send("POST", "/api/conversations") else { return }
+        messages = []
+        conversationId = r.id
+        current = r.id
+        pinned = false
+        conversations = r.conversations
+        persist()
     }
 
     private func merge(items incoming: [Item]) {
@@ -192,11 +316,16 @@ final class Store {
         thinking = true
         defer { thinking = false }
 
-        struct Body: Encodable { var text: String; var clientId: String; var images: [String] }
+        struct Body: Encodable { var text: String; var clientId: String; var images: [String]; var conversationId: String? }
         let body = Body(text: trimmed, clientId: clientId,
-                        images: images.map { "data:image/jpeg;base64,\($0.base64EncodedString())" })
+                        images: images.map { "data:image/jpeg;base64,\($0.base64EncodedString())" },
+                        conversationId: conversationId)
         do {
             let res: ChatResponse = try await api.send("POST", "/api/chat", body: body)
+            if let c = res.conversationId, c != conversationId {
+                conversationId = c
+                if !pinned { current = c }
+            }
             if let u = res.userMessage { merge(messages: [u]) }
             merge(messages: res.messages)
             merge(items: res.items)
@@ -206,7 +335,7 @@ final class Store {
         } catch let e as APIError where e.isOffline && images.isEmpty {
             // ohne Netz: später schicken
             online = false
-            outbox.append(Outbox(clientId: clientId, text: trimmed, createdAt: now))
+            outbox.append(Outbox(clientId: clientId, text: trimmed, createdAt: now, conversationId: conversationId))
             persist()
         } catch {
             messages.removeAll { $0.id == local.id }
@@ -215,12 +344,82 @@ final class Store {
         }
     }
 
+    // MARK: Sprachnachrichten
+
+    /** Aufnahme schicken: Stella schreibt sie ab und behandelt den Text wie eine getippte Nachricht */
+    func sendVoice(fileURL: URL, seconds: Int) async {
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        guard let data = try? Data(contentsOf: fileURL), !data.isEmpty else { return }
+        let clientId = UUID().uuidString
+        let local = ChatMessage(id: "local-\(clientId)", clientId: clientId, role: "user", text: "🎤 Sprachnachricht …",
+                                attachments: [], createdAt: ISO.string(Date()), pending: true)
+        messages.append(local)
+        thinking = true
+        defer { thinking = false }
+        var path = "/api/chat/audio?clientId=\(clientId)&duration=\(seconds)"
+        if let c = conversationId { path += "&conversationId=\(c)" }
+        var req = api.request("POST", path)
+        req.setValue("audio/mp4", forHTTPHeaderField: "Content-Type")
+        req.httpBody = data
+        do {
+            let res = try JSONDecoder().decode(AudioResponse.self, from: try await api.raw(req))
+            finishVoice(local.id, res)
+        } catch {
+            voiceFailed(local.id, error)
+        }
+    }
+
+    /** „Nochmal versuchen“: die gespeicherte Aufnahme erneut abschreiben lassen */
+    func retryVoice(_ localId: String) async {
+        guard let i = messages.firstIndex(where: { $0.id == localId }), let audioId = messages[i].failedAudioId else { return }
+        struct Body: Encodable { var audioId: String; var clientId: String?; var conversationId: String? }
+        thinking = true
+        defer { thinking = false }
+        do {
+            let res: AudioResponse = try await api.send("POST", "/api/chat/audio/retry",
+                                                        body: Body(audioId: audioId, clientId: messages[i].clientId, conversationId: conversationId))
+            finishVoice(localId, res)
+        } catch {
+            voiceFailed(localId, error)
+        }
+    }
+
+    private func finishVoice(_ localId: String, _ res: AudioResponse) {
+        messages.removeAll { $0.id == localId }
+        if let c = res.conversationId, c != conversationId {
+            conversationId = c
+            if !pinned { current = c }
+        }
+        if let u = res.userMessage { merge(messages: [u]) }
+        merge(messages: res.messages)
+        merge(items: res.items)
+        online = true
+        persist()
+        Haptics.soft()
+    }
+
+    private func voiceFailed(_ localId: String, _ error: Error) {
+        if let e = error as? APIError, let audioId = e.audioId, let i = messages.firstIndex(where: { $0.id == localId }) {
+            // Abschreiben ging nicht, die Aufnahme liegt aber auf dem Server → bleibt mit „Nochmal versuchen“ stehen
+            messages[i].pending = false
+            messages[i].text = "🎤 Sprachnachricht – nicht abgeschrieben"
+            messages[i].failedAudioId = audioId
+            messages.append(ChatMessage(id: "err-\(UUID().uuidString)", clientId: nil, role: "assistant", text: "😕 \(e.message)",
+                                        attachments: [], createdAt: ISO.string(Date())))
+        } else {
+            messages.removeAll { $0.id == localId }
+            messages.append(ChatMessage(id: "err-\(UUID().uuidString)", clientId: nil, role: "assistant",
+                                        text: "😕 \(error.localizedDescription)", attachments: [], createdAt: ISO.string(Date())))
+        }
+        persist()
+    }
+
     private func flushOutbox() async {
         guard !outbox.isEmpty else { return }
-        struct Body: Encodable { var text: String; var clientId: String }
+        struct Body: Encodable { var text: String; var clientId: String; var conversationId: String? }
         while let next = outbox.first {
             do {
-                let res: ChatResponse = try await api.send("POST", "/api/chat", body: Body(text: next.text, clientId: next.clientId))
+                let res: ChatResponse = try await api.send("POST", "/api/chat", body: Body(text: next.text, clientId: next.clientId, conversationId: next.conversationId))
                 outbox.removeFirst()
                 if let u = res.userMessage { merge(messages: [u]) }
                 merge(messages: res.messages)
@@ -296,7 +495,8 @@ final class Store {
         let waiting = Set(outbox.map { "local-\($0.clientId)" })
         let kept = messages.filter { m in m.pending != true || waiting.contains(m.id) }
         let cache = Cache(me: me, items: Array(items.values), messages: kept, outbox: outbox, lastSync: lastSync,
-                          actions: Array(actions.values))
+                          actions: Array(actions.values), conversationId: conversationId, pinned: pinned,
+                          current: current, conversations: conversations)
         if let data = try? JSONEncoder().encode(cache) { try? data.write(to: cacheURL, options: .atomic) }
     }
 
@@ -308,6 +508,10 @@ final class Store {
         outbox = cache.outbox
         lastSync = cache.lastSync
         actions = Dictionary((cache.actions ?? []).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        conversationId = cache.conversationId
+        pinned = cache.pinned ?? false
+        current = cache.current
+        conversations = cache.conversations ?? []
     }
 }
 
@@ -330,4 +534,10 @@ enum SettingValue: Encodable {
 enum Haptics {
     @MainActor static func soft() { UIImpactFeedbackGenerator(style: .soft).impactOccurred() }
     @MainActor static func success() { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+}
+
+/** Wo die Einführung beginnt: ganz vorn oder – zum Bearbeiten des Profils – bei „Was trifft auf dich zu?“ */
+enum OnboardingStart: String, Identifiable {
+    case welcome, situation
+    var id: String { rawValue }
 }

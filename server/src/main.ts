@@ -8,7 +8,7 @@ import {
   deleteSecret, hasSecret, HttpError, login, logout, register, requireUser, setSecret, userByIngestToken, userCount,
 } from './auth.ts';
 import {
-  addMessage, db, getUser, itemsChangedSince, listItems, messagesSince, newId, now, recentMessages, updateUserSettings,
+  addMessage, conversationMessages, conversationMessagesSince, db, getConversation, getUser, itemsChangedSince, listItems, newId, now, recentMessages, updateUserSettings,
   type User, type UserSettings,
 } from './db.ts';
 import { handleChat } from './assistant.ts';
@@ -19,7 +19,7 @@ import { startScheduler } from './scheduler.ts';
 import { toICalendar } from './ical.ts';
 import { getBookCredentials, listShelf, LOGIN_PAGES, normalizeCookies, PROVIDERS, saveBookCredentials, screenshotPage, secretName } from './books.ts';
 import { deleteUserFont, renderHandwriting, saveUserFont, userFontPath } from './handwriting.ts';
-import { checkAllMail, draftReply, getMailEvent, listAccounts, PRESETS, publicAccounts, restoreMail, saveAccounts, setEventField, testAccount, type MailAccount } from './mail.ts';
+import { checkAllMail, draftReply, getMailBody, getMailEvent, isMailCategory, listAccounts, moveMail, PRESETS, publicAccounts, restoreMail, saveAccounts, setEventField, testAccount, type MailAccount } from './mail.ts';
 import { lessonsFor, syncUntis, testUntis, type UntisCredentials } from './untis.ts';
 import { FILE_TYPES, filePath, saveDataUrl, saveFile } from './files.ts';
 import type { BookProvider } from './db.ts';
@@ -30,6 +30,11 @@ import { LlmUnavailable } from './llm.ts';
 import { buildBriefing } from './briefing.ts';
 import { cleanBlocks, planWeek } from './weekplan.ts';
 import { acceptHint, dismissHint } from './hints.ts';
+import { registerAdminRoutes } from './admin.ts';
+import { registerQuickRoutes } from './quick.ts';
+import { registerProfileRoutes, registerSignupRoutes, registrationMode } from './signup.ts';
+import { registerAudioRoutes } from './audio.ts';
+import { currentConversation, listConversations, registerConversationRoutes } from './conversations.ts';
 import { addMemory, cleanSchedule, deleteMemory, isCategory, listMemories, MEMORY_CATEGORIES, updateMemory } from './memory.ts';
 
 // trustProxy nur für Caddy auf derselben Maschine – sonst ließe sich die Absender-Adresse fälschen
@@ -37,7 +42,8 @@ const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, bodyLi
 app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: 5 * 1024 * 1024 }, (_req, body, done) => done(null, body));
 
 app.setErrorHandler((err, _req, reply) => {
-  if (err instanceof HttpError) return reply.code(err.status).send({ error: err.message });
+  if (err instanceof HttpError) return reply.code(err.status).send({ ...err.extra, error: err.message });
+  if ((err as { statusCode?: number }).statusCode === 413) return reply.code(413).send({ error: 'Das ist zu groß (Sprachnachrichten: höchstens 2 Minuten bzw. 10 MB).' });
   app.log.error(err);
   return reply.code(500).send({ error: 'Interner Fehler' });
 });
@@ -46,7 +52,7 @@ const str = (v: unknown, max = 4000) => (typeof v === 'string' ? v.slice(0, max)
 
 function publicUser(user: User) {
   return {
-    id: user.id, name: user.name, email: user.email, timeZone: user.timeZone, settings: user.settings,
+    id: user.id, name: user.name, email: user.email, timeZone: user.timeZone, settings: user.settings, role: user.role,
     ingestUrl: `${config.publicUrl}/api/ingest/${user.ingestToken}`,
     integrations: {
       books: Object.fromEntries((Object.keys(PROVIDERS) as BookProvider[]).map((p) => {
@@ -66,15 +72,10 @@ function publicUser(user: User) {
 // ---------- öffentlich ----------
 
 app.get('/api/status', async () => ({
-  ok: true, hasUsers: userCount() > 0, registrationOpen: userCount() === 0 || config.allowRegistration,
+  ok: true, hasUsers: userCount() > 0, registration: registrationMode(), registrationOpen: userCount() === 0 || registrationMode() !== 'closed',
 }));
 
-app.post('/api/auth/register', async (req) => {
-  const b = req.body as Record<string, unknown>;
-  const { token, user } = register(str(b.name, 80) || 'Du', str(b.email, 200), str(b.password, 200), str(b.timeZone, 60), str(b.device, 80));
-  addMessage(user.id, 'assistant', voice(user.settings.tone).welcome(user.name));
-  return { token, user: publicUser(user) };
-});
+registerSignupRoutes(app, publicUser);
 
 app.post('/api/auth/login', async (req) => {
   const b = req.body as Record<string, unknown>;
@@ -164,6 +165,11 @@ app.register(async (api) => {
     return { ok: true };
   });
 
+  registerAdminRoutes(api);
+  registerQuickRoutes(api);
+  registerProfileRoutes(api, publicUser);
+  registerAudioRoutes(api);
+
   api.get('/api/me', async (req) => publicUser(req.user));
 
   api.patch('/api/settings', async (req) => {
@@ -212,6 +218,11 @@ app.register(async (api) => {
       if (!isTone(b.tone)) throw new HttpError(400, 'Ton muss nett, frech oder cool sein');
       patch.tone = b.tone;
     }
+    if (b.name !== undefined) {
+      const name = str(b.name, 80).trim();
+      if (!name) throw new HttpError(400, 'Der Name darf nicht leer sein.');
+      db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name, req.user.id);
+    }
     let tz: string | undefined;
     if (b.timeZone) {
       try { new Intl.DateTimeFormat('de', { timeZone: str(b.timeZone) }); tz = str(b.timeZone); } catch { throw new HttpError(400, 'Unbekannte Zeitzone'); }
@@ -232,7 +243,7 @@ app.register(async (api) => {
       try { return saveDataUrl(String(d)); } catch { throw new HttpError(400, 'Bild konnte nicht gelesen werden'); }
     });
     if (!text && !images.length) throw new HttpError(400, 'Leere Nachricht');
-    return handleChat(req.user, text, str(b.clientId, 100) || null, images);
+    return handleChat(req.user, text, str(b.clientId, 100) || null, images, str(b.conversationId, 100) || null);
   });
 
   api.get('/api/messages', async (req) => {
@@ -246,21 +257,22 @@ app.register(async (api) => {
       WHERE user_id = ? AND status IN ('queued', 'running') AND type IN ('book_page', 'digi4school_page', 'solve_homework')`)
     .all(userId) as { id: string }[]).map((r) => r.id).filter(Boolean);
 
+  registerConversationRoutes(api);
+
+  // `conversation`: welchen Chat das Gerät gerade hält (sonst der neueste von heute). `current` ist immer der neueste von heute.
   api.get('/api/sync', async (req) => {
-    const since = str((req.query as Record<string, string>).since);
+    const q = req.query as Record<string, string>;
+    const since = str(q.since);
     const serverTime = now();
+    const current = currentConversation(req.user.id);
+    const conversationId = (q.conversation && getConversation(req.user.id, q.conversation)?.id) || current;
+    const messages = !conversationId ? [] : since ? conversationMessagesSince(req.user.id, conversationId, since) : conversationMessages(req.user.id, conversationId, 80);
+    const common = { messages, serverTime, busyItems: busyItems(req.user.id), conversationId, current, conversations: listConversations(req.user) };
     if (!since) {
       const today = todayIn(req.user.timeZone);
-      const items = listItems(req.user.id, { from: addDays(today, -30), includeDone: true });
-      return {
-        items, messages: recentMessages(req.user.id, 80), serverTime, busyItems: busyItems(req.user.id),
-        actions: listActions(req.user.id, { limit: 100 }),
-      };
+      return { items: listItems(req.user.id, { from: addDays(today, -30), includeDone: true }), ...common, actions: listActions(req.user.id, { limit: 100 }) };
     }
-    return {
-      items: itemsChangedSince(req.user.id, since), messages: messagesSince(req.user.id, since), serverTime,
-      busyItems: busyItems(req.user.id), actions: listActions(req.user.id, { since }),
-    };
+    return { items: itemsChangedSince(req.user.id, since), ...common, actions: listActions(req.user.id, { since }) };
   });
 
   // Anstehende Erinnerungen – die iOS-App plant daraus lokale Mitteilungen
@@ -492,6 +504,24 @@ app.register(async (api) => {
     // der Klick auf „Senden“ nach dem Lesen des Textes ist die Zustimmung
     const action = r.status === 'proposed' ? approve(req.user.id, r.actionId).entry : null;
     return { ok: true, action };
+  });
+  // Volltext einer Mail (bei Bedarf per IMAP geholt, 30 Tage zwischengespeichert)
+  api.get('/api/inbox/:id/body', async (req: FastifyRequest<{ Params: { id: string } }>) => {
+    const ev = getMailEvent(req.user.id, req.params.id);
+    if (!ev) throw new HttpError(404, 'Mail nicht gefunden');
+    try {
+      return await getMailBody(req.user.id, req.params.id);
+    } catch (err) {
+      // Postfach gerade nicht erreichbar: wenigstens den gespeicherten Auszug zeigen
+      if (typeof ev.payload.snippet === 'string' && ev.payload.snippet) return { body: ev.payload.snippet, truncated: true, cached: false, partial: true };
+      throw new HttpError(502, `Ich komme gerade nicht an die Mail ran (${(err as Error).message}).`);
+    }
+  });
+  // Von Hand einsortieren: important | normal | newsletter | spam – Stella merkt sich den Absender
+  api.post('/api/inbox/:id/category', async (req: FastifyRequest<{ Params: { id: string } }>) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    if (!isMailCategory(b.category)) throw new HttpError(400, 'Unbekannte Kategorie');
+    try { return { ok: true, ...(await moveMail(req.user.id, req.params.id, b.category)) }; } catch (err) { throw new HttpError(404, (err as Error).message); }
   });
   api.post('/api/inbox/:id/handled', async (req: FastifyRequest<{ Params: { id: string } }>) => {
     const b = (req.body ?? {}) as Record<string, unknown>;

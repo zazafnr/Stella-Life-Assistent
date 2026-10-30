@@ -10,6 +10,8 @@ struct SettingsView: View {
     @State private var notifications: UNAuthorizationStatus = .notDetermined
     @State private var error: String?
     @State private var confirmLogout = false
+    @State private var confirmDelete = false
+    @State private var deletePassword = ""
     @State private var server = API.shared.server
 
     var body: some View {
@@ -37,6 +39,19 @@ struct SettingsView: View {
                         }
                     } header: {
                         Text("Wie Stella schreibt")
+                    }
+
+                    Section {
+                        Button { store.onboardingRequest = .situation } label: {
+                            row("Profil", symbol: "person.crop.circle", tint: Theme.pink, detail: Self.profileSummary(me))
+                        }
+                        Button { store.onboardingRequest = .welcome } label: {
+                            row("Einführung wiederholen", symbol: "sparkles", tint: Theme.blue, detail: nil)
+                        }
+                    } header: {
+                        Text("Du & Stella")
+                    } footer: {
+                        Text("Hier stellst du Stella neu auf dich ein: Lebenssituation, Arbeitszeiten, wobei sie helfen soll.")
                     }
 
                     Section {
@@ -87,13 +102,19 @@ struct SettingsView: View {
                     }
 
                     Section {
-                        connection("Schulbücher", symbol: "books.vertical", on: me.integrations.books.values.contains { $0.connected },
-                                   detail: "digi4school · scook")
-                        connection("WebUntis", symbol: "calendar.badge.clock", on: me.integrations.webuntis, detail: "Stundenplan & Entfall")
-                        connection("E-Mail", symbol: "envelope", on: me.integrations.mailAccounts > 0,
-                                   detail: me.integrations.mailAccounts == 1 ? "1 Postfach" : "\(me.integrations.mailAccounts) Postfächer")
-                        connection("Handschrift", symbol: "pencil.and.scribble", on: me.integrations.handwritingFont, detail: "eigene Schrift für das Heft")
-                        connection("FreeNotes", symbol: "ipad.and.iphone", on: me.integrations.freeNotes ?? false, detail: "Heft auf dem iPad")
+                        if me.isSchool {
+                            connection("Schulbücher", symbol: "books.vertical", on: me.integrations.books.values.contains { $0.connected },
+                                       detail: "digi4school · scook")
+                            connection("WebUntis", symbol: "calendar.badge.clock", on: me.integrations.webuntis, detail: "Stundenplan & Entfall")
+                        }
+                        if me.has("mails") {
+                            connection("E-Mail", symbol: "envelope", on: me.integrations.mailAccounts > 0,
+                                       detail: me.integrations.mailAccounts == 1 ? "1 Postfach" : "\(me.integrations.mailAccounts) Postfächer")
+                        }
+                        if me.isSchool {
+                            connection("Handschrift", symbol: "pencil.and.scribble", on: me.integrations.handwritingFont, detail: "eigene Schrift für das Heft")
+                            connection("FreeNotes", symbol: "ipad.and.iphone", on: me.integrations.freeNotes ?? false, detail: "Heft auf dem iPad")
+                        }
                         NavigationLink {
                             ConnectionsView()
                         } label: {
@@ -135,6 +156,18 @@ struct SettingsView: View {
                         Text("Erinnerungen werden auf dem Gerät eingeplant und kommen auch ohne Internet pünktlich.")
                     }
 
+                    if me.role == "owner" {
+                        Section {
+                            NavigationLink { ServerKeysView() } label: {
+                                row("Schlüssel & Absender", symbol: "key.horizontal", tint: Theme.blue, detail: nil)
+                            }
+                        } header: {
+                            Text("Server")
+                        } footer: {
+                            Text("Groq, OpenRouter und der Mail-Absender für Bestätigungs-Codes – nur für dich als Owner sichtbar.")
+                        }
+                    }
+
                     if let ai {
                         Section {
                             VStack(alignment: .leading, spacing: 8) {
@@ -165,6 +198,21 @@ struct SettingsView: View {
                                 }
                         }
                         Button("Abmelden", role: .destructive) { confirmLogout = true }
+                        Button("Konto löschen …", role: .destructive) { deletePassword = ""; confirmDelete = true }
+                    }
+
+                    Section {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Stella by EVOLSIOR – Built to become")
+                                .font(.system(size: 15, weight: .semibold))
+                            Text("Der Name steckt in zwei Wörtern: Evolic (sich weiterentwickeln) und Excelsior (immer höher hinaus).")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Theme.muted)
+                        }
+                    } header: {
+                        Text("Über Stella")
+                    } footer: {
+                        Text("Version 2.0")
                     }
                 }
 
@@ -185,12 +233,36 @@ struct SettingsView: View {
                     dismiss()
                 }
             }
+            .alert("Konto löschen", isPresented: $confirmDelete) {
+                SecureField("Passwort", text: $deletePassword)
+                Button("Endgültig löschen", role: .destructive) {
+                    Task {
+                        do {
+                            try await store.deleteAccount(password: deletePassword)
+                            dismiss()
+                        } catch {
+                            self.error = error.localizedDescription
+                        }
+                    }
+                }
+                Button("Abbrechen", role: .cancel) {}
+            } message: {
+                Text("Dein Konto und alle Daten – Chats, Einträge, Mails, Fotos, Aufnahmen und was Stella über dich weiß – werden unwiderruflich gelöscht. Zur Bestätigung dein Passwort.")
+            }
             .task {
                 notifications = await Notifier.shared.status()
                 await store.refreshMe()
                 ai = try? await API.shared.get("/api/ai/status", as: AIStatus.self)
             }
         }
+    }
+
+    private static func profileSummary(_ me: Me) -> String {
+        guard let p = me.settings.profile else { return "noch nicht eingerichtet" }
+        let names = ["school": "Schule", "university": "Studium", "work": "Job", "apprenticeship": "Lehre", "other": "Alltag"]
+        let label = names[p.situation] ?? p.situation
+        if let w = p.workHours { return "\(label) · \(w.start)–\(w.end)" }
+        return label
     }
 
     private var notificationLabel: String {

@@ -6,7 +6,7 @@ export type ItemStatus = 'open' | 'done' | 'cancelled';
 
 export interface Attachment {
   id: string;
-  kind: 'image';
+  kind: 'image' | 'audio';
   caption?: string;
 }
 
@@ -40,6 +40,8 @@ export interface ChatMessage {
   createdAt: string;
   /** offline in der App erzeugt, noch nicht synchronisiert */
   pending?: boolean;
+  /** nur im Gerät: Sprachnachricht, die Stella nicht abschreiben konnte – die Aufnahme liegt auf dem Server, „Nochmal versuchen“ nutzt diese Id */
+  failedAudioId?: string;
   /** gehört zu einer Aktion (Vorschlag mit Ja/Nein oder Erledigtes mit „Rückgängig“) */
   actionId?: string;
 }
@@ -80,9 +82,24 @@ export interface Memory {
   updatedAt: string;
 }
 
+/** Ein Chat. Jeder Tag startet automatisch einen neuen; mehrere am Tag bekommen einen Titel. */
+export interface Conversation {
+  id: string;
+  /** KI-Titel (höchstens 5 Wörter) oder null */
+  title: string | null;
+  /** was angezeigt wird: Titel, sonst „Heute“, „Gestern“ oder „Mi, 4.11.“ */
+  label: string;
+  day: string;
+  lastMessage: string | null;
+  updatedAt: string;
+  count: number;
+}
+
 export interface ChatResponse {
   messages: ChatMessage[];
   items: Item[];
+  /** in welchem Chat die Nachricht gelandet ist */
+  conversationId?: string;
   /** die gespeicherte Nutzer-Nachricht (mit Fotos), ersetzt den lokalen Platzhalter */
   userMessage?: ChatMessage;
 }
@@ -95,6 +112,12 @@ export interface SyncResponse {
   busyItems?: string[];
   /** Aktionen und Vorschläge, die sich seit `since` geändert haben */
   actions?: ActionEntry[];
+  /** der Chat, zu dem `messages` gehören */
+  conversationId?: string | null;
+  /** der neueste Chat von heute (null: heute noch nichts geschrieben) */
+  current?: string | null;
+  /** die letzten Chats mit Titel, neueste zuerst */
+  conversations?: Conversation[];
 }
 
 export interface HealthDay {
@@ -161,3 +184,35 @@ export interface WeekPlan {
   /** Zeit, die schon fest eingeplant ist (Minuten je Tag) – für die Wochenansicht */
   load: { date: string; freeMinutes: number; plannedMinutes: number }[];
 }
+
+// ---------- Profil (Einführung, Paket 5) ----------
+
+export const SITUATIONS = ['school', 'university', 'work', 'apprenticeship', 'other'] as const;
+export type Situation = (typeof SITUATIONS)[number];
+export const FEATURES = ['mails', 'planner', 'homework', 'shopping', 'goals', 'finance', 'health'] as const;
+export type Feature = (typeof FEATURES)[number];
+export const AGE_GROUPS = ['u14', '14-17', '18-24', '25-34', '35-49', '50+'] as const;
+export type AgeGroup = (typeof AGE_GROUPS)[number];
+
+/** Wer Stella benutzt und wobei sie helfen soll – steuert Oberfläche, Hinweise und Planung */
+export interface UserProfile {
+  situation: Situation;
+  ageGroup?: AgeGroup;
+  /** Arbeitstage (1 = Montag … 7 = Sonntag) und Zeiten; Pendeln ja/nein */
+  workHours?: { days: number[]; start: string; end: string; commute?: boolean };
+  school?: { level: string };
+  university?: { name: string };
+  features: Feature[];
+}
+
+/** Sieht dieses Profil die Funktion? Ohne Profil (ältere Konten) bleibt alles wie bisher, nur Finanzen braucht eine Einrichtung. */
+export function profileHas(profile: UserProfile | undefined, feature: Feature): boolean {
+  if (!profile) return feature !== 'finance';
+  if (feature === 'homework' && profile.situation !== 'school') return false;
+  return profile.features.includes(feature);
+}
+
+/** Schule im engen Sinn: Schulbücher, HÜ-Autopilot, WebUntis. Ohne Profil = ja (wie bisher). */
+export const profileIsSchool = (profile: UserProfile | undefined) => !profile || profile.situation === 'school';
+/** Schule oder Studium: Tests, Lerneinheiten, Lernpläne */
+export const profileIsLearner = (profile: UserProfile | undefined) => !profile || profile.situation === 'school' || profile.situation === 'university';

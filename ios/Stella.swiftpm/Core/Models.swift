@@ -43,6 +43,8 @@ struct ChatMessage: Codable, Hashable, Identifiable {
     var pending: Bool?
     /** Karte mit Ja/Nein oder „Rückgängig“ */
     var actionId: String?
+    /** nur im Gerät: Sprachnachricht, die Stella nicht abschreiben konnte – „Nochmal versuchen“ nutzt diese Id */
+    var failedAudioId: String?
 
     var isUser: Bool { role == "user" }
 }
@@ -99,10 +101,53 @@ struct PermissionRow: Codable, Hashable, Identifiable {
     var id: String { group }
 }
 
+/** Ein Chat: jeder Tag startet einen neuen, mehrere am Tag bekommen einen Titel */
+struct Conversation: Codable, Hashable, Identifiable {
+    var id: String
+    var title: String?
+    /** Titel, sonst „Heute“, „Gestern“ oder „Mi, 4.11.“ */
+    var label: String
+    var day: String
+    var lastMessage: String?
+    var updatedAt: String
+    var count: Int
+}
+
+/** Antwort auf eine Sprachnachricht: wie ChatResponse, dazu das Transkript und die Id der Aufnahme */
+struct AudioResponse: Codable {
+    var messages: [ChatMessage]
+    var items: [Item]
+    var userMessage: ChatMessage?
+    var conversationId: String?
+    var transcript: String
+    var audioId: String
+}
+
+/** Schnellaktion im Chat: Chip bzw. große Karte im leeren Chat */
+struct QuickAction: Codable, Hashable, Identifiable {
+    var id: String
+    var symbol: String
+    var label: String
+    /** text = in die Eingabe einfügen, send = sofort schicken, camera = Kamera öffnen, mic = Aufnahme */
+    var kind: String
+    var text: String?
+}
+
+struct QuickActions: Codable {
+    var actions: [QuickAction]
+    var cards: [QuickAction]
+}
+
+struct NewConversation: Codable {
+    var id: String
+    var conversations: [Conversation]
+}
+
 struct ChatResponse: Codable {
     var messages: [ChatMessage]
     var items: [Item]
     var userMessage: ChatMessage?
+    var conversationId: String?
 }
 
 struct SyncResponse: Codable {
@@ -111,6 +156,9 @@ struct SyncResponse: Codable {
     var serverTime: String
     var busyItems: [String]?
     var actions: [ActionEntry]?
+    var conversationId: String?
+    var current: String?
+    var conversations: [Conversation]?
 }
 
 struct BookConfig: Codable, Hashable {
@@ -119,6 +167,28 @@ struct BookConfig: Codable, Hashable {
     var url: String
     var pageOffset: Int?
     var pageUrlTemplate: String?
+}
+
+struct WorkHours: Codable, Hashable {
+    var days: [Int]
+    var start: String
+    var end: String
+    var commute: Bool?
+}
+
+struct SchoolInfo: Codable, Hashable { var level: String }
+struct UniversityInfo: Codable, Hashable { var name: String }
+
+/** Wer Stella benutzt und wobei sie helfen soll (Einführung) – steuert, was die App zeigt */
+struct UserProfile: Codable, Hashable {
+    /** school, university, work, apprenticeship, other */
+    var situation: String
+    var ageGroup: String?
+    var workHours: WorkHours?
+    var school: SchoolInfo?
+    var university: UniversityInfo?
+    /** mails, planner, homework, shopping, goals, finance, health */
+    var features: [String]
 }
 
 struct UserSettings: Codable, Hashable {
@@ -134,6 +204,9 @@ struct UserSettings: Codable, Hashable {
     var briefing: String?
     /** Sonntagabend Wochenplan anbieten: "sunday" oder "off" */
     var weekPlan: String?
+    var profile: UserProfile?
+    /** "pending": die Einführung kommt beim nächsten Öffnen; "done": erledigt oder übersprungen */
+    var onboarding: String?
 }
 
 /** Ein Block im Wochenplan-Vorschlag */
@@ -258,8 +331,21 @@ struct Me: Codable, Hashable {
     var settings: UserSettings
     var ingestUrl: String
     var integrations: Integrations
+    /** der erste Nutzer ist "owner" und sieht „Server“ in den Einstellungen */
+    var role: String?
 
     var firstName: String { name.split(separator: " ").first.map(String.init) ?? name }
+
+    /** Sieht dieses Profil die Funktion? Ohne Profil (ältere Konten) wie bisher – nur Finanzen braucht eine Einrichtung. */
+    func has(_ feature: String) -> Bool {
+        guard let p = settings.profile else { return feature != "finance" }
+        if feature == "homework" && p.situation != "school" { return false }
+        return p.features.contains(feature)
+    }
+    /** Schulbücher, HÜ-Autopilot, WebUntis – ohne Profil wie bisher */
+    var isSchool: Bool { settings.profile.map { $0.situation == "school" } ?? true }
+    /** Tests, Lerneinheiten, Lernpläne: Schule oder Studium */
+    var isLearner: Bool { settings.profile.map { $0.situation == "school" || $0.situation == "university" } ?? true }
 }
 
 struct AuthResponse: Codable {
@@ -271,6 +357,16 @@ struct ServerStatus: Codable {
     var ok: Bool
     var hasUsers: Bool
     var registrationOpen: Bool
+    /** closed, invite oder open */
+    var registration: String?
+}
+
+/** Antwort auf Registrieren: Sitzung (erstes Konto) oder „erst Code bestätigen“ */
+struct SignupResponse: Decodable {
+    var token: String?
+    var user: Me?
+    var needsVerification: Bool?
+    var email: String?
 }
 
 struct Lesson: Codable, Hashable, Identifiable {
@@ -285,6 +381,10 @@ struct Lesson: Codable, Hashable, Identifiable {
     var id: String { "\(date)-\(start)-\(code ?? subject ?? "")" }
     var cancelled: Bool { status == "cancelled" }
     var name: String { subject ?? code ?? "Stunde" }
+}
+
+enum InboxTab: String, CaseIterable {
+    case important = "Wichtig", normal = "Neutral", newsletter = "Unwichtig", trash = "Papierkorb"
 }
 
 struct InboxEntry: Codable, Hashable, Identifiable {
@@ -308,6 +408,17 @@ struct InboxEntry: Codable, Hashable, Identifiable {
 
     var trashed: Bool { action == "trash" }
     var important: Bool { category == "important" }
+    /** Wichtig / Neutral / Unwichtig / Papierkorb – Social-Benachrichtigungen zählen zu „Unwichtig“, SMS zu „Wichtig“ */
+    var tab: InboxTab {
+        if source == "sms" { return .important }
+        if source == "social" { return .newsletter }
+        if trashed || category == "spam" { return .trash }
+        switch category {
+        case "important": return .important
+        case "newsletter": return .newsletter
+        default: return .normal
+        }
+    }
     var date: Date? { ISO.parse(createdAt) }
     /** „Wichtig für dich“: wichtige Mail der letzten 7 Tage, noch nicht erledigt */
     var focus: Bool {

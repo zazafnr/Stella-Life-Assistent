@@ -93,3 +93,13 @@ export function formatDateDe(ymd: Ymd, today?: Ymd): string {
   const [, m, d] = ymd.split('-').map(Number);
   return `${WEEKDAYS_DE[weekdayOf(ymd)]}, ${d}.${m}.`;
 }
+
+const WEEKDAYS_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
+/** „Heute“, „Gestern“ oder „Mi, 4.11.“ – für Chat-Listen */
+export function dayLabel(day: Ymd, today: Ymd): string {
+  if (day === today) return 'Heute';
+  if (day === addDays(today, -1)) return 'Gestern';
+  const [, m, d] = day.split('-').map(Number) as [number, number, number];
+  return `${WEEKDAYS_SHORT[weekdayOf(day)] ?? ''}, ${d}.${m}.`;
+}

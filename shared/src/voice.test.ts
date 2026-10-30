@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { planReminders } from './planning.ts';
-import { isTone, toneInstruction, TONES, voice } from './voice.ts';
+import { isTone, STYLE_RULES, toneInstruction, TONES, voice } from './voice.ts';
 
 const hw = { kind: 'homework' as const, title: 'Latein HÜ', detail: 'S. 45 Nr. 3', due: '2026-10-30' };
 
@@ -30,4 +30,23 @@ test('Ton-Prüfung und KI-Stil', () => {
   assert.ok(isTone('cool'));
   assert.ok(!isTone('böse'));
   assert.match(toneInstruction('frech'), /nie gemein/i);
+});
+
+test('feste Texte bleiben kurz: höchstens 6 Zeilen und 450 Zeichen, in jedem Ton', () => {
+  for (const tone of TONES) {
+    const v = voice(tone) as unknown as Record<string, unknown>;
+    for (const [name, fn] of Object.entries(v)) {
+      if (typeof fn !== 'function') continue;
+      let out: unknown;
+      try { out = (fn as (...a: unknown[]) => unknown)('Beispiel', 'Beispiel', 'Beispiel', 'Beispiel'); } catch { continue; }
+      if (typeof out !== 'string') continue;
+      assert.ok(out.split('\n').length <= 6, `${tone}.${name} hat mehr als 6 Zeilen`);
+      assert.ok(out.length <= 450, `${tone}.${name} ist ${out.length} Zeichen lang`);
+    }
+  }
+});
+
+test('Antwortstil steckt in der Stilvorgabe jedes Tons', () => {
+  for (const tone of TONES) assert.match(toneInstruction(tone), /etwa 6 Zeilen.*Aufzählungen.*keine Überschriften/i);
+  assert.match(STYLE_RULES, /hilfsbereiter Kumpel/);
 });

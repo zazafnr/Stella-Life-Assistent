@@ -11,7 +11,7 @@ export function hashPassword(password: string): string {
   return `scrypt$${salt.toString('base64')}$${hash.toString('base64')}`;
 }
 
-function verifyPassword(password: string, stored: string): boolean {
+export function verifyPassword(password: string, stored: string): boolean {
   const [, salt, hash] = stored.split('$');
   const expected = Buffer.from(hash, 'base64');
   const actual = scryptSync(password, Buffer.from(salt, 'base64'), expected.length);
@@ -22,7 +22,7 @@ function verifyPassword(password: string, stored: string): boolean {
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 
-function createSession(userId: string, device?: string): string {
+export function createSession(userId: string, device?: string): string {
   const token = randomBytes(32).toString('base64url');
   db.prepare('INSERT INTO sessions (token_hash, user_id, device, created_at, last_seen) VALUES (?, ?, ?, ?, ?)')
     .run(sha256(token), userId, device ?? null, now(), now());
@@ -37,10 +37,11 @@ export function register(name: string, email: string, password: string, timeZone
   if (userCount() > 0 && !config.allowRegistration) throw new HttpError(403, 'Registrierung ist geschlossen.');
   if (password.length < 8) throw new HttpError(400, 'Passwort muss mindestens 8 Zeichen haben.');
   const id = newId();
+  const role = userCount() === 0 ? 'owner' : 'user';
   try {
-    db.prepare('INSERT INTO users (id, name, email, password_hash, time_zone, ingest_token, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    db.prepare('INSERT INTO users (id, name, email, password_hash, time_zone, ingest_token, created_at, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(id, name.trim(), email.trim().toLowerCase(), hashPassword(password), timeZone || config.defaultTimeZone,
-        randomBytes(24).toString('base64url'), now());
+        randomBytes(24).toString('base64url'), now(), role);
   } catch {
     throw new HttpError(409, 'Diese E-Mail ist schon registriert.');
   }
@@ -82,6 +83,7 @@ export function login(email: string, password: string, device?: string, ip = '')
     throw new HttpError(401, 'E-Mail oder Passwort falsch.');
   }
   keys.forEach((k) => failures.delete(k));
+  if (!getUser(row.id)!.verified) throw new HttpError(403, 'Bitte bestätige zuerst deine E-Mail-Adresse – der Code steht in der Mail von Stella.', { needsVerification: true, email: mail });
   return { token: createSession(row.id, device), user: getUser(row.id)! };
 }
 
@@ -105,13 +107,19 @@ export async function requireUser(req: FastifyRequest, reply: FastifyReply) {
   req.user = user;
 }
 
+/** Nur für den Owner (erster Nutzer): Server-Schlüssel und Einladungen. Läuft nach requireUser. */
+export async function requireOwner(req: FastifyRequest, reply: FastifyReply) {
+  if (req.user?.role !== 'owner') return reply.code(403).send({ error: 'Das darf nur der Owner dieses Servers.' });
+}
+
 export function userByIngestToken(token: string): User | null {
   const row = db.prepare('SELECT id FROM users WHERE ingest_token = ?').get(token) as { id: string } | undefined;
   return row ? getUser(row.id) : null;
 }
 
 export class HttpError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  /** `extra` geht mit in die Antwort (z. B. needsVerification) */
+  constructor(public status: number, message: string, public extra: Record<string, unknown> = {}) { super(message); }
 }
 
 // ---------- Verschlüsselte Zugangsdaten (digi4school, E-Mail-Konten …) ----------

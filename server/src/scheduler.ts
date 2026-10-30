@@ -9,7 +9,8 @@ import { nightlyLearning } from './learning.ts';
 import { maybeSendBriefing } from './briefing.ts';
 import { deliverHints } from './hints.ts';
 import { maybeOfferWeek, replanMissed } from './weekplan.ts';
-import { checkAllMail, listAccounts, sendMail } from './mail.ts';
+import { titleOldChats } from './conversations.ts';
+import { checkAllMail, listAccounts, purgeMailBodies, sendMail } from './mail.ts';
 import { syncUntis } from './untis.ts';
 import { fetchBookPage } from './books.ts';
 import { solveHomework } from './homework.ts';
@@ -78,10 +79,12 @@ async function every(key: string, ms: number, fn: () => Promise<void>) {
 }
 
 async function periodic() {
+  await every('mail-bodies', 6 * 3600_000, async () => { purgeMailBodies(); }).catch((err) => console.warn('Mail-Cache:', err.message));
   for (const userId of allUserIds()) {
     if (listAccounts(userId).length) {
       await every(`mail:${userId}`, 5 * 60_000, () => checkAllMail(userId)).catch((err) => console.warn('Mail:', err.message));
     }
+    await every(`titles:${userId}`, 30 * 60_000, () => titleOldChats(userId)).catch((err) => console.warn('Chat-Titel:', err.message));
     await every(`learn:${userId}`, 30 * 60_000, () => nightlyLearning(userId)).catch((err) => console.warn('Lernen:', err.message));
     await every(`briefing:${userId}`, 2 * 60_000, async () => { await maybeSendBriefing(userId); }).catch((err) => console.warn('Briefing:', err.message));
     await every(`hints:${userId}`, 10 * 60_000, () => deliverHints(userId)).catch((err) => console.warn('Hinweise:', err.message));

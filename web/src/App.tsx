@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { api, authenticate, refreshMe, startBackgroundSync, useStore } from './store.ts';
+import { api, ApiError, authenticate, meHas, meIsSchool, refreshMe, resendCode, startBackgroundSync, useStore, verifyEmail } from './store.ts';
 import { Today } from './components/Today.tsx';
 import { Chat } from './components/Chat.tsx';
 import { Planner } from './components/Planner.tsx';
 import { Inbox } from './components/Inbox.tsx';
 import { Health } from './components/Health.tsx';
 import { Settings } from './components/Settings.tsx';
+import { Intro, dismissBoot, introShown } from './components/Intro.tsx';
+import { Onboarding } from './components/Onboarding.tsx';
 import { Icon, type IconName } from './ui/Icon.tsx';
 import { Sky, StarMark, showToast } from './ui/Decor.tsx';
 
@@ -31,8 +33,19 @@ export function App() {
   const online = useStore((s) => s.online);
   const items = useStore((s) => s.items);
   const [tab, setTab] = useState<Tab>(initialTab);
+  const me = useStore((s) => s.me);
+  /** Einführung: beim ersten Mal von selbst (onboarding = pending), später aus den Einstellungen */
+  const [onboarding, setOnboarding] = useState<{ startAt: 'welcome' | 'situation' } | null>(null);
+  const showOnboarding = onboarding ?? (me?.settings.onboarding === 'pending' ? { startAt: 'welcome' as const } : null);
 
   const hasMe = useStore((s) => !!s.me);
+  const lastSync = useStore((s) => s.lastSync);
+  const [intro, setIntro] = useState(() => !introShown());
+  const [ready, setReady] = useState(false);
+  // Ladebildschirm (steht in index.html) geht weg, sobald Anmeldestatus und Daten da sind – spätestens nach 4 s
+  useEffect(() => { if (!token || hasMe || lastSync) setReady(true); }, [token, hasMe, lastSync]);
+  useEffect(() => { const t = setTimeout(() => setReady(true), 4000); return () => clearTimeout(t); }, []);
+  useEffect(() => { if (ready) dismissBoot(); }, [ready]);
   useEffect(() => { if (token) startBackgroundSync(); }, [token]);
   useEffect(() => { if (token && !hasMe) void refreshMe().catch(() => {}); }, [token, hasMe]);
   useEffect(() => { history.replaceState(null, '', tab === 'today' ? location.pathname : `#${tab}`); }, [tab]);
@@ -54,22 +67,28 @@ export function App() {
     return () => removeEventListener('resize', paint);
   }, [tab]);
 
-  const openHomework = useMemo(() => Object.values(items).filter((i) => i.kind === 'homework' && i.status === 'open' && !i.deleted).length, [items]);
+  const school = meIsSchool(me);
+  const openHomework = useMemo(() => (school ? Object.values(items).filter((i) => i.kind === 'homework' && i.status === 'open' && !i.deleted).length : 0), [items, school]);
 
-  if (!token) return <Login />;
+  const introLayer = intro ? <Intro onDone={() => setIntro(false)} /> : null;
+
+  if (!token) return <>{introLayer}<Login /></>;
 
   return (
+    <>
+    {introLayer}
+    {showOnboarding && <Onboarding startAt={showOnboarding.startAt} onDone={(after) => { setOnboarding(null); if (after === 'settings') setTab('settings'); }} />}
     <div className="app">
       <div className="desktop-drag" aria-hidden="true" />
       <nav className="sidebar" aria-label="Navigation">
         <div className="brand"><span style={{ color: 'var(--pink)' }}><StarMark size={18} /></span>Stella</div>
-        {TABS.map(([t, icon, label]) => (
+        {TABS.filter(([t]) => t !== 'inbox' || meHas(me, 'mails')).map(([t, icon, label]) => (
           <button key={t} type="button" className={tab === t ? 'side-link active' : 'side-link'} onClick={() => setTab(t)} aria-current={tab === t ? 'page' : undefined}>
             <Icon name={icon} size={19} />{label}
             {t === 'planner' && openHomework > 0 && <span className="side-badge">{openHomework}</span>}
           </button>
         ))}
-        <button type="button" className={tab === 'health' ? 'side-link active' : 'side-link'} onClick={() => setTab('health')}><Icon name="heart" size={19} />Gesundheit</button>
+        {meHas(me, 'health') && <button type="button" className={tab === 'health' ? 'side-link active' : 'side-link'} onClick={() => setTab('health')}><Icon name="heart" size={19} />Gesundheit</button>}
         <div className="side-spacer" />
         <button type="button" className={tab === 'settings' ? 'side-link active' : 'side-link'} onClick={() => setTab('settings')}><Icon name="gear" size={19} />Einstellungen</button>
       </nav>
@@ -81,48 +100,76 @@ export function App() {
         {tab === 'planner' && <Planner />}
         {tab === 'inbox' && <Inbox />}
         {tab === 'health' && <Health back={() => setTab('today')} />}
-        {tab === 'settings' && <Settings back={() => setTab('today')} />}
+        {tab === 'settings' && <Settings back={() => setTab('today')} openOnboarding={(startAt) => setOnboarding({ startAt })} />}
       </main>
 
       <nav className="tabbar" aria-label="Navigation">
-        {TABS.map(([t, icon, label]) => (
+        {TABS.filter(([t]) => t !== 'inbox' || meHas(me, 'mails')).map(([t, icon, label]) => (
           <button key={t} type="button" className={tab === t ? 'tab active' : 'tab'} onClick={() => setTab(t)} aria-current={tab === t ? 'page' : undefined}>
             <Icon name={icon} size={22} />{label}
           </button>
         ))}
       </nav>
     </div>
+    </>
   );
 }
 
 function Login() {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [mode, setMode] = useState<'login' | 'register' | 'verify'>('login');
+  const [form, setForm] = useState({ name: '', email: '', password: '', invite: '', code: '' });
+  const [registration, setRegistration] = useState<'closed' | 'invite' | 'open'>('invite');
+  const [hasUsers, setHasUsers] = useState(true);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
+  const [wait, setWait] = useState(0);
 
   useEffect(() => {
-    api<{ hasUsers: boolean }>('/api/status')
-      .then((s) => { if (!s.hasUsers) setMode('register'); })
+    api<{ hasUsers: boolean; registration?: 'closed' | 'invite' | 'open' }>('/api/status')
+      .then((s) => { setHasUsers(s.hasUsers); setRegistration(s.registration ?? 'invite'); if (!s.hasUsers) setMode('register'); })
       .catch(() => setError('Server nicht erreichbar.'));
   }, []);
+  useEffect(() => {
+    if (wait <= 0) return;
+    const t = setTimeout(() => setWait(wait - 1), 1000);
+    return () => clearTimeout(t);
+  }, [wait]);
+
+  const toVerify = (email: string, note: string) => { setForm((f) => ({ ...f, email, code: '' })); setMode('verify'); setInfo(note); setWait(60); };
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError('');
+    setInfo('');
     try {
-      await authenticate(mode, form);
+      if (mode === 'verify') {
+        await verifyEmail(form.email, form.code);
+      } else {
+        const res = await authenticate(mode, form);
+        if (res?.needsVerification) toVerify(res.email, `Ich habe dir einen 6-stelligen Code an ${res.email} geschickt. Er gilt 15 Minuten.`);
+      }
     } catch (err) {
-      setError((err as Error).message);
+      if (err instanceof ApiError && err.data.needsVerification) toVerify(String(err.data.email ?? form.email), 'Dein Konto ist noch nicht bestätigt. Gib den Code aus der Mail ein – oder fordere einen neuen an.');
+      else setError((err as Error).message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function again() {
+    setError('');
+    try { await resendCode(form.email); setInfo('Neuer Code ist unterwegs.'); setWait(60); } catch (err) {
+      setError((err as Error).message);
+      if (err instanceof ApiError && typeof err.data.retryIn === 'number') setWait(err.data.retryIn);
     }
   }
 
   const field = (key: keyof typeof form) => ({
     value: form[key], onChange: (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value }),
   });
+  const canRegister = !hasUsers || registration !== 'closed';
 
   return (
     <div className="login">
@@ -131,14 +178,37 @@ function Login() {
         <div className="login-star"><StarMark size={34} /></div>
         <h1 className="display">Stella</h1>
         <p className="tagline">Let Stella handle your life.</p>
-        {mode === 'register' && <label className="field" style={{ textAlign: 'left' }}>Dein Name<input autoComplete="given-name" required {...field('name')} /></label>}
-        <label className="field" style={{ textAlign: 'left' }}>E-Mail<input type={mode === 'login' ? 'text' : 'email'} inputMode="email" autoCapitalize="none" autoComplete="email" required {...field('email')} /></label>
-        <label className="field" style={{ textAlign: 'left' }}>Passwort<input type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={mode === 'login' ? 1 : 8} required {...field('password')} /></label>
+        {mode === 'verify' ? (
+          <>
+            {info && <p className="muted small" style={{ margin: 0 }}>{info}</p>}
+            <label className="field" style={{ textAlign: 'left' }}>Code aus der Mail
+              <input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,7}" maxLength={7} required autoFocus placeholder="123456" {...field('code')} style={{ letterSpacing: '.3em', fontSize: 22, textAlign: 'center' }} />
+            </label>
+          </>
+        ) : (
+          <>
+            {mode === 'register' && <label className="field" style={{ textAlign: 'left' }}>Dein Name<input autoComplete="given-name" required {...field('name')} /></label>}
+            <label className="field" style={{ textAlign: 'left' }}>E-Mail<input type={mode === 'login' ? 'text' : 'email'} inputMode="email" autoCapitalize="none" autoComplete="email" required {...field('email')} /></label>
+            <label className="field" style={{ textAlign: 'left' }}>Passwort<input type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={mode === 'login' ? 1 : 8} required {...field('password')} /></label>
+            {mode === 'register' && hasUsers && registration === 'invite' && (
+              <label className="field" style={{ textAlign: 'left' }}>Einladungscode<input autoCapitalize="characters" autoComplete="off" required placeholder="ABCD-EFGH" {...field('invite')} /></label>
+            )}
+          </>
+        )}
         {error && <p className="error-text" style={{ margin: 0 }}>{error}</p>}
-        <button type="submit" className="btn block" disabled={busy}>{mode === 'login' ? 'Anmelden' : 'Konto erstellen'}</button>
-        <button type="button" className="link" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
-          {mode === 'login' ? 'Noch kein Konto?' : 'Schon ein Konto? Anmelden'}
-        </button>
+        {mode !== 'verify' && info && <p className="muted small" style={{ margin: 0 }}>{info}</p>}
+        <button type="submit" className="btn block" disabled={busy}>{mode === 'login' ? 'Anmelden' : mode === 'register' ? 'Konto erstellen' : 'Bestätigen'}</button>
+        {mode === 'verify' ? (
+          <>
+            <button type="button" className="link" disabled={wait > 0} onClick={() => void again()}>{wait > 0 ? `Neuen Code senden (${wait} s)` : 'Neuen Code senden'}</button>
+            <button type="button" className="link" onClick={() => { setMode('login'); setError(''); setInfo(''); }}>Zurück zur Anmeldung</button>
+          </>
+        ) : canRegister ? (
+          <button type="button" className="link" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setInfo(''); }}>
+            {mode === 'login' ? 'Noch kein Konto?' : 'Schon ein Konto? Anmelden'}
+          </button>
+        ) : <p className="muted small" style={{ margin: 0 }}>Neue Konten sind gerade nicht möglich.</p>}
+        <p className="by-evolsior">by EVOLSIOR</p>
       </form>
     </div>
   );

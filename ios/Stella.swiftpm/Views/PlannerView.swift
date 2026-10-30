@@ -10,6 +10,18 @@ struct PlannerView: View {
     @State private var showAdd = false
     @State private var planning = Demo.opens("weekplan")
 
+    /** HÜs nur in der Schule, Tests und Lernplan in Schule und Studium */
+    private var availableFilters: [Filter] {
+        let me = store.me
+        return Filter.allCases.filter { f in
+            switch f {
+            case .homework: return me?.isSchool ?? true
+            case .exams: return me?.isLearner ?? true
+            default: return true
+            }
+        }
+    }
+
     enum Filter: String, CaseIterable, Identifiable {
         case all = "Alles", homework = "HÜs", exams = "Tests", other = "Termine"
         var id: String { rawValue }
@@ -62,7 +74,7 @@ struct PlannerView: View {
                         }
                         .buttonStyle(PressableStyle())
                         Picker("Filter", selection: $filter) {
-                            ForEach(Filter.allCases) { Text($0.rawValue).tag($0) }
+                            ForEach(availableFilters) { Text($0.rawValue).tag($0) }
                         }
                         .pickerStyle(.segmented)
 

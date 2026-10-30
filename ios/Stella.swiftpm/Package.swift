@@ -35,7 +35,8 @@ let package = Package(
             capabilities: [
                 .camera(purposeString: "Fotografiere Arbeitsblätter und Hefteinträge, damit Stella sie lesen kann."),
                 .photoLibrary(purposeString: "Wähle Fotos von Arbeitsblättern für Stella aus."),
-                .motion(purposeString: "Stella zählt deine Schritte für dein Tagesziel.")
+                .motion(purposeString: "Stella zählt deine Schritte für dein Tagesziel."),
+                .microphone(purposeString: "Stella nimmt deine Sprachnachrichten auf, damit du nicht tippen musst.")
             ],
             appCategory: .productivity
         )

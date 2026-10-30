@@ -64,6 +64,7 @@ struct Cloud: View {
 struct Sky: View {
     var clouds = true
     var height: CGFloat = 320
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -76,13 +77,20 @@ struct Sky: View {
                 .offset(x: 140, y: 120)
             if clouds {
                 TimelineView(.animation(minimumInterval: 1 / 30)) { ctx in
-                    let t = ctx.date.timeIntervalSinceReferenceDate
+                    // bei „Bewegung reduzieren“ stehen die Wolken still
+                    let t = reduceMotion ? 0 : ctx.date.timeIntervalSinceReferenceDate
                     GeometryReader { geo in
                         let w = geo.size.width
                         drifting(Cloud(width: 110), t: t, speed: 9, phase: 0.1, y: 24, w: w)
                         drifting(Cloud(width: 74), t: t, speed: 6, phase: 0.55, y: 70, w: w).opacity(0.85)
                         drifting(Cloud(width: 130), t: t, speed: 12, phase: 0.8, y: 120, w: w).opacity(0.7)
-                        ShootingStar(t: t, width: w)
+                        // hoher Himmel (ganzer Chat): weitere, hellere Wolken weiter unten
+                        if height > 600 {
+                            drifting(Cloud(width: 150), t: t, speed: 5, phase: 0.3, y: height * 0.32, w: w).opacity(0.55)
+                            drifting(Cloud(width: 100), t: t, speed: 7, phase: 0.7, y: height * 0.5, w: w).opacity(0.45)
+                            drifting(Cloud(width: 170), t: t, speed: 4, phase: 0.05, y: height * 0.7, w: w).opacity(0.4)
+                        }
+                        if !reduceMotion { ShootingStar(t: t, width: w) }
                     }
                 }
                 .frame(height: height)

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { addDays, formatDateDe, todayIn, weekdayOf, type Item } from '@stella/shared';
-import { api, deleteItem, patchItem, useStore } from '../store.ts';
+import { api, deleteItem, meIsLearner, meIsSchool, patchItem, useStore } from '../store.ts';
 import { AuthImage, Lightbox } from './Rich.tsx';
 import { Icon } from '../ui/Icon.tsx';
 import { Confetti, Sky, showToast } from '../ui/Decor.tsx';
@@ -10,6 +10,8 @@ interface Lesson { date: string; start: string; end: string; subject: string | n
 
 type Filter = 'all' | 'school' | 'exams' | 'study';
 const FILTERS: [Filter, string][] = [['all', 'Alles'], ['school', 'HÜs'], ['exams', 'Tests'], ['study', 'Lernplan']];
+/** HÜs nur in der Schule, Tests und Lernplan in Schule und Studium */
+const filtersFor = (school: boolean, learner: boolean) => FILTERS.filter(([f]) => f === 'all' || (f === 'school' ? school : learner));
 const matches = (f: Filter, i: Item) =>
   f === 'all' || (f === 'school' && (i.kind === 'homework' || i.kind === 'assignment'))
   || (f === 'exams' && i.kind === 'exam') || (f === 'study' && i.kind === 'study');
@@ -29,7 +31,8 @@ const KIND_LABEL: Record<string, string> = {
 export function Planner() {
   const itemsById = useStore((s) => s.items);
   const busy = useStore((s) => s.busyItems);
-  const tz = useStore((s) => s.me?.timeZone ?? 'Europe/Vienna');
+  const me = useStore((s) => s.me);
+  const tz = me?.timeZone ?? 'Europe/Vienna';
   const today = todayIn(tz);
   const [day, setDay] = useState(today);
   const [filter, setFilter] = useState<Filter>('all');
@@ -144,7 +147,7 @@ export function Planner() {
         </button>
 
         <div className="segmented rise" role="tablist" aria-label="Filter">
-          {FILTERS.map(([f, label]) => (
+          {filtersFor(meIsSchool(me), meIsLearner(me)).map(([f, label]) => (
             <button key={f} type="button" role="tab" aria-selected={filter === f} className={filter === f ? 'active' : ''} onClick={() => setFilter(f)}>{label}</button>
           ))}
         </div>

@@ -4,7 +4,11 @@ import { config } from './config.ts';
 import { newId } from './db.ts';
 
 const dir = path.join(config.dataDir, 'files');
-export const FILE_TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' };
+export const FILE_TYPES: Record<string, string> = {
+  png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp',
+  // Sprachnachrichten (Paket 4)
+  m4a: 'audio/mp4', webm: 'audio/webm', mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav',
+};
 
 export function filePath(id: string): string | null {
   const safe = id.replace(/[^a-f0-9-]/g, '');

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { getState } from '../store.ts';
+import { fetchFileUrl, getState } from '../store.ts';
+import { Icon } from '../ui/Icon.tsx';
 
 /** Minimaler Formatierer für **fett**, _kursiv_ und Zeilenumbrüche – ohne HTML-Einschleusung. */
 export function Rich({ text }: { text: string }) {
@@ -47,5 +48,37 @@ export function Lightbox({ url, onClose }: { url: string; onClose: () => void })
       <img src={url} alt="" />
       <a className="lightbox-save btn" href={url} download="stella-aufgabe.png" onClick={(e) => e.stopPropagation()}>Sichern</a>
     </div>
+  );
+}
+
+/** Sprachnachricht abspielen: lädt die Aufnahme erst beim ersten Antippen (sie braucht den Login). */
+export function AudioPlayer({ id }: { id: string }) {
+  const [state, setState] = useState<'idle' | 'loading' | 'playing' | 'failed'>('idle');
+  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
+  useEffect(() => () => { audio?.pause(); if (audio) URL.revokeObjectURL(audio.src); }, [audio]);
+
+  async function toggle() {
+    if (audio) {
+      if (audio.paused) { void audio.play(); setState('playing'); } else { audio.pause(); setState('idle'); }
+      return;
+    }
+    setState('loading');
+    try {
+      const a = new Audio(await fetchFileUrl(id));
+      a.onended = () => setState('idle');
+      setAudio(a);
+      await a.play();
+      setState('playing');
+    } catch {
+      setState('failed');
+    }
+  }
+
+  return (
+    <button type="button" className="audio-play" onClick={() => void toggle()} aria-label={state === 'playing' ? 'Pausieren' : 'Sprachnachricht abspielen'}>
+      <span className="audio-play-btn"><Icon name={state === 'playing' ? 'pause' : 'play'} size={16} filled={state !== 'playing'} /></span>
+      <span className="audio-wave" aria-hidden="true">{[5, 9, 14, 8, 16, 11, 6, 13, 9, 5].map((h, i) => <i key={i} style={{ height: h }} />)}</span>
+      <span className="small">{state === 'loading' ? 'lädt …' : state === 'failed' ? 'nicht verfügbar' : 'Sprachnachricht'}</span>
+    </button>
   );
 }

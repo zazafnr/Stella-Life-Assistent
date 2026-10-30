@@ -135,6 +135,10 @@ darf – sonst bleibt es beim Hinweis.
 
 ## 8. Fahrplan
 
+> **Stella v2** (Registrierung für alle Lebenslagen, Groq, Chats nach Tagen, Sprache, Listen, Ziele,
+> Ausgaben, „Was Stella vorhat“) steht Paket für Paket in [`docs/plan/stella-v2.md`](plan/stella-v2.md).
+> Ausgeliefert wird mit `scripts/deploy-vps.sh`.
+
 **Phase 1: dieser Stand** ✅
 Chat, Kurznotizen (auch offline), Planer, Erinnerungen, Lernpläne, Push, Kalender-Abo, Gesundheit und SMS über Kurzbefehle, digi4school (Kalibrierung offen), automatische KI-Modellwahl.
 

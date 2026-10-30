@@ -10,6 +10,7 @@
 import { addDays, formatDateDe, timeIn, voice, type Hint, type Item } from '@stella/shared';
 import { levelFor, perform, type ActionParams, type ActionType, type Performed } from './actions.ts';
 import { buildLagebild, toMin, type Lagebild } from './context.ts';
+import { hasFeature, isLearner, isSchool } from './profile.ts';
 import { addMessage, db, getUser, now, setPending, type PendingType, type User } from './db.ts';
 import { bookFor } from './planner.ts';
 import { pushToUser } from './push.ts';
@@ -46,8 +47,8 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
   const tomorrowDay = lb.days.find((d) => d.date === tomorrow);
   const today = lb.days[0]!;
 
-  // Tests: Stoff fehlt / kein Lernplan
-  for (const e of lb.exams) {
+  // Tests: Stoff fehlt / kein Lernplan (nur Schule und Studium)
+  for (const e of isLearner(user) ? lb.exams : []) {
     if (e.daysLeft < 1) continue;
     if (!e.hasMaterial && e.daysLeft <= 10) {
       out.push({
@@ -65,8 +66,8 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
   }
 
   // Verpasste Lerneinheiten neu einplanen
-  const allItems = db.prepare(`SELECT id, title, due, parent_id FROM items WHERE user_id = ? AND deleted = 0 AND status = 'open'
-    AND kind = 'study' AND due < ? AND due >= ?`).all(user.id, lb.today, addDays(lb.today, -7)) as { id: string; title: string; due: string; parent_id: string | null }[];
+  const allItems = (!isLearner(user) ? [] : db.prepare(`SELECT id, title, due, parent_id FROM items WHERE user_id = ? AND deleted = 0 AND status = 'open'
+    AND kind = 'study' AND due < ? AND due >= ?`).all(user.id, lb.today, addDays(lb.today, -7))) as { id: string; title: string; due: string; parent_id: string | null }[];
   for (const s of allItems) {
     const exam = lb.exams.find((e) => e.exam.id === s.parent_id);
     if (!exam) continue;
@@ -94,7 +95,7 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
     const dueTomorrow = tomorrowDay.items.filter((i) => i.status === 'open');
 
     // Stunde entfällt, die HÜ dafür ist aber noch für morgen eingetragen
-    const cancelled = tomorrowDay.lessons.filter((l) => l.status === 'cancelled' && l.subject);
+    const cancelled = !isSchool(user) ? [] : tomorrowDay.lessons.filter((l) => l.status === 'cancelled' && l.subject);
     for (const l of cancelled) {
       const stillThere = tomorrowDay.lessons.some((x) => x.subject === l.subject && x.status !== 'cancelled');
       if (stillThere) continue;
@@ -111,7 +112,7 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
 
     // HÜ für morgen, aber weder Foto noch Buchseite – Autopilot kann nichts tun
     const afternoon = toMin(lb.now) >= toMin('14:00');
-    if (afternoon && levelFor(user, 'homework') !== 'never') {
+    if (afternoon && isSchool(user) && levelFor(user, 'homework') !== 'never') {
       for (const hw of dueTomorrow.filter((i) => i.kind === 'homework')) {
         if (hw.attachments.length || (hw.page && bookFor(user, hw.subject))) continue;
         out.push({ key: `no_source:${hw.id}`, priority: 'high', itemId: hw.id, text: v.hintNoSource(hw.title), open: { tab: 'chat', label: 'Foto schicken' } });
@@ -127,7 +128,7 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
 
   // Mails, die auf eine Antwort warten (älter als ein halber Tag)
   const halfDay = Date.now() - 12 * 3600_000;
-  for (const m of lb.importantInbox) {
+  for (const m of hasFeature(user, 'mails') ? lb.importantInbox : []) {
     if (!m.needsReply || m.source !== 'email' || Date.parse(m.createdAt) > halfDay) continue;
     out.push({ key: `reply:${m.id}`, priority: 'normal', text: v.hintReply(m.sender ?? 'Jemand', m.summary), open: { tab: 'inbox', label: 'Antwort schreiben' } });
   }

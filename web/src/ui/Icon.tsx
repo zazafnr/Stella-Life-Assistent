@@ -36,6 +36,9 @@ const PATHS: Record<string, string> = {
   memory: 'M12 4a4 4 0 0 0-4 4 3.5 3.5 0 0 0-2 6.3V17a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3v-2.7A3.5 3.5 0 0 0 16 8a4 4 0 0 0-4-4zM12 4v16M9 11h1.5M13.5 13H15',
   history: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2',
   undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
+  mic: 'M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zM6 11a6 6 0 0 0 12 0M12 17v4M9 21h6',
+  play: 'M8 5l11 7-11 7z',
+  pause: 'M8 5v14M16 5v14',
 };
 
 export type IconName = keyof typeof PATHS;

@@ -30,6 +30,8 @@ enum Tab: Hashable { case today, chat, planner, inbox }
 
 struct RootView: View {
     @Environment(Store.self) private var store
+    @AppStorage("evolsiorIntroShown") private var introShown = false
+    @State private var launchDelayPassed = false
     @State private var tab: Tab = {
         switch Demo.tab {
         case "chat": return .chat
@@ -39,7 +41,36 @@ struct RootView: View {
         }
     }()
 
+    /** das EVOLSIOR-Intro läuft nur beim allerersten Start (nicht in den Screenshot-Läufen der CI) */
+    private var showIntro: Bool { !introShown && Demo.token == nil }
+    /** Ladebildschirm nur, wenn das Laden länger als 0,3 s dauert, damit nichts flackert */
+    private var showLaunch: Bool { !store.ready && (launchDelayPassed || showIntro) }
+
     var body: some View {
+        ZStack {
+            content
+            if showLaunch {
+                LaunchView()
+                    .transition(.opacity)
+                    .zIndex(1)
+            }
+            if showIntro {
+                IntroView { introShown = true }
+                    .zIndex(2)
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: showLaunch)
+        .fullScreenCover(item: Binding(get: { store.loggedIn ? store.activeOnboarding : nil }, set: { if $0 == nil { store.onboardingRequest = nil } })) { start in
+            OnboardingView(startAt: start)
+                .environment(store)
+        }
+        .task {
+            try? await Task.sleep(for: .milliseconds(300))
+            launchDelayPassed = true
+        }
+    }
+
+    @ViewBuilder private var content: some View {
         if store.loggedIn {
             TabView(selection: $tab) {
                 TodayView(go: { tab = $0 })
@@ -52,9 +83,11 @@ struct RootView: View {
                     .tabItem { Label("Planer", systemImage: "calendar") }
                     .tag(Tab.planner)
                     .badge(store.openHomework)
-                InboxView()
-                    .tabItem { Label("Inbox", systemImage: "tray") }
-                    .tag(Tab.inbox)
+                if store.me?.has("mails") != false {
+                    InboxView()
+                        .tabItem { Label("Inbox", systemImage: "tray") }
+                        .tag(Tab.inbox)
+                }
             }
             .task { store.start() }
             .transition(.opacity)

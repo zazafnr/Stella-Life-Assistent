@@ -5,8 +5,8 @@
 
 import { useSyncExternalStore } from 'react';
 import {
-  formatDateDe, interpret, todayIn, type ActionEntry, type ActionGroup, type ChatMessage, type ChatResponse, type Item, type PermissionLevel,
-  type SyncResponse, type Tone,
+  formatDateDe, interpret, profileHas, profileIsLearner, profileIsSchool, todayIn, type ActionEntry, type ActionGroup, type ChatMessage, type ChatResponse, type Conversation, type Item, type PermissionLevel,
+  type SyncResponse, type Tone, type Feature, type UserProfile,
 } from '@stella/shared';
 
 export type BookProvider = 'digi4school' | 'scook';
@@ -14,12 +14,16 @@ export interface BookConfig { subject: string; provider: BookProvider; url: stri
 
 export interface Me {
   id: string; name: string; email: string; timeZone: string; ingestUrl: string;
+  /** der erste Nutzer ist 'owner' und sieht „Server“ in den Einstellungen */
+  role?: 'owner' | 'user';
   settings: {
     eveningTime?: string; studyTime?: string; stepGoal?: number;
     books?: BookConfig[]; homeworkAutopilot?: boolean; mailAutoTrash?: boolean; tone?: Tone;
     permissions?: Partial<Record<ActionGroup, PermissionLevel>>;
     briefing?: string;
     weekPlan?: 'sunday' | 'off';
+    profile?: UserProfile;
+    onboarding?: 'pending' | 'done';
   };
   integrations: {
     books: Record<BookProvider, { connected: boolean; cookies: boolean; email: string | null }>;
@@ -31,7 +35,7 @@ export interface Me {
   };
 }
 
-interface OutboxEntry { clientId: string; text: string; createdAt: string }
+interface OutboxEntry { clientId: string; text: string; createdAt: string; conversationId?: string | null }
 
 interface State {
   token: string | null;
@@ -45,12 +49,19 @@ interface State {
   busyItems: string[];
   /** Aktionen und Vorschläge von Stella (für Karten mit Ja/Nein und „Rückgängig“) */
   actions: Record<string, ActionEntry>;
+  /** der Chat, dessen Nachrichten `messages` zeigt */
+  conversationId: string | null;
+  /** true: ein älterer Chat wurde bewusst geöffnet – dann springt die Ansicht nicht von selbst auf den neuesten von heute */
+  pinned: boolean;
+  /** der neueste Chat von heute laut Server */
+  current: string | null;
+  conversations: Conversation[];
 }
 
 const STORAGE_KEY = 'stella-state-v1';
 
 function load(): State {
-  const base: State = { token: null, me: null, items: {}, messages: [], outbox: [], lastSync: null, online: navigator.onLine, thinking: false, busyItems: [], actions: {} };
+  const base: State = { token: null, me: null, items: {}, messages: [], outbox: [], lastSync: null, online: navigator.onLine, thinking: false, busyItems: [], actions: {}, conversationId: null, pinned: false, current: null, conversations: [] };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return { ...base, ...JSON.parse(raw), online: navigator.onLine, thinking: false };
@@ -77,7 +88,7 @@ export const getState = () => state;
 
 // ---------- HTTP ----------
 
-export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
+export class ApiError extends Error { constructor(public status: number, message: string, public data: Record<string, unknown> = {}) { super(message); } }
 
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
@@ -86,7 +97,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   const res = await fetch(path, { ...init, headers, body: init.json !== undefined ? JSON.stringify(init.json) : init.body });
   if (res.status === 401 && state.token) { logoutLocal(); throw new ApiError(401, 'Bitte neu anmelden.'); }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? `Fehler ${res.status}`);
+  if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? `Fehler ${res.status}`, data as Record<string, unknown>);
   return data as T;
 }
 
@@ -94,17 +105,37 @@ const isNetworkError = (err: unknown) => !(err instanceof ApiError);
 
 // ---------- Anmeldung ----------
 
-export async function authenticate(mode: 'login' | 'register', body: Record<string, string>) {
-  const device = /iPhone|iPad/.test(navigator.userAgent) ? 'iOS' : navigator.platform;
-  const { token, user } = await api<{ token: string; user: Me }>(`/api/auth/${mode}`, {
-    method: 'POST', json: { ...body, device, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-  });
-  set({ token, me: user, items: {}, messages: [], outbox: [], lastSync: null, actions: {} });
-  await sync();
+const deviceName = () => (/iPhone|iPad/.test(navigator.userAgent) ? 'iOS' : navigator.platform);
+
+function startSession(token: string, user: Me) {
+  set({ token, me: user, items: {}, messages: [], outbox: [], lastSync: null, actions: {}, conversationId: null, pinned: false, current: null, conversations: [] });
+  return sync();
 }
 
+/** Anmelden oder registrieren. Bei einem neuen Konto (nicht das erste) schickt der Server erst einen Code per Mail: Ergebnis `{ needsVerification }`. */
+export async function authenticate(mode: 'login' | 'register', body: Record<string, string>): Promise<{ needsVerification: true; email: string } | undefined> {
+  const res = await api<{ token?: string; user?: Me; needsVerification?: boolean; email?: string }>(`/api/auth/${mode}`, {
+    method: 'POST', json: { ...body, device: deviceName(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+  });
+  if (res.needsVerification) return { needsVerification: true, email: res.email ?? body.email! };
+  await startSession(res.token!, res.user!);
+  return undefined;
+}
+
+export async function verifyEmail(email: string, code: string) {
+  const { token, user } = await api<{ token: string; user: Me }>('/api/auth/verify', { method: 'POST', json: { email, code, device: deviceName() } });
+  await startSession(token, user);
+}
+
+export const resendCode = (email: string) => api<{ ok: boolean }>('/api/auth/resend', { method: 'POST', json: { email } });
+
+/** Sieht dieses Profil die Funktion? (Ohne Profil wie bisher.) */
+export const meHas = (me: Me | null, f: Feature) => profileHas(me?.settings.profile, f);
+export const meIsSchool = (me: Me | null) => profileIsSchool(me?.settings.profile);
+export const meIsLearner = (me: Me | null) => profileIsLearner(me?.settings.profile);
+
 export function logoutLocal() {
-  set({ token: null, me: null, items: {}, messages: [], outbox: [], lastSync: null, actions: {} });
+  set({ token: null, me: null, items: {}, messages: [], outbox: [], lastSync: null, actions: {}, conversationId: null, pinned: false, current: null, conversations: [] });
 }
 
 export async function logout() {
@@ -164,14 +195,28 @@ export function sync(): Promise<void> {
   syncing ??= (async () => {
     try {
       await flushOutbox();
-      const q = state.lastSync ? `?since=${encodeURIComponent(state.lastSync)}` : '';
+      const params = new URLSearchParams();
+      if (state.lastSync) params.set('since', state.lastSync);
+      if (state.conversationId) params.set('conversation', state.conversationId);
+      const q = params.size ? `?${params}` : '';
       const res = await api<SyncResponse>(`/api/sync${q}`);
-      notifyDesktop(res.messages, !state.lastSync);
-      if (!state.lastSync) set({ items: {} });
+      const firstSync = !state.lastSync;
+      notifyDesktop(res.messages, firstSync);
+      if (firstSync) set({ items: {} });
       mergeItems(res.items);
+      // anderer Chat als der gehaltene (erster Abgleich, Chat verschwunden): Ansicht ersetzen statt mischen
+      const switched = (res.conversationId ?? null) !== state.conversationId;
+      if (switched) set({ messages: [], conversationId: res.conversationId ?? null });
       mergeMessages(res.messages);
-      mergeActions(res.actions ?? [], !state.lastSync);
-      set({ lastSync: res.serverTime, online: true, busyItems: res.busyItems ?? [] });
+      if (switched && !firstSync && res.conversationId) {
+        // der Abgleich lieferte nur Neues – den ganzen Chat nachladen
+        const all = await api<ChatMessage[]>(`/api/conversations/${res.conversationId}/messages?limit=80`).catch(() => []);
+        mergeMessages(all);
+      }
+      mergeActions(res.actions ?? [], firstSync);
+      set({ lastSync: res.serverTime, online: true, busyItems: res.busyItems ?? [], current: res.current ?? null, conversations: res.conversations ?? state.conversations });
+      // neuer Tag, nichts Älteres bewusst geöffnet → auf den neuesten Chat von heute wechseln
+      if (!state.pinned && res.current && res.current !== state.conversationId) await openConversation(res.current);
     } catch (err) {
       if (isNetworkError(err)) set({ online: false });
     } finally {
@@ -185,7 +230,7 @@ async function flushOutbox() {
   for (const entry of [...state.outbox]) {
     let res: ChatResponse = { messages: [], items: [] };
     try {
-      res = await api<ChatResponse>('/api/chat', { method: 'POST', json: { text: entry.text, clientId: entry.clientId } });
+      res = await api<ChatResponse>('/api/chat', { method: 'POST', json: { text: entry.text, clientId: entry.clientId, conversationId: entry.conversationId ?? null } });
     } catch (err) {
       if (isNetworkError(err)) throw err; // später nochmal
       // Server lehnt ab (z. B. leere Nachricht) → nicht ewig wiederholen
@@ -213,8 +258,9 @@ export async function sendMessage(text: string, images: string[] = []) {
   if (navigator.onLine) {
     set({ thinking: true });
     try {
-      const res = await api<ChatResponse>('/api/chat', { method: 'POST', json: { text, clientId, images } });
+      const res = await api<ChatResponse>('/api/chat', { method: 'POST', json: { text, clientId, images, conversationId: state.conversationId } });
       set((s) => ({ messages: s.messages.map((m) => (m.id === local.id ? { ...m, pending: false } : m)) }));
+      if (res.conversationId && res.conversationId !== state.conversationId) set({ conversationId: res.conversationId, current: state.pinned ? state.current : res.conversationId });
       mergeItems(res.items);
       mergeMessages(res.userMessage ? [res.userMessage, ...res.messages] : res.messages);
       set({ online: true });
@@ -229,6 +275,63 @@ export async function sendMessage(text: string, images: string[] = []) {
     }
   }
   queueOffline(text, clientId, createdAt);
+}
+
+// ---------- Sprachnachrichten ----------
+
+type AudioResponse = ChatResponse & { transcript: string; audioId: string };
+
+function finishAudio(localId: string, res: AudioResponse) {
+  set((s) => ({ messages: s.messages.filter((m) => m.id !== localId) }));
+  if (res.conversationId && res.conversationId !== state.conversationId) set({ conversationId: res.conversationId, current: state.pinned ? state.current : res.conversationId });
+  mergeItems(res.items);
+  mergeMessages(res.userMessage ? [res.userMessage, ...res.messages] : res.messages);
+  set({ online: true });
+}
+
+/** Aufnahme schicken: Stella schreibt sie ab und behandelt den Text wie eine getippte Nachricht. */
+export async function sendAudio(blob: Blob, seconds: number) {
+  if (!navigator.onLine) throw new Error('Sprachnachrichten brauche ich mit Internet – tipp es kurz oder versuch es gleich nochmal.');
+  const clientId = crypto.randomUUID();
+  const local: ChatMessage = { id: `local-${clientId}`, clientId, role: 'user', text: '🎤 Sprachnachricht …', attachments: [], createdAt: new Date().toISOString(), pending: true };
+  set((s) => ({ messages: [...s.messages, local], thinking: true }));
+  try {
+    const q = new URLSearchParams({ clientId, duration: String(seconds) });
+    if (state.conversationId) q.set('conversationId', state.conversationId);
+    finishAudio(local.id, await api<AudioResponse>(`/api/chat/audio?${q}`, { method: 'POST', body: blob, headers: { 'Content-Type': blob.type || 'audio/webm' } }));
+  } catch (err) {
+    const audioId = err instanceof ApiError ? (err.data.audioId as string | undefined) : undefined;
+    if (audioId) {
+      // Abschreiben ging nicht, die Aufnahme liegt aber auf dem Server → Nachricht bleibt mit „Nochmal versuchen“ stehen
+      set((s) => ({ messages: s.messages.map((m) => (m.id === local.id ? { ...m, pending: false, text: '🎤 Sprachnachricht – nicht abgeschrieben', failedAudioId: audioId } : m)) }));
+    } else {
+      set((s) => ({ messages: s.messages.filter((m) => m.id !== local.id) }));
+    }
+    throw err;
+  } finally {
+    set({ thinking: false });
+  }
+}
+
+/** „Nochmal versuchen“: die gespeicherte Aufnahme erneut abschreiben lassen. */
+export async function retryAudio(localId: string) {
+  const msg = state.messages.find((m) => m.id === localId);
+  if (!msg?.failedAudioId) return;
+  set({ thinking: true });
+  try {
+    finishAudio(localId, await api<AudioResponse>('/api/chat/audio/retry', {
+      method: 'POST', json: { audioId: msg.failedAudioId, clientId: msg.clientId, conversationId: state.conversationId },
+    }));
+  } finally {
+    set({ thinking: false });
+  }
+}
+
+/** Aufnahme (mit Login) holen, zum Abspielen */
+export async function fetchFileUrl(id: string): Promise<string> {
+  const r = await fetch(`/api/files/${id}`, { headers: { Authorization: `Bearer ${state.token}` } });
+  if (!r.ok) throw new Error('Aufnahme nicht verfügbar');
+  return URL.createObjectURL(await r.blob());
 }
 
 function queueOffline(text: string, clientId: string, createdAt: string) {
@@ -252,11 +355,25 @@ function queueOffline(text: string, clientId: string, createdAt: string) {
     createdAt: new Date(Date.parse(createdAt) + 1).toISOString(), pending: true,
   };
   set((s) => ({
-    outbox: [...s.outbox, { clientId, text, createdAt }],
+    outbox: [...s.outbox, { clientId, text, createdAt, conversationId: s.conversationId }],
     messages: [...s.messages, replyMsg],
     items: localItem ? { ...s.items, [localItem.id]: localItem } : s.items,
     online: false,
   }));
+}
+
+// ---------- Chats ----------
+
+/** Einen Chat zeigen (alter Chat: lesbar und fortsetzbar). Der neueste von heute folgt wieder dem Server. */
+export async function openConversation(id: string) {
+  const messages = await api<ChatMessage[]>(`/api/conversations/${id}/messages?limit=80`);
+  set((s) => ({ conversationId: id, pinned: id !== s.current, messages }));
+}
+
+/** „Neuer Chat“: ein leerer Chat von heute (ein schon leerer wird wiederverwendet). */
+export async function newConversation() {
+  const r = await api<{ id: string; conversations: Conversation[] }>('/api/conversations', { method: 'POST' });
+  set({ conversationId: r.id, pinned: false, current: r.id, messages: [], conversations: r.conversations });
 }
 
 // ---------- Aktionen: Ja / Nein / Rückgängig ----------
