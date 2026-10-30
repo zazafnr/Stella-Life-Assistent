@@ -15,6 +15,7 @@ import { addMessage, db, getUser, now, setPending, type PendingType, type User }
 import { bookFor } from './planner.ts';
 import { pushToUser } from './push.ts';
 import { nextLessonDate } from './untis.ts';
+import { activeGoals, parseGoalQuick, staleGoals } from './goals.ts';
 
 export interface FoundHint extends Hint {
   action?: { type: ActionType; params: ActionParams[ActionType]; label: string };
@@ -131,6 +132,25 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
   for (const m of hasFeature(user, 'mails') ? lb.importantInbox : []) {
     if (!m.needsReply || m.source !== 'email' || Date.parse(m.createdAt) > halfDay) continue;
     out.push({ key: `reply:${m.id}`, priority: 'normal', text: v.hintReply(m.sender ?? 'Jemand', m.summary), open: { tab: 'inbox', label: 'Antwort schreiben' } });
+  }
+
+  // Ziele ohne Eintrag seit zwei Wochen (höchstens einmal im Monat je Ziel)
+  for (const { goal, weeks } of staleGoals(user, lb.today)) {
+    out.push({ key: `goal_stale:${goal.id}:${lb.today.slice(0, 7)}`, priority: 'normal', text: v.goalStale(goal.title, weeks), open: { tab: 'goals', label: 'Ziele ansehen' } });
+  }
+
+  // Gedächtnis-Einträge der Kategorie „Ziel“: einmal anbieten, sie als echtes Ziel anzulegen
+  const haveGoal = new Set(activeGoals(user.id).map((g) => g.title.toLowerCase()));
+  for (const m of lb.memories.filter((x) => x.category === 'goal').slice(0, 3)) {
+    const bare = m.text.replace(/^\s*(ich\s+)?(will|möchte|moechte|werde|plane|mein ziel( ist)?)[:,]?\s+/iu, '').trim();
+    const parsed = parseGoalQuick(`ich will ${bare}`);
+    const title = (parsed?.title ?? bare).replace(/[.!]+$/u, '').slice(0, 80);
+    if (title.length < 3 || haveGoal.has(title.toLowerCase())) continue;
+    out.push({
+      key: `goal_memory:${m.id}`, priority: 'normal', text: v.goalFromMemory(title),
+      action: { type: 'goal.create', params: { ...parsed, title: title.charAt(0).toUpperCase() + title.slice(1) }, label: 'Als Ziel anlegen' },
+    });
+    break;
   }
 
   // bekannter Zustand: Vorschlag schon verschickt / weggeklickt / abgelehnt

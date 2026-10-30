@@ -20,6 +20,7 @@ import { draftReply } from './mail.ts';
 import { maybeTitle } from './conversations.ts';
 import { afterWorkTime, describeUser, isSchool } from './profile.ts';
 import { matchOpenItems, openItems } from './lists.ts';
+import { activeGoals, amountText, describeCadence, extractGoal, extractLog, GOAL_RE, looksLikeGoal, matchGoal, parseLogQuick, progress, weekTarget, type NewGoal } from './goals.ts';
 import { resolvePlace } from './places.ts';
 import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type ToolDef } from './llm.ts';
 import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
@@ -72,6 +73,9 @@ async function handleChatIn(user: User, text: string, clientId: string | null, i
   if (!handled && FORGOT_RE.test(text)) handled = await answerForgot(t);
   if (!handled && INBOX_RE.test(text)) handled = answerInbox(t);
   if (!handled && WEEK_RE.test(text)) handled = await answerWeek(t, text);
+  if (!handled && GOAL_START_RE.test(text) && (looksLikeGoal(text) || GOAL_EXPLICIT_RE.test(text))) handled = await onGoalCreate(t, text);
+  if (!handled && !images.length) handled = await onGoalLog(t, text);
+  if (handled && pending) clearPending(user.id);
   if (!handled && pending && intent?.type !== 'create') handled = await answerPending(t, pending, text);
   if (pending && !handled) clearPending(user.id);
 
@@ -100,6 +104,8 @@ async function handleChatIn(user: User, text: string, clientId: string | null, i
 
 const BRIEFING_RE = /^\s*(\W*)(morning[- ]?)?briefing\b|^\s*(tages)?(überblick|ueberblick)\b|^\s*was (steht|ist) heute (an|los)\b/iu;
 const INBOX_RE = /^\s*(\W*)(was (ist|gibt'?s) neu(es)? (in|bei) (der |meiner |meinen |deiner )?(mail|mails|post|inbox)|(gibt'?s |hab ich )?neue (mail|mails|post)|mail-?übersicht|hab ich post)\b/iu;
+const GOAL_START_RE = GOAL_RE;
+const GOAL_EXPLICIT_RE = /^\s*(mein\s+ziel|ziel\s*[:,])/iu;
 const FORGOT_RE = /hab(e)? ich (was|etwas|irgendwas) vergessen|was (hab|habe) ich vergessen/iu;
 
 const WEEK_RE = /\bplan(e|st)?\s+(mir\s+)?(meine|die|diese|nächste|naechste)\s+(\w+\s+)?woche\b|\bwochenplan|\bwoche\s+(planen|durchplanen)|\bplan my week\b/iu;
@@ -308,6 +314,45 @@ function onListAdd(t: Turn, intent: Extract<Intent, { type: 'list_add' }>) {
   const res = r.result as { added: string[]; skipped: string[] };
   if (!res.added.length) say(t, v(t).listAlready(res.skipped.join(', ')));
   else sayA(t, v(t).listAdded(res.added.join(', '), res.added.length), r.actionId);
+}
+
+/** „ich will 3x pro Woche laufen gehen“ → Ziel anlegen (Karte mit Rückgängig) */
+async function onGoalCreate(t: Turn, text: string): Promise<boolean> {
+  const g = await extractGoal(t.user, text);
+  if (!g) return false;
+  if (activeGoals(t.user.id).some((x) => x.title.toLowerCase() === g.title.toLowerCase())) { say(t, v(t).goalExists(g.title)); return true; }
+  const r = perform(t.user, 'goal.create', g as NewGoal, { source: 'chat', quiet: true, say: sayAction(t) });
+  if (r.status === 'refused') { say(t, `🙅 ${r.reason}`); return true; }
+  if (r.status !== 'done') return true;
+  sayA(t, v(t).goalSet(g.title, describeCadence(g)), r.actionId);
+  return true;
+}
+
+/** „war heute 5 km laufen“ → dem passenden Ziel zuordnen; false, wenn das gar nicht nach Fortschritt klingt */
+async function onGoalLog(t: Turn, text: string): Promise<boolean> {
+  const goals = activeGoals(t.user.id);
+  if (!goals.length) return false;
+  const quick = parseLogQuick(text, t.today);
+  if (!quick) return false;
+  let hit: { goal: (typeof goals)[number]; value: number; date: string; note: string | null } | null = null;
+  const named = matchGoal(goals, text);
+  if (named) {
+    const unit = named.unit.toLowerCase();
+    if (unit === 'x') hit = { goal: named, value: 1, date: quick.date, note: quick.unit && quick.unit !== 'x' ? text.trim().slice(0, 200) : null };
+    else if (quick.unit === unit) hit = { goal: named, value: quick.value, date: quick.date, note: null };
+  } else if (quick.unit && quick.unit !== 'x') {
+    const byUnit = goals.filter((g) => g.unit.toLowerCase() === quick.unit);
+    if (byUnit.length === 1) hit = { goal: byUnit[0]!, value: quick.value, date: quick.date, note: null };
+    else if (byUnit.length > 1) { say(t, v(t).goalUnclear()); return true; }
+  }
+  hit ??= await extractLog(t.user, text, goals, t.today);
+  if (!hit) return false;
+  const r = perform(t.user, 'goal.log', { goalId: hit.goal.id, value: hit.value, date: hit.date, note: hit.note }, { source: 'chat', quiet: true, say: sayAction(t) });
+  if (r.status === 'refused') { say(t, `🙅 ${r.reason}`); return true; }
+  if (r.status !== 'done') return true;
+  const p = progress(t.user, hit.goal, t.today);
+  sayA(t, v(t).goalLogged(hit.goal.title, amountText(hit.goal, hit.value), `${amountText(hit.goal, p.weekValue)} von ${amountText(hit.goal, weekTarget(hit.goal))}`), r.actionId);
+  return true;
 }
 
 function onListShow(t: Turn) {

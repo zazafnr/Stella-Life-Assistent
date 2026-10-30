@@ -149,7 +149,7 @@ export interface Hint {
   /** schon als Vorschlag-Karte verschickt */
   actionId?: string;
   /** statt Aktion: woanders weitermachen (Rückfrage im Chat beantworten, Antwort in der Inbox schreiben) */
-  open?: { tab: 'chat' | 'inbox'; label: string };
+  open?: { tab: 'chat' | 'inbox' | 'goals'; label: string };
   itemId?: string;
 }
 
@@ -182,7 +182,7 @@ export interface PlanBlock {
   subject: string | null;
   /** Test, HÜ oder Abgabe, für die der Block ist */
   parentId: string;
-  why: 'exam' | 'homework' | 'assignment';
+  why: 'exam' | 'homework' | 'assignment' | 'goal';
 }
 
 /** „Plan my week“: Vorschlag für die nächsten 7 Tage */
@@ -265,4 +265,41 @@ export interface NearbyPlaces {
   plural: string;
   emoji: string;
   places: NearbyPlace[];
+}
+
+// ---------- Ziele (Paket 8) ----------
+
+export interface Goal {
+  id: string;
+  title: string;
+  why: string | null;
+  /** was gezählt wird, z. B. „km“ oder „Einheiten“ */
+  metric: string;
+  unit: string;
+  /** pro Tag (cadence daily) bzw. pro Woche (sonst) */
+  target: number;
+  /** daily | weekly:n | custom */
+  cadence: string;
+  /** Zeit pro Einheit in Minuten – für den Wochenplaner */
+  minutes: number | null;
+  /** z. B. „So 18:00“ oder „18:00“ */
+  checkIn: string | null;
+  status: 'active' | 'paused' | 'done';
+  createdAt: string;
+}
+
+export interface GoalLog {
+  id: string;
+  date: string;
+  value: number;
+  note: string | null;
+}
+
+export interface GoalProgress extends Goal {
+  /** Stand diese Woche (Montag bis Sonntag) */
+  weekValue: number;
+  weekTarget: number;
+  /** die letzten 8 Wochen, älteste zuerst (die letzte ist die aktuelle) */
+  history: number[];
+  recent: GoalLog[];
 }

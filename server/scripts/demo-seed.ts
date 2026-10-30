@@ -18,6 +18,7 @@ const { addMessage, createConversation, db, getUser, newId, updateUserSettings }
 const { addItem } = await import('../src/planner.ts');
 const { addMemory } = await import('../src/memory.ts');
 const { addListItems, shoppingListId } = await import('../src/lists.ts');
+const goalsMod = await import('../src/goals.ts');
 const { handleChat } = await import('../src/assistant.ts');
 const { perform } = await import('../src/actions.ts');
 const { buildWeekPlan } = await import('../src/weekplan.ts');
@@ -86,6 +87,16 @@ await handleChat(user(), 'plan meine Woche', null);
 const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
 const rows = db.prepare('SELECT id FROM messages WHERE user_id = ? ORDER BY created_at, rowid').all(uid) as { id: string }[];
 rows.forEach((r, i) => db.prepare('UPDATE messages SET created_at = ? WHERE id = ?').run(ago(i === 0 ? 240 : (rows.length - i) * 3), r.id));
+
+// Ziele mit Verlauf (Karte auf „Heute“ und Ziele-Ansicht)
+{
+  const run = goalsMod.createGoal(uid, goalsMod.cleanGoal({ title: 'Laufen gehen', why: 'fitter werden', cadence: 'weekly:3', target: 3, minutes: 45, checkIn: 'So 18:00' }));
+  [[-1, 1], [-2, 1], [-3, 1], [-8, 1], [-9, 1], [-15, 1], [-16, 1], [-17, 1], [-22, 1], [-30, 1], [-31, 1], [-38, 1], [-45, 1], [-46, 1]]
+    .forEach(([off, v]) => { if (addDays(today, off!) < today) goalsMod.logGoal(uid, run.id, v!, addDays(today, off!)); });
+  goalsMod.logGoal(uid, run.id, 1, today, 'Runde um den See');
+  const read = goalsMod.createGoal(uid, goalsMod.cleanGoal({ title: 'Lesen', cadence: 'custom', target: 100, unit: 'Seiten', metric: 'Seiten', why: 'abschalten vor dem Schlafen' }));
+  [[0, 24], [-1, 30], [-3, 18], [-8, 40], [-10, 55], [-16, 70], [-24, 90], [-31, 35]].forEach(([off, v]) => goalsMod.logGoal(uid, read.id, v!, addDays(today, off!)));
+}
 
 // Einkaufsliste (Karte auf „Heute“ und Listen-Ansicht)
 addListItems(uid, shoppingListId(uid), [{ text: 'Milch', qty: '2 Liter' }, { text: 'Eier' }, { text: 'Butter' }, { text: 'Äpfel', qty: '1 kg' }], 'chat');

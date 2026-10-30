@@ -316,6 +316,34 @@ const MIGRATIONS: string[] = [
   CREATE TABLE place_words (word TEXT PRIMARY KEY, category TEXT);
   CREATE TABLE places_cache (key TEXT PRIMARY KEY, data TEXT NOT NULL, fetched_at TEXT NOT NULL);
   `,
+  `
+  -- Paket 8: Ziele mit Fortschritt (keine Punkte, Serien oder Abzeichen)
+  CREATE TABLE goals (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    why TEXT,
+    metric TEXT NOT NULL DEFAULT 'Einheiten',
+    unit TEXT NOT NULL DEFAULT 'x',
+    target REAL NOT NULL DEFAULT 1,
+    cadence TEXT NOT NULL DEFAULT 'weekly:1',
+    minutes INTEGER,
+    check_in TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX goals_user ON goals(user_id, status);
+  CREATE TABLE goal_logs (
+    id TEXT PRIMARY KEY,
+    goal_id TEXT NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+    date TEXT NOT NULL,
+    value REAL NOT NULL DEFAULT 1,
+    note TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX goal_logs_goal ON goal_logs(goal_id, date);
+  `,
 ];
 
 function migrate() {

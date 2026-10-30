@@ -17,6 +17,7 @@ import { addMemory, deleteMemory, getMemory, updateMemory, type NewMemory } from
 import type { OutgoingMail } from './mail.ts';
 import { addItem, bookFor, changeItem, createStudyPlan } from './planner.ts';
 import { addListItems, removeListItems, setListItemsDone, shoppingListId } from './lists.ts';
+import { cleanGoal, createGoal, deleteGoal, deleteLog, getGoal, logGoal, type NewGoal } from './goals.ts';
 
 export const GROUPS: Record<ActionGroup, { label: string; help: string; default: PermissionLevel; levels: PermissionLevel[] }> = {
   planner: {
@@ -83,6 +84,8 @@ export interface ActionParams {
   'memory.delete': { id: string };
   'list.add': { items: { text: string; qty?: string | null }[] };
   'list.check': { ids: string[]; names?: string[]; done: boolean };
+  'goal.create': NewGoal;
+  'goal.log': { goalId: string; value: number; date: string; note?: string | null };
 }
 export type ActionType = keyof ActionParams;
 
@@ -159,7 +162,7 @@ const DEFS: { [T in ActionType]: Def<T> } = {
     summary: (_u, p) => `Woche planen (${p.blocks.length} ${p.blocks.length === 1 ? 'Block' : 'Blöcke'})`,
     run: (u, p) => {
       const items = p.blocks.map((b) => addItem(u, {
-        kind: 'study', subject: b.subject, title: b.title, detail: b.focus, due: b.date, time: b.start, parentId: b.parentId, source: 'plan',
+        kind: b.why === 'goal' ? 'todo' : 'study', subject: b.subject, title: b.title, detail: b.focus, due: b.date, time: b.start, parentId: b.parentId, source: 'plan',
       }));
       return { result: { count: items.length }, undo: { ids: items.map((i) => i.id) }, changed: items };
     },
@@ -212,6 +215,24 @@ const DEFS: { [T in ActionType]: Def<T> } = {
     undo: (u, d: { prev: { id: string; done: boolean }[] }) => {
       for (const x of d.prev) setListItemsDone(u.id, [x.id], x.done);
     },
+  },
+  'goal.create': {
+    group: () => 'planner',
+    summary: (_u, p) => `Ziel „${p.title}“ anlegen`,
+    run: (u, p) => {
+      const goal = createGoal(u.id, cleanGoal({ ...p }));
+      return { result: { id: goal.id, title: goal.title }, undo: { id: goal.id } };
+    },
+    undo: (u, d: { id: string }) => { deleteGoal(u.id, d.id); },
+  },
+  'goal.log': {
+    group: () => 'planner',
+    summary: (u, p) => `${getGoal(u.id, p.goalId)?.title ?? 'Ziel'}: Fortschritt eintragen`,
+    run: (u, p) => {
+      const log = logGoal(u.id, p.goalId, p.value, p.date, p.note ?? null);
+      return { result: { id: log.id }, undo: { id: log.id } };
+    },
+    undo: (u, d: { id: string }) => { deleteLog(u.id, d.id); },
   },
   'memory.add': {
     group: () => 'memory',

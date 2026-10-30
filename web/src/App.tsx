@@ -4,6 +4,7 @@ import { Today } from './components/Today.tsx';
 import { Chat } from './components/Chat.tsx';
 import { Planner } from './components/Planner.tsx';
 import { Inbox } from './components/Inbox.tsx';
+import { Goals } from './components/Goals.tsx';
 import { Health } from './components/Health.tsx';
 import { Settings } from './components/Settings.tsx';
 import { Intro, dismissBoot, introShown } from './components/Intro.tsx';
@@ -11,15 +12,16 @@ import { Onboarding } from './components/Onboarding.tsx';
 import { Icon, type IconName } from './ui/Icon.tsx';
 import { Sky, StarMark, showToast } from './ui/Decor.tsx';
 
-export type Tab = 'today' | 'chat' | 'planner' | 'inbox' | 'health' | 'settings';
+export type Tab = 'today' | 'chat' | 'planner' | 'goals' | 'inbox' | 'health' | 'settings';
 
 const TABS: [Tab, IconName, string][] = [
   ['today', 'sparkle', 'Heute'],
   ['chat', 'chat', 'Chat'],
   ['planner', 'calendar', 'Planer'],
+  ['goals', 'target', 'Ziele'],
   ['inbox', 'inbox', 'Inbox'],
 ];
-const ALL: Tab[] = ['today', 'chat', 'planner', 'inbox', 'health', 'settings'];
+const ALL: Tab[] = ['today', 'chat', 'planner', 'goals', 'inbox', 'health', 'settings'];
 
 function initialTab(): Tab {
   const hash = location.hash.slice(1) as Tab;
@@ -98,6 +100,7 @@ export function App() {
         {tab === 'today' && <Today go={setTab} />}
         {tab === 'chat' && <Chat />}
         {tab === 'planner' && <Planner />}
+        {tab === 'goals' && <Goals />}
         {tab === 'inbox' && <Inbox />}
         {tab === 'health' && <Health back={() => setTab('today')} />}
         {tab === 'settings' && <Settings back={() => setTab('today')} openOnboarding={(startAt) => setOnboarding({ startAt })} />}

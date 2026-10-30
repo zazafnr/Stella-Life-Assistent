@@ -4,7 +4,7 @@ import { api, sync } from '../store.ts';
 import { Icon } from '../ui/Icon.tsx';
 import { Sheet, showToast } from '../ui/Decor.tsx';
 
-const WHY: Record<PlanBlock['why'], string> = { exam: 'pink', homework: 'blue', assignment: 'green' };
+const WHY: Record<PlanBlock['why'], string> = { exam: 'pink', homework: 'blue', assignment: 'green', goal: 'violet' };
 
 /** „Woche planen“: Stellas Vorschlag ansehen, einzelne Blöcke abwählen, übernehmen */
 export function WeekPlanSheet({ today, onClose }: { today: string; onClose: () => void }) {

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addDays, diffDays, formatDateDe, todayIn, type Item } from '@stella/shared';
+import { addDays, diffDays, formatDateDe, todayIn, type GoalProgress, type Item } from '@stella/shared';
 import { api, meHas, useStore } from '../store.ts';
 import type { Tab } from '../App.tsx';
 import { Icon, type IconName } from '../ui/Icon.tsx';
 import { Confetti, Ring, Sky, StarMark } from '../ui/Decor.tsx';
 import { BriefingCard } from './BriefingCard.tsx';
 import { ListsSheet } from './Lists.tsx';
+import { WeekBar, amount } from './Goals.tsx';
 
 interface Lesson { date: string; start: string; subject: string | null; code: string | null; status: string }
 interface InboxEntry { source: string; category: string | null; action: string | null; createdAt: string }
@@ -57,6 +58,11 @@ export function Today({ go }: { go: (t: Tab) => void }) {
       .then((r) => setShopCount(r.lists.find((l) => l.kind === 'shopping')?.items.filter((i) => !i.done).length ?? 0)).catch(() => {});
   };
   useEffect(loadShopCount, [me?.settings.profile]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [goalList, setGoalList] = useState<GoalProgress[]>([]);
+  useEffect(() => {
+    api<{ goals: GoalProgress[] }>('/api/goals').then((r) => setGoalList(r.goals.filter((g) => g.status === 'active'))).catch(() => {});
+  }, []);
 
   useEffect(() => {
     api<Lesson[]>(`/api/timetable?from=${tomorrow}&to=${tomorrow}`).then(setLessons).catch(() => setLessons([]));
@@ -190,6 +196,21 @@ export function Today({ go }: { go: (t: Tab) => void }) {
               })}
             </div>
           </section>
+        )}
+
+        {goalList.length > 0 && (
+          <button type="button" className="card interactive" onClick={() => go('goals')} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <span className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0 }}>Deine Ziele</h2><Icon name="chevron" size={16} /></span>
+            {goalList.slice(0, 3).map((g) => (
+              <span key={g.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span className="row" style={{ justifyContent: 'space-between', fontSize: 14 }}>
+                  <span style={{ fontWeight: 600 }}>{g.title}</span>
+                  <span className="muted small">{amount(g, g.weekValue)} von {amount(g, g.weekTarget)}</span>
+                </span>
+                <WeekBar goal={g} />
+              </span>
+            ))}
+          </button>
         )}
 
         <button type="button" className="card interactive row" onClick={() => go('inbox')}>

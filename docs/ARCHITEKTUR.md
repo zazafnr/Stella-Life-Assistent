@@ -133,6 +133,17 @@ Rückgängig), im Chat („Plan meine Woche“) immer als Karte. Sonntag 18–20
 für die neue Woche von selbst an. Verpasste Blöcke plant sie neu ein, wenn sie den Planer ändern
 darf – sonst bleibt es beim Hinweis.
 
+**Ziele** (`server/src/goals.ts`, Tabellen `goals` und `goal_logs`) – „Ich will 3x pro Woche laufen
+gehen“ liest Groq als JSON heraus (Rückfall ohne KI: Muster im Satz), `goal.create` legt es mit
+Karte und Rückgängig an. „War heute 5 km laufen“ ordnet Stella über den Namen, dann über die
+Einheit und zuletzt per Groq dem Ziel zu (`goal.log`; bei zwei Zielen mit gleicher Einheit fragt
+sie nach, statt zu raten). Gezählt wird immer Montag bis Sonntag gegen das Wochenziel, dazu der
+Verlauf der letzten 8 Wochen – bewusst ohne Punkte, Serien oder Abzeichen. Stella unterstützt
+mit einer Erinnerung zur gewählten Zeit (einmal am Tag), dem Wochenrückblick im Sonntags-Briefing,
+Zeitblöcken im Wochenplan (`PlanBlock.why = 'goal'`, nur bei Zielen mit „Minuten pro Einheit“;
+übernommen werden sie als To-dos), einem Hinweis nach 14 Tagen ohne Eintrag und dem einmaligen
+Angebot, Gedächtnis-Einträge der Kategorie „Ziel“ in echte Ziele umzuwandeln.
+
 ## 8. Fahrplan
 
 > **Stella v2** (Registrierung für alle Lebenslagen, Groq, Chats nach Tagen, Sprache, Listen, Ziele,

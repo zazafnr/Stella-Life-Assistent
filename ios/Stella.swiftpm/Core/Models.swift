@@ -171,6 +171,58 @@ struct StellaList: Codable, Hashable, Identifiable {
     var items: [ListEntry]
 }
 
+/** Ein Ziel mit Stand diese Woche (Montag bis Sonntag) und Verlauf der letzten 8 Wochen */
+struct GoalProgress: Codable, Hashable, Identifiable {
+    var id: String
+    var title: String
+    var why: String?
+    var metric: String
+    var unit: String
+    /** pro Tag (cadence daily) bzw. pro Woche */
+    var target: Double
+    /** daily | weekly:n | custom */
+    var cadence: String
+    var minutes: Int?
+    var checkIn: String?
+    /** active | paused | done */
+    var status: String
+    var createdAt: String
+    var weekValue: Double
+    var weekTarget: Double
+    /** älteste Woche zuerst, die letzte ist die aktuelle */
+    var history: [Double]
+    var recent: [GoalLogEntry]
+
+    var isActive: Bool { status == "active" }
+
+    static func number(_ v: Double) -> String {
+        let r = (v * 10).rounded() / 10
+        let text = r == r.rounded() ? String(Int(r)) : String(r)
+        return text.replacingOccurrences(of: ".", with: ",")
+    }
+
+    /** „3×“ bei Einheiten, sonst „12 km“ */
+    func amount(_ v: Double) -> String {
+        unit == "x" ? "\(Self.number(v))×" : "\(Self.number(v)) \(unit)"
+    }
+
+    var rhythm: String {
+        if cadence == "daily" { return "täglich" }
+        if cadence.hasPrefix("weekly:"), let n = Int(cadence.dropFirst(7)) { return "\(n)× pro Woche" }
+        return "\(Self.number(target)) \(unit) pro Woche"
+    }
+}
+
+struct GoalLogEntry: Codable, Hashable, Identifiable {
+    var id: String
+    var date: String
+    var value: Double
+    var note: String?
+}
+
+struct GoalsResponse: Codable { var goals: [GoalProgress] }
+struct GoalResponse: Codable { var goal: GoalProgress }
+
 struct ListsResponse: Codable { var lists: [StellaList] }
 struct ListResponse: Codable { var list: StellaList }
 

@@ -26,7 +26,7 @@ struct StellaApp: App {
     }
 }
 
-enum Tab: Hashable { case today, chat, planner, inbox }
+enum Tab: Hashable { case today, chat, planner, goals, inbox }
 
 struct RootView: View {
     @Environment(Store.self) private var store
@@ -36,6 +36,7 @@ struct RootView: View {
         switch Demo.tab {
         case "chat": return .chat
         case "planner": return .planner
+        case "goals": return .goals
         case "inbox": return .inbox
         default: return .today
         }
@@ -83,6 +84,9 @@ struct RootView: View {
                     .tabItem { Label("Planer", systemImage: "calendar") }
                     .tag(Tab.planner)
                     .badge(store.openHomework)
+                GoalsView()
+                    .tabItem { Label("Ziele", systemImage: "target") }
+                    .tag(Tab.goals)
                 if store.me?.has("mails") != false {
                     InboxView()
                         .tabItem { Label("Inbox", systemImage: "tray") }

@@ -14,6 +14,7 @@ import { checkAllMail, listAccounts, purgeMailBodies, sendMail } from './mail.ts
 import { syncUntis } from './untis.ts';
 import { fetchBookPage } from './books.ts';
 import { solveHomework } from './homework.ts';
+import { sendGoalCheckIns } from './goals.ts';
 import { pushToUser } from './push.ts';
 
 type ReminderRow = { id: string; user_id: string; item_id: string | null; message: string; with_attachments: number; always: number };
@@ -90,6 +91,7 @@ async function periodic() {
     await every(`learn:${userId}`, 30 * 60_000, () => nightlyLearning(userId)).catch((err) => console.warn('Lernen:', err.message));
     await every(`briefing:${userId}`, 2 * 60_000, async () => { await maybeSendBriefing(userId); }).catch((err) => console.warn('Briefing:', err.message));
     await every(`hints:${userId}`, 10 * 60_000, () => deliverHints(userId)).catch((err) => console.warn('Hinweise:', err.message));
+    await every(`goals:${userId}`, 2 * 60_000, () => sendGoalCheckIns(userId)).catch((err) => console.warn('Ziele:', err.message));
     await every(`replan:${userId}`, 30 * 60_000, async () => { replanMissed(userId); }).catch((err) => console.warn('Neu planen:', err.message));
     await every(`weekplan:${userId}`, 10 * 60_000, () => maybeOfferWeek(userId)).catch((err) => console.warn('Wochenplan:', err.message));
     if (hasSecret(userId, 'webuntis')) {

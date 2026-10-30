@@ -8,6 +8,7 @@
 import { timeIn, voice, WEEKDAYS_DE, weekdayOf, type Briefing, type BriefingSection } from '@stella/shared';
 import { buildLagebild, isoWeekday, toHhmm, toMin, type Lagebild } from './context.ts';
 import { addMessage, db, getUser, notifyOnce, type User } from './db.ts';
+import { goalBriefingLines } from './goals.ts';
 import { deliverHint, findHints, isDelivered } from './hints.ts';
 import { pushToUser } from './push.ts';
 
@@ -66,6 +67,10 @@ export function buildBriefing(user: User, lb: Lagebild = buildLagebild(user, 3))
       });
     }
   }
+
+  // Sonntags: Rückblick auf die Wochenziele
+  const goalLines = goalBriefingLines(user, lb.today);
+  if (goalLines.length) sections.push({ id: 'goals', title: 'Deine Ziele diese Woche', lines: goalLines });
 
   // Was Stella seit gestern Abend erledigt hat
   const since = new Date(Date.now() - 14 * 3600_000).toISOString();

@@ -22,8 +22,9 @@ struct TodayView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         header.rise(0)
-                        BriefingCardView(onOpen: { go($0 == "inbox" ? .inbox : .chat) })
+                        BriefingCardView(onOpen: { go($0 == "inbox" ? .inbox : ($0 == "goals" ? .goals : .chat)) })
                         if store.me?.has("shopping") == true { ShoppingCardView() }
+                        GoalsCardView(go: { go(.goals) })
                         dueCard.rise(1)
                         HStack(spacing: 14) {
                             examCard
@@ -412,7 +413,7 @@ struct BriefingCardView: View {
     @State private var briefing: Briefing?
     @State private var gone: Set<String> = []
 
-    private let icons = ["school": "🏫", "due": "📌", "plan": "🗓️", "tomorrow": "🌙", "done": "✅", "inbox": "✉️"]
+    private let icons = ["school": "🏫", "due": "📌", "plan": "🗓️", "tomorrow": "🌙", "done": "✅", "inbox": "✉️", "goals": "🎯"]
 
     var body: some View {
         let morning = Calendar.current.component(.hour, from: Date()) < 12

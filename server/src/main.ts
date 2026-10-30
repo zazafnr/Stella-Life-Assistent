@@ -31,6 +31,7 @@ import { buildBriefing } from './briefing.ts';
 import { cleanBlocks, planWeek } from './weekplan.ts';
 import { acceptHint, dismissHint } from './hints.ts';
 import { registerAdminRoutes } from './admin.ts';
+import { registerGoalRoutes } from './goals.ts';
 import { registerListRoutes } from './lists.ts';
 import { registerPlaceRoutes } from './places.ts';
 import { registerQuickRoutes } from './quick.ts';
@@ -169,6 +170,7 @@ app.register(async (api) => {
 
   registerAdminRoutes(api);
   registerListRoutes(api);
+  registerGoalRoutes(api);
   registerPlaceRoutes(api);
   registerQuickRoutes(api);
   registerProfileRoutes(api, publicUser);

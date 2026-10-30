@@ -166,6 +166,36 @@ export function voice(tone: Tone | undefined) {
       frech: `📬 ${count === 1 ? '**1 wichtige Mail**' : `**${count} wichtige Mails**`} – die lesen sich nicht von selbst:\n${lines}`,
       cool: `📬 ${count === 1 ? '1 wichtige Mail' : `${count} wichtige Mails`}:\n${lines}`,
     }),
+    goalSet: (title: string, rhythm: string) => by({
+      nett: `🎯 Neues Ziel: **${title}** – ${rhythm}. Ich helfe dir dran zu bleiben. 💫`,
+      frech: `🎯 **${title}**, ${rhythm}. Mal sehen, wie lange der Elan hält. 😏`,
+      cool: `🎯 Ziel steht: **${title}**, ${rhythm}.`,
+    }),
+    goalExists: (title: string) => by({
+      nett: `🎯 **${title}** gibt es schon – schreib einfach, wenn du etwas geschafft hast, dann trage ich es ein.`,
+      frech: `🎯 **${title}** gibt es schon. Doppelt gemoppelt hält nicht fitter. 😏`,
+      cool: `🎯 **${title}** gibt es schon.`,
+    }),
+    goalLogged: (title: string, amount: string, stand: string) => by({
+      nett: `✅ **${title}**: ${amount} eingetragen. Diese Woche: ${stand}. 💫`,
+      frech: `✅ **${title}**: ${amount} – ${stand} diese Woche. Geht doch. 😏`,
+      cool: `✅ **${title}** +${amount}. Woche: ${stand}.`,
+    }),
+    goalUnclear: () => by({
+      nett: '🤔 Zu welchem Ziel gehört das? Sag mir den Namen, dann trage ich es ein.',
+      frech: '🤔 Und welches Ziel soll das sein? Ich kann nicht hellsehen. 😏',
+      cool: '🤔 Welches Ziel?',
+    }),
+    goalStale: (title: string, weeks: number) => by({
+      nett: `🎯 Bei **${title}** hast du seit ${weeks} Wochen nichts eingetragen. Soll ich es pausieren oder anpassen?`,
+      frech: `🎯 **${title}** liegt seit ${weeks} Wochen brach. Aufgeben ist okay – dann sag's mir. 😏`,
+      cool: `🎯 **${title}**: seit ${weeks} Wochen nix. Pausieren oder anpassen?`,
+    }),
+    goalFromMemory: (title: string) => by({
+      nett: `🎯 Du hast mir mal gesagt: „${title}“. Soll ich daraus ein richtiges Ziel machen, bei dem ich dich unterstütze?`,
+      frech: `🎯 „${title}“ – das wolltest du mal. Soll ich daraus ein Ziel machen, oder war's nur Gerede? 😏`,
+      cool: `🎯 „${title}“ – als Ziel anlegen?`,
+    }),
     remembered: (fact: string) => by({
       nett: `💭 Gemerkt: ${fact}`,
       frech: `💭 Notiert in meinem Elefantengedächtnis: ${fact} 🐘`,
