@@ -244,8 +244,10 @@ struct BudgetSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Monatsbudget in Euro") {
+                Section {
                     TextField("z. B. 200", text: $value).keyboardType(.decimalPad)
+                } header: {
+                    Text("Monatsbudget in Euro")
                 } footer: {
                     Text("Leer lassen, wenn es kein Budget geben soll.")
                 }
