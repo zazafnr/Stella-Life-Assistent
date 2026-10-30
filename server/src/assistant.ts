@@ -1,7 +1,7 @@
 // Stellas "Gehirn": erst schnelle Regeln (offline-fähig, kostenlos), dann die KI mit Werkzeugen.
 
 import {
-  addDays, formatDateDe, interpret, nextSchoolDay, parseEntry, splitTopics, timeIn, todayIn, toneInstruction, voice, WEEKDAYS_DE, weekdayOf,
+  addDays, formatDateDe, interpret, nextSchoolDay, parseEntry, splitTopics, STYLE_RULES, timeIn, todayIn, toneInstruction, voice, WEEKDAYS_DE, weekdayOf,
   type Attachment, type ChatMessage, type ChatResponse, type Intent, type Item, type ItemKind, type ItemQuery, type MemoryCategory, type ParsedEntry,
 } from '@stella/shared';
 import {
@@ -18,6 +18,7 @@ import { findHints, markDelivered as markHintDelivered } from './hints.ts';
 import { cleanSchedule, findMemory, isCategory, listMemories } from './memory.ts';
 import { draftReply } from './mail.ts';
 import { maybeTitle } from './conversations.ts';
+import { describeUser, isSchool } from './profile.ts';
 import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type ToolDef } from './llm.ts';
 import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
 
@@ -67,6 +68,7 @@ async function handleChatIn(user: User, text: string, clientId: string | null, i
   if (/^\s*(bitte\s+)?(mach\s+(das|es)\s+)?r(ü|ue)ckg(ä|ae)ngig\b|^\s*undo\b/iu.test(text)) handled = undoLast(t);
   if (!handled && BRIEFING_RE.test(text)) { say(t, briefingText(t.user)); handled = true; }
   if (!handled && FORGOT_RE.test(text)) handled = await answerForgot(t);
+  if (!handled && INBOX_RE.test(text)) handled = answerInbox(t);
   if (!handled && WEEK_RE.test(text)) handled = await answerWeek(t, text);
   if (!handled && pending && intent?.type !== 'create') handled = await answerPending(t, pending, text);
   if (pending && !handled) clearPending(user.id);
@@ -91,6 +93,7 @@ async function handleChatIn(user: User, text: string, clientId: string | null, i
 }
 
 const BRIEFING_RE = /^\s*(\W*)(morning[- ]?)?briefing\b|^\s*(tages)?(überblick|ueberblick)\b|^\s*was (steht|ist) heute (an|los)\b/iu;
+const INBOX_RE = /^\s*(\W*)(was (ist|gibt'?s) neu(es)? (in|bei) (der |meiner |meinen |deiner )?(mail|mails|post|inbox)|(gibt'?s |hab ich )?neue (mail|mails|post)|mail-?übersicht|hab ich post)\b/iu;
 const FORGOT_RE = /hab(e)? ich (was|etwas|irgendwas) vergessen|was (hab|habe) ich vergessen/iu;
 
 const WEEK_RE = /\bplan(e|st)?\s+(mir\s+)?(meine|die|diese|nächste|naechste)\s+(\w+\s+)?woche\b|\bwochenplan|\bwoche\s+(planen|durchplanen)|\bplan my week\b/iu;
@@ -106,6 +109,16 @@ async function answerWeek(t: Turn, text: string): Promise<boolean> {
   }
   const { result } = offerWeekPlan(t.user, plan, { intro: v.weekPlanIntro(plan.blocks.length), source: 'chat', say: sayAction(t) });
   if (result.status === 'refused') say(t, result.reason);
+  return true;
+}
+
+/** „Was ist neu in der Mail?“ – die wichtigen Mails der letzten Tage in wenigen Zeilen */
+function answerInbox(t: Turn): boolean {
+  const v = voice(t.user.settings.tone);
+  const mails = buildLagebild(t.user, 3).importantInbox;
+  if (!mails.length) { say(t, v.inboxNone()); return true; }
+  const lines = mails.slice(0, 4).map((m) => `- **${m.sender ?? 'Jemand'}**: ${m.summary || '(ohne Text)'}${m.needsReply ? ' _(Antwort nötig)_' : ''}`).join('\n');
+  say(t, v.inboxSome(mails.length, lines) + (mails.length > 4 ? `\n… und ${mails.length - 4} weitere in der Inbox.` : ''));
   return true;
 }
 
@@ -565,19 +578,20 @@ const TOOLS: ToolDef[] = [
 function systemPrompt(user: User, today: string): string {
   const lb = buildLagebild(user, 8);
   return `Du bist Stella, der persönliche Assistent von ${user.name}. Motto: "Let Stella handle your life."
-${user.name} geht in Österreich zur Schule. Du nimmst ${user.name} Arbeit ab: Schule, Termine, Lernen, Nachrichten, Alltag.
+${describeUser(user)} Du nimmst ${user.name} Arbeit ab: Termine, Planung, Nachrichten, Alltag${isSchool(user) ? ', Schule und Lernen' : ''}.
 
 Jetzt: ${WEEKDAYS_DE[weekdayOf(today)]}, ${today}, ${timeIn(user.timeZone)} Uhr (${user.timeZone}).
 
 Regeln:
-- Antworte auf Deutsch, kurz (wie eine Chat-Nachricht).
+- Antworte auf Deutsch.
+- ${STYLE_RULES}
 - ${toneInstruction(user.settings.tone)}
 - HANDELN statt erklären: Wenn ${user.name} etwas organisiert, geplant, verschoben, abgesagt oder vorbereitet haben will, tu es mit den Werkzeugen (mehrere Schritte sind ok). Rechne Daten selbst aus (YYYY-MM-DD).
 - Manche Aktionen brauchen die Zustimmung von ${user.name}: Dann bekommt ${user.name} eine Karte mit Ja/Nein – sag nur kurz, dass du gefragt hast.
 - Nutze das Lagebild unten (freie Zeiten, Tests, Lernstand) für Vorschläge. Plane nichts in belegte Zeiten.
 - Erfinde keine Termine oder Fakten. Frag nach, wenn etwas Wichtiges fehlt.
 - Bei Tests/Schularbeiten: Stoff erfragen, dann create_study_plan.
-- Hausübungen erledigst du (solve_homework): Stella löst sie und schreibt sie in Handschrift ins Heft.
+${isSchool(user) ? `- Hausübungen erledigst du (solve_homework): Stella löst sie und schreibt sie in Handschrift ins Heft.\n` : ''}
 - GEDÄCHTNIS: Erfährst du etwas Dauerhaftes und Nützliches über ${user.name} (Personen und ihre Rolle, feste Termine/Routinen mit Wochentag und Uhrzeit, Vorlieben, was schwer/leicht fällt, Ziele), speichere es sofort mit remember – ohne nachzufragen und ohne es groß anzukündigen. Nicht speichern: Einmaliges (das ist ein Planer-Eintrag), Banales, Passwörter, Dinge, die schon unten stehen. Ist etwas überholt, ändere oder lösche den alten Eintrag (update_memory/forget). Nutze dein Wissen, ohne es jedes Mal zu erwähnen.
 
 LAGEBILD

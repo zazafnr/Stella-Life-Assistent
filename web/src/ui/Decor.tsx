@@ -18,6 +18,24 @@ export function Sky({ clouds = true }: { clouds?: boolean }) {
   );
 }
 
+/** Ganzer Himmel für den Chat: Verlauf von Himmelblau nach Weiß, Wolken ziehen langsam (bei „Bewegung reduzieren“ stehen sie still). */
+export function CloudSky() {
+  const clouds = [
+    { top: '6%', w: 150, o: 0.95, d: 0, t: 160 }, { top: '16%', w: 110, o: 0.8, d: -70, t: 200 }, { top: '34%', w: 190, o: 0.6, d: -30, t: 240 },
+    { top: '52%', w: 130, o: 0.55, d: -120, t: 210 }, { top: '70%', w: 170, o: 0.5, d: -90, t: 260 }, { top: '86%', w: 120, o: 0.45, d: -150, t: 190 },
+  ];
+  return (
+    <div className="cloud-sky" aria-hidden="true">
+      <div className="cloud-sky-gradient" />
+      <div className="glow" style={{ width: 320, height: 320, right: -120, top: '22%', background: '#FFC2DA', opacity: 0.3 }} />
+      <div className="glow" style={{ width: 280, height: 280, left: -120, top: '62%', background: '#9CCBFF', opacity: 0.28 }} />
+      {clouds.map((c, i) => (
+        <div key={i} className="cloud drift" style={{ top: c.top, left: 0, width: c.w, height: c.w * 0.28, opacity: c.o, animationDuration: `${c.t}s`, animationDelay: `${c.d}s` }} />
+      ))}
+    </div>
+  );
+}
+
 /** Der Stella-Stern, hüpft leicht. */
 export function StarMark({ size = 20 }: { size?: number }) {
   return <Icon name="star" filled size={size} className="hop" />;

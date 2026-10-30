@@ -15,8 +15,17 @@ export function isTone(v: unknown): v is Tone {
   return typeof v === 'string' && (TONES as string[]).includes(v);
 }
 
+/** Antwortstil in jedem Ton: kurz, wie ein hilfsbereiter Kumpel */
+export const STYLE_RULES = 'Stil: Antworte wie ein hilfsbereiter Kumpel – kurz, höchstens etwa 6 Zeilen. Lieber Aufzählungen (mit „- “) als Absätze. ' +
+  'Wichtiges **fett**. Keine Überschriften, keine Floskeln („Gerne!“, „Natürlich!“, „Ich hoffe, das hilft“). Auch im Ton „nett“: herzlich, aber knapp. ' +
+  'Lange Ergebnisse (Wochenplan, Listen) erscheinen als Karte – schreib dann nur einen Satz dazu.';
+
 /** Stilvorgabe für die KI */
 export function toneInstruction(tone: Tone | undefined): string {
+  return `${toneText(tone)} Immer kurz: etwa 6 Zeilen, Aufzählungen statt Absätze, Wichtiges **fett**, keine Überschriften und keine Floskeln.`;
+}
+
+function toneText(tone: Tone | undefined): string {
   switch (tone ?? 'nett') {
     case 'frech':
       return 'Ton: frech und schlagfertig – neckisch, ironisch, kleine Sprüche und Augenzwinkern (😏🙄😂), wie eine beste Freundin, die einen aufzieht. ' +
@@ -106,6 +115,16 @@ export function voice(tone: Tone | undefined) {
       nett: `🗑️ **${title}** ist gelöscht.`,
       frech: `🗑️ **${title}** ist weg. Als wär's nie passiert. 💅`,
       cool: `🗑️ **${title}** gelöscht.`,
+    }),
+    inboxNone: () => by({
+      nett: '📭 In deiner Inbox ist nichts Wichtiges – alles ruhig. 💫',
+      frech: '📭 Nichts Wichtiges in der Inbox. Ausnahmsweise darfst du entspannen. 😏',
+      cool: '📭 Nix Wichtiges. Läuft.',
+    }),
+    inboxSome: (count: number, lines: string) => by({
+      nett: `📬 ${count === 1 ? '**1 wichtige Mail**' : `**${count} wichtige Mails**`}:\n${lines}`,
+      frech: `📬 ${count === 1 ? '**1 wichtige Mail**' : `**${count} wichtige Mails**`} – die lesen sich nicht von selbst:\n${lines}`,
+      cool: `📬 ${count === 1 ? '1 wichtige Mail' : `${count} wichtige Mails`}:\n${lines}`,
     }),
     remembered: (fact: string) => by({
       nett: `💭 Gemerkt: ${fact}`,

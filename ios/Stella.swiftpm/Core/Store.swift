@@ -26,6 +26,9 @@ final class Store {
     /** der neueste Chat von heute laut Server */
     var current: String?
     var conversations: [Conversation] = []
+    /** Chips über dem Eingabefeld und die vier Karten im leeren Chat – nach Profil und Tageszeit vom Server */
+    var quick = QuickActions(actions: Store.fallbackActions, cards: Store.fallbackActions)
+    @ObservationIgnored private var lastQuick = Date.distantPast
 
     @ObservationIgnored private var outbox: [Outbox] = []
     @ObservationIgnored private var loop: Task<Void, Never>?
@@ -219,6 +222,24 @@ final class Store {
             await planReminders()
         } catch {
             handle(error)
+        }
+    }
+
+    // MARK: Schnellaktionen
+
+    private static let fallbackActions = [
+        QuickAction(id: "voice", symbol: "mic.fill", label: "Sprachnachricht", kind: "mic"),
+        QuickAction(id: "week", symbol: "calendar.badge.clock", label: "Woche planen", kind: "send", text: "Plan meine Woche"),
+        QuickAction(id: "forgot", symbol: "questionmark.bubble.fill", label: "Hab ich was vergessen?", kind: "send", text: "Hab ich was vergessen?"),
+        QuickAction(id: "briefing", symbol: "sun.max.fill", label: "Briefing", kind: "send", text: "Briefing"),
+    ]
+
+    /** höchstens alle 30 Minuten neu (die Reihenfolge ändert sich mit der Uhrzeit); `force` nach Profiländerung */
+    func loadQuick(force: Bool = false) async {
+        guard loggedIn, force || Date().timeIntervalSince(lastQuick) > 1800 else { return }
+        if let q: QuickActions = try? await api.get("/api/quick-actions") {
+            quick = q
+            lastQuick = Date()
         }
     }
 

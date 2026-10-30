@@ -123,6 +123,21 @@ struct AudioResponse: Codable {
     var audioId: String
 }
 
+/** Schnellaktion im Chat: Chip bzw. große Karte im leeren Chat */
+struct QuickAction: Codable, Hashable, Identifiable {
+    var id: String
+    var symbol: String
+    var label: String
+    /** text = in die Eingabe einfügen, send = sofort schicken, camera = Kamera öffnen, mic = Aufnahme */
+    var kind: String
+    var text: String?
+}
+
+struct QuickActions: Codable {
+    var actions: [QuickAction]
+    var cards: [QuickAction]
+}
+
 struct NewConversation: Codable {
     var id: String
     var conversations: [Conversation]

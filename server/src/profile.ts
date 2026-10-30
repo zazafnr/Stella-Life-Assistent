@@ -69,3 +69,20 @@ export function applyProfile(user: User, profile: UserProfile): User {
 export function skipProfile(user: User): User {
   return applyProfile(user, { situation: 'other', features: ['mails', 'planner', 'shopping', 'goals', 'health'] });
 }
+
+/** Ein Satz für KI-Prompts: wer der Nutzer ist (Schule, Studium, Job …) */
+export function describeUser(user: User): string {
+  const p = user.settings.profile;
+  const name = user.name;
+  if (!p || p.situation === 'school') return `${name} geht in Österreich zur Schule${p?.school?.level ? ` (${p.school.level})` : ''}.`;
+  if (p.situation === 'university') return `${name} studiert${p.university?.name ? ` (${p.university.name})` : ''}.`;
+  if (p.situation === 'work') return `${name} arbeitet${p.workHours ? ` (${p.workHours.start}–${p.workHours.end})` : ''}.`;
+  if (p.situation === 'apprenticeship') return `${name} macht eine Lehre.`;
+  return `${name} steht mitten im Alltag.`;
+}
+
+/** Kurzform für „einen Schüler“ / „eine Person“ in Aufgaben-Prompts (z. B. Mails sortieren) */
+export function whoIs(user: User): string {
+  const s = user.settings.profile?.situation;
+  return !s || s === 'school' ? 'einen Schüler' : s === 'university' ? 'eine Studentin oder einen Studenten' : s === 'work' || s === 'apprenticeship' ? 'eine berufstätige Person' : 'eine Person';
+}

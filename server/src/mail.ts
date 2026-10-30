@@ -18,6 +18,7 @@ import { getSecret, setSecret } from './auth.ts';
 import { addMessage, db, getUser, newId, now, type User } from './db.ts';
 import { complete, groqAvailable, LlmUnavailable, llmAvailable } from './llm.ts';
 import { accessToken } from './oauth.ts';
+import { whoIs } from './profile.ts';
 import { levelFor, perform } from './actions.ts';
 import { formatDateDe, todayIn, voice } from '@stella/shared';
 import { pushToUser } from './push.ts';
@@ -272,7 +273,7 @@ async function checkAccount(userId: string, account: MailAccount) {
       });
     }
 
-    const verdicts = await classify(mails, todayIn(user.timeZone), userId, 'einen Schüler');
+    const verdicts = await classify(mails, todayIn(user.timeZone), userId, whoIs(user));
     const trash = autoTrash ? await trashPath(c) : null;
     const trashed: NewMail[] = [];
     for (const m of mails) {
@@ -414,7 +415,7 @@ export async function draftReply(user: User, eventId: string, instruction = '', 
   const { message } = await complete([
     {
       role: 'system',
-      content: `Du schreibst E-Mail-Antworten im Namen von ${user.name} (Schüler:in in Österreich). Höflich und kurz, passend zum Absender: ` +
+      content: `Du schreibst E-Mail-Antworten im Namen von ${user.name} (Österreich). Höflich und kurz, passend zum Absender: ` +
         'Lehrer:innen, Schule, Ämter, Firmen in der Sie-Form mit Anrede und Gruß; Freunde und Familie locker in der Du-Form. ' +
         'Erfinde keine Fakten oder Zusagen – wo etwas fehlt, schreib eine neutrale Formulierung. Antworte nur mit dem Text der Mail, ohne Betreff.',
     },

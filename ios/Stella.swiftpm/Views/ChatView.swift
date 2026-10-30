@@ -17,18 +17,32 @@ struct ChatView: View {
     @Environment(\.openURL) private var openURL
     @FocusState private var focused: Bool
 
-    private let suggestions = ["Latein HÜ S. 45 Nr. 3 Freitag", "Freitag 15 Uhr Friseur", "erinnere mich in 2 Stunden an die Wäsche", "Hab ich was vergessen?", "Briefing"]
+    @State private var hint: String?
 
     var body: some View {
         ZStack(alignment: .top) {
             Theme.bg.ignoresSafeArea()
-            Sky(height: 220)
+            // der ganze Chat liegt unter einem Himmel mit ziehenden Wolken (bei „Bewegung reduzieren“ stehen sie still)
+            Sky(height: UIScreen.main.bounds.height)
             VStack(spacing: 0) {
                 header
                 messagesList
                 composer
             }
+            if let hint {
+                Text(hint)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Theme.text.opacity(0.9), in: Capsule())
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .padding(.bottom, 130)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
+        .animation(.spring, value: hint)
+        .task { await store.loadQuick() }
         .sheet(isPresented: $showHistory) {
             ChatHistorySheet()
         }
@@ -121,6 +135,7 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 8) {
+                    if store.messages.isEmpty && !store.thinking { emptyState }
                     ForEach(store.messages) { m in
                         Bubble(message: m, onImage: { viewing = $0 })
                             .id(m.id)
@@ -132,8 +147,13 @@ struct ChatView: View {
                             .id("typing")
                     }
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+                // weiche, durchscheinende Spalte in Milchglas – darauf liegen die Nachrichten
+                .background(.white.opacity(0.5), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(.white.opacity(0.7), lineWidth: 1))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
                 .frame(maxWidth: 780)
                 .frame(maxWidth: .infinity)
                 .animation(.spring(response: 0.4, dampingFraction: 0.85), value: store.messages.count)
@@ -157,17 +177,19 @@ struct ChatView: View {
 
     private var composer: some View {
         VStack(spacing: 8) {
-            if text.isEmpty && images.isEmpty && !focused {
+            if text.isEmpty && images.isEmpty && !focused && !store.messages.isEmpty && !recorder.isRecording {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(suggestions, id: \.self) { s in
-                            Button(s) { text = s; focused = true }
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(Theme.text)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(.white, in: Capsule())
-                                .overlay(Capsule().stroke(Theme.border))
+                        ForEach(store.quick.actions) { a in
+                            Button { run(a) } label: {
+                                Label(a.label, systemImage: a.symbol)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(Theme.text)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background(.white, in: Capsule())
+                                    .overlay(Capsule().stroke(Theme.border))
+                            }
                         }
                     }
                     .padding(.horizontal, 16)
@@ -246,6 +268,64 @@ struct ChatView: View {
             .frame(maxWidth: 800)
         }
         .animation(.easeOut(duration: 0.2), value: focused)
+    }
+
+    // MARK: Schnellaktionen
+
+    /** Begrüßung und vier große Karten, solange der Chat noch leer ist */
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            HoppingStar(size: 38)
+            Text("Hi\(store.me.map { ", \($0.firstName)" } ?? "")!")
+                .font(Theme.display(26))
+                .foregroundStyle(Theme.text)
+            Text("Wobei kann ich dir helfen? Tipp etwas an – oder sprich einfach los.")
+                .font(.system(size: 15))
+                .foregroundStyle(Theme.muted)
+                .multilineTextAlignment(.center)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                ForEach(store.quick.cards) { a in
+                    Button { run(a) } label: {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Image(systemName: a.symbol)
+                                .font(.system(size: 18))
+                                .foregroundStyle(Theme.blue)
+                                .frame(width: 40, height: 40)
+                                .background(Theme.blueTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            Text(a.label)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Theme.text)
+                                .multilineTextAlignment(.leading)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 100, alignment: .topLeading)
+                        .padding(12)
+                        .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .shadow(color: Theme.blue.opacity(0.08), radius: 10, y: 4)
+                    }
+                    .buttonStyle(PressableStyle())
+                }
+            }
+            .padding(.top, 6)
+        }
+        .padding(.vertical, 20)
+    }
+
+    private func run(_ a: QuickAction) {
+        switch a.kind {
+        case "send":
+            Task { await store.send(text: a.text ?? a.label) }
+        case "camera":
+            showCamera = true
+        case "mic":
+            hint = "Halte den Mikrofon-Knopf unten rechts gedrückt"
+            Task {
+                try? await Task.sleep(for: .seconds(2.5))
+                hint = nil
+            }
+        default:
+            text = a.text ?? ""
+            focused = true
+        }
     }
 
     // MARK: Sprachnachricht

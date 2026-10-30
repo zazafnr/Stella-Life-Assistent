@@ -1,14 +1,22 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { addDays, dayLabel as chatDayLabel, todayIn, type Conversation } from '@stella/shared';
-import { compressImage, newConversation, openConversation, retryAudio, sendAudio, sendMessage, useStore } from '../store.ts';
+import { api, compressImage, newConversation, openConversation, retryAudio, sendAudio, sendMessage, useStore } from '../store.ts';
 import { MAX_SECONDS, recordingSupported, startRecording, type Recording } from '../audio.ts';
 import { AudioPlayer, AuthImage, Lightbox, Rich } from './Rich.tsx';
 import { ItemStatus } from './Today.tsx';
 import { ActionCard } from './ActionCard.tsx';
 import { Icon } from '../ui/Icon.tsx';
-import { Sheet, Sky, StarMark, showToast } from '../ui/Decor.tsx';
+import { CloudSky, Sheet, StarMark, showToast } from '../ui/Decor.tsx';
 
-const SUGGESTIONS = ['Französisch HÜ S. 45 Nr. 16 Freitag', 'Freitag 15 Uhr Friseur', 'erinnere mich in 2 Stunden an die Wäsche', 'Hab ich was vergessen?', 'Briefing'];
+interface QuickAction { id: string; icon: string; label: string; kind: 'text' | 'send' | 'camera' | 'mic'; text?: string }
+
+/** Falls Stella gerade nicht erreichbar ist: ein paar Chips, die immer gehen */
+const FALLBACK_ACTIONS: QuickAction[] = [
+  { id: 'voice', icon: 'mic', label: 'Sprachnachricht', kind: 'mic' },
+  { id: 'week', icon: 'calendar', label: 'Woche planen', kind: 'send', text: 'Plan meine Woche' },
+  { id: 'forgot', icon: 'sparkle', label: 'Hab ich was vergessen?', kind: 'send', text: 'Hab ich was vergessen?' },
+  { id: 'briefing', icon: 'sun', label: 'Briefing', kind: 'send', text: 'Briefing' },
+];
 
 function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });
@@ -33,6 +41,9 @@ export function Chat() {
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [history, setHistory] = useState(false);
+  const me = useStore((s) => s.me);
+  const [quick, setQuick] = useState<{ actions: QuickAction[]; cards: QuickAction[] }>({ actions: FALLBACK_ACTIONS, cards: FALLBACK_ACTIONS });
+  const cameraRef = useRef<HTMLInputElement>(null);
   const [recording, setRecording] = useState<{ rec: Recording; startedAt: number } | null>(null);
   const [seconds, setSeconds] = useState(0);
   const [level, setLevel] = useState(0);
@@ -61,6 +72,21 @@ export function Chat() {
       setText(t);
       setPhotos(imgs);
     }
+  }
+
+  // Schnellaktionen nach Profil und Tageszeit (alle 30 Minuten neu, weil sich die Reihenfolge mit der Uhrzeit ändert)
+  useEffect(() => {
+    const load = () => api<{ actions: QuickAction[]; cards: QuickAction[] }>('/api/quick-actions').then(setQuick).catch(() => {});
+    load();
+    const t = setInterval(load, 30 * 60_000);
+    return () => clearInterval(t);
+  }, [me?.settings.profile]);
+
+  function runQuick(a: QuickAction) {
+    if (a.kind === 'mic') void record();
+    else if (a.kind === 'camera') cameraRef.current?.click();
+    else if (a.kind === 'send') void submit(a.text ?? a.label);
+    else { setText(a.text ?? ''); inputRef.current?.focus(); }
   }
 
   // Zeit und Pegel der laufenden Aufnahme
@@ -106,10 +132,10 @@ export function Chat() {
 
   let lastDay = '';
   return (
-    <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+    <div style={{ display: 'flex', flex: 1, minHeight: 0, minWidth: 0 }}>
       <aside className="chat-history" aria-label="Chats"><ChatHistory onNew={() => void startNew()} /></aside>
       <div className="chat">
-        <Sky />
+        <CloudSky />
         <header className="chat-head">
           <span className="avatar-star"><StarMark size={19} /></span>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -128,9 +154,18 @@ export function Chat() {
         <div className="chat-scroll">
           <div className="chat-inner">
             {messages.length === 0 && (
-              <div className="empty">
+              <div className="chat-empty">
                 <span className="icon-tile pink"><StarMark size={26} /></span>
-                <p>Schreib Stella in Stichworten, was ansteht.</p>
+                <h2 className="display" style={{ fontSize: 24 }}>Hi{me?.name ? `, ${me.name.split(' ')[0]}` : ''}!</h2>
+                <p className="muted" style={{ margin: 0 }}>Wobei kann ich dir helfen? Tipp etwas an – oder sprich einfach los.</p>
+                <div className="quick-cards">
+                  {quick.cards.map((a) => (
+                    <button key={a.id} type="button" className="quick-card" onClick={() => runQuick(a)}>
+                      <span className="icon-tile blue"><Icon name={a.icon as never} size={22} /></span>
+                      <span>{a.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             {messages.map((m) => {
@@ -165,9 +200,11 @@ export function Chat() {
           </div>
         </div>
 
-        {messages.length < 5 && (
-          <div className="suggestions">
-            {SUGGESTIONS.map((s) => <button key={s} type="button" className="chip" onClick={() => setText(s)}>{s}</button>)}
+        {messages.length > 0 && !text.trim() && photos.length === 0 && !recording && (
+          <div className="suggestions" aria-label="Schnellaktionen">
+            {quick.actions.map((a) => (
+              <button key={a.id} type="button" className="chip" onClick={() => runQuick(a)}><Icon name={a.icon as never} size={14} /> {a.label}</button>
+            ))}
           </div>
         )}
         {error && <p className="error-text" style={{ textAlign: 'center', margin: '4px 16px' }}>{error}</p>}
@@ -193,6 +230,7 @@ export function Chat() {
           ) : (
           <form className="composer" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
             <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { void addPhotos(e.target.files); e.target.value = ''; }} />
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { void addPhotos(e.target.files); e.target.value = ''; }} />
             <button type="button" className="attach" aria-label="Foto der Aufgabe" onClick={() => fileRef.current?.click()}><Icon name="camera" size={20} /></button>
             <label className="sr-only" htmlFor="stella-input">Nachricht an Stella</label>
             <textarea
