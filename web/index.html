@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#CFE6FF" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@300;700;800&display=swap" rel="stylesheet" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -16,8 +16,31 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <style>
+      /* Ladebildschirm: steht sofort da, bevor das JavaScript geladen ist (Paket 0b) */
+      #boot { position: fixed; inset: 0; z-index: 9000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+        background: linear-gradient(180deg, #CFE6FF 0%, #E8F3FF 45%, #F5F9FF 100%); color: #0F2A4A; font-family: Inter, system-ui, sans-serif;
+        transition: opacity .2s ease-out; }
+      #boot.done { opacity: 0; pointer-events: none; }
+      #boot .star { color: #FF7EB3; margin-bottom: 10px; animation: boot-hop 1.6s ease-in-out infinite; }
+      #boot .name { font-family: "Inter Tight", Inter, system-ui, sans-serif; font-weight: 800; font-size: 28px; letter-spacing: -.01em; }
+      #boot .by { font-size: 11px; font-weight: 500; letter-spacing: .32em; text-transform: uppercase; color: #8DA0BA; padding-left: .32em; }
+      /* allererster Start: erst dunkel und leer, darüber läuft das EVOLSIOR-Intro */
+      html[data-first] #boot { background: #0A0F1A; transition: background .4s ease-out, opacity .2s ease-out; }
+      html[data-first] #boot > * { visibility: hidden; }
+      @keyframes boot-hop { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-6px) rotate(10deg); } }
+      @media (prefers-reduced-motion: reduce) { #boot .star { animation: none; } }
+    </style>
+    <script>
+      try { if (!localStorage.getItem('evolsiorIntroShown')) document.documentElement.setAttribute('data-first', ''); } catch (e) {}
+    </script>
   </head>
   <body>
+    <div id="boot" aria-hidden="true">
+      <svg class="star" width="56" height="56" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c.6 4.8 3.2 7.4 8 8-4.8.6-7.4 3.2-8 8-.6-4.8-3.2-7.4-8-8 4.8-.6 7.4-3.2 8-8z"/></svg>
+      <div class="name">Stella</div>
+      <div class="by">by EVOLSIOR</div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

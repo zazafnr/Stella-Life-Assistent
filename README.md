@@ -2,6 +2,8 @@
 
 **Let Stella handle your life.**
 
+*Stella by **EVOLSIOR** – Built to become.*
+
 Stella ist dein eigener KI-Assistent für Schule und Alltag. Du schreibst in Stichworten, Stella erledigt den Rest:
 
 | Du schreibst | Stella macht |

@@ -17,6 +17,8 @@ final class Store {
     var online = true
     var thinking = false
     var loggedIn: Bool
+    /** Cache wiederhergestellt bzw. erster Abgleich fertig – davor zeigt die App den Ladebildschirm */
+    var ready = false
 
     @ObservationIgnored private var outbox: [Outbox] = []
     @ObservationIgnored private var loop: Task<Void, Never>?
@@ -41,6 +43,7 @@ final class Store {
     init() {
         loggedIn = API.shared.token != nil
         restore()
+        ready = !loggedIn || me != nil
     }
 
     // MARK: Abgeleitete Listen
@@ -106,6 +109,13 @@ final class Store {
     // MARK: Abgleich
 
     func start() {
+        if !ready {
+            // spätestens nach 4 s aufhören zu warten, auch wenn der Server nicht antwortet
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(4))
+                self?.ready = true
+            }
+        }
         loop?.cancel()
         loop = Task { [weak self] in
             while !Task.isCancelled {
@@ -122,6 +132,7 @@ final class Store {
 
     func sync() async {
         guard loggedIn else { return }
+        defer { ready = true }
         await flushOutbox()
         let path = lastSync.map { "/api/sync?since=\($0.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? $0)" } ?? "/api/sync"
         do {

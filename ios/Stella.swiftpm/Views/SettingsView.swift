@@ -166,6 +166,20 @@ struct SettingsView: View {
                         }
                         Button("Abmelden", role: .destructive) { confirmLogout = true }
                     }
+
+                    Section {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Stella by EVOLSIOR – Built to become")
+                                .font(.system(size: 15, weight: .semibold))
+                            Text("Der Name steckt in zwei Wörtern: Evolic (sich weiterentwickeln) und Excelsior (immer höher hinaus).")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Theme.muted)
+                        }
+                    } header: {
+                        Text("Über Stella")
+                    } footer: {
+                        Text("Version 2.0")
+                    }
                 }
 
                 if let error {

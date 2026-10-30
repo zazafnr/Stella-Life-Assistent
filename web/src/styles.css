@@ -555,3 +555,24 @@ textarea.cookies { min-height: 90px; font-family: ui-monospace, monospace; font-
 .plan-check { width: 24px; height: 24px; border-radius: 8px; border: 2px solid var(--border-strong); display: grid; place-items: center; flex: none; color: #fff; }
 .plan-check.on { background: var(--blue); border-color: var(--blue); }
 .plan-notes { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 14px; background: #FFF4E5; color: #8A5300; font-size: 14px; }
+
+/* ---------- EVOLSIOR-Intro (Paket 0b) ---------- */
+.intro { position: fixed; inset: 0; z-index: 9500; display: flex; align-items: center; justify-content: center; background: #0A0F1A; color: #fff; transition: opacity .4s ease-in-out; }
+.intro.out { opacity: 0; pointer-events: none; }
+.intro-inner { display: flex; flex-direction: column; align-items: center; gap: 22px; margin-top: -8vh; padding: 0 16px; text-align: center; }
+.intro-name { font-family: "Inter Tight", Inter, system-ui, sans-serif; font-weight: 300; text-transform: uppercase; font-size: clamp(26px, 8vw, 48px);
+  letter-spacing: .4em; margin-right: -.4em; animation: intro-name .8s cubic-bezier(.2, .7, .2, 1) both; }
+.intro-tag { font-size: clamp(12px, 3.4vw, 15px); font-weight: 400; letter-spacing: .15em; color: rgba(255, 255, 255, .7); white-space: nowrap; }
+.intro-ch { display: inline-block; opacity: 0; animation: intro-ch .3s ease-out forwards; }
+@keyframes intro-name { from { opacity: 0; letter-spacing: .5em; } to { opacity: 1; letter-spacing: .4em; } }
+@keyframes intro-ch { from { opacity: 0; filter: blur(8px); transform: translateY(6px); } to { opacity: 1; filter: blur(0); transform: none; } }
+/* „Bewegung reduzieren“: nur einblenden, keine Verschiebung, kein Buchstaben-Tanz */
+.intro.reduced .intro-name { animation: intro-fade .8s ease-out both; }
+.intro.reduced .intro-ch { animation: intro-fade .8s ease-out both; animation-delay: .2s !important; }
+@keyframes intro-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .intro .intro-name { animation: intro-fade .8s ease-out both !important; animation-duration: .8s !important; }
+  .intro .intro-ch { animation: intro-fade .8s ease-out both !important; animation-duration: .8s !important; animation-delay: .2s !important; }
+  .intro { transition-duration: .4s !important; }
+}
+.by-evolsior { font-size: 11px; font-weight: 500; letter-spacing: .3em; text-transform: uppercase; color: var(--faint, #8DA0BA); text-align: center; margin: 4px 0 0; }

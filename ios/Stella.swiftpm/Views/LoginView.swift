@@ -78,6 +78,12 @@ struct LoginView: View {
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.faint)
                         .padding(.top, 8)
+
+                    Text("by EVOLSIOR")
+                        .font(.system(size: 11, weight: .medium))
+                        .tracking(3.5)
+                        .textCase(.uppercase)
+                        .foregroundStyle(Theme.faint)
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 40)

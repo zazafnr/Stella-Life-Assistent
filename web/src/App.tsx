@@ -6,6 +6,7 @@ import { Planner } from './components/Planner.tsx';
 import { Inbox } from './components/Inbox.tsx';
 import { Health } from './components/Health.tsx';
 import { Settings } from './components/Settings.tsx';
+import { Intro, dismissBoot, introShown } from './components/Intro.tsx';
 import { Icon, type IconName } from './ui/Icon.tsx';
 import { Sky, StarMark, showToast } from './ui/Decor.tsx';
 
@@ -33,6 +34,13 @@ export function App() {
   const [tab, setTab] = useState<Tab>(initialTab);
 
   const hasMe = useStore((s) => !!s.me);
+  const lastSync = useStore((s) => s.lastSync);
+  const [intro, setIntro] = useState(() => !introShown());
+  const [ready, setReady] = useState(false);
+  // Ladebildschirm (steht in index.html) geht weg, sobald Anmeldestatus und Daten da sind – spätestens nach 4 s
+  useEffect(() => { if (!token || hasMe || lastSync) setReady(true); }, [token, hasMe, lastSync]);
+  useEffect(() => { const t = setTimeout(() => setReady(true), 4000); return () => clearTimeout(t); }, []);
+  useEffect(() => { if (ready) dismissBoot(); }, [ready]);
   useEffect(() => { if (token) startBackgroundSync(); }, [token]);
   useEffect(() => { if (token && !hasMe) void refreshMe().catch(() => {}); }, [token, hasMe]);
   useEffect(() => { history.replaceState(null, '', tab === 'today' ? location.pathname : `#${tab}`); }, [tab]);
@@ -56,9 +64,13 @@ export function App() {
 
   const openHomework = useMemo(() => Object.values(items).filter((i) => i.kind === 'homework' && i.status === 'open' && !i.deleted).length, [items]);
 
-  if (!token) return <Login />;
+  const introLayer = intro ? <Intro onDone={() => setIntro(false)} /> : null;
+
+  if (!token) return <>{introLayer}<Login /></>;
 
   return (
+    <>
+    {introLayer}
     <div className="app">
       <div className="desktop-drag" aria-hidden="true" />
       <nav className="sidebar" aria-label="Navigation">
@@ -92,6 +104,7 @@ export function App() {
         ))}
       </nav>
     </div>
+    </>
   );
 }
 
@@ -139,6 +152,7 @@ function Login() {
         <button type="button" className="link" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
           {mode === 'login' ? 'Noch kein Konto?' : 'Schon ein Konto? Anmelden'}
         </button>
+        <p className="by-evolsior">by EVOLSIOR</p>
       </form>
     </div>
   );

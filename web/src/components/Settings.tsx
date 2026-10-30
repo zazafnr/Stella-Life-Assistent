@@ -10,6 +10,7 @@ import { Handwriting } from './settings/Handwriting.tsx';
 import { ActionLog, MemoryView, Permissions } from './settings/Assistant.tsx';
 import { Icon, type IconName } from '../ui/Icon.tsx';
 import { Sheet, Sky, StarMark, Switch, showToast } from '../ui/Decor.tsx';
+import { VERSION } from '../version.ts';
 
 type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'notify' | 'ai' | 'perms' | 'memory' | 'log';
 
@@ -140,6 +141,13 @@ export function Settings({ back }: { back: () => void }) {
             {ai.dailyLimit <= 50 && <span className="small muted">Einmal 10 $ bei OpenRouter aufladen → 1.000 pro Tag</span>}
           </button>
         )}
+
+        <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontWeight: 600 }}>Über Stella</span>
+          <span className="small muted">Version {VERSION}</span>
+          <span className="small">Stella by EVOLSIOR – <em>Built to become</em></span>
+          <span className="small muted">EVOLSIOR steckt in zwei Wörtern: <em>Evolic</em> (sich weiterentwickeln) und <em>Excelsior</em> (immer höher hinaus).</span>
+        </section>
 
         <button type="button" className="btn secondary" style={{ alignSelf: 'flex-start' }} onClick={() => void logout()}><Icon name="logout" size={18} />Abmelden</button>
       </div>
