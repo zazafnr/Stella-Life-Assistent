@@ -1,82 +1,118 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>EVOLSIOR – Built to become</title>
-<meta name="description" content="EVOLSIOR baut Apps, die mit dir wachsen. Mit Stella, deiner persönlichen Alltags-Assistentin.">
-<meta name="theme-color" content="#CFE6FF">
-<meta property="og:title" content="EVOLSIOR – Built to become"><meta property="og:description" content="EVOLSIOR baut Apps, die mit dir wachsen. Mit Stella, deiner persönlichen Alltags-Assistentin."><meta property="og:type" content="website">
-<link rel="icon" href="/assets/star.svg" type="image/svg+xml">
+<meta name="description" content="EVOLSIOR builds calm, precise apps that grow with the people who use them. Home of Stella, a personal assistant for your whole life.">
+<link rel="canonical" href="https://evolsior.com/">
+<meta name="theme-color" content="#09090B">
+<meta name="color-scheme" content="dark">
+<meta property="og:site_name" content="EVOLSIOR">
+<meta property="og:type" content="website">
+<meta property="og:title" content="EVOLSIOR – Built to become">
+<meta property="og:description" content="EVOLSIOR builds calm, precise apps that grow with the people who use them. Home of Stella, a personal assistant for your whole life.">
+<meta property="og:url" content="https://evolsior.com/">
+<meta property="og:image" content="https://evolsior.com/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css">
+<script src="/assets/site.js" defer></script>
 </head>
 <body>
-<a class="skip" href="#inhalt">Zum Inhalt</a>
+<a class="skip" href="#main">Skip to content</a>
 <header class="nav"><div class="wrap">
-  <a class="brand" href="/"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3c.5 4 2.9 6.5 7 7-4.1.5-6.5 3-7 7-.5-4-2.9-6.5-7-7 4.1-.5 6.5-3 7-7z"/></svg>EVOLSIOR</a>
-  <nav class="links" aria-label="Hauptnavigation">
-    <a href="/#produkte">Produkte</a><a href="/#ueber-uns">Über uns</a><a href="/#kontakt">Kontakt</a>
-    <a class="btn small" href="https://stella.evolsior.com">Stella öffnen</a>
+  <a class="brand" href="/" aria-label="EVOLSIOR home"><svg viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><rect x="10" y="5" width="18" height="5" rx="2.5"/><rect x="4" y="13.5" width="18" height="5" rx="2.5"/><rect x="10" y="22" width="18" height="5" rx="2.5"/></svg>EVOLSIOR</a>
+  <nav class="links" aria-label="Main">
+    <a href="#apps">Apps</a><a href="#company">Company</a><a href="#contact">Contact</a>
+    <a class="btn sm ghost" href="https://stella.evolsior.com">Open Stella <span class="arrow">↗</span></a>
   </nav>
 </div></header>
-<main id="inhalt">
 
-<section class="sky hero" aria-labelledby="h-start">
-  <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+<main id="main">
+<section class="hero" aria-labelledby="h-hero">
+  <canvas aria-hidden="true"></canvas>
   <div class="wrap">
-    <span class="mark"><svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3c.5 4 2.9 6.5 7 7-4.1.5-6.5 3-7 7-.5-4-2.9-6.5-7-7 4.1-.5 6.5-3 7-7z"/></svg></span>
-    <h1 id="h-start">Built to become.</h1>
-    <p class="lead">EVOLSIOR baut Apps, die mit dir wachsen: ruhig, klar und so gebaut, dass sie dir den Alltag leichter machen.</p>
-    <div class="cta"><a class="btn" href="/stella">Stella entdecken</a><a class="btn secondary" href="#ueber-uns">Wer wir sind</a></div>
-    <span class="by">by EVOLSIOR</span>
+    <p class="label" style="margin-bottom:28px">EVOLSIOR · Software company</p>
+    <h1 id="h-hero">Built<br>to become.</h1>
+    <p class="lead">We design and build apps that grow with the people who use them. Calm, precise and made to last.</p>
+    <div class="actions">
+      <a class="btn" href="/stella">Explore Stella <span class="arrow">→</span></a>
+      <a class="btn ghost" href="#company">Our approach</a>
+    </div>
+    <div class="meta label">
+      <span><i class="dot"></i>Stella · Live, invite only</span>
+      <span><i class="dot off"></i>Next app · In development</span>
+    </div>
   </div>
 </section>
 
-<section id="produkte" aria-labelledby="h-produkte"><div class="wrap">
-  <div class="head"><span class="eyebrow">Produkte</span><h2 id="h-produkte">Unsere Apps</h2><p class="muted">Jede App hat ihren eigenen Bereich. Hier findest du, was es schon gibt und woran wir arbeiten.</p></div>
-  <div class="grid">
-    <a class="card" href="/stella">
-      <span class="icon pink"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3c.5 4 2.9 6.5 7 7-4.1.5-6.5 3-7 7-.5-4-2.9-6.5-7-7 4.1-.5 6.5-3 7-7z"/></svg></span>
-      <span class="tag">Verfügbar mit Einladung</span>
-      <h3>Stella</h3>
-      <p>Deine persönliche Alltags-Assistentin: Planer, Erinnerungen, Mails, Einkaufsliste, Ziele und Ausgaben an einem Ort.</p>
-      <span>Mehr über Stella →</span>
-    </a>
-    <div class="card ghost">
-      <span class="icon">＋</span>
-      <span class="tag soon">In Arbeit</span>
-      <h3>Weitere Apps</h3>
-      <p>Hier erscheinen die nächsten Apps von EVOLSIOR, jede mit eigenem Bereich unter evolsior.com.</p>
+<section id="apps" aria-labelledby="h-apps">
+  <div class="wrap">
+    <div class="head" data-reveal>
+      <p class="label">Apps</p>
+      <h2 id="h-apps">Everything we ship,<br>in one place.</h2>
+    </div>
+
+    <article class="spot feature" data-reveal data-tilt-host>
+      <div class="feature-copy">
+        <span class="pill"><i class="dot"></i>Live · Invite only</span>
+        <h3 class="feature-name">Stella</h3>
+        <p class="lead">A personal assistant for your whole life. Plans, reminders, mail, errands, goals and money, handled in one conversation.</p>
+        <ul class="ticks label">
+          <li>Plans and reminders</li><li>Mail, sorted</li><li>Goals and spending</li>
+        </ul>
+        <a class="link" href="/stella">Discover Stella <span class="arrow">→</span></a>
+      </div>
+      <div class="feature-visual" aria-hidden="true">
+        <div class="glow"></div>
+        <div class="phone tilt" style="--w:300px"><div class="screen" style="background-image:var(--img-chat)"><span class="shine"></span></div></div>
+      </div>
+    </article>
+
+    <div class="next-grid">
+      <article class="spot ghost-card" data-reveal>
+        <span class="pill"><i class="dot off"></i>In development</span>
+        <h3>The next app is taking shape.</h3>
+        <p class="muted-p">Same care, new problem. We will show it here when it is ready.</p>
+      </article>
+      <article class="spot ghost-card" data-reveal>
+        <span class="pill"><i class="dot off"></i>Open door</span>
+        <h3>Got an idea worth building?</h3>
+        <a class="link" href="mailto:hello@evolsior.com">hello@evolsior.com <span class="arrow">→</span></a>
+      </article>
     </div>
   </div>
-</div></section>
+</section>
 
-<section id="ueber-uns" class="band" aria-labelledby="h-ueber"><div class="wrap split">
-  <div>
-    <span class="eyebrow">Über uns</span>
-    <h2 id="h-ueber" style="margin: 12px 0 18px">Aus <em style="font-style:normal;color:var(--pink)">Evolic</em> und <em style="font-style:normal;color:var(--pink)">Excelsior</em>.</h2>
-    <p class="muted">Der Name sagt, worum es geht: sich weiterentwickeln (<em>evolvere</em>) und immer ein Stück höher streben (<em>excelsior</em>). Wir bauen Software, die nicht laut sein muss, um zu helfen.</p>
+<section id="company" class="paper" aria-labelledby="h-company">
+  <div class="wrap">
+    <p class="label" id="h-company" style="margin-bottom:32px">Company</p>
+    <p class="fill">Software should not be finished the day it ships. It should learn, adapt and grow with the person using it, quietly and on their terms. That is what we build. That is the whole idea.</p>
+    <div class="principles">
+      <div data-reveal><p class="label">Always becoming</p><h3>Never done, always better.</h3><p>Every release moves closer to how you actually live. We ship small, listen closely and keep improving.</p></div>
+      <div data-reveal><p class="label">Calm by design</p><h3>Help without noise.</h3><p>No streaks, no badges, no pressure. Our apps do their work in the background and speak up only when it matters.</p></div>
+      <div data-reveal><p class="label">Yours by default</p><h3>Your data stays yours.</h3><p>We store only what an app needs, never sell it, and let you delete your account and everything in it, any time.</p></div>
+    </div>
   </div>
-  <ul class="checks">
-    <li><span><strong>Ruhig statt aufdringlich.</strong> Keine Punkte, Serien oder Abzeichen. Stella unterstützt, sie drängt nicht.</span></li>
-    <li><span><strong>Deine Daten gehören dir.</strong> Wir speichern nur, was die App wirklich braucht, und du kannst dein Konto samt Daten jederzeit löschen.</span></li>
-    <li><span><strong>Für jeden Alltag.</strong> Ob Schule, Studium oder Job: die App richtet sich nach dir.</span></li>
-  </ul>
-</div></section>
+</section>
 
-<section id="kontakt" aria-labelledby="h-kontakt"><div class="wrap">
-  <div class="card" style="text-align:center; justify-items:center; padding: clamp(32px,6vw,64px)">
-    <span class="eyebrow">Kontakt</span>
-    <h2 id="h-kontakt">Sag Hallo.</h2>
-    <p>Fragen, Ideen oder Feedback zu unseren Apps? Wir freuen uns auf deine Nachricht.</p>
-    <a class="btn" href="mailto:hello@evolsior.com">hello@evolsior.com</a>
+<section id="contact" aria-labelledby="h-contact" style="padding-bottom: clamp(56px, 8vw, 100px)">
+  <div class="wrap">
+    <p class="label" id="h-contact" style="margin-bottom:28px">Contact</p>
+    <a class="mail" href="mailto:hello@evolsior.com" data-reveal>hello@evolsior.com</a>
+    <p class="lead" style="margin-top:28px">Questions, press or partnerships. We read every message.</p>
   </div>
-</div></section>
+</section>
 </main>
+
 <footer><div class="wrap">
-  <span>© 2026 EVOLSIOR · Built to become</span>
-  <nav aria-label="Rechtliches"><a href="/stella">Stella</a><a href="/impressum">Impressum</a><a href="/datenschutz">Datenschutz</a></nav>
+  <span>© 2026 EVOLSIOR</span>
+  <nav aria-label="Legal"><a href="/stella">Stella</a><a href="/imprint">Imprint</a><a href="/privacy">Privacy</a></nav>
 </div></footer>
-</body></html>
+
+</body>
+</html>
