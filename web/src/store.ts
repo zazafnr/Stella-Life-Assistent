@@ -5,8 +5,8 @@
 
 import { useSyncExternalStore } from 'react';
 import {
-  formatDateDe, interpret, todayIn, type ActionEntry, type ActionGroup, type ChatMessage, type ChatResponse, type Conversation, type Item, type PermissionLevel,
-  type SyncResponse, type Tone,
+  formatDateDe, interpret, profileHas, profileIsLearner, profileIsSchool, todayIn, type ActionEntry, type ActionGroup, type ChatMessage, type ChatResponse, type Conversation, type Item, type PermissionLevel,
+  type SyncResponse, type Tone, type Feature, type UserProfile,
 } from '@stella/shared';
 
 export type BookProvider = 'digi4school' | 'scook';
@@ -22,6 +22,8 @@ export interface Me {
     permissions?: Partial<Record<ActionGroup, PermissionLevel>>;
     briefing?: string;
     weekPlan?: 'sunday' | 'off';
+    profile?: UserProfile;
+    onboarding?: 'pending' | 'done';
   };
   integrations: {
     books: Record<BookProvider, { connected: boolean; cookies: boolean; email: string | null }>;
@@ -103,14 +105,34 @@ const isNetworkError = (err: unknown) => !(err instanceof ApiError);
 
 // ---------- Anmeldung ----------
 
-export async function authenticate(mode: 'login' | 'register', body: Record<string, string>) {
-  const device = /iPhone|iPad/.test(navigator.userAgent) ? 'iOS' : navigator.platform;
-  const { token, user } = await api<{ token: string; user: Me }>(`/api/auth/${mode}`, {
-    method: 'POST', json: { ...body, device, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-  });
+const deviceName = () => (/iPhone|iPad/.test(navigator.userAgent) ? 'iOS' : navigator.platform);
+
+function startSession(token: string, user: Me) {
   set({ token, me: user, items: {}, messages: [], outbox: [], lastSync: null, actions: {}, conversationId: null, pinned: false, current: null, conversations: [] });
-  await sync();
+  return sync();
 }
+
+/** Anmelden oder registrieren. Bei einem neuen Konto (nicht das erste) schickt der Server erst einen Code per Mail: Ergebnis `{ needsVerification }`. */
+export async function authenticate(mode: 'login' | 'register', body: Record<string, string>): Promise<{ needsVerification: true; email: string } | undefined> {
+  const res = await api<{ token?: string; user?: Me; needsVerification?: boolean; email?: string }>(`/api/auth/${mode}`, {
+    method: 'POST', json: { ...body, device: deviceName(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+  });
+  if (res.needsVerification) return { needsVerification: true, email: res.email ?? body.email! };
+  await startSession(res.token!, res.user!);
+  return undefined;
+}
+
+export async function verifyEmail(email: string, code: string) {
+  const { token, user } = await api<{ token: string; user: Me }>('/api/auth/verify', { method: 'POST', json: { email, code, device: deviceName() } });
+  await startSession(token, user);
+}
+
+export const resendCode = (email: string) => api<{ ok: boolean }>('/api/auth/resend', { method: 'POST', json: { email } });
+
+/** Sieht dieses Profil die Funktion? (Ohne Profil wie bisher.) */
+export const meHas = (me: Me | null, f: Feature) => profileHas(me?.settings.profile, f);
+export const meIsSchool = (me: Me | null) => profileIsSchool(me?.settings.profile);
+export const meIsLearner = (me: Me | null) => profileIsLearner(me?.settings.profile);
 
 export function logoutLocal() {
   set({ token: null, me: null, items: {}, messages: [], outbox: [], lastSync: null, actions: {}, conversationId: null, pinned: false, current: null, conversations: [] });

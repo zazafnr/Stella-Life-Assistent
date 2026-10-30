@@ -39,6 +39,20 @@ struct ServerKeysView: View {
     @State private var user = ""
     @State private var pass = ""
     @State private var from = ""
+    struct Invite: Codable, Identifiable, Hashable {
+        var code: String
+        var createdAt: String
+        var expiresAt: String?
+        var usedBy: String?
+        var id: String { code }
+    }
+    struct InvitesResponse: Codable {
+        var mode: String?
+        var invites: [Invite]
+    }
+
+    @State private var invites: [Invite] = []
+    @State private var registrationMode = "invite"
     @State private var message: String?
     @State private var failed = false
     @State private var busy = false
@@ -50,6 +64,7 @@ struct ServerKeysView: View {
             keySection(name: "openrouter", title: "OpenRouter-API-Key", input: $openrouterInput, placeholder: "sk-or-…",
                        hint: "Für Chat und Planer. Ohne Eintrag hier gilt der Schlüssel aus der Server-Umgebung.")
             smtpSection
+            invitesSection
             if let message {
                 Section { Text(message).foregroundStyle(failed ? Theme.pinkText : Theme.green) }
             }
@@ -113,6 +128,49 @@ struct ServerKeysView: View {
         }
     }
 
+    private var invitesSection: some View {
+        Section {
+            Button("Neue Einladung") { Task { await createInvite() } }
+            ForEach(invites) { i in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(i.code).font(.system(size: 16, weight: .semibold, design: .monospaced))
+                        Text(i.usedBy.map { "benutzt von \($0)" } ?? "noch frei").font(.system(size: 12)).foregroundStyle(Theme.muted)
+                    }
+                    Spacer()
+                    if i.usedBy == nil {
+                        Button("Kopieren") { UIPasteboard.general.string = i.code; show("Kopiert.", failed: false) }
+                            .font(.system(size: 14, weight: .semibold))
+                            .buttonStyle(.borderless)
+                    }
+                    Button(role: .destructive) { Task { await deleteInvite(i.code) } } label: { Image(systemName: "trash") }
+                        .buttonStyle(.borderless)
+                }
+            }
+        } header: {
+            Text("Einladungen")
+        } footer: {
+            Text(registrationMode == "open" ? "Die Registrierung ist offen – jede:r kann sich anmelden."
+                 : registrationMode == "closed" ? "Die Registrierung ist geschlossen – Einladungen gelten nicht."
+                 : "Neue Konten brauchen einen Einladungscode (14 Tage gültig) und bestätigen ihre E-Mail.")
+        }
+    }
+
+    private func createInvite() async {
+        struct Body: Encodable { var days: Int }
+        await run("Neue Einladung erstellt.") {
+            let r: InvitesResponse = try await API.shared.send("POST", "/api/admin/invites", body: Body(days: 14))
+            invites = r.invites
+        }
+    }
+
+    private func deleteInvite(_ code: String) async {
+        await run("Gelöscht.") {
+            let r: InvitesResponse = try await API.shared.send("DELETE", "/api/admin/invites/\(code)")
+            invites = r.invites
+        }
+    }
+
     private func statusText(_ s: KeyStatus?) -> String {
         guard let s, s.set else { return "Fehlt" }
         var text = "Gesetzt"
@@ -126,6 +184,10 @@ struct ServerKeysView: View {
         do {
             let r: KeysResponse = try await API.shared.get("/api/admin/keys")
             keys = r.keys
+            if let inv: InvitesResponse = try? await API.shared.get("/api/admin/invites") {
+                invites = inv.invites
+                registrationMode = inv.mode ?? "invite"
+            }
         } catch {
             show(error.localizedDescription, failed: true)
         }

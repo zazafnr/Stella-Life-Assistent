@@ -154,6 +154,28 @@ struct BookConfig: Codable, Hashable {
     var pageUrlTemplate: String?
 }
 
+struct WorkHours: Codable, Hashable {
+    var days: [Int]
+    var start: String
+    var end: String
+    var commute: Bool?
+}
+
+struct SchoolInfo: Codable, Hashable { var level: String }
+struct UniversityInfo: Codable, Hashable { var name: String }
+
+/** Wer Stella benutzt und wobei sie helfen soll (Einführung) – steuert, was die App zeigt */
+struct UserProfile: Codable, Hashable {
+    /** school, university, work, apprenticeship, other */
+    var situation: String
+    var ageGroup: String?
+    var workHours: WorkHours?
+    var school: SchoolInfo?
+    var university: UniversityInfo?
+    /** mails, planner, homework, shopping, goals, finance, health */
+    var features: [String]
+}
+
 struct UserSettings: Codable, Hashable {
     var eveningTime: String?
     var studyTime: String?
@@ -167,6 +189,9 @@ struct UserSettings: Codable, Hashable {
     var briefing: String?
     /** Sonntagabend Wochenplan anbieten: "sunday" oder "off" */
     var weekPlan: String?
+    var profile: UserProfile?
+    /** "pending": die Einführung kommt beim nächsten Öffnen; "done": erledigt oder übersprungen */
+    var onboarding: String?
 }
 
 /** Ein Block im Wochenplan-Vorschlag */
@@ -295,6 +320,17 @@ struct Me: Codable, Hashable {
     var role: String?
 
     var firstName: String { name.split(separator: " ").first.map(String.init) ?? name }
+
+    /** Sieht dieses Profil die Funktion? Ohne Profil (ältere Konten) wie bisher – nur Finanzen braucht eine Einrichtung. */
+    func has(_ feature: String) -> Bool {
+        guard let p = settings.profile else { return feature != "finance" }
+        if feature == "homework" && p.situation != "school" { return false }
+        return p.features.contains(feature)
+    }
+    /** Schulbücher, HÜ-Autopilot, WebUntis – ohne Profil wie bisher */
+    var isSchool: Bool { settings.profile.map { $0.situation == "school" } ?? true }
+    /** Tests, Lerneinheiten, Lernpläne: Schule oder Studium */
+    var isLearner: Bool { settings.profile.map { $0.situation == "school" || $0.situation == "university" } ?? true }
 }
 
 struct AuthResponse: Codable {
@@ -306,6 +342,16 @@ struct ServerStatus: Codable {
     var ok: Bool
     var hasUsers: Bool
     var registrationOpen: Bool
+    /** closed, invite oder open */
+    var registration: String?
+}
+
+/** Antwort auf Registrieren: Sitzung (erstes Konto) oder „erst Code bestätigen“ */
+struct SignupResponse: Decodable {
+    var token: String?
+    var user: Me?
+    var needsVerification: Bool?
+    var email: String?
 }
 
 struct Lesson: Codable, Hashable, Identifiable {

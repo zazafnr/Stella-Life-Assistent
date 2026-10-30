@@ -184,3 +184,35 @@ export interface WeekPlan {
   /** Zeit, die schon fest eingeplant ist (Minuten je Tag) – für die Wochenansicht */
   load: { date: string; freeMinutes: number; plannedMinutes: number }[];
 }
+
+// ---------- Profil (Einführung, Paket 5) ----------
+
+export const SITUATIONS = ['school', 'university', 'work', 'apprenticeship', 'other'] as const;
+export type Situation = (typeof SITUATIONS)[number];
+export const FEATURES = ['mails', 'planner', 'homework', 'shopping', 'goals', 'finance', 'health'] as const;
+export type Feature = (typeof FEATURES)[number];
+export const AGE_GROUPS = ['u14', '14-17', '18-24', '25-34', '35-49', '50+'] as const;
+export type AgeGroup = (typeof AGE_GROUPS)[number];
+
+/** Wer Stella benutzt und wobei sie helfen soll – steuert Oberfläche, Hinweise und Planung */
+export interface UserProfile {
+  situation: Situation;
+  ageGroup?: AgeGroup;
+  /** Arbeitstage (1 = Montag … 7 = Sonntag) und Zeiten; Pendeln ja/nein */
+  workHours?: { days: number[]; start: string; end: string; commute?: boolean };
+  school?: { level: string };
+  university?: { name: string };
+  features: Feature[];
+}
+
+/** Sieht dieses Profil die Funktion? Ohne Profil (ältere Konten) bleibt alles wie bisher, nur Finanzen braucht eine Einrichtung. */
+export function profileHas(profile: UserProfile | undefined, feature: Feature): boolean {
+  if (!profile) return feature !== 'finance';
+  if (feature === 'homework' && profile.situation !== 'school') return false;
+  return profile.features.includes(feature);
+}
+
+/** Schule im engen Sinn: Schulbücher, HÜ-Autopilot, WebUntis. Ohne Profil = ja (wie bisher). */
+export const profileIsSchool = (profile: UserProfile | undefined) => !profile || profile.situation === 'school';
+/** Schule oder Studium: Tests, Lerneinheiten, Lernpläne */
+export const profileIsLearner = (profile: UserProfile | undefined) => !profile || profile.situation === 'school' || profile.situation === 'university';

@@ -60,6 +60,10 @@ struct RootView: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: showLaunch)
+        .fullScreenCover(item: Binding(get: { store.loggedIn ? store.activeOnboarding : nil }, set: { if $0 == nil { store.onboardingRequest = nil } })) { start in
+            OnboardingView(startAt: start)
+                .environment(store)
+        }
         .task {
             try? await Task.sleep(for: .milliseconds(300))
             launchDelayPassed = true
@@ -79,9 +83,11 @@ struct RootView: View {
                     .tabItem { Label("Planer", systemImage: "calendar") }
                     .tag(Tab.planner)
                     .badge(store.openHomework)
-                InboxView()
-                    .tabItem { Label("Inbox", systemImage: "tray") }
-                    .tag(Tab.inbox)
+                if store.me?.has("mails") != false {
+                    InboxView()
+                        .tabItem { Label("Inbox", systemImage: "tray") }
+                        .tag(Tab.inbox)
+                }
             }
             .task { store.start() }
             .transition(.opacity)

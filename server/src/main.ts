@@ -31,6 +31,7 @@ import { buildBriefing } from './briefing.ts';
 import { cleanBlocks, planWeek } from './weekplan.ts';
 import { acceptHint, dismissHint } from './hints.ts';
 import { registerAdminRoutes } from './admin.ts';
+import { registerProfileRoutes, registerSignupRoutes, registrationMode } from './signup.ts';
 import { registerAudioRoutes } from './audio.ts';
 import { currentConversation, listConversations, registerConversationRoutes } from './conversations.ts';
 import { addMemory, cleanSchedule, deleteMemory, isCategory, listMemories, MEMORY_CATEGORIES, updateMemory } from './memory.ts';
@@ -40,7 +41,7 @@ const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, bodyLi
 app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: 5 * 1024 * 1024 }, (_req, body, done) => done(null, body));
 
 app.setErrorHandler((err, _req, reply) => {
-  if (err instanceof HttpError) return reply.code(err.status).send({ error: err.message });
+  if (err instanceof HttpError) return reply.code(err.status).send({ ...err.extra, error: err.message });
   if ((err as { statusCode?: number }).statusCode === 413) return reply.code(413).send({ error: 'Das ist zu groß (Sprachnachrichten: höchstens 2 Minuten bzw. 10 MB).' });
   app.log.error(err);
   return reply.code(500).send({ error: 'Interner Fehler' });
@@ -70,15 +71,10 @@ function publicUser(user: User) {
 // ---------- öffentlich ----------
 
 app.get('/api/status', async () => ({
-  ok: true, hasUsers: userCount() > 0, registrationOpen: userCount() === 0 || config.allowRegistration,
+  ok: true, hasUsers: userCount() > 0, registration: registrationMode(), registrationOpen: userCount() === 0 || registrationMode() !== 'closed',
 }));
 
-app.post('/api/auth/register', async (req) => {
-  const b = req.body as Record<string, unknown>;
-  const { token, user } = register(str(b.name, 80) || 'Du', str(b.email, 200), str(b.password, 200), str(b.timeZone, 60), str(b.device, 80));
-  addMessage(user.id, 'assistant', voice(user.settings.tone).welcome(user.name));
-  return { token, user: publicUser(user) };
-});
+registerSignupRoutes(app, publicUser);
 
 app.post('/api/auth/login', async (req) => {
   const b = req.body as Record<string, unknown>;
@@ -169,6 +165,7 @@ app.register(async (api) => {
   });
 
   registerAdminRoutes(api);
+  registerProfileRoutes(api, publicUser);
   registerAudioRoutes(api);
 
   api.get('/api/me', async (req) => publicUser(req.user));
@@ -218,6 +215,11 @@ app.register(async (api) => {
     if (b.tone !== undefined) {
       if (!isTone(b.tone)) throw new HttpError(400, 'Ton muss nett, frech oder cool sein');
       patch.tone = b.tone;
+    }
+    if (b.name !== undefined) {
+      const name = str(b.name, 80).trim();
+      if (!name) throw new HttpError(400, 'Der Name darf nicht leer sein.');
+      db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name, req.user.id);
     }
     let tz: string | undefined;
     if (b.timeZone) {

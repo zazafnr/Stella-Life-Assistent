@@ -76,14 +76,35 @@ final class Store {
 
     // MARK: Anmeldung
 
-    func authenticate(register: Bool, name: String, email: String, password: String) async throws {
-        struct Body: Encodable { var name: String; var email: String; var password: String; var device: String; var timeZone: String }
+    /** Gibt die E-Mail-Adresse zurück, wenn erst ein Code aus der Bestätigungs-Mail eingegeben werden muss */
+    @discardableResult
+    func authenticate(register: Bool, name: String, email: String, password: String, invite: String = "") async throws -> String? {
+        struct Body: Encodable { var name: String; var email: String; var password: String; var device: String; var timeZone: String; var invite: String }
         let body = Body(name: name, email: email, password: password,
                         device: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone",
-                        timeZone: TimeZone.current.identifier)
-        let res: AuthResponse = try await api.send("POST", register ? "/api/auth/register" : "/api/auth/login", body: body)
-        api.token = res.token
-        me = res.user
+                        timeZone: TimeZone.current.identifier, invite: invite)
+        let res: SignupResponse = try await api.send("POST", register ? "/api/auth/register" : "/api/auth/login", body: body)
+        if res.needsVerification == true { return res.email ?? email }
+        guard let token = res.token, let user = res.user else { throw APIError(message: "Antwort vom Server nicht verstanden", status: -1) }
+        await beginSession(token: token, user: user)
+        return nil
+    }
+
+    func verify(email: String, code: String) async throws {
+        struct Body: Encodable { var email: String; var code: String; var device: String }
+        let res: AuthResponse = try await api.send("POST", "/api/auth/verify",
+            body: Body(email: email, code: code, device: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"))
+        await beginSession(token: res.token, user: res.user)
+    }
+
+    func resendCode(email: String) async throws {
+        struct Body: Encodable { var email: String }
+        _ = try await api.send("POST", "/api/auth/resend", body: Body(email: email), as: OK.self)
+    }
+
+    private func beginSession(token: String, user: Me) async {
+        api.token = token
+        me = user
         items = [:]
         messages = []
         outbox = []
@@ -97,6 +118,17 @@ final class Store {
         await sync()
         await Notifier.shared.requestPermission()
     }
+
+    /** Konto samt allen Daten löschen (Passwort zur Bestätigung) */
+    func deleteAccount(password: String) async throws {
+        struct Body: Encodable { var password: String }
+        _ = try await api.send("DELETE", "/api/me", body: Body(password: password), as: OK.self)
+        logoutLocal()
+    }
+
+    /** Einführung auf Wunsch (Einstellungen) – die erste kommt von selbst, solange `onboarding` auf „pending“ steht */
+    var onboardingRequest: OnboardingStart?
+    var activeOnboarding: OnboardingStart? { onboardingRequest ?? (me?.settings.onboarding == "pending" ? .welcome : nil) }
 
     func logout() async {
         _ = try? await api.send("POST", "/api/auth/logout", as: OK.self)
@@ -481,4 +513,10 @@ enum SettingValue: Encodable {
 enum Haptics {
     @MainActor static func soft() { UIImpactFeedbackGenerator(style: .soft).impactOccurred() }
     @MainActor static func success() { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+}
+
+/** Wo die Einführung beginnt: ganz vorn oder – zum Bearbeiten des Profils – bei „Was trifft auf dich zu?“ */
+enum OnboardingStart: String, Identifiable {
+    case welcome, situation
+    var id: String { rawValue }
 }

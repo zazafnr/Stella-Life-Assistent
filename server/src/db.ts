@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import path from 'node:path';
-import { todayIn, type ActionGroup, type Attachment, type ChatMessage, type Item, type ItemKind, type ItemStatus, type PermissionLevel, type Tone } from '@stella/shared';
+import { todayIn, type UserProfile, type ActionGroup, type Attachment, type ChatMessage, type Item, type ItemKind, type ItemStatus, type PermissionLevel, type Tone } from '@stella/shared';
 import { config } from './config.ts';
 
 export const db = new Database(path.join(config.dataDir, 'stella.db'));
@@ -272,6 +272,24 @@ const MIGRATIONS: string[] = [
   ALTER TABLE messages ADD COLUMN conversation_id TEXT;
   CREATE INDEX messages_conversation ON messages(conversation_id, created_at);
   `,
+  `
+  -- Paket 5: Registrierung mit Einladung und E-Mail-Code. Bestehende Konten gelten als bestätigt (DEFAULT 1).
+  ALTER TABLE users ADD COLUMN verified INTEGER NOT NULL DEFAULT 1;
+  CREATE TABLE invites (
+    code TEXT PRIMARY KEY,
+    created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+    used_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT
+  );
+  CREATE TABLE email_codes (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    code_hash TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    sent_at TEXT NOT NULL
+  );
+  `,
 ];
 
 function migrate() {
@@ -321,6 +339,10 @@ export interface UserSettings {
   weekPlan?: 'sunday' | 'off';
   /** was Stella von sich aus darf (je Bereich), siehe actions.ts */
   permissions?: Partial<Record<ActionGroup, PermissionLevel>>;
+  /** Lebenssituation und Funktionen aus der Einführung */
+  profile?: UserProfile;
+  /** 'pending': die Einführung wird beim nächsten Öffnen gezeigt; 'done': erledigt oder übersprungen */
+  onboarding?: 'pending' | 'done';
 }
 
 export interface User {
@@ -332,9 +354,11 @@ export interface User {
   ingestToken: string;
   /** der erste Nutzer ist 'owner' (darf Server-Schlüssel eintragen), alle anderen 'user' */
   role: 'owner' | 'user';
+  /** E-Mail per Code bestätigt */
+  verified: boolean;
 }
 
-type UserRow = { id: string; name: string; email: string; time_zone: string; settings: string; ingest_token: string; role: string };
+type UserRow = { id: string; name: string; email: string; time_zone: string; settings: string; ingest_token: string; role: string; verified: number };
 function readSettings(json: string): UserSettings {
   const s = JSON.parse(json) as UserSettings;
   if (!s.books && s.digi4schoolBooks) s.books = s.digi4schoolBooks.map((b) => ({ ...b, provider: 'digi4school' }));
@@ -346,6 +370,7 @@ const toUser = (r: UserRow): User => ({
   id: r.id, name: r.name, email: r.email, timeZone: r.time_zone,
   settings: readSettings(r.settings), ingestToken: r.ingest_token,
   role: r.role === 'owner' ? 'owner' : 'user',
+  verified: r.verified !== 0,
 });
 
 export function allUserIds(): string[] {

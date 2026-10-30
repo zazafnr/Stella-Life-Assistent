@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { TONE_INFO, TONES, type Tone } from '@stella/shared';
-import { api, logout, refreshMe, useStore, type Me } from '../store.ts';
+import { api, logout, logoutLocal, meHas, meIsSchool, refreshMe, useStore, type Me } from '../store.ts';
 import { enablePush, isIos, isStandalone, pushPermission } from '../push.ts';
 import { Copy, Section, useAction } from './settings/ui.tsx';
 import { Books } from './settings/Books.tsx';
@@ -13,11 +13,11 @@ import { Icon, type IconName } from '../ui/Icon.tsx';
 import { Sheet, Sky, StarMark, Switch, showToast } from '../ui/Decor.tsx';
 import { VERSION } from '../version.ts';
 
-type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server';
+type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server' | 'delete';
 
 interface AiStatusData { configured: boolean; chain: string[]; visionChain: string[]; coolingDown: string[]; usedToday: number; dailyLimit: number }
 
-export function Settings({ back }: { back: () => void }) {
+export function Settings({ back, openOnboarding }: { back: () => void; openOnboarding: (startAt: 'welcome' | 'situation') => void }) {
   const me = useStore((s) => s.me);
   const online = useStore((s) => s.online);
   const waiting = useStore((s) => Object.values(s.actions).filter((a) => a.status === 'proposed').length);
@@ -54,6 +54,14 @@ export function Settings({ back }: { back: () => void }) {
     },
   ];
 
+  const school = meIsSchool(me);
+  const visibleRows = rows.filter((r) => {
+    if (r.id === 'books' || r.id === 'untis' || r.id === 'notes') return school;
+    if (r.id === 'mail') return meHas(me, 'mails');
+    if (r.id === 'health') return meHas(me, 'health');
+    return true;
+  });
+
   async function patch(json: Record<string, unknown>, ok = 'Gespeichert') {
     try {
       await api('/api/settings', { method: 'PATCH', json });
@@ -86,7 +94,7 @@ export function Settings({ back }: { back: () => void }) {
         <TonePicker value={me.settings.tone ?? 'nett'} onChange={(tone) => void patch({ tone }, `${TONE_INFO[tone].emoji} Stella ist jetzt ${TONE_INFO[tone].label.toLowerCase()}`)} />
 
         <Group title="Verbindungen">
-          {rows.map((r) => (
+          {visibleRows.map((r) => (
             <button key={r.id} type="button" className="list-row" onClick={() => setSheet(r.id)}>
               <span className={`icon-tile ${r.tile}`} style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name={r.icon} size={18} /></span>
               <span className="grow"><span className="list-title">{r.title}</span><span className="list-sub">{r.sub}</span></span>
@@ -94,6 +102,19 @@ export function Settings({ back }: { back: () => void }) {
               <Icon name="chevron" size={16} />
             </button>
           ))}
+        </Group>
+
+        <Group title="Du & Stella">
+          <button type="button" className="list-row" onClick={() => openOnboarding('situation')}>
+            <span className="icon-tile pink" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="star" size={18} /></span>
+            <span className="grow"><span className="list-title">Profil</span><span className="list-sub">{profileSummary(me)}</span></span>
+            <Icon name="chevron" size={16} />
+          </button>
+          <button type="button" className="list-row" onClick={() => openOnboarding('welcome')}>
+            <span className="icon-tile blue" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="sparkle" size={18} /></span>
+            <span className="grow"><span className="list-title">Einführung wiederholen</span><span className="list-sub">Stella neu auf dich einstellen</span></span>
+            <Icon name="chevron" size={16} />
+          </button>
         </Group>
 
         <Group title="Stella als Assistentin">
@@ -160,7 +181,10 @@ export function Settings({ back }: { back: () => void }) {
           <span className="small muted">EVOLSIOR steckt in zwei Wörtern: <em>Evolic</em> (sich weiterentwickeln) und <em>Excelsior</em> (immer höher hinaus).</span>
         </section>
 
-        <button type="button" className="btn secondary" style={{ alignSelf: 'flex-start' }} onClick={() => void logout()}><Icon name="logout" size={18} />Abmelden</button>
+        <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
+          <button type="button" className="btn secondary" onClick={() => void logout()}><Icon name="logout" size={18} />Abmelden</button>
+          <button type="button" className="link danger" onClick={() => setSheet('delete')}>Konto löschen</button>
+        </div>
       </div>
 
       {sheet === 'books' && <Sheet title="Schulbücher" onClose={() => setSheet(null)}><Books me={me} /></Sheet>}
@@ -173,6 +197,7 @@ export function Settings({ back }: { back: () => void }) {
       {sheet === 'perms' && <Sheet title="Was Stella selbst darf" onClose={() => setSheet(null)}><Permissions /></Sheet>}
       {sheet === 'memory' && <Sheet title="Was Stella über dich weiß" onClose={() => setSheet(null)}><MemoryView /></Sheet>}
       {sheet === 'server' && <Sheet title="Server" onClose={() => setSheet(null)}><Server /></Sheet>}
+      {sheet === 'delete' && <Sheet title="Konto löschen" onClose={() => setSheet(null)}><DeleteAccount onDeleted={() => { setSheet(null); logoutLocal(); }} /></Sheet>}
       {sheet === 'log' && <Sheet title="Was Stella getan hat" onClose={() => setSheet(null)}><ActionLog /></Sheet>}
     </div>
   );
@@ -296,5 +321,29 @@ function AiDetails({ ai }: { ai: AiStatusData }) {
         <ol className="models">{ai.visionChain.map((m) => <li key={m}><code>{m}</code>{ai.coolingDown.includes(m) && ' · Pause'}</li>)}</ol>
       </Section>
     </>
+  );
+}
+
+const SITUATION_LABEL: Record<string, string> = { school: 'Schule', university: 'Studium', work: 'Job', apprenticeship: 'Lehre', other: 'Alltag' };
+function profileSummary(me: Me) {
+  const p = me.settings.profile;
+  if (!p) return 'noch nicht eingerichtet';
+  const w = p.workHours;
+  return `${SITUATION_LABEL[p.situation] ?? p.situation}${w ? ` · ${w.start}–${w.end}` : ''}`;
+}
+
+/** Konto samt allen Daten löschen – mit Passwort als Bestätigung. */
+function DeleteAccount({ onDeleted }: { onDeleted: () => void }) {
+  const [password, setPassword] = useState('');
+  const [run, view, busy] = useAction();
+  return (
+    <Section title="Konto löschen">
+      <p>Dein Konto und <strong>alle Daten</strong> – Chats, Einträge, Mails, Fotos, Aufnahmen und was Stella über dich weiß – werden unwiderruflich gelöscht.</p>
+      <form className="form-grid" onSubmit={(e) => { e.preventDefault(); void run(async () => { await api('/api/me', { method: 'DELETE', json: { password } }); onDeleted(); }, 'Gelöscht.'); }}>
+        <label>Zur Bestätigung: dein Passwort<input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+        <button type="submit" className="btn danger" disabled={busy || !password}>Endgültig löschen</button>
+      </form>
+      {view}
+    </Section>
   );
 }

@@ -27,6 +27,7 @@ export function Server() {
     <>
       {(['groq', 'openrouter'] as const).map((n) => <KeyCard key={n} name={n} status={keys[n]} onChange={setKeys} />)}
       <SmtpCard status={keys.smtp} onChange={setKeys} />
+      <Invites />
     </>
   );
 }
@@ -106,6 +107,32 @@ function SmtpCard({ status, onChange }: { status: KeyStatus; onChange: (k: Keys)
           {status.set && <button type="button" className="link danger" onClick={() => void put(null, 'Gelöscht.')}>Entfernen</button>}
         </div>
       </form>
+      {view}
+    </Section>
+  );
+}
+
+interface Invite { code: string; createdAt: string; expiresAt: string | null; usedBy: string | null }
+
+/** Einladungscodes für neue Konten (Registrierung bleibt sonst zu). */
+function Invites() {
+  const [data, setData] = useState<{ mode: string; invites: Invite[] } | null>(null);
+  const [run, view] = useAction();
+  useEffect(() => { api<{ mode: string; invites: Invite[] }>('/api/admin/invites').then(setData).catch(() => {}); }, []);
+  const modeText = data?.mode === 'open' ? 'Die Registrierung ist offen – jede:r kann sich anmelden.' : data?.mode === 'closed'
+    ? 'Die Registrierung ist geschlossen – Einladungen gelten nicht.' : 'Neue Konten brauchen einen Einladungscode und bestätigen ihre E-Mail.';
+  return (
+    <Section title="Einladungen">
+      <p className="muted small">{modeText}</p>
+      <button type="button" className="btn" onClick={() => void run(async () => { const r = await api<{ invites: Invite[] }>('/api/admin/invites', { method: 'POST', json: { days: 14 } }); setData((d) => ({ mode: d?.mode ?? 'invite', invites: r.invites })); }, 'Neue Einladung erstellt (14 Tage gültig).')}>Neue Einladung</button>
+      {data?.invites.map((i) => (
+        <div key={i.code} className="copy-row" style={{ opacity: i.usedBy ? 0.6 : 1 }}>
+          <code>{i.code}</code>
+          <span className="small muted">{i.usedBy ? `benutzt von ${i.usedBy}` : i.expiresAt ? `gültig bis ${new Date(i.expiresAt).toLocaleDateString('de-AT')}` : ''}</span>
+          {!i.usedBy && <button type="button" className="btn secondary small" onClick={() => void navigator.clipboard.writeText(i.code)}>Kopieren</button>}
+          <button type="button" className="link danger small" onClick={() => void run(async () => { const r = await api<{ invites: Invite[] }>(`/api/admin/invites/${i.code}`, { method: 'DELETE' }); setData((d) => ({ mode: d?.mode ?? 'invite', invites: r.invites })); }, 'Gelöscht.')}>Löschen</button>
+        </div>
+      ))}
       {view}
     </Section>
   );

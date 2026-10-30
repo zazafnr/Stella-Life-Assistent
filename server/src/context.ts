@@ -7,6 +7,7 @@ import { addDays, formatDateDe, timeIn, todayIn, WEEKDAYS_DE, weekdayOf, type It
 import { db, listItems, type User } from './db.ts';
 import { listMemories, MEMORY_CATEGORIES } from './memory.ts';
 import { lessonsFor } from './untis.ts';
+import { isSchool } from './profile.ts';
 
 export interface Interval { start: string; end: string }
 export interface Busy extends Interval { label: string }
@@ -88,7 +89,7 @@ function dayContext(user: User, date: Ymd, today: Ymd, nowHhmm: string, lessons:
     busy.push({ start: i.time, end: toHhmm(Math.min(toMin(i.time) + (DEFAULT_MINUTES[i.kind] ?? 30), 24 * 60 - 1)), label: i.title });
   }
   // Schule ohne WebUntis: Vormittag an Schultagen als belegt annehmen
-  if (!weekend && !lessons.length && hasNoTimetable(user.id)) busy.push({ start: '07:30', end: '13:30', label: 'Schule (geschätzt)' });
+  if (!weekend && !lessons.length && isSchool(user) && hasNoTimetable(user.id)) busy.push({ start: '07:30', end: '13:30', label: 'Schule (geschätzt)' });
 
   const window = { ...(weekend ? WEEKEND_WINDOW : DAY_WINDOW) };
   if (date === today && toMin(nowHhmm) > toMin(window.start)) window.start = nowHhmm;

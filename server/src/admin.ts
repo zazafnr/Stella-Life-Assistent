@@ -3,6 +3,7 @@
 import type { FastifyInstance } from 'fastify';
 import { HttpError, requireOwner } from './auth.ts';
 import { isKeyName, keyStatus, setKey, testKey } from './keys.ts';
+import { createInvite, deleteInvite, listInvites, registrationMode } from './signup.ts';
 
 export function registerAdminRoutes(api: FastifyInstance) {
   api.get('/api/admin/keys', { preHandler: requireOwner }, async () => ({ keys: keyStatus() }));
@@ -18,5 +19,16 @@ export function registerAdminRoutes(api: FastifyInstance) {
     if (!isKeyName(req.params.name)) throw new HttpError(400, 'Unbekannter Schlüssel.');
     const result = await testKey(req.params.name);
     return { ...result, keys: keyStatus() };
+  });
+
+  // Einladungscodes für neue Konten (Registrierungsmodus „invite“)
+  api.get('/api/admin/invites', { preHandler: requireOwner }, async () => ({ mode: registrationMode(), invites: listInvites() }));
+  api.post('/api/admin/invites', { preHandler: requireOwner }, async (req) => {
+    const days = Number(((req.body ?? {}) as Record<string, unknown>).days) || 14;
+    return { ...createInvite(req.user.id, days), invites: listInvites() };
+  });
+  api.delete<{ Params: { code: string } }>('/api/admin/invites/:code', { preHandler: requireOwner }, async (req) => {
+    if (!deleteInvite(req.params.code)) throw new HttpError(404, 'Einladung nicht gefunden.');
+    return { invites: listInvites() };
   });
 }

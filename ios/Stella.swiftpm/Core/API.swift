@@ -6,6 +6,9 @@ struct APIError: LocalizedError {
     var status: Int
     /** Sprachnachricht: Abschreiben ging nicht, die Aufnahme liegt aber auf dem Server („Nochmal versuchen“) */
     var audioId: String? = nil
+    /** Konto ist noch nicht per Code bestätigt */
+    var needsVerification = false
+    var email: String? = nil
     var errorDescription: String? { message }
     var isAuth: Bool { status == 401 }
     var isOffline: Bool { status == 0 }
@@ -89,7 +92,8 @@ final class API: @unchecked Sendable {
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
             let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-            throw APIError(message: obj?["error"] as? String ?? "Fehler \(status)", status: status, audioId: obj?["audioId"] as? String)
+            throw APIError(message: obj?["error"] as? String ?? "Fehler \(status)", status: status, audioId: obj?["audioId"] as? String,
+                           needsVerification: obj?["needsVerification"] as? Bool ?? false, email: obj?["email"] as? String)
         }
         return data
     }
