@@ -18,7 +18,9 @@ aufgebraucht ist. **Deshalb macht die CI Screenshots nur, wenn der Appetize-Uplo
 ist oder ausdrücklich verlangt** (manueller Lauf mit `screenshots: true`). Ein normaler Push lädt
 nur zu Appetize hoch, der neue Stand ist dort nach etwa 2 Minuten.
 
-Der Appetize-Link bleibt immer gleich. Er steht in der Zusammenfassung jedes Laufs
+**Live-Simulator: https://appetize.io/app/7hedphqd45epodlt5k6olpxife**
+
+Der Appetize-Link bleibt immer gleich. Er steht auch in der Zusammenfassung jedes Laufs
 („Live-Simulator: …“) und, wenn Screenshots gemacht wurden, in `meta.json` (`appetize`) und als
 Knopf „Live ausprobieren“ auf der Vorschau-Seite.
 
