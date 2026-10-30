@@ -8,7 +8,7 @@ import {
   deleteSecret, hasSecret, HttpError, login, logout, register, requireUser, setSecret, userByIngestToken, userCount,
 } from './auth.ts';
 import {
-  addMessage, db, getUser, itemsChangedSince, listItems, messagesSince, newId, now, recentMessages, updateUserSettings,
+  addMessage, conversationMessages, conversationMessagesSince, db, getConversation, getUser, itemsChangedSince, listItems, newId, now, recentMessages, updateUserSettings,
   type User, type UserSettings,
 } from './db.ts';
 import { handleChat } from './assistant.ts';
@@ -31,6 +31,7 @@ import { buildBriefing } from './briefing.ts';
 import { cleanBlocks, planWeek } from './weekplan.ts';
 import { acceptHint, dismissHint } from './hints.ts';
 import { registerAdminRoutes } from './admin.ts';
+import { currentConversation, listConversations, registerConversationRoutes } from './conversations.ts';
 import { addMemory, cleanSchedule, deleteMemory, isCategory, listMemories, MEMORY_CATEGORIES, updateMemory } from './memory.ts';
 
 // trustProxy nur für Caddy auf derselben Maschine – sonst ließe sich die Absender-Adresse fälschen
@@ -235,7 +236,7 @@ app.register(async (api) => {
       try { return saveDataUrl(String(d)); } catch { throw new HttpError(400, 'Bild konnte nicht gelesen werden'); }
     });
     if (!text && !images.length) throw new HttpError(400, 'Leere Nachricht');
-    return handleChat(req.user, text, str(b.clientId, 100) || null, images);
+    return handleChat(req.user, text, str(b.clientId, 100) || null, images, str(b.conversationId, 100) || null);
   });
 
   api.get('/api/messages', async (req) => {
@@ -249,21 +250,22 @@ app.register(async (api) => {
       WHERE user_id = ? AND status IN ('queued', 'running') AND type IN ('book_page', 'digi4school_page', 'solve_homework')`)
     .all(userId) as { id: string }[]).map((r) => r.id).filter(Boolean);
 
+  registerConversationRoutes(api);
+
+  // `conversation`: welchen Chat das Gerät gerade hält (sonst der neueste von heute). `current` ist immer der neueste von heute.
   api.get('/api/sync', async (req) => {
-    const since = str((req.query as Record<string, string>).since);
+    const q = req.query as Record<string, string>;
+    const since = str(q.since);
     const serverTime = now();
+    const current = currentConversation(req.user.id);
+    const conversationId = (q.conversation && getConversation(req.user.id, q.conversation)?.id) || current;
+    const messages = !conversationId ? [] : since ? conversationMessagesSince(req.user.id, conversationId, since) : conversationMessages(req.user.id, conversationId, 80);
+    const common = { messages, serverTime, busyItems: busyItems(req.user.id), conversationId, current, conversations: listConversations(req.user) };
     if (!since) {
       const today = todayIn(req.user.timeZone);
-      const items = listItems(req.user.id, { from: addDays(today, -30), includeDone: true });
-      return {
-        items, messages: recentMessages(req.user.id, 80), serverTime, busyItems: busyItems(req.user.id),
-        actions: listActions(req.user.id, { limit: 100 }),
-      };
+      return { items: listItems(req.user.id, { from: addDays(today, -30), includeDone: true }), ...common, actions: listActions(req.user.id, { limit: 100 }) };
     }
-    return {
-      items: itemsChangedSince(req.user.id, since), messages: messagesSince(req.user.id, since), serverTime,
-      busyItems: busyItems(req.user.id), actions: listActions(req.user.id, { since }),
-    };
+    return { items: itemsChangedSince(req.user.id, since), ...common, actions: listActions(req.user.id, { since }) };
   });
 
   // Anstehende Erinnerungen – die iOS-App plant daraus lokale Mitteilungen

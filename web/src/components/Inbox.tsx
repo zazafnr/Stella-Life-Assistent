@@ -258,7 +258,7 @@ function MailReader({ entry: e, onClose, onChange }: { entry: InboxEntry; onClos
         {mode === 'own' && <ReplyEditor entry={e} writeFirst={false} onDone={(sent) => { if (sent) { onChange(); onClose(); } else setMode('read'); }} />}
         {mode === 'stella' && <ReplyEditor entry={e} writeFirst onDone={(sent) => { if (sent) { onChange(); onClose(); } else setMode('read'); }} />}
         {mode === 'move' && (
-          <div className="chips" role="group" aria-label="Verschieben nach">
+          <div className="chips" role="group" aria-label="Verschieben nach" style={{ flexWrap: 'wrap' }}>
             {MOVE_TARGETS.map(([c, label]) => <button key={c} type="button" className="chip" onClick={() => void moveTo(c)}>{label}</button>)}
             <button type="button" className="link small" onClick={() => setMode('read')}>Abbrechen</button>
           </div>

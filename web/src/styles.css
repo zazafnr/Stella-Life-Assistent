@@ -602,3 +602,20 @@ textarea.cookies { min-height: 90px; font-family: ui-monospace, monospace; font-
 .mail-reader { display: flex; flex-direction: column; gap: 12px; }
 .mail-subject { font-size: 17px; font-weight: 700; }
 .mail-body { white-space: pre-wrap; word-break: break-word; font-size: 15px; line-height: 1.55; background: var(--surface-2); border-radius: 16px; padding: 14px 16px; max-height: 42vh; overflow-y: auto; }
+
+/* ---------- Chats nach Tagen (Paket 3) ---------- */
+.chat-head-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.chat-history { display: none; }
+.history-list { display: flex; flex-direction: column; gap: 14px; }
+.history-group { display: flex; flex-direction: column; gap: 6px; }
+.history-item { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+.history-item:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.history-item.active { border-color: var(--blue); background: #F2F7FF; }
+.history-title { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-sub { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-meta { font-size: 11px; color: var(--faint); }
+@media (min-width: 1240px) {
+  .chat-history { display: block; width: 280px; flex-shrink: 0; padding: 24px 16px; border-right: 1px solid var(--border); overflow-y: auto; position: relative; z-index: 1; background: rgba(255, 255, 255, .5); }
+  .is-desktop .chat-history { padding-top: 46px; }
+  .history-btn { display: none; }
+}

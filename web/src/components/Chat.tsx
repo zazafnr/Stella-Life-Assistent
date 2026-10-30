@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { addDays, todayIn } from '@stella/shared';
-import { compressImage, sendMessage, useStore } from '../store.ts';
+import { addDays, dayLabel as chatDayLabel, todayIn, type Conversation } from '@stella/shared';
+import { compressImage, newConversation, openConversation, sendMessage, useStore } from '../store.ts';
 import { AuthImage, Lightbox, Rich } from './Rich.tsx';
 import { ItemStatus } from './Today.tsx';
 import { ActionCard } from './ActionCard.tsx';
 import { Icon } from '../ui/Icon.tsx';
-import { Sky, StarMark } from '../ui/Decor.tsx';
+import { Sheet, Sky, StarMark, showToast } from '../ui/Decor.tsx';
 
 const SUGGESTIONS = ['Französisch HÜ S. 45 Nr. 16 Freitag', 'Freitag 15 Uhr Friseur', 'erinnere mich in 2 Stunden an die Wäsche', 'Hab ich was vergessen?', 'Briefing'];
 
@@ -31,6 +31,7 @@ export function Chat() {
   const [error, setError] = useState('');
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [history, setHistory] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -66,9 +67,14 @@ export function Chat() {
     }
   }
 
+  async function startNew() {
+    try { await newConversation(); setHistory(false); inputRef.current?.focus(); } catch (err) { showToast((err as Error).message, true); }
+  }
+
   let lastDay = '';
   return (
     <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+      <aside className="chat-history" aria-label="Chats"><ChatHistory onNew={() => void startNew()} /></aside>
       <div className="chat">
         <Sky />
         <header className="chat-head">
@@ -79,6 +85,10 @@ export function Chat() {
               <span className="pulse" aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
               {working ? `löst gerade ${working.title}` : 'für dich da'}
             </span>
+          </div>
+          <div className="chat-head-actions">
+            <button type="button" className="icon-btn history-btn" aria-label="Alle Chats" onClick={() => setHistory(true)}><Icon name="history" size={19} /></button>
+            <button type="button" className="btn small secondary" onClick={() => void startNew()}><Icon name="plus" size={16} />Neuer Chat</button>
           </div>
         </header>
 
@@ -152,8 +162,51 @@ export function Chat() {
           </form>
         </div>
         {lightbox && <Lightbox url={lightbox} onClose={() => setLightbox(null)} />}
+        {history && <Sheet title="Chats" onClose={() => setHistory(false)}><ChatHistory inSheet onNew={() => void startNew()} onPick={() => setHistory(false)} /></Sheet>}
       </div>
       <AsideToday />
+    </div>
+  );
+}
+
+/** Alle Chats, nach Tag gruppiert, mit Titel. Ein alter Chat ist lesbar und kann fortgesetzt werden. */
+function ChatHistory({ onNew, onPick, inSheet = false }: { onNew: () => void; onPick?: () => void; inSheet?: boolean }) {
+  const conversations = useStore((s) => s.conversations);
+  const active = useStore((s) => s.conversationId);
+  const tz = useStore((s) => s.me?.timeZone ?? 'Europe/Vienna');
+  const today = todayIn(tz);
+  const groups = useMemo(() => {
+    const out: { day: string; items: Conversation[] }[] = [];
+    for (const c of conversations) {
+      const g = out.find((x) => x.day === c.day);
+      if (g) g.items.push(c); else out.push({ day: c.day, items: [c] });
+    }
+    return out;
+  }, [conversations]);
+
+  async function pick(id: string) {
+    try { await openConversation(id); onPick?.(); } catch (err) { showToast((err as Error).message, true); }
+  }
+
+  return (
+    <div className="history-list">
+      <div className="row" style={{ justifyContent: inSheet ? 'flex-start' : 'space-between' }}>
+        {!inSheet && <h2 className="display" style={{ fontSize: 20 }}>Chats</h2>}
+        <button type="button" className="btn small" onClick={onNew}><Icon name="plus" size={16} />Neuer Chat</button>
+      </div>
+      {groups.length === 0 && <p className="muted small">Noch keine Chats – schreib Stella, dann taucht der erste hier auf.</p>}
+      {groups.map((g) => (
+        <section key={g.day} className="history-group">
+          <span className="eyebrow">{chatDayLabel(g.day, today)}</span>
+          {g.items.map((c) => (
+            <button key={c.id} type="button" className={c.id === active ? 'history-item active' : 'history-item'} onClick={() => void pick(c.id)} aria-current={c.id === active ? 'true' : undefined}>
+              <span className="history-title">{c.title || c.lastMessage || 'Chat'}</span>
+              {c.title && c.lastMessage && <span className="history-sub">{c.lastMessage}</span>}
+              <span className="history-meta">{new Date(c.updatedAt).toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' })} · {c.count} Nachrichten</span>
+            </button>
+          ))}
+        </section>
+      ))}
     </div>
   );
 }

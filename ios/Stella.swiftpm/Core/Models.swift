@@ -99,10 +99,28 @@ struct PermissionRow: Codable, Hashable, Identifiable {
     var id: String { group }
 }
 
+/** Ein Chat: jeder Tag startet einen neuen, mehrere am Tag bekommen einen Titel */
+struct Conversation: Codable, Hashable, Identifiable {
+    var id: String
+    var title: String?
+    /** Titel, sonst „Heute“, „Gestern“ oder „Mi, 4.11.“ */
+    var label: String
+    var day: String
+    var lastMessage: String?
+    var updatedAt: String
+    var count: Int
+}
+
+struct NewConversation: Codable {
+    var id: String
+    var conversations: [Conversation]
+}
+
 struct ChatResponse: Codable {
     var messages: [ChatMessage]
     var items: [Item]
     var userMessage: ChatMessage?
+    var conversationId: String?
 }
 
 struct SyncResponse: Codable {
@@ -111,6 +129,9 @@ struct SyncResponse: Codable {
     var serverTime: String
     var busyItems: [String]?
     var actions: [ActionEntry]?
+    var conversationId: String?
+    var current: String?
+    var conversations: [Conversation]?
 }
 
 struct BookConfig: Codable, Hashable {

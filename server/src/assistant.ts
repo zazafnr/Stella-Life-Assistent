@@ -5,8 +5,8 @@ import {
   type Attachment, type ChatMessage, type ChatResponse, type Intent, type Item, type ItemKind, type ItemQuery, type MemoryCategory, type ParsedEntry,
 } from '@stella/shared';
 import {
-  addAttachment, addMessage, clearPending, db, enqueueJob, findMessageByClientId, getItem, getPending, listItems,
-  recentMessages, setPending, type User,
+  addAttachment, addMessage, chatContext, clearPending, conversationMessages, db, enqueueJob, findMessageByClientId, getConversation,
+  getItem, getPending, listItems, setPending, todayConversation, type User,
 } from './db.ts';
 import { PROVIDERS } from './books.ts';
 import { lessonsFor } from './untis.ts';
@@ -17,11 +17,14 @@ import { briefingText } from './briefing.ts';
 import { findHints, markDelivered as markHintDelivered } from './hints.ts';
 import { cleanSchedule, findMemory, isCategory, listMemories } from './memory.ts';
 import { draftReply } from './mail.ts';
+import { maybeTitle } from './conversations.ts';
 import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type ToolDef } from './llm.ts';
 import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
 
 interface Turn {
   user: User;
+  /** der Chat, in dem diese Unterhaltung stattfindet – nur dessen Verlauf sieht die KI */
+  conversationId: string;
   today: string;
   replies: ChatMessage[];
   changed: Map<string, Item>;
@@ -40,12 +43,21 @@ const dot = (s: string) => (s.endsWith('.') ? s : `${s}.`);
 const touched = (t: Turn, ...items: (Item | null)[]) => items.forEach((i) => i && t.changed.set(i.id, i));
 const v = (t: Turn) => voice(t.user.settings.tone);
 
-export async function handleChat(user: User, text: string, clientId: string | null, imageIds: string[] = []): Promise<ChatResponse> {
+/** `conversationId`: in welchem Chat geschrieben wird (alter Chat fortsetzen); ohne Angabe der neueste von heute. */
+export async function handleChat(user: User, text: string, clientId: string | null, imageIds: string[] = [], conversationId: string | null = null): Promise<ChatResponse> {
   if (clientId && findMessageByClientId(user.id, clientId)) return { messages: [], items: [] }; // schon verarbeitet
+  const convId = (conversationId && getConversation(user.id, conversationId)?.id) || todayConversation(user.id)!;
+  // alles, was während dieser Anfrage geschrieben wird (auch in Hilfsfunktionen), landet in diesem Chat
+  const res = await chatContext.run({ userId: user.id, conversationId: convId }, () => handleChatIn(user, text, clientId, imageIds, convId));
+  void maybeTitle(user.id, convId).catch(() => {});
+  return { ...res, conversationId: convId };
+}
+
+async function handleChatIn(user: User, text: string, clientId: string | null, imageIds: string[], convId: string): Promise<ChatResponse> {
   const images: Attachment[] = imageIds.map((id) => ({ id, kind: 'image', caption: 'Foto' }));
   const userMessage = addMessage(user.id, 'user', text, { clientId, attachments: images });
 
-  const t: Turn = { user, today: todayIn(user.timeZone), replies: [], changed: new Map(), images };
+  const t: Turn = { user, conversationId: convId, today: todayIn(user.timeZone), replies: [], changed: new Map(), images };
   const intent = interpret(text, t.today, timeIn(user.timeZone));
   const pending = getPending(user.id);
 
@@ -660,7 +672,7 @@ async function runTool(t: Turn, name: string, args: Record<string, any>): Promis
 }
 
 async function runAgent(t: Turn) {
-  const history = recentMessages(t.user.id, 16);
+  const history = conversationMessages(t.user.id, t.conversationId, 16);
   const messages: LlmMessage[] = [
     { role: 'system', content: systemPrompt(t.user, t.today) },
     ...history.map((m) => ({ role: m.role, content: m.text }) as LlmMessage),

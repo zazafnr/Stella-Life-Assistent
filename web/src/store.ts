@@ -5,7 +5,7 @@
 
 import { useSyncExternalStore } from 'react';
 import {
-  formatDateDe, interpret, todayIn, type ActionEntry, type ActionGroup, type ChatMessage, type ChatResponse, type Item, type PermissionLevel,
+  formatDateDe, interpret, todayIn, type ActionEntry, type ActionGroup, type ChatMessage, type ChatResponse, type Conversation, type Item, type PermissionLevel,
   type SyncResponse, type Tone,
 } from '@stella/shared';
 
@@ -33,7 +33,7 @@ export interface Me {
   };
 }
 
-interface OutboxEntry { clientId: string; text: string; createdAt: string }
+interface OutboxEntry { clientId: string; text: string; createdAt: string; conversationId?: string | null }
 
 interface State {
   token: string | null;
@@ -47,12 +47,19 @@ interface State {
   busyItems: string[];
   /** Aktionen und Vorschläge von Stella (für Karten mit Ja/Nein und „Rückgängig“) */
   actions: Record<string, ActionEntry>;
+  /** der Chat, dessen Nachrichten `messages` zeigt */
+  conversationId: string | null;
+  /** true: ein älterer Chat wurde bewusst geöffnet – dann springt die Ansicht nicht von selbst auf den neuesten von heute */
+  pinned: boolean;
+  /** der neueste Chat von heute laut Server */
+  current: string | null;
+  conversations: Conversation[];
 }
 
 const STORAGE_KEY = 'stella-state-v1';
 
 function load(): State {
-  const base: State = { token: null, me: null, items: {}, messages: [], outbox: [], lastSync: null, online: navigator.onLine, thinking: false, busyItems: [], actions: {} };
+  const base: State = { token: null, me: null, items: {}, messages: [], outbox: [], lastSync: null, online: navigator.onLine, thinking: false, busyItems: [], actions: {}, conversationId: null, pinned: false, current: null, conversations: [] };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return { ...base, ...JSON.parse(raw), online: navigator.onLine, thinking: false };
@@ -101,12 +108,12 @@ export async function authenticate(mode: 'login' | 'register', body: Record<stri
   const { token, user } = await api<{ token: string; user: Me }>(`/api/auth/${mode}`, {
     method: 'POST', json: { ...body, device, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
   });
-  set({ token, me: user, items: {}, messages: [], outbox: [], lastSync: null, actions: {} });
+  set({ token, me: user, items: {}, messages: [], outbox: [], lastSync: null, actions: {}, conversationId: null, pinned: false, current: null, conversations: [] });
   await sync();
 }
 
 export function logoutLocal() {
-  set({ token: null, me: null, items: {}, messages: [], outbox: [], lastSync: null, actions: {} });
+  set({ token: null, me: null, items: {}, messages: [], outbox: [], lastSync: null, actions: {}, conversationId: null, pinned: false, current: null, conversations: [] });
 }
 
 export async function logout() {
@@ -166,14 +173,28 @@ export function sync(): Promise<void> {
   syncing ??= (async () => {
     try {
       await flushOutbox();
-      const q = state.lastSync ? `?since=${encodeURIComponent(state.lastSync)}` : '';
+      const params = new URLSearchParams();
+      if (state.lastSync) params.set('since', state.lastSync);
+      if (state.conversationId) params.set('conversation', state.conversationId);
+      const q = params.size ? `?${params}` : '';
       const res = await api<SyncResponse>(`/api/sync${q}`);
-      notifyDesktop(res.messages, !state.lastSync);
-      if (!state.lastSync) set({ items: {} });
+      const firstSync = !state.lastSync;
+      notifyDesktop(res.messages, firstSync);
+      if (firstSync) set({ items: {} });
       mergeItems(res.items);
+      // anderer Chat als der gehaltene (erster Abgleich, Chat verschwunden): Ansicht ersetzen statt mischen
+      const switched = (res.conversationId ?? null) !== state.conversationId;
+      if (switched) set({ messages: [], conversationId: res.conversationId ?? null });
       mergeMessages(res.messages);
-      mergeActions(res.actions ?? [], !state.lastSync);
-      set({ lastSync: res.serverTime, online: true, busyItems: res.busyItems ?? [] });
+      if (switched && !firstSync && res.conversationId) {
+        // der Abgleich lieferte nur Neues – den ganzen Chat nachladen
+        const all = await api<ChatMessage[]>(`/api/conversations/${res.conversationId}/messages?limit=80`).catch(() => []);
+        mergeMessages(all);
+      }
+      mergeActions(res.actions ?? [], firstSync);
+      set({ lastSync: res.serverTime, online: true, busyItems: res.busyItems ?? [], current: res.current ?? null, conversations: res.conversations ?? state.conversations });
+      // neuer Tag, nichts Älteres bewusst geöffnet → auf den neuesten Chat von heute wechseln
+      if (!state.pinned && res.current && res.current !== state.conversationId) await openConversation(res.current);
     } catch (err) {
       if (isNetworkError(err)) set({ online: false });
     } finally {
@@ -187,7 +208,7 @@ async function flushOutbox() {
   for (const entry of [...state.outbox]) {
     let res: ChatResponse = { messages: [], items: [] };
     try {
-      res = await api<ChatResponse>('/api/chat', { method: 'POST', json: { text: entry.text, clientId: entry.clientId } });
+      res = await api<ChatResponse>('/api/chat', { method: 'POST', json: { text: entry.text, clientId: entry.clientId, conversationId: entry.conversationId ?? null } });
     } catch (err) {
       if (isNetworkError(err)) throw err; // später nochmal
       // Server lehnt ab (z. B. leere Nachricht) → nicht ewig wiederholen
@@ -215,8 +236,9 @@ export async function sendMessage(text: string, images: string[] = []) {
   if (navigator.onLine) {
     set({ thinking: true });
     try {
-      const res = await api<ChatResponse>('/api/chat', { method: 'POST', json: { text, clientId, images } });
+      const res = await api<ChatResponse>('/api/chat', { method: 'POST', json: { text, clientId, images, conversationId: state.conversationId } });
       set((s) => ({ messages: s.messages.map((m) => (m.id === local.id ? { ...m, pending: false } : m)) }));
+      if (res.conversationId && res.conversationId !== state.conversationId) set({ conversationId: res.conversationId, current: state.pinned ? state.current : res.conversationId });
       mergeItems(res.items);
       mergeMessages(res.userMessage ? [res.userMessage, ...res.messages] : res.messages);
       set({ online: true });
@@ -254,11 +276,25 @@ function queueOffline(text: string, clientId: string, createdAt: string) {
     createdAt: new Date(Date.parse(createdAt) + 1).toISOString(), pending: true,
   };
   set((s) => ({
-    outbox: [...s.outbox, { clientId, text, createdAt }],
+    outbox: [...s.outbox, { clientId, text, createdAt, conversationId: s.conversationId }],
     messages: [...s.messages, replyMsg],
     items: localItem ? { ...s.items, [localItem.id]: localItem } : s.items,
     online: false,
   }));
+}
+
+// ---------- Chats ----------
+
+/** Einen Chat zeigen (alter Chat: lesbar und fortsetzbar). Der neueste von heute folgt wieder dem Server. */
+export async function openConversation(id: string) {
+  const messages = await api<ChatMessage[]>(`/api/conversations/${id}/messages?limit=80`);
+  set((s) => ({ conversationId: id, pinned: id !== s.current, messages }));
+}
+
+/** „Neuer Chat“: ein leerer Chat von heute (ein schon leerer wird wiederverwendet). */
+export async function newConversation() {
+  const r = await api<{ id: string; conversations: Conversation[] }>('/api/conversations', { method: 'POST' });
+  set({ conversationId: r.id, pinned: false, current: r.id, messages: [], conversations: r.conversations });
 }
 
 // ---------- Aktionen: Ja / Nein / Rückgängig ----------

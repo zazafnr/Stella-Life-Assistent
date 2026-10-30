@@ -1,7 +1,8 @@
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import path from 'node:path';
-import type { ActionGroup, Attachment, ChatMessage, Item, ItemKind, ItemStatus, PermissionLevel, Tone } from '@stella/shared';
+import { todayIn, type ActionGroup, type Attachment, type ChatMessage, type Item, type ItemKind, type ItemStatus, type PermissionLevel, type Tone } from '@stella/shared';
 import { config } from './config.ts';
 
 export const db = new Database(path.join(config.dataDir, 'stella.db'));
@@ -257,6 +258,20 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (user_id, event_id)
   );
   `,
+  `
+  -- Paket 3: Chats nach Tagen. Jede Nachricht gehört zu einem Chat (conversation); alte Nachrichten ordnet backfillConversations() pro Tag zu.
+  CREATE TABLE conversations (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT,
+    day TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX conversations_user ON conversations(user_id, updated_at);
+  ALTER TABLE messages ADD COLUMN conversation_id TEXT;
+  CREATE INDEX messages_conversation ON messages(conversation_id, created_at);
+  `,
 ];
 
 function migrate() {
@@ -440,7 +455,57 @@ export function itemsChangedSince(userId: string, since: string): Item[] {
     .all(userId, since) as ItemRow[]).map(toItem);
 }
 
-// ---------- Messages ----------
+// ---------- Chats (Konversationen) und Nachrichten ----------
+
+/** In welchem Chat gerade geantwortet wird – gilt für alles, was während einer Chat-Anfrage passiert (auch tief in Hilfsfunktionen). */
+export const chatContext = new AsyncLocalStorage<{ userId: string; conversationId: string }>();
+
+type ConversationRow = { id: string; user_id: string; title: string | null; day: string; created_at: string; updated_at: string };
+
+export function getConversation(userId: string, id: string): ConversationRow | null {
+  return (db.prepare('SELECT * FROM conversations WHERE user_id = ? AND id = ?').get(userId, id) as ConversationRow | undefined) ?? null;
+}
+
+export function createConversation(userId: string, day?: string, createdAt = now()): string {
+  const user = getUser(userId);
+  const id = newId();
+  db.prepare('INSERT INTO conversations (id, user_id, title, day, created_at, updated_at) VALUES (?, ?, NULL, ?, ?, ?)')
+    .run(id, userId, day ?? todayIn(user?.timeZone ?? 'Europe/Vienna'), createdAt, createdAt);
+  return id;
+}
+
+/** Der neueste Chat von heute (Zeitzone des Nutzers) – gibt es noch keinen, wird einer angelegt. */
+export function todayConversation(userId: string, create = true): string | null {
+  const today = todayIn(getUser(userId)?.timeZone ?? 'Europe/Vienna');
+  const row = db.prepare('SELECT id FROM conversations WHERE user_id = ? AND day = ? ORDER BY created_at DESC, rowid DESC LIMIT 1').get(userId, today) as { id: string } | undefined;
+  return row?.id ?? (create ? createConversation(userId, today) : null);
+}
+
+/** Alte Nachrichten ohne Chat pro Kalendertag (Zeitzone des Nutzers) einem Chat zuordnen. Läuft beim Start und ist danach ein No-op. */
+export function backfillConversations() {
+  const users = db.prepare('SELECT DISTINCT user_id FROM messages WHERE conversation_id IS NULL').all() as { user_id: string }[];
+  for (const { user_id } of users) {
+    const tz = getUser(user_id)?.timeZone;
+    if (!tz) continue;
+    const rows = db.prepare('SELECT id, created_at FROM messages WHERE user_id = ? AND conversation_id IS NULL ORDER BY created_at, rowid').all(user_id) as { id: string; created_at: string }[];
+    const byDay = new Map<string, { id: string; created_at: string }[]>();
+    for (const r of rows) {
+      const day = todayIn(tz, new Date(r.created_at));
+      byDay.set(day, [...(byDay.get(day) ?? []), r]);
+    }
+    db.transaction(() => {
+      for (const [day, msgs] of byDay) {
+        const first = msgs[0]!.created_at, last = msgs.at(-1)!.created_at;
+        const existing = db.prepare('SELECT id FROM conversations WHERE user_id = ? AND day = ? ORDER BY created_at LIMIT 1').get(user_id, day) as { id: string } | undefined;
+        const id = existing?.id ?? newId();
+        if (!existing) db.prepare('INSERT INTO conversations (id, user_id, title, day, created_at, updated_at) VALUES (?, ?, NULL, ?, ?, ?)').run(id, user_id, day, first, last);
+        const set = db.prepare('UPDATE messages SET conversation_id = ? WHERE id = ?');
+        for (const m of msgs) set.run(id, m.id);
+      }
+    })();
+  }
+}
+backfillConversations();
 
 type MsgRow = { id: string; client_id: string | null; role: string; text: string; attachments: string; created_at: string; action_id?: string | null };
 const toMessage = (r: MsgRow): ChatMessage => ({
@@ -454,11 +519,19 @@ export function findMessageByClientId(userId: string, clientId: string): ChatMes
   return r ? toMessage(r) : null;
 }
 
+/**
+ * Nachricht speichern. Ohne `conversationId` landet sie im Chat, in dem gerade geantwortet wird (siehe chatContext),
+ * sonst im neuesten Chat von heute – so auch alles, was Stella von sich aus schickt (Briefing, Hinweise, Erinnerungen).
+ */
 export function addMessage(userId: string, role: ChatMessage['role'], text: string,
-  opts: { clientId?: string | null; attachments?: Attachment[]; createdAt?: string; actionId?: string } = {}): ChatMessage {
+  opts: { clientId?: string | null; attachments?: Attachment[]; createdAt?: string; actionId?: string; conversationId?: string } = {}): ChatMessage {
   const id = newId();
-  db.prepare('INSERT INTO messages (id, user_id, client_id, role, text, attachments, created_at, action_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(id, userId, opts.clientId ?? null, role, text, JSON.stringify(opts.attachments ?? []), opts.createdAt ?? now(), opts.actionId ?? null);
+  const ctx = chatContext.getStore();
+  const conversationId = opts.conversationId ?? (ctx?.userId === userId ? ctx.conversationId : todayConversation(userId)!);
+  const createdAt = opts.createdAt ?? now();
+  db.prepare('INSERT INTO messages (id, user_id, client_id, role, text, attachments, created_at, action_id, conversation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, userId, opts.clientId ?? null, role, text, JSON.stringify(opts.attachments ?? []), createdAt, opts.actionId ?? null, conversationId);
+  db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ? AND updated_at < ?').run(createdAt, conversationId, createdAt);
   return toMessage(db.prepare('SELECT * FROM messages WHERE id = ?').get(id) as MsgRow);
 }
 
@@ -467,6 +540,19 @@ export function recentMessages(userId: string, limit = 50, before?: string): Cha
     ? db.prepare('SELECT * FROM messages WHERE user_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT ?').all(userId, before, limit)
     : db.prepare('SELECT * FROM messages WHERE user_id = ? ORDER BY created_at DESC LIMIT ?').all(userId, limit);
   return (rows as MsgRow[]).map(toMessage).reverse();
+}
+
+/** Die letzten Nachrichten eines einzelnen Chats (älteste zuerst) – nur das sieht die KI als Verlauf. */
+export function conversationMessages(userId: string, conversationId: string, limit = 50, before?: string): ChatMessage[] {
+  const rows = before
+    ? db.prepare('SELECT * FROM messages WHERE user_id = ? AND conversation_id = ? AND created_at < ? ORDER BY created_at DESC, rowid DESC LIMIT ?').all(userId, conversationId, before, limit)
+    : db.prepare('SELECT * FROM messages WHERE user_id = ? AND conversation_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?').all(userId, conversationId, limit);
+  return (rows as MsgRow[]).map(toMessage).reverse();
+}
+
+export function conversationMessagesSince(userId: string, conversationId: string, since: string): ChatMessage[] {
+  return (db.prepare('SELECT * FROM messages WHERE user_id = ? AND conversation_id = ? AND created_at > ? ORDER BY created_at, rowid')
+    .all(userId, conversationId, since) as MsgRow[]).map(toMessage);
 }
 
 export function messagesSince(userId: string, since: string): ChatMessage[] {

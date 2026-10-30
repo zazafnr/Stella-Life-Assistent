@@ -9,6 +9,7 @@ struct ChatView: View {
     @State private var images: [UIImage] = []
     @State private var showCamera = false
     @State private var viewing: String?
+    @State private var showHistory = false
     @FocusState private var focused: Bool
 
     private let suggestions = ["Latein HÜ S. 45 Nr. 3 Freitag", "Freitag 15 Uhr Friseur", "erinnere mich in 2 Stunden an die Wäsche", "Hab ich was vergessen?", "Briefing"]
@@ -22,6 +23,9 @@ struct ChatView: View {
                 messagesList
                 composer
             }
+        }
+        .sheet(isPresented: $showHistory) {
+            ChatHistorySheet()
         }
         .sheet(isPresented: $showCamera) {
             CameraPicker { image in images.append(image) }
@@ -64,6 +68,24 @@ struct ChatView: View {
                 }
             }
             Spacer()
+            Button { showHistory = true } label: {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 40, height: 40)
+                    .background(.white, in: Circle())
+                    .shadow(color: Theme.blue.opacity(0.1), radius: 6, y: 2)
+            }
+            .accessibilityLabel("Alle Chats")
+            Button {
+                Task { await store.newConversation() }
+            } label: {
+                Label("Neuer Chat", systemImage: "plus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .padding(.horizontal, 14)
+                    .frame(height: 40)
+                    .background(.white, in: Capsule())
+                    .shadow(color: Theme.blue.opacity(0.1), radius: 6, y: 2)
+            }
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 10)

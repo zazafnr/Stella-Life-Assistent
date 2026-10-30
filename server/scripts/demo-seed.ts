@@ -14,7 +14,7 @@ const PASSWORD = process.env.DEMO_PASSWORD || 'demo-passwort-123';
 const NAME = process.env.DEMO_NAME || 'Lukas';
 
 const { hashPassword, register } = await import('../src/auth.ts');
-const { addMessage, db, getUser, newId, updateUserSettings } = await import('../src/db.ts');
+const { addMessage, createConversation, db, getUser, newId, updateUserSettings } = await import('../src/db.ts');
 const { addItem } = await import('../src/planner.ts');
 const { addMemory } = await import('../src/memory.ts');
 const { handleChat } = await import('../src/assistant.ts');
@@ -86,17 +86,28 @@ const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
 const rows = db.prepare('SELECT id FROM messages WHERE user_id = ? ORDER BY created_at, rowid').all(uid) as { id: string }[];
 rows.forEach((r, i) => db.prepare('UPDATE messages SET created_at = ? WHERE id = ?').run(ago(i === 0 ? 240 : (rows.length - i) * 3), r.id));
 
+// ein älterer Chat mit Titel (Verlauf: „Chats“)
+const twoDaysAgo = (min: number) => new Date(Date.now() - 2 * 86_400_000 + min * 60_000).toISOString();
+const oldChat = createConversation(uid, addDays(today, -2), twoDaysAgo(0));
+addMessage(uid, 'user', 'Wie lerne ich am besten Vokabeln?', { conversationId: oldChat, createdAt: twoDaysAgo(0) });
+addMessage(uid, 'assistant', 'Kurze Einheiten, dafür oft:\n- **10 Minuten** am Tag\n- laut sprechen\n- am Abend **einmal wiederholen**', { conversationId: oldChat, createdAt: twoDaysAgo(1) });
+addMessage(uid, 'user', 'Und wie merke ich mir die Artikel?', { conversationId: oldChat, createdAt: twoDaysAgo(3) });
+addMessage(uid, 'assistant', 'Immer **mit Artikel** lernen: „das Haus“ statt nur „Haus“.', { conversationId: oldChat, createdAt: twoDaysAgo(4) });
+db.prepare('UPDATE conversations SET title = ? WHERE id = ?').run('Vokabeln lernen', oldChat);
+
 // Inbox
 const inbox = (source: string, sender: string, text: string, payload: Record<string, unknown>, hoursAgo: number) =>
   db.prepare('INSERT INTO inbox_events (id, user_id, source, sender, text, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .run(newId(), uid, source, sender, text, JSON.stringify(payload), new Date(Date.now() - hoursAgo * 3600_000).toISOString());
-const mail = { accountId: 'demo', account: 'Schule', fromAddress: 'post@schule.at' };
+const mail = { accountId: 'demo', account: 'Schule', fromAddress: 'post@schule.at', snippet: 'Liebe Eltern, liebe Schülerinnen und Schüler,\n\nbitte denkt daran, die Einverständniserklärung bis Freitag abzugeben.\n\nLiebe Grüße\nFrau Huber' };
 inbox('email', 'Frau Huber', 'Wandertag Freitag', { ...mail, category: 'important', summary: 'Wandertag: Einverständniserklärung bis Freitag abgeben', reason: 'Klassenvorstand', deadline: { date: addDays(today, 4), time: null, what: 'Einverständnis abgeben' }, needsReply: false }, 3);
 inbox('email', 'Herr Gruber', 'Referat Termin', { ...mail, category: 'important', summary: 'Fragt, ob du dein Referat schon am Montag halten kannst', reason: 'Lehrer fragt dich direkt', needsReply: true }, 20);
 inbox('social', 'Instagram', 'lena.mayer hat deinen Beitrag kommentiert', { platform: 'Instagram', summary: 'lena.mayer: „Bin dabei!! 🔥“' }, 1);
 inbox('sms', 'Mama', 'Holst du Milch auf dem Heimweg?', { summary: 'Holst du Milch auf dem Heimweg?' }, 2);
 inbox('email', 'Zalando', 'Nur heute: −30 % auf alles', { ...mail, account: 'Privat', category: 'spam', action: 'trash', summary: 'Werbung' }, 5);
 inbox('email', 'Elternverein', 'Herbstfest', { ...mail, category: 'normal', summary: 'Einladung zum Herbstfest am Samstag' }, 30);
+inbox('email', 'Lernhilfe Newsletter', 'Neue Übungen für November', { ...mail, account: 'Privat', category: 'newsletter', summary: 'Neue Übungsblätter für Mathe und Englisch' }, 26);
+inbox('email', 'Bestellung #4411', 'Dein Paket ist unterwegs', { ...mail, account: 'Privat', category: 'normal', summary: 'Versandbestätigung: Ankunft Donnerstag' }, 40);
 
 // Schritte der letzten Woche
 const steps = [6400, 9100, 7300, 11200, 5200, 8800, 4300];

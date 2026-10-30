@@ -19,6 +19,13 @@ final class Store {
     var loggedIn: Bool
     /** Cache wiederhergestellt bzw. erster Abgleich fertig – davor zeigt die App den Ladebildschirm */
     var ready = false
+    /** der Chat, dessen Nachrichten `messages` zeigt */
+    var conversationId: String?
+    /** true: ein älterer Chat wurde bewusst geöffnet – die Ansicht springt dann nicht von selbst auf den neuesten von heute */
+    var pinned = false
+    /** der neueste Chat von heute laut Server */
+    var current: String?
+    var conversations: [Conversation] = []
 
     @ObservationIgnored private var outbox: [Outbox] = []
     @ObservationIgnored private var loop: Task<Void, Never>?
@@ -29,6 +36,7 @@ final class Store {
         var clientId: String
         var text: String
         var createdAt: String
+        var conversationId: String?
     }
 
     private struct Cache: Codable {
@@ -38,6 +46,10 @@ final class Store {
         var outbox: [Outbox]
         var lastSync: String?
         var actions: [ActionEntry]?
+        var conversationId: String?
+        var pinned: Bool?
+        var current: String?
+        var conversations: [Conversation]?
     }
 
     init() {
@@ -76,6 +88,10 @@ final class Store {
         messages = []
         outbox = []
         lastSync = nil
+        conversationId = nil
+        pinned = false
+        current = nil
+        conversations = []
         loggedIn = true
         persist()
         await sync()
@@ -96,6 +112,10 @@ final class Store {
         lastSync = nil
         busyItems = []
         actions = [:]
+        conversationId = nil
+        pinned = false
+        current = nil
+        conversations = []
         loggedIn = false
         persist()
         Notifier.shared.clear()
@@ -134,22 +154,62 @@ final class Store {
         guard loggedIn else { return }
         defer { ready = true }
         await flushOutbox()
-        let path = lastSync.map { "/api/sync?since=\($0.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? $0)" } ?? "/api/sync"
+        var query: [String] = []
+        if let since = lastSync { query.append("since=\(since.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? since)") }
+        if let held = conversationId { query.append("conversation=\(held)") }
+        let path = "/api/sync" + (query.isEmpty ? "" : "?" + query.joined(separator: "&"))
         do {
             let res: SyncResponse = try await api.get(path)
             if me == nil { await refreshMe() }
             merge(items: res.items)
+            // anderer Chat als der gehaltene (erster Abgleich, Chat verschwunden): Ansicht ersetzen statt mischen
+            let switched = res.conversationId != conversationId
+            let firstSync = lastSync == nil
+            if switched {
+                messages = []
+                conversationId = res.conversationId
+            }
             merge(messages: res.messages)
+            if switched, !firstSync, let id = res.conversationId,
+               let all: [ChatMessage] = try? await api.get("/api/conversations/\(id)/messages?limit=80") {
+                merge(messages: all)
+            }
+            current = res.current
+            if let list = res.conversations { conversations = list }
             if lastSync == nil { actions = [:] }
             for a in res.actions ?? [] { actions[a.id] = a }
             busyItems = Set(res.busyItems ?? [])
             lastSync = res.serverTime
             online = true
             persist()
+            // neuer Tag, nichts Älteres bewusst geöffnet → auf den neuesten Chat von heute wechseln
+            if !pinned, let cur = res.current, cur != conversationId { await openConversation(cur) }
             await planReminders()
         } catch {
             handle(error)
         }
+    }
+
+    // MARK: Chats
+
+    /** Einen Chat zeigen (alter Chat: lesbar und fortsetzbar) */
+    func openConversation(_ id: String) async {
+        guard let list: [ChatMessage] = try? await api.get("/api/conversations/\(id)/messages?limit=80") else { return }
+        messages = list
+        conversationId = id
+        pinned = id != current
+        persist()
+    }
+
+    /** „Neuer Chat“: ein leerer Chat von heute (ein schon leerer wird wiederverwendet) */
+    func newConversation() async {
+        guard let r: NewConversation = try? await api.send("POST", "/api/conversations") else { return }
+        messages = []
+        conversationId = r.id
+        current = r.id
+        pinned = false
+        conversations = r.conversations
+        persist()
     }
 
     private func merge(items incoming: [Item]) {
@@ -203,11 +263,16 @@ final class Store {
         thinking = true
         defer { thinking = false }
 
-        struct Body: Encodable { var text: String; var clientId: String; var images: [String] }
+        struct Body: Encodable { var text: String; var clientId: String; var images: [String]; var conversationId: String? }
         let body = Body(text: trimmed, clientId: clientId,
-                        images: images.map { "data:image/jpeg;base64,\($0.base64EncodedString())" })
+                        images: images.map { "data:image/jpeg;base64,\($0.base64EncodedString())" },
+                        conversationId: conversationId)
         do {
             let res: ChatResponse = try await api.send("POST", "/api/chat", body: body)
+            if let c = res.conversationId, c != conversationId {
+                conversationId = c
+                if !pinned { current = c }
+            }
             if let u = res.userMessage { merge(messages: [u]) }
             merge(messages: res.messages)
             merge(items: res.items)
@@ -217,7 +282,7 @@ final class Store {
         } catch let e as APIError where e.isOffline && images.isEmpty {
             // ohne Netz: später schicken
             online = false
-            outbox.append(Outbox(clientId: clientId, text: trimmed, createdAt: now))
+            outbox.append(Outbox(clientId: clientId, text: trimmed, createdAt: now, conversationId: conversationId))
             persist()
         } catch {
             messages.removeAll { $0.id == local.id }
@@ -228,10 +293,10 @@ final class Store {
 
     private func flushOutbox() async {
         guard !outbox.isEmpty else { return }
-        struct Body: Encodable { var text: String; var clientId: String }
+        struct Body: Encodable { var text: String; var clientId: String; var conversationId: String? }
         while let next = outbox.first {
             do {
-                let res: ChatResponse = try await api.send("POST", "/api/chat", body: Body(text: next.text, clientId: next.clientId))
+                let res: ChatResponse = try await api.send("POST", "/api/chat", body: Body(text: next.text, clientId: next.clientId, conversationId: next.conversationId))
                 outbox.removeFirst()
                 if let u = res.userMessage { merge(messages: [u]) }
                 merge(messages: res.messages)
@@ -307,7 +372,8 @@ final class Store {
         let waiting = Set(outbox.map { "local-\($0.clientId)" })
         let kept = messages.filter { m in m.pending != true || waiting.contains(m.id) }
         let cache = Cache(me: me, items: Array(items.values), messages: kept, outbox: outbox, lastSync: lastSync,
-                          actions: Array(actions.values))
+                          actions: Array(actions.values), conversationId: conversationId, pinned: pinned,
+                          current: current, conversations: conversations)
         if let data = try? JSONEncoder().encode(cache) { try? data.write(to: cacheURL, options: .atomic) }
     }
 
@@ -319,6 +385,10 @@ final class Store {
         outbox = cache.outbox
         lastSync = cache.lastSync
         actions = Dictionary((cache.actions ?? []).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        conversationId = cache.conversationId
+        pinned = cache.pinned ?? false
+        current = cache.current
+        conversations = cache.conversations ?? []
     }
 }
 

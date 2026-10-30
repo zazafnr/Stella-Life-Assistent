@@ -80,9 +80,24 @@ export interface Memory {
   updatedAt: string;
 }
 
+/** Ein Chat. Jeder Tag startet automatisch einen neuen; mehrere am Tag bekommen einen Titel. */
+export interface Conversation {
+  id: string;
+  /** KI-Titel (höchstens 5 Wörter) oder null */
+  title: string | null;
+  /** was angezeigt wird: Titel, sonst „Heute“, „Gestern“ oder „Mi, 4.11.“ */
+  label: string;
+  day: string;
+  lastMessage: string | null;
+  updatedAt: string;
+  count: number;
+}
+
 export interface ChatResponse {
   messages: ChatMessage[];
   items: Item[];
+  /** in welchem Chat die Nachricht gelandet ist */
+  conversationId?: string;
   /** die gespeicherte Nutzer-Nachricht (mit Fotos), ersetzt den lokalen Platzhalter */
   userMessage?: ChatMessage;
 }
@@ -95,6 +110,12 @@ export interface SyncResponse {
   busyItems?: string[];
   /** Aktionen und Vorschläge, die sich seit `since` geändert haben */
   actions?: ActionEntry[];
+  /** der Chat, zu dem `messages` gehören */
+  conversationId?: string | null;
+  /** der neueste Chat von heute (null: heute noch nichts geschrieben) */
+  current?: string | null;
+  /** die letzten Chats mit Titel, neueste zuerst */
+  conversations?: Conversation[];
 }
 
 export interface HealthDay {
