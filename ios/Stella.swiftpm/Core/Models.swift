@@ -289,6 +289,10 @@ struct Lesson: Codable, Hashable, Identifiable {
     var name: String { subject ?? code ?? "Stunde" }
 }
 
+enum InboxTab: String, CaseIterable {
+    case important = "Wichtig", normal = "Neutral", newsletter = "Unwichtig", trash = "Papierkorb"
+}
+
 struct InboxEntry: Codable, Hashable, Identifiable {
     var id: String
     var source: String
@@ -310,6 +314,17 @@ struct InboxEntry: Codable, Hashable, Identifiable {
 
     var trashed: Bool { action == "trash" }
     var important: Bool { category == "important" }
+    /** Wichtig / Neutral / Unwichtig / Papierkorb – Social-Benachrichtigungen zählen zu „Unwichtig“, SMS zu „Wichtig“ */
+    var tab: InboxTab {
+        if source == "sms" { return .important }
+        if source == "social" { return .newsletter }
+        if trashed || category == "spam" { return .trash }
+        switch category {
+        case "important": return .important
+        case "newsletter": return .newsletter
+        default: return .normal
+        }
+    }
     var date: Date? { ISO.parse(createdAt) }
     /** „Wichtig für dich“: wichtige Mail der letzten 7 Tage, noch nicht erledigt */
     var focus: Bool {

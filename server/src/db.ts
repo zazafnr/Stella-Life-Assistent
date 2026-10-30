@@ -239,6 +239,24 @@ const MIGRATIONS: string[] = [
     DELETE FROM llm_usage WHERE user_id = OLD.id;
   END;
   `,
+  `
+  -- Paket 2: Absender-Regeln für Mails (gelten vor der KI) und Zwischenspeicher für den Volltext (30 Tage)
+  CREATE TABLE mail_rules (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    sender TEXT NOT NULL,
+    category TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, sender)
+  );
+  CREATE TABLE mail_bodies (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    event_id TEXT NOT NULL,
+    body TEXT NOT NULL,
+    truncated INTEGER NOT NULL DEFAULT 0,
+    fetched_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, event_id)
+  );
+  `,
 ];
 
 function migrate() {

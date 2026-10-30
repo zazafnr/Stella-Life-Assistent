@@ -50,7 +50,7 @@ struct FocusCard: View {
         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Color(hex: 0xF7C9DC), lineWidth: 1.5))
         .shadow(color: Theme.blue.opacity(0.06), radius: 12, y: 4)
         .sheet(isPresented: $replying) {
-            ReplySheet(entry: entry) { changed("Wird gesendet ✉️") }
+            ReplySheet(entry: entry, writeFirst: true) { changed("Wird gesendet ✉️") }
         }
     }
 
@@ -96,6 +96,8 @@ private struct FlowPills: View {
 /** Antwort: Stella schreibt einen Entwurf, du änderst ihn, gesendet wird nur auf „Senden“ */
 struct ReplySheet: View {
     var entry: InboxEntry
+    /** true: Stella schreibt gleich einen Entwurf; false: leerer Editor zum Selbstschreiben */
+    var writeFirst = true
     var sent: () -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(Store.self) private var store
@@ -130,7 +132,7 @@ struct ReplySheet: View {
                     HStack(spacing: 8) {
                         TextField("Was soll drinstehen? z. B. „bin morgen krank“", text: $instruction)
                             .textFieldStyle(.roundedBorder)
-                        Button("Neu") { Task { await write() } }
+                        Button(text.isEmpty ? "Stella" : "Neu") { Task { await write() } }
                             .buttonStyle(SoftButton(filled: false))
                             .disabled(writing)
                     }
@@ -151,7 +153,7 @@ struct ReplySheet: View {
             }
         }
         .task {
-            if let d = entry.draft?.body, !d.isEmpty { text = d } else { await write() }
+            if let d = entry.draft?.body, !d.isEmpty { text = d } else if writeFirst { await write() }
         }
     }
 

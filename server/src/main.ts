@@ -19,7 +19,7 @@ import { startScheduler } from './scheduler.ts';
 import { toICalendar } from './ical.ts';
 import { getBookCredentials, listShelf, LOGIN_PAGES, normalizeCookies, PROVIDERS, saveBookCredentials, screenshotPage, secretName } from './books.ts';
 import { deleteUserFont, renderHandwriting, saveUserFont, userFontPath } from './handwriting.ts';
-import { checkAllMail, draftReply, getMailEvent, listAccounts, PRESETS, publicAccounts, restoreMail, saveAccounts, setEventField, testAccount, type MailAccount } from './mail.ts';
+import { checkAllMail, draftReply, getMailBody, getMailEvent, isMailCategory, listAccounts, moveMail, PRESETS, publicAccounts, restoreMail, saveAccounts, setEventField, testAccount, type MailAccount } from './mail.ts';
 import { lessonsFor, syncUntis, testUntis, type UntisCredentials } from './untis.ts';
 import { FILE_TYPES, filePath, saveDataUrl, saveFile } from './files.ts';
 import type { BookProvider } from './db.ts';
@@ -495,6 +495,24 @@ app.register(async (api) => {
     // der Klick auf „Senden“ nach dem Lesen des Textes ist die Zustimmung
     const action = r.status === 'proposed' ? approve(req.user.id, r.actionId).entry : null;
     return { ok: true, action };
+  });
+  // Volltext einer Mail (bei Bedarf per IMAP geholt, 30 Tage zwischengespeichert)
+  api.get('/api/inbox/:id/body', async (req: FastifyRequest<{ Params: { id: string } }>) => {
+    const ev = getMailEvent(req.user.id, req.params.id);
+    if (!ev) throw new HttpError(404, 'Mail nicht gefunden');
+    try {
+      return await getMailBody(req.user.id, req.params.id);
+    } catch (err) {
+      // Postfach gerade nicht erreichbar: wenigstens den gespeicherten Auszug zeigen
+      if (typeof ev.payload.snippet === 'string' && ev.payload.snippet) return { body: ev.payload.snippet, truncated: true, cached: false, partial: true };
+      throw new HttpError(502, `Ich komme gerade nicht an die Mail ran (${(err as Error).message}).`);
+    }
+  });
+  // Von Hand einsortieren: important | normal | newsletter | spam – Stella merkt sich den Absender
+  api.post('/api/inbox/:id/category', async (req: FastifyRequest<{ Params: { id: string } }>) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    if (!isMailCategory(b.category)) throw new HttpError(400, 'Unbekannte Kategorie');
+    try { return { ok: true, ...(await moveMail(req.user.id, req.params.id, b.category)) }; } catch (err) { throw new HttpError(404, (err as Error).message); }
   });
   api.post('/api/inbox/:id/handled', async (req: FastifyRequest<{ Params: { id: string } }>) => {
     const b = (req.body ?? {}) as Record<string, unknown>;

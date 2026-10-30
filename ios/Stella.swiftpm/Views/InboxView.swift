@@ -5,16 +5,17 @@ struct InboxView: View {
     @State private var entries: [InboxEntry]?
     @State private var filter: Filter = .important
     @State private var toast: String?
+    @State private var reading: InboxEntry?
 
     enum Filter: String, CaseIterable {
-        case important = "Wichtig", social = "Social", sms = "SMS", trash = "Gelöscht", all = "Alles"
+        case important = "Wichtig", normal = "Neutral", newsletter = "Unwichtig", trash = "Papierkorb", all = "Alles"
 
         func matches(_ e: InboxEntry) -> Bool {
             switch self {
-            case .important: return e.important || e.source == "sms"
-            case .social: return e.source == "social"
-            case .sms: return e.source == "sms"
-            case .trash: return e.trashed
+            case .important: return e.tab == .important
+            case .normal: return e.tab == .normal
+            case .newsletter: return e.tab == .newsletter
+            case .trash: return e.tab == .trash
             case .all: return true
             }
         }
@@ -22,8 +23,8 @@ struct InboxView: View {
         var symbol: String {
             switch self {
             case .important: return "star.fill"
-            case .social: return "heart.fill"
-            case .sms: return "message.fill"
+            case .normal: return "tray.fill"
+            case .newsletter: return "bell.slash.fill"
             case .trash: return "trash.fill"
             case .all: return "tray.full.fill"
             }
@@ -60,7 +61,7 @@ struct InboxView: View {
                         } else if shown.isEmpty && !(filter == .important && !focus.isEmpty) {
                             VStack(spacing: 12) {
                                 Cloud(width: 90)
-                                Text(filter == .important ? "Nichts Wichtiges – alles ruhig." : "Hier ist gerade nichts.")
+                                Text(emptyText)
                                     .foregroundStyle(Theme.muted)
                             }
                             .frame(maxWidth: .infinity)
@@ -69,6 +70,8 @@ struct InboxView: View {
                             LazyVStack(spacing: 10) {
                                 ForEach(Array(shown.enumerated()), id: \.element.id) { index, e in
                                     InboxRow(entry: e, restore: { Task { await restore(e) } })
+                                        .contentShape(Rectangle())
+                                        .onTapGesture { if e.source == "email" { reading = e } }
                                         .rise(min(index, 8))
                                 }
                             }
@@ -96,6 +99,22 @@ struct InboxView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .task { await load() }
+            .sheet(item: $reading) { e in
+                MailReaderSheet(entry: e) { msg in
+                    if !msg.isEmpty { show(msg) }
+                    Task { await load() }
+                }
+            }
+        }
+    }
+
+    private var emptyText: String {
+        switch filter {
+        case .important: return "Nichts Wichtiges – alles ruhig."
+        case .normal: return "Nichts Neutrales da."
+        case .newsletter: return "Nichts Unwichtiges da. Newsletter und Social-Benachrichtigungen landen hier."
+        case .trash: return "Der Papierkorb ist leer – Stella hat noch keine Werbung weggeräumt."
+        case .all: return "Hier ist gerade nichts."
         }
     }
 
@@ -179,7 +198,7 @@ struct InboxRow: View {
                     if let acc = entry.account { Pill(text: acc) }
                     if entry.important { Pill(text: "wichtig", icon: "star.fill", tone: .pink) }
                     if entry.trashed {
-                        Pill(text: "gelöscht", icon: "trash", tone: .gray)
+                        Pill(text: "im Papierkorb", icon: "trash", tone: .gray)
                         Spacer()
                         Button("Zurückholen", action: restore)
                             .font(.system(size: 13, weight: .semibold))

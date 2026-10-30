@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, sync } from '../store.ts';
 import { formatDateDe } from '@stella/shared';
 import { Icon, type IconName } from '../ui/Icon.tsx';
-import { Sky, showToast } from '../ui/Decor.tsx';
+import { Sheet, Sky, showToast } from '../ui/Decor.tsx';
 
 interface InboxEntry {
   id: string;
@@ -28,7 +28,22 @@ interface InboxEntry {
 const isFocus = (e: InboxEntry) => e.source === 'email' && !e.handled && e.action !== 'trash'
   && (e.category === 'important' || e.needsReply || !!e.deadline) && Date.parse(e.createdAt) > Date.now() - 7 * 86_400_000;
 
-type Filter = 'important' | 'social' | 'sms' | 'trash' | 'all';
+/** Wichtig / Neutral / Unwichtig / Papierkorb – Social-Benachrichtigungen zählen zu „Unwichtig“, SMS zu „Wichtig“ */
+type Tab = 'important' | 'normal' | 'newsletter' | 'trash';
+type Filter = Tab | 'all';
+export type MailCategory = 'important' | 'normal' | 'newsletter' | 'spam';
+
+const TAB_LABEL: Record<Tab, string> = { important: 'Wichtig', normal: 'Neutral', newsletter: 'Unwichtig', trash: 'Papierkorb' };
+const MOVE_TARGETS: [MailCategory, string][] = [['important', 'Wichtig'], ['normal', 'Neutral'], ['newsletter', 'Unwichtig'], ['spam', 'Papierkorb']];
+
+function tabOf(e: InboxEntry): Tab {
+  if (e.source === 'sms') return 'important';
+  if (e.source === 'social') return 'newsletter';
+  if (e.action === 'trash' || e.category === 'spam') return 'trash';
+  if (e.category === 'important') return 'important';
+  if (e.category === 'newsletter') return 'newsletter';
+  return 'normal';
+}
 
 const PLATFORM: Record<string, [IconName, string, string]> = {
   Instagram: ['insta', '#FDE6EF', '#C0306E'], TikTok: ['music', '#DDF6F5', '#0E8F8A'], Snapchat: ['message', '#FFF6CC', '#7A5B00'],
@@ -52,6 +67,7 @@ function when(iso: string) {
 export function Inbox() {
   const [filter, setFilter] = useState<Filter>('important');
   const [entries, setEntries] = useState<InboxEntry[] | null>(null);
+  const [reading, setReading] = useState<InboxEntry | null>(null);
 
   const load = useCallback(() => {
     api<InboxEntry[]>('/api/inbox?limit=300').then(setEntries).catch((err: Error) => showToast(err.message, true));
@@ -59,21 +75,13 @@ export function Inbox() {
   useEffect(load, [load]);
 
   const counts = useMemo(() => {
-    const e = entries ?? [];
-    return {
-      important: e.filter((x) => x.category === 'important' || x.source === 'sms').length,
-      social: e.filter((x) => x.source === 'social').length,
-      sms: e.filter((x) => x.source === 'sms').length,
-      trash: e.filter((x) => x.action === 'trash').length,
-    };
+    const c: Record<Tab, number> = { important: 0, normal: 0, newsletter: 0, trash: 0 };
+    for (const e of entries ?? []) c[tabOf(e)]++;
+    return c;
   }, [entries]);
 
   const focus = (entries ?? []).filter(isFocus);
-  const shown = (entries ?? []).filter((e) => !(filter === 'important' && isFocus(e))).filter((e) =>
-    filter === 'important' ? e.category === 'important' || e.source === 'sms'
-      : filter === 'social' ? e.source === 'social'
-        : filter === 'sms' ? e.source === 'sms'
-          : filter === 'trash' ? e.action === 'trash' : true);
+  const shown = (entries ?? []).filter((e) => !(filter === 'important' && isFocus(e))).filter((e) => filter === 'all' || tabOf(e) === filter);
 
   async function restore(id: string) {
     try {
@@ -85,7 +93,7 @@ export function Inbox() {
     }
   }
 
-  const counters: [Filter, number, string][] = [['important', counts.important, 'Wichtig'], ['social', counts.social, 'Social'], ['sms', counts.sms, 'SMS'], ['trash', counts.trash, 'Gelöscht']];
+  const counters = (Object.keys(TAB_LABEL) as Tab[]).map((t) => [t, counts[t], TAB_LABEL[t]] as const);
 
   return (
     <div className="page">
@@ -114,9 +122,10 @@ export function Inbox() {
         {entries && shown.length === 0 && (
           <div className="empty">
             <span className="icon-tile blue"><Icon name="inbox" size={26} /></span>
-            <p>{filter === 'trash' ? 'Stella hat noch nichts gelöscht.' : filter === 'social'
-              ? 'Noch keine Social-Benachrichtigungen. Sie kommen über die E-Mails von Instagram, TikTok & Co.'
-              : 'Alles ruhig. Verbinde deine Postfächer unter Einstellungen → E-Mail.'}</p>
+            <p>{filter === 'trash' ? 'Der Papierkorb ist leer – Stella hat noch keine Werbung weggeräumt.' : filter === 'newsletter'
+              ? 'Nichts Unwichtiges da. Newsletter und Social-Benachrichtigungen (Instagram, TikTok & Co.) landen hier.'
+              : filter === 'normal' ? 'Nichts Neutrales da.'
+                : 'Alles ruhig. Verbinde deine Postfächer unter Einstellungen → E-Mail.'}</p>
           </div>
         )}
 
@@ -125,7 +134,9 @@ export function Inbox() {
             const platform = e.platform ? PLATFORM[e.platform] : undefined;
             const [bg, fg] = colorFor(e.sender ?? '?');
             return (
-              <div key={e.id} className="inbox-row">
+              <div key={e.id} className={e.source === 'email' ? 'inbox-row clickable' : 'inbox-row'}
+                {...(e.source === 'email' ? { role: 'button', tabIndex: 0, 'aria-label': `Mail von ${e.sender ?? 'Unbekannt'} öffnen`, onClick: () => setReading(e),
+                  onKeyDown: (ev: { key: string }) => { if (ev.key === 'Enter' || ev.key === ' ') setReading(e); } } : {})}>
                 {e.source === 'social'
                   ? <span className="avatar" style={{ borderRadius: 13, background: platform?.[1] ?? '#EAF2FF', color: platform?.[2] ?? '#1F6FEB' }}><Icon name={platform?.[0] ?? 'sparkle'} size={20} /></span>
                   : <span className="avatar" style={{ background: bg, color: fg }}>{initials(e.sender ?? '?')}</span>}
@@ -143,7 +154,7 @@ export function Inbox() {
                     {e.action === 'trash' && (
                       <>
                         <span className="pill pink">im Papierkorb</span>
-                        <button type="button" className="link small" onClick={() => void restore(e.id)}>Wiederherstellen</button>
+                        <button type="button" className="link small" onClick={(ev) => { ev.stopPropagation(); void restore(e.id); }}>Wiederherstellen</button>
                       </>
                     )}
                     {e.action === 'restored' && <span className="pill green">wiederhergestellt</span>}
@@ -154,39 +165,123 @@ export function Inbox() {
           })}
         </div>
       </div>
+      {reading && <MailReader entry={reading} onClose={() => setReading(null)} onChange={load} />}
     </div>
+  );
+}
+
+/** Antwort-Editor: leer zum Selbstschreiben oder mit Entwurf von Stella. Gesendet wird nur nach einem Klick auf „Senden“. */
+function ReplyEditor({ entry: e, writeFirst, onDone }: { entry: InboxEntry; writeFirst: boolean; onDone: (sent: boolean) => void }) {
+  const [draft, setDraft] = useState(e.draft?.body ?? '');
+  const [instruction, setInstruction] = useState('');
+  const [busy, setBusy] = useState<'' | 'draft' | 'send'>('');
+
+  const write = useCallback(async (withInstruction: boolean, text = '') => {
+    setBusy('draft');
+    try {
+      const d = await api<{ body: string }>(`/api/inbox/${e.id}/draft`, { method: 'POST', json: { instruction: withInstruction ? text : '' } });
+      setDraft(d.body);
+    } catch (err) { showToast((err as Error).message, true); } finally { setBusy(''); }
+  }, [e.id]);
+  useEffect(() => { if (writeFirst && !e.draft?.body) void write(false); }, [writeFirst, e.draft?.body, write]);
+
+  async function send() {
+    setBusy('send');
+    try {
+      await api(`/api/inbox/${e.id}/send`, { method: 'POST', json: { body: draft } });
+      showToast('Wird gesendet ✉️');
+      onDone(true);
+      void sync();
+    } catch (err) { showToast((err as Error).message, true); setBusy(''); }
+  }
+
+  return (
+    <div className="reply-editor">
+      <textarea value={draft} onChange={(ev) => setDraft(ev.target.value)} rows={7} placeholder={busy === 'draft' ? 'Stella schreibt …' : 'Deine Antwort'} disabled={busy === 'draft'} />
+      <div className="row" style={{ gap: 8 }}>
+        <input className="grow" value={instruction} onChange={(ev) => setInstruction(ev.target.value)} placeholder="Was soll drinstehen? z. B. „bin morgen krank“" />
+        <button type="button" className="btn small secondary" disabled={!!busy} onClick={() => void write(true, instruction)}>{draft ? 'Neu schreiben' : 'Stella schreibt'}</button>
+      </div>
+      <div className="row" style={{ gap: 8 }}>
+        <button type="button" className="btn small" disabled={!draft.trim() || !!busy} onClick={() => void send()}>
+          <Icon name="send" size={16} />{busy === 'send' ? 'Sendet …' : 'Senden'}
+        </button>
+        <button type="button" className="link small" onClick={() => onDone(false)}>Abbrechen</button>
+      </div>
+      <span className="small muted">Gesendet wird nur, wenn du auf „Senden“ tippst – an {e.sender}.</span>
+    </div>
+  );
+}
+
+/** Lesebildschirm: Volltext, Antworten (selbst oder von Stella), Verschieben, Erledigt */
+function MailReader({ entry: e, onClose, onChange }: { entry: InboxEntry; onClose: () => void; onChange: () => void }) {
+  const [text, setText] = useState<{ body: string; truncated: boolean; partial?: boolean } | null>(null);
+  const [error, setError] = useState('');
+  const [mode, setMode] = useState<'read' | 'own' | 'stella' | 'move'>('read');
+
+  useEffect(() => {
+    api<{ body: string; truncated: boolean; partial?: boolean }>(`/api/inbox/${e.id}/body`).then(setText).catch((err: Error) => setError(err.message));
+  }, [e.id]);
+
+  async function moveTo(category: MailCategory) {
+    try {
+      const r = await api<{ note: string | null }>(`/api/inbox/${e.id}/category`, { method: 'POST', json: { category } });
+      showToast(r.note ?? 'Verschoben – Stella merkt sich den Absender');
+      onChange();
+      onClose();
+    } catch (err) { showToast((err as Error).message, true); }
+  }
+  async function done() {
+    await api(`/api/inbox/${e.id}/handled`, { method: 'POST' }).catch(() => {});
+    onChange();
+    onClose();
+  }
+
+  return (
+    <Sheet title={e.sender ?? 'Mail'} onClose={onClose}>
+      <div className="mail-reader">
+        <span className="mail-subject">{e.text}</span>
+        <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+          {e.account && <span className="pill gray">{e.account}</span>}
+          <span className="pill gray">{when(e.createdAt)}</span>
+          {e.reason && <span className="pill blue">{e.reason}</span>}
+          {e.deadline && <span className="pill pink">Frist {formatDateDe(e.deadline.date)}{e.deadline.time ? ` ${e.deadline.time}` : ''}</span>}
+          {e.replied && <span className="pill green">beantwortet</span>}
+        </div>
+        {e.summary && e.summary !== e.text && <p className="muted small" style={{ margin: 0 }}>Stella: {e.summary}</p>}
+        <div className="mail-body" tabIndex={0}>
+          {error ? <span className="error-text">{error}</span> : text ? text.body : <span className="muted">⏳ Stella holt die Mail …</span>}
+          {text?.partial && <p className="muted small">Nur ein Auszug – das Postfach hat gerade nicht geantwortet.</p>}
+          {text?.truncated && !text.partial && <p className="muted small">Gekürzt – der Rest steht im Original.</p>}
+        </div>
+
+        {mode === 'own' && <ReplyEditor entry={e} writeFirst={false} onDone={(sent) => { if (sent) { onChange(); onClose(); } else setMode('read'); }} />}
+        {mode === 'stella' && <ReplyEditor entry={e} writeFirst onDone={(sent) => { if (sent) { onChange(); onClose(); } else setMode('read'); }} />}
+        {mode === 'move' && (
+          <div className="chips" role="group" aria-label="Verschieben nach">
+            {MOVE_TARGETS.map(([c, label]) => <button key={c} type="button" className="chip" onClick={() => void moveTo(c)}>{label}</button>)}
+            <button type="button" className="link small" onClick={() => setMode('read')}>Abbrechen</button>
+          </div>
+        )}
+        {(mode === 'read') && (
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" className="btn small" onClick={() => setMode('own')}><Icon name="send" size={16} />Antworten</button>
+            <button type="button" className="btn small secondary" onClick={() => setMode('stella')}><Icon name="sparkle" size={16} />Stella antworten lassen</button>
+            <button type="button" className="btn small secondary" onClick={() => setMode('move')}>Verschieben nach …</button>
+            <button type="button" className="link small" onClick={() => void done()}><Icon name="check" size={14} /> Erledigt</button>
+          </div>
+        )}
+      </div>
+    </Sheet>
   );
 }
 
 /** Eine wichtige Mail: warum, Frist, Antwort – mit Knöpfen zum Erledigen */
 function FocusCard({ entry: e, onChange }: { entry: InboxEntry; onChange: () => void }) {
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(e.draft?.body ?? '');
-  const [instruction, setInstruction] = useState('');
-  const [busy, setBusy] = useState<'' | 'draft' | 'send' | 'deadline'>('');
+  const [busy, setBusy] = useState<'' | 'deadline'>('');
   const [bg, fg] = colorFor(e.sender ?? '?');
 
-  async function write(withInstruction = false) {
-    setBusy('draft');
-    try {
-      const d = await api<{ body: string }>(`/api/inbox/${e.id}/draft`, { method: 'POST', json: { instruction: withInstruction ? instruction : '' } });
-      setDraft(d.body);
-    } catch (err) { showToast((err as Error).message, true); } finally { setBusy(''); }
-  }
-  async function openEditor() {
-    setOpen(true);
-    if (!draft) await write();
-  }
-  async function send() {
-    setBusy('send');
-    try {
-      await api(`/api/inbox/${e.id}/send`, { method: 'POST', json: { body: draft } });
-      showToast('Wird gesendet ✉️');
-      setOpen(false);
-      onChange();
-      void sync();
-    } catch (err) { showToast((err as Error).message, true); } finally { setBusy(''); }
-  }
   async function addDeadline() {
     setBusy('deadline');
     try {
@@ -221,24 +316,11 @@ function FocusCard({ entry: e, onChange }: { entry: InboxEntry; onChange: () => 
       </div>
 
       {open ? (
-        <div className="reply-editor">
-          <textarea value={draft} onChange={(ev) => setDraft(ev.target.value)} rows={7} placeholder={busy === 'draft' ? 'Stella schreibt …' : 'Deine Antwort'} disabled={busy === 'draft'} />
-          <div className="row" style={{ gap: 8 }}>
-            <input className="grow" value={instruction} onChange={(ev) => setInstruction(ev.target.value)} placeholder="Was soll drinstehen? z. B. „bin morgen krank“" />
-            <button type="button" className="btn small secondary" disabled={!!busy} onClick={() => void write(true)}>Neu schreiben</button>
-          </div>
-          <div className="row" style={{ gap: 8 }}>
-            <button type="button" className="btn small" disabled={!draft.trim() || !!busy} onClick={() => void send()}>
-              <Icon name="send" size={16} />{busy === 'send' ? 'Sendet …' : 'Senden'}
-            </button>
-            <button type="button" className="link small" onClick={() => setOpen(false)}>Abbrechen</button>
-          </div>
-          <span className="small muted">Gesendet wird nur, wenn du auf „Senden“ tippst – an {e.sender}.</span>
-        </div>
+        <ReplyEditor entry={e} writeFirst onDone={(sent) => { setOpen(false); if (sent) onChange(); }} />
       ) : (
         <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
           {e.deadline && !e.deadlineActionId && <button type="button" className="btn small" disabled={!!busy} onClick={() => void addDeadline()}>Frist eintragen</button>}
-          {!e.replied && <button type="button" className={e.needsReply ? 'btn small' : 'btn small secondary'} onClick={() => void openEditor()}>Antwort schreiben</button>}
+          {!e.replied && <button type="button" className={e.needsReply ? 'btn small' : 'btn small secondary'} onClick={() => setOpen(true)}>Antwort schreiben</button>}
           <button type="button" className="link small" onClick={() => void done()}><Icon name="check" size={14} /> Erledigt</button>
         </div>
       )}
