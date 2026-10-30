@@ -27,7 +27,7 @@ final class API: @unchecked Sendable {
     }
 
     var token: String? {
-        get { Keychain.read("token") }
+        get { Demo.token ?? Keychain.read("token") }
         set { if let v = newValue { Keychain.write("token", v) } else { Keychain.delete("token") } }
     }
 

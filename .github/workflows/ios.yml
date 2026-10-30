@@ -2,12 +2,19 @@ name: iOS-App
 
 # Kompiliert die Swift-Playgrounds-App auf einem Mac in der Cloud,
 # damit Fehler auffallen, bevor sie aufs iPhone/iPad kommt.
+# Danach: Klick-Vorschau – die App läuft im iPhone-Simulator gegen einen echten Stella-Server
+# mit Beispieldaten, jeder Screen wird fotografiert und auf den Branch ios-preview gelegt.
+# Der Skill .claude/skills/ios-preview macht daraus eine Seite in der Claude-App.
 on:
   push:
     paths:
       - "ios/**"
+      - "server/scripts/demo-seed.ts"
       - ".github/workflows/ios.yml"
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 concurrency:
   group: ios-${{ github.ref }}
@@ -35,13 +42,25 @@ jobs:
         working-directory: ios/Stella.swiftpm
         run: xcodebuild -list
 
-      - name: Für iPhone-/iPad-Simulator kompilieren
+      - name: iPhone-Simulator wählen
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)["devices"]
+          phones = [x for k, v in d.items() if "iOS" in k for x in v if x["name"].startswith("iPhone")]
+          pro = [x for x in phones if "Pro" in x["name"] and "Max" not in x["name"]]
+          print((pro or phones)[-1]["udid"])')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          xcrun simctl list devices | grep "$UDID"
+
+      - name: Für den iPhone-Simulator kompilieren
         working-directory: ios/Stella.swiftpm
         run: |
           set -o pipefail
           xcodebuild build \
             -scheme Stella \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination 'id=${{ steps.sim.outputs.udid }}' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee build.log | grep -E "error:|warning:|BUILD (SUCCEEDED|FAILED)" || true
@@ -51,3 +70,82 @@ jobs:
         if: failure()
         working-directory: ios/Stella.swiftpm
         run: grep -E "error:" build.log | sort -u | head -80 || true
+
+      # ---------- Klick-Vorschau ----------
+      - uses: actions/setup-node@v4
+        continue-on-error: true
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Stella-Server mit Beispieldaten starten
+        id: server
+        continue-on-error: true
+        env:
+          STELLA_DATA_DIR: ${{ runner.temp }}/demo
+          STELLA_SECRET: preview-secret-not-for-production
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          npm ci --no-audit --no-fund
+          mkdir -p "$STELLA_DATA_DIR"
+          npx tsx server/scripts/demo-seed.ts > "$RUNNER_TEMP/token"
+          cd server
+          PORT=8790 HOST=127.0.0.1 nohup npx tsx src/main.ts > "$RUNNER_TEMP/server.log" 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8790/api/status && exit 0
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/server.log"; exit 1
+
+      - name: Screens im Simulator fotografieren
+        id: shots
+        if: steps.server.outcome == 'success'
+        continue-on-error: true
+        env:
+          UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          OUT="$RUNNER_TEMP/preview"; mkdir -p "$OUT"
+          APP=$(find ios/Stella.swiftpm/build/Build/Products -maxdepth 2 -name "*.app" -path "*iphonesimulator*" | head -1)
+          echo "App: $APP"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time "9:41" --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3 || true
+          xcrun simctl install "$UDID" "$APP"
+          BUNDLE=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$APP/Info.plist")
+          TOKEN=$(cat "$RUNNER_TEMP/token")
+          shoot() { # name tab [open]
+            xcrun simctl terminate "$UDID" "$BUNDLE" 2>/dev/null || true
+            xcrun simctl launch "$UDID" "$BUNDLE" -server http://localhost:8790 -demoToken "$TOKEN" -tab "$2" ${3:+-open "$3"} >/dev/null
+            sleep 9
+            xcrun simctl io "$UDID" screenshot --type=png "$OUT/$1.png" >/dev/null
+            sips -s format jpeg -s formatOptions 82 -Z 1400 "$OUT/$1.png" --out "$OUT/$1.jpg" >/dev/null && rm "$OUT/$1.png"
+          }
+          shoot today today
+          shoot chat chat
+          shoot planner planner
+          shoot inbox inbox
+          shoot weekplan planner weekplan
+          shoot settings today settings
+          DEVICE=$(xcrun simctl list devices | grep "$UDID" | sed -E 's/^ *([^(]+) \(.*/\1/' | xargs)
+          python3 - "$OUT" "$DEVICE" <<'PY'
+          import json, os, sys, datetime
+          out, device = sys.argv[1], sys.argv[2]
+          json.dump({
+              "commit": os.environ["GITHUB_SHA"], "branch": os.environ["GITHUB_REF_NAME"],
+              "run": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              "device": device, "createdAt": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+              "screens": ["today", "chat", "planner", "inbox", "weekplan", "settings"],
+          }, open(f"{out}/meta.json", "w"), indent=2)
+          PY
+          ls -la "$OUT"
+
+      - name: Vorschau auf den Branch ios-preview legen
+        if: steps.shots.outcome == 'success'
+        continue-on-error: true
+        working-directory: ${{ runner.temp }}/preview
+        run: |
+          git init -q -b ios-preview
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "iOS-Vorschau für ${GITHUB_SHA::7} (${GITHUB_REF_NAME})"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ios-preview
+          echo "Vorschau aktualisiert: ${GITHUB_SHA::7}"

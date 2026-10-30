@@ -30,7 +30,14 @@ enum Tab: Hashable { case today, chat, planner, inbox }
 
 struct RootView: View {
     @Environment(Store.self) private var store
-    @State private var tab: Tab = .today
+    @State private var tab: Tab = {
+        switch Demo.tab {
+        case "chat": return .chat
+        case "planner": return .planner
+        case "inbox": return .inbox
+        default: return .today
+        }
+    }()
 
     var body: some View {
         if store.loggedIn {

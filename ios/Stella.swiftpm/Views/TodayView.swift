@@ -7,7 +7,7 @@ struct TodayView: View {
     @State private var lessons: [Lesson]?
     @State private var steps: Int?
     @State private var inbox: [InboxEntry] = []
-    @State private var showSettings = false
+    @State private var showSettings = Demo.opens("settings")
     @State private var showHealth = false
     @State private var openItem: Item?
 

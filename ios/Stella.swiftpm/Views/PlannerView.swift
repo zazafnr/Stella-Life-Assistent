@@ -8,7 +8,7 @@ struct PlannerView: View {
     @State private var lessons: [Lesson] = []
     @State private var openItem: Item?
     @State private var showAdd = false
-    @State private var planning = false
+    @State private var planning = Demo.opens("weekplan")
 
     enum Filter: String, CaseIterable, Identifiable {
         case all = "Alles", homework = "HÜs", exams = "Tests", other = "Termine"
