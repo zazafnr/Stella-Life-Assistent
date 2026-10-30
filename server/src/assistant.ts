@@ -1,7 +1,7 @@
 // Stellas "Gehirn": erst schnelle Regeln (offline-fähig, kostenlos), dann die KI mit Werkzeugen.
 
 import {
-  addDays, formatDateDe, interpret, nextSchoolDay, parseEntry, splitTopics, STYLE_RULES, timeIn, todayIn, toneInstruction, voice, WEEKDAYS_DE, weekdayOf,
+  addDays, formatDateDe, interpret, placeKind, nextSchoolDay, parseEntry, splitTopics, STYLE_RULES, timeIn, todayIn, toneInstruction, voice, WEEKDAYS_DE, weekdayOf,
   type Attachment, type ChatMessage, type ChatResponse, type Intent, type Item, type ItemKind, type ItemQuery, type MemoryCategory, type ParsedEntry,
 } from '@stella/shared';
 import {
@@ -18,7 +18,9 @@ import { findHints, markDelivered as markHintDelivered } from './hints.ts';
 import { cleanSchedule, findMemory, isCategory, listMemories } from './memory.ts';
 import { draftReply } from './mail.ts';
 import { maybeTitle } from './conversations.ts';
-import { describeUser, isSchool } from './profile.ts';
+import { afterWorkTime, describeUser, isSchool } from './profile.ts';
+import { matchOpenItems, openItems } from './lists.ts';
+import { resolvePlace } from './places.ts';
 import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type ToolDef } from './llm.ts';
 import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
 
@@ -81,6 +83,10 @@ async function handleChatIn(user: User, text: string, clientId: string | null, i
       case 'move': await onMove(t, intent, text); break;
       case 'delete': onDelete(t, intent.query); break;
       case 'remind': onRemind(t, intent); break;
+      case 'list_add': onListAdd(t, intent); break;
+      case 'list_show': onListShow(t); break;
+      case 'list_done': if (!onListDone(t, intent)) await runAgent(t); break;
+      case 'errand': await onErrand(t, intent); break;
       case 'remember': onRemember(t, intent.text); break;
       case 'forget': onForget(t, intent.text); break;
       case 'correct': if (!onCorrect(t, intent)) await runAgent(t); break;
@@ -291,6 +297,51 @@ function onRemind(t: Turn, intent: Extract<Intent, { type: 'remind' }>) {
   touched(t, ...r.changed);
   if (r.status === 'refused') say(t, `🙅 ${r.reason}`);
   else if (r.status === 'done') sayA(t, v(t).remindSet(whenLabel(t, intent.due, intent.time), intent.text), r.actionId);
+}
+
+// ---------- Einkaufsliste und Erledigungen ----------
+
+function onListAdd(t: Turn, intent: Extract<Intent, { type: 'list_add' }>) {
+  const r = perform(t.user, 'list.add', { items: intent.items }, { source: 'chat', quiet: true, say: sayAction(t) });
+  if (r.status === 'refused') { say(t, `🙅 ${r.reason}`); return; }
+  if (r.status !== 'done') return;
+  const res = r.result as { added: string[]; skipped: string[] };
+  if (!res.added.length) say(t, v(t).listAlready(res.skipped.join(', ')));
+  else sayA(t, v(t).listAdded(res.added.join(', '), res.added.length), r.actionId);
+}
+
+function onListShow(t: Turn) {
+  const open = openItems(t.user.id);
+  if (!open.length) { say(t, v(t).listEmpty()); return; }
+  const lines = open.slice(0, 8).map((i) => `- ${i.text}${i.qty ? ` (${i.qty})` : ''}`).join('\n');
+  say(t, v(t).listShow(open.length, lines) + (open.length > 8 ? `\n… und ${open.length - 8} weitere in der Liste.` : ''));
+}
+
+/** „Milch hab ich“ / „hab eingekauft“ – false, wenn nichts auf der Liste dazu passt (dann antwortet die KI) */
+function onListDone(t: Turn, intent: Extract<Intent, { type: 'list_done' }>): boolean {
+  const open = openItems(t.user.id);
+  if (intent.items === 'all') {
+    if (!open.length) return false;
+    const r = perform(t.user, 'list.check', { ids: open.map((i) => i.id), names: [`${open.length} Einträge`], done: true }, { source: 'chat', quiet: true, say: sayAction(t) });
+    if (r.status === 'done') sayA(t, v(t).listAllChecked(open.length), r.actionId);
+    return true;
+  }
+  const { matched, missing } = matchOpenItems(t.user.id, intent.items);
+  if (!matched.length) return false;
+  const r = perform(t.user, 'list.check', { ids: matched.map((i) => i.id), names: matched.map((i) => i.text), done: true }, { source: 'chat', quiet: true, say: sayAction(t) });
+  if (r.status === 'done') sayA(t, v(t).listChecked(matched.map((i) => i.text).join(', ')) + (missing.length ? `\n${v(t).listNoMatch(missing.join(', '))}` : ''), r.actionId);
+  return true;
+}
+
+/** „nach der Arbeit Blumen kaufen“: Erinnerung zur passenden Zeit, mit dem passenden Laden */
+async function onErrand(t: Turn, intent: Extract<Intent, { type: 'errand' }>) {
+  const place = intent.place ?? await resolvePlace(t.user.id, intent.text);
+  const time = intent.when === 'after_work' ? afterWorkTime(t.user) : intent.when === 'after_school' ? '15:00' : '19:00';
+  const due = time > timeIn(t.user.timeZone) ? t.today : addDays(t.today, 1);
+  const r = perform(t.user, 'item.create', { kind: 'reminder', title: intent.text, due, time, source: 'chat', place }, { source: 'chat', quiet: true, say: sayAction(t) });
+  touched(t, ...r.changed);
+  if (r.status === 'refused') say(t, `🙅 ${r.reason}`);
+  else if (r.status === 'done') sayA(t, v(t).errandSet(whenLabel(t, due, time), intent.text, place ? placeKind(place.category)?.plural ?? null : null), r.actionId);
 }
 
 /** grobe Einordnung für „merk dir …“ – die KI sortiert in der Nacht nicht um, der Nutzer kann ändern */

@@ -29,6 +29,16 @@ export interface Item {
   attachments: Attachment[];
   updatedAt: string;
   deleted: boolean;
+  /** Erledigung mit Ort: beim Erinnern zeigt Stella Läden in der Nähe */
+  place?: { category: string; label: string } | null;
+}
+
+/** Karte unter einer Stella-Nachricht (z. B. Läden in der Nähe) */
+export interface MessageCard {
+  type: 'places';
+  category: string;
+  label: string;
+  itemId: string | null;
 }
 
 export interface ChatMessage {
@@ -44,6 +54,7 @@ export interface ChatMessage {
   failedAudioId?: string;
   /** gehört zu einer Aktion (Vorschlag mit Ja/Nein oder Erledigtes mit „Rückgängig“) */
   actionId?: string;
+  card?: MessageCard;
 }
 
 /** Wie viel Stella von sich aus tun darf */
@@ -216,3 +227,42 @@ export function profileHas(profile: UserProfile | undefined, feature: Feature): 
 export const profileIsSchool = (profile: UserProfile | undefined) => !profile || profile.situation === 'school';
 /** Schule oder Studium: Tests, Lerneinheiten, Lernpläne */
 export const profileIsLearner = (profile: UserProfile | undefined) => !profile || profile.situation === 'school' || profile.situation === 'university';
+
+// ---------- Listen und Läden (Paket 7) ----------
+
+export interface ListItem {
+  id: string;
+  text: string;
+  qty: string | null;
+  done: boolean;
+  addedVia: string;
+  createdAt: string;
+}
+
+export interface StellaList {
+  id: string;
+  name: string;
+  kind: 'shopping' | 'custom';
+  items: ListItem[];
+}
+
+export interface NearbyPlace {
+  name: string;
+  distanceM: number;
+  openingHours: string | null;
+  /** null = unbekannt */
+  openNow: boolean | null;
+  address: string | null;
+  lat: number;
+  lon: number;
+  appleMapsUrl: string;
+  osmUrl: string;
+}
+
+export interface NearbyPlaces {
+  category: string;
+  label: string;
+  plural: string;
+  emoji: string;
+  places: NearbyPlace[];
+}

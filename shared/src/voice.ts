@@ -116,6 +116,46 @@ export function voice(tone: Tone | undefined) {
       frech: `🗑️ **${title}** ist weg. Als wär's nie passiert. 💅`,
       cool: `🗑️ **${title}** gelöscht.`,
     }),
+    listAdded: (items: string, count: number) => by({
+      nett: `🛒 Auf die Einkaufsliste: ${items}${count > 1 ? '' : ''}.`,
+      frech: `🛒 ${items} – steht drauf. Vergiss es bloß nicht wieder. 😏`,
+      cool: `🛒 Drauf: ${items}.`,
+    }),
+    listAlready: (items: string) => by({
+      nett: `🛒 ${items} steht schon auf der Liste.`,
+      frech: `🛒 ${items} steht schon drauf – so vergesslich bin nicht mal ich. 😏`,
+      cool: `🛒 ${items} ist schon drauf.`,
+    }),
+    listShow: (count: number, lines: string) => by({
+      nett: `🛒 **Einkaufsliste** (${count}):\n${lines}`,
+      frech: `🛒 **Einkaufsliste** (${count}) – viel Spaß beim Einkaufen:\n${lines}`,
+      cool: `🛒 Einkaufsliste (${count}):\n${lines}`,
+    }),
+    listEmpty: () => by({
+      nett: '🛒 Die Einkaufsliste ist leer – nichts zu besorgen. ✨',
+      frech: '🛒 Leer. Ausnahmsweise hast du alles. 😏',
+      cool: '🛒 Liste leer. Läuft.',
+    }),
+    listChecked: (items: string) => by({
+      nett: `✅ Abgehakt: ${items}`,
+      frech: `✅ ${items} – erledigt. Geht doch. 😏`,
+      cool: `✅ ${items} ✔`,
+    }),
+    listAllChecked: (count: number) => by({
+      nett: `✅ Alles abgehakt (${count}). Gut gemacht! 💫`,
+      frech: `✅ Alles abgehakt (${count}). Wer hätte das gedacht. 😏`,
+      cool: `✅ Alles durch (${count}).`,
+    }),
+    listNoMatch: (items: string) => by({
+      nett: `🤔 „${items}“ finde ich nicht auf der Einkaufsliste.`,
+      frech: `🤔 „${items}“? Steht nicht drauf. 🙄`,
+      cool: `🤔 „${items}“ steht nicht drauf.`,
+    }),
+    errandSet: (when: string, what: string, place: string | null) => by({
+      nett: `⏰ Mach ich! ${when} erinnere ich dich an „${what}“${place ? ` und zeig dir ${place} in der Nähe` : ''}.`,
+      frech: `⏰ ${when} nerv ich dich wegen „${what}“${place ? ` – inklusive ${place} in der Nähe` : ''}. 😏`,
+      cool: `⏰ ${when}: „${what}“${place ? ` + ${place} in der Nähe` : ''}. Steht.`,
+    }),
     inboxNone: () => by({
       nett: '📭 In deiner Inbox ist nichts Wichtiges – alles ruhig. 💫',
       frech: '📭 Nichts Wichtiges in der Inbox. Ausnahmsweise darfst du entspannen. 😏',

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { interpret, normalizeSubject, parseEntry } from './parser.ts';
+import { interpret, normalizeSubject, parseEntry, type Intent } from './parser.ts';
+import { placeFor } from './places.ts';
 import { buildStudyPlan, planReminders } from './planning.ts';
 import { nextWeekday, zonedToUtc } from './dates.ts';
 
@@ -152,4 +153,61 @@ test('Phase 3: Alltagstermine, Gedächtnis und Korrekturen', () => {
   assert.deepEqual(interpret('doch erst um 16 Uhr', WED), { type: 'correct', due: null, time: '16:00' });
   assert.equal(interpret('Einkaufen: Milch, Brot', WED), null, 'ohne Datum → KI');
   assert.equal(interpret('Wann ist eigentlich die nächste Mathe SA?', WED), null);
+});
+
+// ---------- Einkaufsliste und Erledigungen (Paket 7) ----------
+
+const TODAY = '2026-10-28';
+const items = (s: string) => {
+  const i = interpret(s, TODAY);
+  assert.equal(i?.type, 'list_add', `„${s}“ → ${JSON.stringify(i)}`);
+  return (i as Extract<Intent, { type: 'list_add' }>).items;
+};
+
+test('Einkaufsliste: „schreib Milch auf die Einkaufsliste“ und mehrere Dinge in einem Satz', () => {
+  assert.deepEqual(items('schreib Milch auf die Einkaufsliste'), [{ text: 'Milch', qty: null }]);
+  assert.deepEqual(items('Schreib Eier, Butter und Brot auf die Einkaufsliste'), [{ text: 'Eier', qty: null }, { text: 'Butter', qty: null }, { text: 'Brot', qty: null }]);
+  assert.deepEqual(items('wir brauchen Eier und Butter'), [{ text: 'Eier', qty: null }, { text: 'Butter', qty: null }]);
+  assert.deepEqual(items('setz bitte die Milch auf die Liste'), [{ text: 'Milch', qty: null }]);
+  assert.deepEqual(items('Einkaufsliste: Nudeln, 2 Liter Milch, 500 g Mehl'), [{ text: 'Nudeln', qty: null }, { text: 'Milch', qty: '2 Liter' }, { text: 'Mehl', qty: '500 g' }]);
+  assert.deepEqual(items('trag zwei Packungen Butter in die Einkaufsliste'), [{ text: 'Butter', qty: '2 Packungen' }]);
+});
+
+test('Einkaufsliste anzeigen und abhaken', () => {
+  for (const s of ['was steht auf der Einkaufsliste?', 'Einkaufsliste', 'zeig mir die Einkaufsliste', 'was fehlt noch auf der Liste?']) assert.equal(interpret(s, TODAY)?.type, 'list_show', s);
+  assert.deepEqual(interpret('Milch hab ich', TODAY), { type: 'list_done', items: ['Milch'] });
+  assert.deepEqual(interpret('Eier und Butter hab ich', TODAY), { type: 'list_done', items: ['Eier', 'Butter'] });
+  assert.deepEqual(interpret('hab eingekauft', TODAY), { type: 'list_done', items: 'all' });
+  assert.deepEqual(interpret('alles eingekauft', TODAY), { type: 'list_done', items: 'all' });
+});
+
+test('Einkaufsliste: Sätze, die nichts mit Einkaufen zu tun haben, bleiben bei der KI', () => {
+  for (const s of ['ich brauche Hilfe bei Mathe', 'wir brauchen Zeit und Ruhe', 'das hab ich', 'Latein HÜ hab ich', 'wie wird das Wetter morgen']) {
+    const i = interpret(s, TODAY);
+    assert.ok(!i || !['list_add', 'list_show', 'list_done', 'errand'].includes(i.type), `${s} → ${JSON.stringify(i)}`);
+  }
+});
+
+test('Erledigung mit Ort: „nach der Arbeit Blumen kaufen“ → Blumenladen', () => {
+  assert.deepEqual(interpret('nach der Arbeit Blumen für meine Frau kaufen', TODAY),
+    { type: 'errand', text: 'Blumen für meine Frau kaufen', place: { category: 'florist', label: 'Blumenladen' }, when: 'after_work' });
+  assert.deepEqual(interpret('Ich muss nach der Arbeit noch zur Apotheke und Tabletten holen', TODAY)?.type, 'errand');
+  assert.deepEqual(interpret('Brot kaufen auf dem Heimweg', TODAY),
+    { type: 'errand', text: 'Brot kaufen', place: { category: 'bakery', label: 'Bäckerei' }, when: 'after_work' });
+  assert.equal((interpret('heute Abend Paket abholen', TODAY) as Extract<Intent, { type: 'errand' }>).place?.category, 'post');
+  assert.equal(interpret('Blumen kaufen', TODAY)?.type === 'errand', false, 'ohne Zeitangabe bleibt es ein normaler Satz');
+  const unknown = interpret('nach der Schule ein Geschenk besorgen', TODAY) as Extract<Intent, { type: 'errand' }>;
+  assert.equal(unknown.type, 'errand');
+  assert.equal(unknown.place, null, 'unbekanntes Wort → kein Laden (Groq schlägt später vor)');
+  assert.equal(unknown.when, 'after_school');
+});
+
+test('Orte: Wort → Geschäft, auch als Wortanfang', () => {
+  assert.equal(placeFor('Blumenstrauß besorgen')?.category, 'florist');
+  assert.equal(placeFor('Hustensaft holen')?.category, 'pharmacy');
+  assert.equal(placeFor('Ladekabel kaufen')?.category, 'electronics');
+  assert.equal(placeFor('Schrauben und Dübel')?.category, 'diy');
+  assert.equal(placeFor('Zeitung holen')?.category, 'tobacco');
+  assert.equal(placeFor('Tanken')?.category, 'fuel');
+  assert.equal(placeFor('Geschenk'), null);
 });

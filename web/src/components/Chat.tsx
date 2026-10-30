@@ -7,8 +7,10 @@ import { ItemStatus } from './Today.tsx';
 import { ActionCard } from './ActionCard.tsx';
 import { Icon } from '../ui/Icon.tsx';
 import { CloudSky, Sheet, StarMark, showToast } from '../ui/Decor.tsx';
+import { ListsSheet } from './Lists.tsx';
+import { PlacesCard } from './PlacesCard.tsx';
 
-interface QuickAction { id: string; icon: string; label: string; kind: 'text' | 'send' | 'camera' | 'mic'; text?: string }
+interface QuickAction { id: string; icon: string; label: string; kind: 'text' | 'send' | 'camera' | 'mic' | 'list'; text?: string }
 
 /** Falls Stella gerade nicht erreichbar ist: ein paar Chips, die immer gehen */
 const FALLBACK_ACTIONS: QuickAction[] = [
@@ -41,6 +43,7 @@ export function Chat() {
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [history, setHistory] = useState(false);
+  const [lists, setLists] = useState(false);
   const me = useStore((s) => s.me);
   const [quick, setQuick] = useState<{ actions: QuickAction[]; cards: QuickAction[] }>({ actions: FALLBACK_ACTIONS, cards: FALLBACK_ACTIONS });
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -84,6 +87,7 @@ export function Chat() {
 
   function runQuick(a: QuickAction) {
     if (a.kind === 'mic') void record();
+    else if (a.kind === 'list') setLists(true);
     else if (a.kind === 'camera') cameraRef.current?.click();
     else if (a.kind === 'send') void submit(a.text ?? a.label);
     else { setText(a.text ?? ''); inputRef.current?.focus(); }
@@ -185,6 +189,7 @@ export function Chat() {
                       )}
                       {m.attachments.filter((a) => a.kind !== 'audio').map((a) => <AuthImage key={a.id} id={a.id} alt={a.caption} onOpen={setLightbox} />)}
                       {m.actionId && <ActionCard id={m.actionId} />}
+                      {m.card?.type === 'places' && <PlacesCard card={m.card} />}
                       <span className="meta">{m.pending ? 'wird gesendet' : timeLabel(m.createdAt)}</span>
                     </div>
                   </div>
@@ -251,6 +256,7 @@ export function Chat() {
           )}
         </div>
         {lightbox && <Lightbox url={lightbox} onClose={() => setLightbox(null)} />}
+        {lists && <ListsSheet onClose={() => setLists(false)} />}
         {history && <Sheet title="Chats" onClose={() => setHistory(false)}><ChatHistory inSheet onNew={() => void startNew()} onPick={() => setHistory(false)} /></Sheet>}
       </div>
       <AsideToday />

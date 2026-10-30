@@ -17,6 +17,7 @@ const { hashPassword, register } = await import('../src/auth.ts');
 const { addMessage, createConversation, db, getUser, newId, updateUserSettings } = await import('../src/db.ts');
 const { addItem } = await import('../src/planner.ts');
 const { addMemory } = await import('../src/memory.ts');
+const { addListItems, shoppingListId } = await import('../src/lists.ts');
 const { handleChat } = await import('../src/assistant.ts');
 const { perform } = await import('../src/actions.ts');
 const { buildWeekPlan } = await import('../src/weekplan.ts');
@@ -85,6 +86,9 @@ await handleChat(user(), 'plan meine Woche', null);
 const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
 const rows = db.prepare('SELECT id FROM messages WHERE user_id = ? ORDER BY created_at, rowid').all(uid) as { id: string }[];
 rows.forEach((r, i) => db.prepare('UPDATE messages SET created_at = ? WHERE id = ?').run(ago(i === 0 ? 240 : (rows.length - i) * 3), r.id));
+
+// Einkaufsliste (Karte auf „Heute“ und Listen-Ansicht)
+addListItems(uid, shoppingListId(uid), [{ text: 'Milch', qty: '2 Liter' }, { text: 'Eier' }, { text: 'Butter' }, { text: 'Äpfel', qty: '1 kg' }], 'chat');
 
 // ein älterer Chat mit Titel (Verlauf: „Chats“)
 const twoDaysAgo = (min: number) => new Date(Date.now() - 2 * 86_400_000 + min * 60_000).toISOString();

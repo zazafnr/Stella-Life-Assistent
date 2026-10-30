@@ -31,6 +31,8 @@ import { buildBriefing } from './briefing.ts';
 import { cleanBlocks, planWeek } from './weekplan.ts';
 import { acceptHint, dismissHint } from './hints.ts';
 import { registerAdminRoutes } from './admin.ts';
+import { registerListRoutes } from './lists.ts';
+import { registerPlaceRoutes } from './places.ts';
 import { registerQuickRoutes } from './quick.ts';
 import { registerProfileRoutes, registerSignupRoutes, registrationMode } from './signup.ts';
 import { registerAudioRoutes } from './audio.ts';
@@ -166,6 +168,8 @@ app.register(async (api) => {
   });
 
   registerAdminRoutes(api);
+  registerListRoutes(api);
+  registerPlaceRoutes(api);
   registerQuickRoutes(api);
   registerProfileRoutes(api, publicUser);
   registerAudioRoutes(api);

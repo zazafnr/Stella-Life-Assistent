@@ -23,6 +23,7 @@ struct TodayView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         header.rise(0)
                         BriefingCardView(onOpen: { go($0 == "inbox" ? .inbox : .chat) })
+                        if store.me?.has("shopping") == true { ShoppingCardView() }
                         dueCard.rise(1)
                         HStack(spacing: 14) {
                             examCard

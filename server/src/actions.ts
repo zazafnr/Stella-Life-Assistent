@@ -16,6 +16,7 @@ import { addMessage, db, enqueueJob, getItem, getUser, newId, now, type NewItem,
 import { addMemory, deleteMemory, getMemory, updateMemory, type NewMemory } from './memory.ts';
 import type { OutgoingMail } from './mail.ts';
 import { addItem, bookFor, changeItem, createStudyPlan } from './planner.ts';
+import { addListItems, removeListItems, setListItemsDone, shoppingListId } from './lists.ts';
 
 export const GROUPS: Record<ActionGroup, { label: string; help: string; default: PermissionLevel; levels: PermissionLevel[] }> = {
   planner: {
@@ -80,6 +81,8 @@ export interface ActionParams {
   'memory.add': NewMemory;
   'memory.update': { id: string; patch: Partial<Pick<Memory, 'text' | 'category' | 'schedule'>> };
   'memory.delete': { id: string };
+  'list.add': { items: { text: string; qty?: string | null }[] };
+  'list.check': { ids: string[]; names?: string[]; done: boolean };
 }
 export type ActionType = keyof ActionParams;
 
@@ -188,6 +191,26 @@ const DEFS: { [T in ActionType]: Def<T> } = {
     run: (u, p) => {
       enqueueJob(u.id, 'send_mail', p);
       return { result: { queued: true } };
+    },
+  },
+  'list.add': {
+    group: () => 'planner',
+    summary: (_u, p) => `${p.items.map((i) => i.text).join(', ')} auf die Einkaufsliste setzen`,
+    run: (u, p) => {
+      const { created, skipped } = addListItems(u.id, shoppingListId(u.id), p.items, 'chat');
+      return { result: { added: created.map((i) => i.text), skipped, ids: created.map((i) => i.id) }, undo: { ids: created.map((i) => i.id) } };
+    },
+    undo: (u, d: { ids: string[] }) => { removeListItems(u.id, d.ids); },
+  },
+  'list.check': {
+    group: () => 'planner',
+    summary: (_u, p) => `${(p.names ?? [`${p.ids.length} Einträge`]).join(', ')} ${p.done ? 'abhaken' : 'wieder öffnen'}`,
+    run: (u, p) => {
+      const prev = setListItemsDone(u.id, p.ids, p.done);
+      return { result: { count: prev.length }, undo: { prev } };
+    },
+    undo: (u, d: { prev: { id: string; done: boolean }[] }) => {
+      for (const x of d.prev) setListItemsDone(u.id, [x.id], x.done);
     },
   },
   'memory.add': {

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { addDays, diffDays, formatDateDe, todayIn, type Item } from '@stella/shared';
-import { api, useStore } from '../store.ts';
+import { api, meHas, useStore } from '../store.ts';
 import type { Tab } from '../App.tsx';
 import { Icon, type IconName } from '../ui/Icon.tsx';
 import { Confetti, Ring, Sky, StarMark } from '../ui/Decor.tsx';
 import { BriefingCard } from './BriefingCard.tsx';
+import { ListsSheet } from './Lists.tsx';
 
 interface Lesson { date: string; start: string; subject: string | null; code: string | null; status: string }
 interface InboxEntry { source: string; category: string | null; action: string | null; createdAt: string }
@@ -47,6 +48,15 @@ export function Today({ go }: { go: (t: Tab) => void }) {
   const [lessons, setLessons] = useState<Lesson[] | null>(null);
   const [steps, setSteps] = useState<number | null>(null);
   const [inbox, setInbox] = useState<InboxEntry[]>([]);
+  const [listOpen, setListOpen] = useState(false);
+  const [shopCount, setShopCount] = useState<number | null>(null);
+
+  const loadShopCount = () => {
+    if (!meHas(me, 'shopping')) return;
+    api<{ lists: { kind: string; items: { done: boolean }[] }[] }>('/api/lists')
+      .then((r) => setShopCount(r.lists.find((l) => l.kind === 'shopping')?.items.filter((i) => !i.done).length ?? 0)).catch(() => {});
+  };
+  useEffect(loadShopCount, [me?.settings.profile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     api<Lesson[]>(`/api/timetable?from=${tomorrow}&to=${tomorrow}`).then(setLessons).catch(() => setLessons([]));
@@ -94,6 +104,20 @@ export function Today({ go }: { go: (t: Tab) => void }) {
         </header>
 
         <BriefingCard onOpen={go} />
+
+        {meHas(me, 'shopping') && (
+          <button type="button" className="card interactive row" style={{ justifyContent: 'space-between', gap: 12 }} onClick={() => setListOpen(true)}>
+            <span className="row" style={{ gap: 12 }}>
+              <span className="icon-tile blue" style={{ width: 40, height: 40, borderRadius: 13 }}><Icon name="plus" size={20} /></span>
+              <span style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                <span style={{ fontWeight: 600 }}>Einkaufsliste</span>
+                <span className="small muted">{shopCount === null ? 'antippen zum Öffnen' : shopCount === 0 ? 'nichts zu besorgen' : `${shopCount} ${shopCount === 1 ? 'Eintrag' : 'Einträge'} offen`}</span>
+              </span>
+            </span>
+            <Icon name="chevron" size={16} />
+          </button>
+        )}
+        {listOpen && <ListsSheet onClose={() => { setListOpen(false); loadShopCount(); }} />}
 
         <section className="card" aria-label={dueLabel}>
           <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>

@@ -8,6 +8,11 @@ struct Attachment: Codable, Hashable, Identifiable {
     var caption: String?
 }
 
+struct PlaceRef: Codable, Hashable {
+    var category: String
+    var label: String
+}
+
 struct Item: Codable, Hashable, Identifiable {
     var id: String
     var kind: String
@@ -25,6 +30,8 @@ struct Item: Codable, Hashable, Identifiable {
     var attachments: [Attachment]
     var updatedAt: String
     var deleted: Bool
+    /** Erledigung mit Ort: beim Erinnern zeigt Stella Läden in der Nähe */
+    var place: PlaceRef?
 
     var isOpen: Bool { status == "open" }
     var isDone: Bool { status == "done" }
@@ -45,6 +52,8 @@ struct ChatMessage: Codable, Hashable, Identifiable {
     var actionId: String?
     /** nur im Gerät: Sprachnachricht, die Stella nicht abschreiben konnte – „Nochmal versuchen“ nutzt diese Id */
     var failedAudioId: String?
+    /** Karte unter der Nachricht, z. B. „Läden in der Nähe“ */
+    var card: MessageCard?
 
     var isUser: Bool { role == "user" }
 }
@@ -136,6 +145,55 @@ struct QuickAction: Codable, Hashable, Identifiable {
 struct QuickActions: Codable {
     var actions: [QuickAction]
     var cards: [QuickAction]
+}
+
+/** Karte unter einer Stella-Nachricht (derzeit: Läden in der Nähe) */
+struct MessageCard: Codable, Hashable {
+    var type: String
+    var category: String
+    var label: String
+    var itemId: String?
+}
+
+struct ListEntry: Codable, Hashable, Identifiable {
+    var id: String
+    var text: String
+    var qty: String?
+    var done: Bool
+    var addedVia: String
+    var createdAt: String
+}
+
+struct StellaList: Codable, Hashable, Identifiable {
+    var id: String
+    var name: String
+    var kind: String
+    var items: [ListEntry]
+}
+
+struct ListsResponse: Codable { var lists: [StellaList] }
+struct ListResponse: Codable { var list: StellaList }
+
+struct NearbyPlace: Codable, Hashable, Identifiable {
+    var name: String
+    var distanceM: Int
+    var openingHours: String?
+    /** nil = unbekannt */
+    var openNow: Bool?
+    var address: String?
+    var lat: Double
+    var lon: Double
+    var appleMapsUrl: String
+    var osmUrl: String
+    var id: String { "\(lat),\(lon)" }
+}
+
+struct NearbyPlaces: Codable {
+    var category: String
+    var label: String
+    var plural: String
+    var emoji: String
+    var places: [NearbyPlace]
 }
 
 struct NewConversation: Codable {

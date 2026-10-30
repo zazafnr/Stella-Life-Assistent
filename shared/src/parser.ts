@@ -43,7 +43,17 @@ export type Intent =
   | { type: 'remember'; text: string }
   | { type: 'forget'; text: string }
   /** "nein, Donnerstag" – bezieht sich auf den zuletzt angelegten/geänderten Eintrag */
-  | { type: 'correct'; due: Ymd | null; time: string | null };
+  | { type: 'correct'; due: Ymd | null; time: string | null }
+  /** "schreib Milch auf die Einkaufsliste", "wir brauchen Eier und Butter" */
+  | { type: 'list_add'; items: { text: string; qty: string | null }[] }
+  /** "was steht auf der Einkaufsliste?" */
+  | { type: 'list_show' }
+  /** "Milch hab ich", "hab eingekauft" – `items: 'all'` hakt alles ab */
+  | { type: 'list_done'; items: string[] | 'all' }
+  /** "nach der Arbeit Blumen für meine Frau kaufen" – Erinnerung zur passenden Zeit, mit Läden in der Nähe */
+  | { type: 'errand'; text: string; place: PlaceRef | null; when: 'after_work' | 'after_school' | 'evening' };
+
+import { placeFor, type PlaceRef } from './places.ts';
 
 // Muss mit 'u'-Flag benutzt werden: \b kennt kein ü/ä/ö.
 const B = '(?<![\\p{L}\\p{N}])';
@@ -300,6 +310,82 @@ export function parseWhen(input: string, today: Ymd): { due: Ymd | null; time: s
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** Schnelle, KI-freie Erkennung der häufigsten Befehle. `null` → an die KI weitergeben. */
+// ---------- Einkaufsliste und Erledigungen ----------
+
+const NUMBER_WORDS: Record<string, string> = { ein: '1', eine: '1', einen: '1', zwei: '2', drei: '3', vier: '4', fünf: '5', fuenf: '5', sechs: '6', sieben: '7', acht: '8', neun: '9', zehn: '10', zwölf: '12', zwoelf: '12' };
+const UNIT = '(?:x|l|liter|kg|kilo|g|gramm|dag|ml|stk|stück|stueck|packung(?:en)?|pkg|flasche(?:n)?|dose(?:n)?|becher|bund|beutel|tafel(?:n)?)';
+const ARTICLES = /^(die|der|das|den|dem|ein|eine|einen|einem|noch|mal|bitte)\s+/iu;
+
+/** „2 Liter Milch, Eier und die Butter“ → [{Milch, 2 Liter}, {Eier}, {Butter}] */
+export function splitListItems(raw: string): { text: string; qty: string | null }[] {
+  const out: { text: string; qty: string | null }[] = [];
+  for (let part of raw.replace(/[.!?]+$/u, '').split(/\s*(?:,|;|&|\bund\b|\bsowie\b|\bplus\b)\s*/iu)) {
+    part = part.trim();
+    while (ARTICLES.test(part) && !new RegExp(`^(ein|eine|einen|zwei|drei)\\s+${UNIT}\\b`, 'iu').test(part)) part = part.replace(ARTICLES, '');
+    if (!part) continue;
+    let qty: string | null = null;
+    const num = new RegExp(`^(\\d+(?:[.,]\\d+)?|${Object.keys(NUMBER_WORDS).join('|')})\\s*(${UNIT}\\b\\.?)?\\s+(?:von\\s+)?(.+)$`, 'iu').exec(part);
+    if (num && (num[2] || /^\d/.test(num[1]!) || num[1]!.toLowerCase() !== 'ein')) {
+      qty = `${NUMBER_WORDS[num[1]!.toLowerCase()] ?? num[1]}${num[2] ? ` ${num[2].replace(/\.$/u, '')}` : ''}`;
+      part = num[3]!.replace(ARTICLES, '');
+    }
+    if (part.length >= 2 && part.length <= 60) out.push({ text: capitalize(part), qty });
+  }
+  return out.slice(0, 20);
+}
+
+// Dinge, die man „braucht“, die aber nichts mit Einkaufen zu tun haben
+const NOT_SHOPPING = /^(hilfe|zeit|ruhe|urlaub|pause|geduld|mut|glück|glueck|ahnung|nerven|schlaf|erholung|unterstützung|unterstuetzung|antwort|infos?|ideen?|plan|lust)\b/iu;
+const LIST_WORD = '(?:einkaufs)?(?:liste|zettel)';
+const LIST_ADD_RE = new RegExp(`^(?:schreib|schreibe|setz|setze|pack|packe|tu|tue|füg|füge|fueg|nimm|trag|trage|notier|notiere|ergänz|ergänze)\\s+(.+?)\\s+(?:auf|in|zu|an)\\s+(?:die|der|meine|meiner|unsere|unserer|den)\\s+(?:einkaufs)?(?:liste|zettel)\\b`, 'iu');
+const LIST_ADD2_RE = new RegExp(`^(?:einkaufs(?:liste|zettel)|liste)\\s*[:,-]\\s*(.+)$`, 'iu');
+const LIST_NEED_RE = /^(?:wir\s+brauchen|uns\s+fehlt|uns\s+fehlen|wir\s+haben\s+keine?n?|wir\s+brauchen\s+noch|ich\s+brauche\s+noch|mir\s+fehlt|mir\s+fehlen)\s+(.+)$/iu;
+const LIST_SHOW_RE = new RegExp(`^\\W*(?:was\\s+(?:steht|ist|gibt'?s|fehlt)\\s+(?:noch\\s+)?(?:auf|in)\\s+(?:der|meiner|unserer)\\s+(?:einkaufs)?(?:liste|zettel)|(?:zeig|zeige|sag|gib)\\s+(?:mir\\s+)?(?:die|meine|unsere)\\s+${LIST_WORD}|(?:meine\\s+|unsere\\s+|die\\s+)?einkaufs(?:liste|zettel)\\s*\\??|was\\s+muss\\s+ich\\s+(?:noch\\s+)?einkaufen)\\s*[?!.]*\\s*$`, 'iu');
+const LIST_ALL_DONE_RE = /^\W*(?:(?:hab|habe)\s+(?:alles\s+)?(?:eingekauft|gekauft|besorgt)|(?:alles|einkauf)\s+(?:eingekauft|erledigt|gekauft|besorgt)|einkauf\s+(?:ist\s+)?(?:erledigt|fertig))\s*[.!]*\s*$/iu;
+const LIST_DONE_RE = /^(.+?)\s+(?:(?:hab|habe)\s+ich(?:\s+(?:schon|jetzt|gekauft|besorgt|eingekauft))*|ist\s+(?:gekauft|besorgt|erledigt)|sind\s+(?:gekauft|besorgt|erledigt))\s*[.!]*\s*$/iu;
+
+const ERRAND_VERB = '(?:kaufen|holen|besorgen|abholen|mitnehmen|einkaufen|bringen|mitbringen)';
+const ERRAND_PRE_RE = new RegExp(`^(?:(?:ich\\s+(?:muss|will|soll|möchte|moechte)|(?:muss|will|soll)\\s+ich)\\s+)?(nach\\s+der\\s+arbeit|nach\\s+der\\s+schule|auf\\s+dem\\s+heimweg|heute\\s+abend|heut\\s+abend)\\s*[,:]?\\s*(?:(?:ich\\s+)?(?:muss|will|soll|möchte|moechte)\\s+(?:ich\\s+)?|bitte\\s+)?(?:noch\\s+)?(.+?\\s${ERRAND_VERB})\\b(.*)$`, 'iu');
+const ERRAND_POST_RE = new RegExp(`^(.+?\\s${ERRAND_VERB})\\s+(nach\\s+der\\s+arbeit|nach\\s+der\\s+schule|auf\\s+dem\\s+heimweg|heute\\s+abend|heut\\s+abend)\\s*[.!]*\\s*$`, 'iu');
+
+function errandWhen(cue: string): 'after_work' | 'after_school' | 'evening' {
+  const c = cue.toLowerCase();
+  return /schule/u.test(c) ? 'after_school' : /abend/u.test(c) ? 'evening' : 'after_work';
+}
+
+function listIntent(text: string): Intent | null {
+  if (text.split(/\s+/).length > 20) return null;
+  let m = ERRAND_PRE_RE.exec(text);
+  if (m) {
+    const task = `${m[2]}${m[3] ?? ''}`.replace(/\s+/gu, ' ').replace(/[.!]+$/u, '').trim();
+    return { type: 'errand', text: capitalize(task), place: placeFor(task), when: errandWhen(m[1]!) };
+  }
+  m = ERRAND_POST_RE.exec(text);
+  if (m) return { type: 'errand', text: capitalize(m[1]!.trim()), place: placeFor(m[1]!), when: errandWhen(m[2]!) };
+
+  if (LIST_SHOW_RE.test(text)) return { type: 'list_show' };
+  m = LIST_ADD_RE.exec(text) ?? LIST_ADD2_RE.exec(text);
+  if (m) {
+    const items = splitListItems(m[1]!);
+    if (items.length) return { type: 'list_add', items };
+  }
+  m = LIST_NEED_RE.exec(text);
+  if (m && !NOT_SHOPPING.test(m[1]!.trim())) {
+    const items = splitListItems(m[1]!);
+    if (items.length) return { type: 'list_add', items };
+  }
+  if (LIST_ALL_DONE_RE.test(text)) return { type: 'list_done', items: 'all' };
+  m = LIST_DONE_RE.exec(text);
+  // „Latein HÜ hab ich“ ist eine Hausübung, keine Einkaufsliste – das übernimmt der „done“-Schnellweg
+  const lowered = text.toLowerCase().split(/\s+/).map((w) => w.replace(/[.,!?]+$/u, ''));
+  const schoolish = SUBJECTS.some(([, ws]) => lowered.some((w) => ws.includes(w))) || KINDS.some(([, , ws]) => lowered.some((w) => ws.includes(w)));
+  if (m && !schoolish && m[1]!.split(/\s+/).length <= 6 && !/^(das|es|ich|er|sie|wir|alles|die hü|hü|hausübung)$/iu.test(m[1]!.trim())) {
+    const items = splitListItems(m[1]!).map((i) => i.text);
+    if (items.length) return { type: 'list_done', items };
+  }
+  return null;
+}
+
 export function interpret(input: string, today: Ymd, now = '12:00'): Intent | null {
   const text = input.trim();
   if (!text) return null;
@@ -317,6 +403,10 @@ export function interpret(input: string, today: Ymd, now = '12:00'): Intent | nu
   }
   m = FORGET_RE.exec(text);
   if (m && m[4]!.trim().length > 2 && !/^(es|das)\s*[.!]?$/iu.test(m[4]!.trim())) return { type: 'forget', text: m[4]!.trim().replace(/[.!]+$/u, '') };
+
+  // Einkaufsliste und Erledigungen mit Ort („nach der Arbeit Blumen kaufen“)
+  const listed = listIntent(text);
+  if (listed) return listed;
 
   // Erinnerungen: "erinnere mich in 2 Stunden an X", "in 30 min Pizza raus"
   m = REMIND_RE.exec(text);

@@ -29,7 +29,7 @@ const JOB_HANDLERS: Record<string, (userId: string, payload: any) => Promise<voi
   },
 };
 
-async function sendDueReminders() {
+export async function sendDueReminders() {
   const ts = now();
   const due = db.prepare(`SELECT r.* FROM reminders r LEFT JOIN items i ON i.id = r.item_id
       WHERE r.sent_at IS NULL AND r.fire_at <= ?
@@ -41,7 +41,9 @@ async function sendDueReminders() {
     const attachments = r.with_attachments && item ? item.attachments : [];
     let text = r.message;
     if (item?.kind === 'homework' && !r.always) text += '\nSchreib mir „erledigt“, wenn du fertig bist. 😉';
-    addMessage(r.user_id, 'assistant', text, { attachments });
+    // Erledigung mit Ort: eine Karte „Läden in der Nähe“ – der Standort wird erst beim Öffnen und nur einmal abgefragt
+    const card = item?.place ? { type: 'places' as const, category: item.place.category, label: item.place.label, itemId: item.id } : undefined;
+    addMessage(r.user_id, 'assistant', text, { attachments, card });
     await pushToUser(r.user_id, { title: 'Stella', body: r.message, url: '/', tag: r.item_id ?? r.id });
   }
   // Erinnerungen zu erledigten Einträgen still verwerfen
