@@ -9,7 +9,7 @@ type Keys = Record<Name, KeyStatus>;
 const TITLES: Record<Name, { title: string; hint: string; field: string }> = {
   groq: { title: 'Groq-API-Key', hint: 'Mails einordnen, Chat-Titel und Sprachnachrichten. Kostenlos erhältlich auf console.groq.com.', field: 'gsk_…' },
   openrouter: { title: 'OpenRouter-API-Key', hint: 'Für Chat und Planer. Ohne Eintrag hier gilt der Schlüssel aus der Server-Umgebung.', field: 'sk-or-…' },
-  smtp: { title: 'E-Mail-Absender (SMTP)', hint: 'Von hier gehen die Bestätigungs-Codes bei der Registrierung raus. Empfehlung: ein eigenes Gmail-Konto für Stella mit App-Passwort.', field: '' },
+  smtp: { title: 'E-Mail-Absender (SMTP)', hint: 'Von hier gehen die Bestätigungs-Codes bei der Registrierung raus. Der Absender (z. B. Stella <noreply@evolsior.com>) bestimmt die Domain: Antworten gehen an support@ dieser Domain, Mails, die Stella dir schreibt, kommen von stella@.', field: '' },
 };
 
 const ago = (iso: string) => new Date(iso).toLocaleString('de-AT', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });

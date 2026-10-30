@@ -25,7 +25,17 @@ Project name `evolsior` (muss zu `name` in `site/wrangler.jsonc` passen). Unter 
 Build command leer, Deploy command `npx wrangler deploy`. Danach im Projekt unter Settings → Domains & Routes:
 `evolsior.com` und `www.evolsior.com` als Custom domain hinzufügen.
 
-## E-Mail
+## E-Mail-Adressen (evolsior.com)
 
-Absender `noreply@evolsior.com` über SMTP (Einstellungen → Server → E-Mail-Absender in Stella). Der Versanddienst verlangt
-SPF-, DKIM- und DMARC-Einträge in Cloudflare DNS. `hello@evolsior.com` leitet Cloudflare Email Routing an das eigene Postfach.
+| Adresse | Wofür | Wie |
+|---|---|---|
+| `noreply@` | automatische Mails, z. B. Bestätigungs-Codes | nur senden (Resend), Antworten gehen an `support@` (Reply-To) |
+| `stella@` | Mails, die Stella dir schreibt | senden über Resend, Antworten kommen hier an |
+| `team@` | Kontakt zur Firma, Presse, Impressum und Datenschutz | Cloudflare Email Routing → eigenes Postfach |
+| `support@` | Hilfe zu Stella, Einladungen | Cloudflare Email Routing → eigenes Postfach |
+
+Senden: Resend (Domain `evolsior.com`, Region EU, DNS-Einträge über Cloudflare). SMTP-Zugangsdaten und Absender
+`Stella <noreply@evolsior.com>` trägt der Owner in Stella unter Einstellungen → Server → E-Mail-Absender ein.
+Die Adressen `stella@` und `support@` leitet der Server aus der Domain des Absenders ab (`server/src/mailer.ts`).
+Empfangen: Cloudflare → Domain → Email → Email Routing, je Adresse eine Regel, alles an das eigene Postfach.
+Einmalig DMARC als TXT `_dmarc`: `v=DMARC1; p=none; rua=mailto:team@evolsior.com`.
