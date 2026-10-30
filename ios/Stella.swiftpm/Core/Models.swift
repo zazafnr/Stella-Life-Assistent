@@ -130,6 +130,43 @@ struct UserSettings: Codable, Hashable {
     var books: [BookConfig]?
     /** "nett", "frech" oder "cool" */
     var tone: String?
+    /** Morning Briefing: "auto", "off" oder "HH:MM" */
+    var briefing: String?
+}
+
+/** Etwas, das Stella bemerkt hat („Was hast du vergessen?“) */
+struct Hint: Codable, Hashable, Identifiable {
+    var key: String
+    var priority: String
+    var text: String
+    var actionLabel: String?
+    var actionId: String?
+    var itemId: String?
+    var id: String { key }
+    var high: Bool { priority == "high" }
+    /** Rückfrage, die man im Chat beantwortet */
+    var answerInChat: String? {
+        if key.hasPrefix("exam_no_material") { return "Stoff sagen" }
+        if key.hasPrefix("no_source") { return "Foto schicken" }
+        return nil
+    }
+}
+
+struct BriefingSection: Codable, Hashable, Identifiable {
+    var id: String
+    var title: String
+    var lines: [String]
+}
+
+struct Briefing: Codable {
+    var date: String
+    var greeting: String
+    var sections: [BriefingSection]
+    var hints: [Hint]
+    var closing: String
+    var text: String
+    var time: String?
+    var sent: Bool
 }
 
 enum Tone: String, CaseIterable, Identifiable {

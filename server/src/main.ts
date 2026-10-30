@@ -26,6 +26,8 @@ import type { BookProvider } from './db.ts';
 import { ackNotesEntry, notesInbox, usesFreeNotes } from './notes.ts';
 import { finishGoogle, finishTarget, googleAuthUrl, googleConfigured, readState, type OAuthClient } from './oauth.ts';
 import { approve, GROUPS, isGroup, isLevel, levelFor, listActions, reject, undo } from './actions.ts';
+import { buildBriefing } from './briefing.ts';
+import { acceptHint, dismissHint } from './hints.ts';
 import { addMemory, cleanSchedule, deleteMemory, isCategory, listMemories, MEMORY_CATEGORIES, updateMemory } from './memory.ts';
 
 // trustProxy nur für Caddy auf derselben Maschine – sonst ließe sich die Absender-Adresse fälschen
@@ -195,6 +197,11 @@ app.register(async (api) => {
       if (permissions.mail_sort) patch.mailAutoTrash = permissions.mail_sort !== 'never';
     }
     if (Object.keys(permissions).length) patch.permissions = permissions;
+    if (b.briefing !== undefined) {
+      const v = str(b.briefing);
+      if (v !== 'auto' && v !== 'off' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) throw new HttpError(400, 'Briefing: "auto", "off" oder HH:MM');
+      patch.briefing = v;
+    }
     if (b.tone !== undefined) {
       if (!isTone(b.tone)) throw new HttpError(400, 'Ton muss nett, frech oder cool sein');
       patch.tone = b.tone;
@@ -490,6 +497,21 @@ app.register(async (api) => {
   });
 
   api.get('/api/ai/status', async () => modelStatus());
+
+  // ----- Morning Briefing & Hinweise -----
+  api.get('/api/briefing', async (req) => buildBriefing(req.user));
+  api.post('/api/hints/:key/accept', async (req: FastifyRequest<{ Params: { key: string } }>) => {
+    try {
+      const r = acceptHint(req.user, req.params.key);
+      return { status: r.status, items: r.changed };
+    } catch (err) {
+      throw new HttpError(400, (err as Error).message);
+    }
+  });
+  api.post('/api/hints/:key/dismiss', async (req: FastifyRequest<{ Params: { key: string } }>) => {
+    dismissHint(req.user.id, req.params.key);
+    return { ok: true };
+  });
 
   // ----- Was Stella selbst darf -----
   api.get('/api/permissions', async (req) => Object.entries(GROUPS).map(([group, g]) => ({

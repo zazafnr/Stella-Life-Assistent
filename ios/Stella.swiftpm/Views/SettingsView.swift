@@ -57,6 +57,7 @@ struct SettingsView: View {
                     }
 
                     Section {
+                        BriefingSetting(value: me.settings.briefing ?? "auto") { v in await save(["briefing": .string(v)]) }
                         timeRow("Abend-Erinnerung", symbol: "moon.stars", value: me.settings.eveningTime ?? "19:00") { t in
                             await save(["eveningTime": .string(t)])
                         }
@@ -341,5 +342,51 @@ struct TonePicker: View {
         }
         .padding(.vertical, 6)
         .sensoryFeedback(.selection, trigger: current)
+    }
+}
+
+/** Morning Briefing: automatisch vor der ersten Stunde, feste Zeit oder aus */
+struct BriefingSetting: View {
+    var value: String
+    var save: (String) async -> Void
+
+    private var mode: String { value == "auto" || value == "off" ? value : "fixed" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker(selection: Binding(get: { mode }, set: { m in Task { await save(m == "fixed" ? "07:00" : m) } })) {
+                Text("Automatisch").tag("auto")
+                Text("Feste Zeit").tag("fixed")
+                Text("Aus").tag("off")
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "sun.horizon.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(Color(hex: 0xFFB86B), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Morning Briefing").foregroundStyle(Theme.text)
+                        Text(mode == "auto" ? "45 min vor der ersten Stunde" : mode == "off" ? "kommt nicht" : "jeden Morgen um \(value)")
+                            .font(.system(size: 12)).foregroundStyle(Theme.muted)
+                    }
+                }
+            }
+            if mode == "fixed" {
+                DatePicker("Uhrzeit", selection: Binding(
+                    get: { Self.date(value) },
+                    set: { d in
+                        let c = Calendar.current.dateComponents([.hour, .minute], from: d)
+                        Task { await save(String(format: "%02d:%02d", c.hour ?? 7, c.minute ?? 0)) }
+                    }
+                ), displayedComponents: .hourAndMinute)
+                .environment(\.locale, Locale(identifier: "de_AT"))
+            }
+        }
+    }
+
+    private static func date(_ hhmm: String) -> Date {
+        let p = hhmm.split(separator: ":").compactMap { Int($0) }
+        return Calendar.current.date(bySettingHour: p.first ?? 7, minute: p.count > 1 ? p[1] : 0, second: 0, of: Date()) ?? Date()
     }
 }

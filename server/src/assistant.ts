@@ -10,8 +10,10 @@ import {
 } from './db.ts';
 import { PROVIDERS } from './books.ts';
 import { lessonsFor } from './untis.ts';
-import { lastUndoable, levelFor, perform, undo, type ActionParams, type ActionType, type Performed } from './actions.ts';
+import { getAction, lastUndoable, levelFor, perform, undo, type ActionParams, type ActionType, type Performed } from './actions.ts';
 import { buildLagebild, lagebildPrompt } from './context.ts';
+import { briefingText } from './briefing.ts';
+import { findHints, markDelivered as markHintDelivered } from './hints.ts';
 import { cleanSchedule, findMemory, isCategory } from './memory.ts';
 import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type ToolDef } from './llm.ts';
 import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
@@ -45,6 +47,8 @@ export async function handleChat(user: User, text: string, clientId: string | nu
 
   let handled = false;
   if (/^\s*(bitte\s+)?(mach\s+(das|es)\s+)?r(ü|ue)ckg(ä|ae)ngig\b|^\s*undo\b/iu.test(text)) handled = undoLast(t);
+  if (!handled && BRIEFING_RE.test(text)) { say(t, briefingText(t.user)); handled = true; }
+  if (!handled && FORGOT_RE.test(text)) handled = await answerForgot(t);
   if (!handled && pending && intent?.type !== 'create') handled = await answerPending(t, pending, text);
   if (pending && !handled) clearPending(user.id);
 
@@ -59,6 +63,31 @@ export async function handleChat(user: User, text: string, clientId: string | nu
     }
   }
   return { messages: t.replies, items: [...t.changed.values()], userMessage };
+}
+
+const BRIEFING_RE = /^\s*(\W*)(morning[- ]?)?briefing\b|^\s*(tages)?(überblick|ueberblick)\b|^\s*was (steht|ist) heute (an|los)\b/iu;
+const FORGOT_RE = /hab(e)? ich (was|etwas|irgendwas) vergessen|was (hab|habe) ich vergessen/iu;
+
+/** „Was hab ich vergessen?“ – alle aktuellen Hinweise, mit Vorschlägen als Karten */
+async function answerForgot(t: Turn): Promise<boolean> {
+  const hints = findHints(t.user);
+  if (!hints.length) { say(t, voice(t.user.settings.tone).nothingForgotten()); return true; }
+  say(t, hints.length === 1 ? 'Eine Sache ist mir aufgefallen:' : `${hints.length} Sachen sind mir aufgefallen:`);
+  for (const h of hints) {
+    if (h.action && !h.actionId) {
+      const r = perform(t.user, h.action.type, h.action.params as never, { source: 'auto', question: h.text, quiet: true, say: sayAction(t) });
+      if (r.status === 'done') {
+        t.replies.push(addMessage(t.user.id, 'assistant', voice(t.user.settings.tone).hintDone(getAction(t.user.id, r.actionId)?.summary ?? h.action.label), { actionId: r.actionId }));
+      }
+      else if (r.status === 'refused') say(t, h.text);
+      markHintDelivered(t.user.id, h.key, r.status === 'refused' ? undefined : r.actionId);
+      touched(t, ...r.changed);
+    } else {
+      say(t, h.text);
+      markHintDelivered(t.user.id, h.key);
+    }
+  }
+  return true;
 }
 
 /** HÜ-Autopilot: löst Stella von selbst (auto/melden)? */

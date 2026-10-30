@@ -100,6 +100,18 @@ alles unter „Was Stella über dich weiß“.
 `STELLA_HEAVY_VISION_MODELS` bekommen schwere Aufgaben (HÜ lösen, mehrstufige Ketten) zuerst ein
 stärkeres Modell. Bezahlmodelle zählen nicht zum Gratis-Tageslimit.
 
+**Hinweise – „Was hast du vergessen?“** (`server/src/hints.ts`) – Regeln über das Lagebild, ohne KI:
+Test ohne Stoff, Test ohne Lernplan, verpasste Lerneinheit (mit freiem Ersatztermin), überfällige
+HÜ, Stunde entfällt aber die HÜ dafür steht noch drin, HÜ ohne Foto/Buch, zu viel auf einmal.
+Jeder Hinweis hat einen stabilen Schlüssel (kommt nie doppelt) und meist einen fertigen
+Vorschlag, der über die Rechte-Stufen läuft. Wichtige kommen sofort (nicht nachts, max. 3 Pushes
+am Tag), der Rest im Briefing. „Passt schon“ blendet einen Hinweis dauerhaft aus.
+
+**Morning Briefing** (`server/src/briefing.ts`) – Schule mit Entfall, heute fällig, Eingeplantes
+und Routinen, morgen fällig (mit Stand), was Stella über Nacht erledigt hat, wichtige Nachrichten,
+dann die Hinweise als eigene Karten. Zeit: automatisch 45 min vor der ersten Stunde, fest oder aus.
+Im Chat jederzeit mit „Briefing“, die Hinweise allein mit „Hab ich was vergessen?“.
+
 ## 8. Fahrplan
 
 **Phase 1: dieser Stand** ✅

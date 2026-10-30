@@ -508,3 +508,20 @@ textarea.cookies { min-height: 90px; font-family: ui-monospace, monospace; font-
 .action-log .log-row.proposed { border-color: var(--blue); background: linear-gradient(180deg, #fff, #F0F6FF); }
 .action-log .log-row > .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .action-log .link.small { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+
+/* Morning Briefing & Hinweise auf „Heute“ */
+.card.briefing { display: flex; flex-direction: column; gap: 10px; background: linear-gradient(180deg, #FFFFFF 0%, #F6FAFF 100%); }
+.briefing-sections { display: flex; flex-direction: column; gap: 12px; }
+.briefing-section { display: flex; gap: 12px; align-items: flex-start; }
+.briefing-icon { font-size: 18px; width: 26px; text-align: center; line-height: 1.4; }
+.briefing-section > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.briefing-title { font-weight: 600; font-size: 14px; }
+.briefing-line { font-size: 14px; color: var(--muted); }
+.hint-row { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--pink-tint); animation: tone-in .35s ease-out both; }
+.hint-row.normal { background: #EEF4FD; }
+.hint-text { font-size: 15px; line-height: 1.45; }
+.hint-text p { margin: 0; }
+.hint-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hint-actions .action-card { margin-top: 0; }
+.hint-actions .btn.small { min-height: 34px; padding: 0 14px; font-size: 14px; border-radius: 12px; }
+.hint-actions .link.small { display: inline-flex; align-items: center; gap: 4px; }

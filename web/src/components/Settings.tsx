@@ -114,6 +114,7 @@ export function Settings({ back }: { back: () => void }) {
         </Group>
 
         <Group title="Zeiten & Ziele">
+          <BriefingRow value={me.settings.briefing ?? 'auto'} onSave={(v) => void patch({ briefing: v }, v === 'off' ? 'Briefing aus' : 'Gespeichert')} />
           <TimeRow label="Erinnerung am Vorabend" value={me.settings.eveningTime ?? '19:00'} onSave={(v) => void patch({ eveningTime: v })} />
           <TimeRow label="Lernzeit" value={me.settings.studyTime ?? '16:30'} onSave={(v) => void patch({ studyTime: v })} />
           <label className="list-row">
@@ -175,6 +176,23 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
       <h2 className="eyebrow" style={{ margin: '4px 4px 0' }}>{title}</h2>
       <div className="list">{children}</div>
     </section>
+  );
+}
+
+/** Morning Briefing: vor der ersten Stunde (WebUntis), feste Zeit oder aus */
+function BriefingRow({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const mode = value === 'auto' || value === 'off' ? value : 'fixed';
+  return (
+    <div className="list-row" style={{ flexWrap: 'wrap', rowGap: 8 }}>
+      <span className="grow"><span className="list-title">Morning Briefing</span>
+        <span className="list-sub">{mode === 'auto' ? '45 Minuten vor der ersten Stunde' : mode === 'off' ? 'kommt nicht' : 'jeden Morgen zur selben Zeit'}</span></span>
+      <select value={mode} aria-label="Morning Briefing" onChange={(e) => onSave(e.target.value === 'fixed' ? '07:00' : e.target.value)}>
+        <option value="auto">Automatisch</option>
+        <option value="fixed">Feste Zeit</option>
+        <option value="off">Aus</option>
+      </select>
+      {mode === 'fixed' && <input type="time" defaultValue={value} style={{ width: 120 }} onBlur={(e) => { if (e.target.value && e.target.value !== value) onSave(e.target.value); }} />}
+    </div>
   );
 }
 

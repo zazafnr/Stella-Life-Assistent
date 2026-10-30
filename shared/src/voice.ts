@@ -172,6 +172,70 @@ export function voice(tone: Tone | undefined) {
         '• „Latein HÜ S. 45 Nr. 3 Freitag“\n• „Mathe SA 12.11.“\n• „was steht an?“\n' +
         'Ich trag\'s ein und erinner dich. Easy.',
     }),
+    // ----- Hinweise: „Was hast du vergessen?“ -----
+    hintNoMaterial: (title: string, days: number) => by({
+      nett: `📝 ${title} ist in ${days} Tagen – welcher Stoff kommt dran? Dann bau ich dir einen Lernplan.`,
+      frech: `📝 ${title} in ${days} Tagen, und ich kenn noch nicht mal den Stoff. Verrätst du's mir? 👀`,
+      cool: `📝 ${title} in ${days} Tagen. Welcher Stoff? Dann gibt's einen Plan.`,
+    }),
+    hintNoPlan: (title: string, days: number) => by({
+      nett: `🧠 Für ${title} (in ${days} Tagen) gibt's noch keinen Lernplan – soll ich einen machen?`,
+      frech: `🧠 ${title} in ${days} Tagen und null Lernplan. Soll ich das mal übernehmen? 😏`,
+      cool: `🧠 ${title} in ${days} Tagen, noch kein Lernplan. Soll ich einen bauen?`,
+    }),
+    hintMissedStudy: (title: string, slot: string) => by({
+      nett: `⏰ „${title}“ ist liegen geblieben – soll ich die Einheit auf ${slot} verschieben?`,
+      frech: `⏰ „${title}“ hast du geschwänzt. 🙄 Auf ${slot} verschieben?`,
+      cool: `⏰ „${title}“ ist ausgefallen. Auf ${slot} schieben?`,
+    }),
+    hintOverdue: (title: string, when: string) => by({
+      nett: `📌 ${title} war ${when} fällig – schon erledigt? Dann hak ich's ab.`,
+      frech: `📌 ${title} war ${when} fällig. Erledigt oder verdrängt? 👀`,
+      cool: `📌 ${title} war ${when} fällig. Abhaken?`,
+    }),
+    hintCancelled: (subject: string, title: string, newDate: string) => by({
+      nett: `🎉 ${subject} entfällt morgen – soll ich ${title} auf ${newDate} verschieben?`,
+      frech: `🎉 ${subject} fällt morgen aus! ${title} auf ${newDate} schieben? Mehr Zeit zum Nichtstun. 😏`,
+      cool: `🎉 Morgen kein ${subject}. ${title} auf ${newDate} schieben?`,
+    }),
+    hintOverloaded: (count: number, freeMinutes: number) => by({
+      nett: `😮‍💨 Morgen sind ${count} Sachen fällig, und heute bleiben dir nur noch ${freeMinutes} Minuten frei. Fang lieber bald an – oder sag mir, was ich verschieben soll.`,
+      frech: `😮‍💨 Morgen ${count} Sachen fällig, heute noch ${freeMinutes} Minuten Zeit. Mathe-Genie, rechne mal. 😏 Sag mir, was ich verschieben soll.`,
+      cool: `😮‍💨 Morgen ${count} Sachen fällig, heute nur noch ${freeMinutes} min frei. Soll ich was verschieben?`,
+    }),
+    hintNoSource: (title: string) => by({
+      nett: `📸 Für ${title} (morgen) hab ich weder Foto noch Buchseite – schick mir ein Foto der Aufgabe, dann lös ich sie.`,
+      frech: `📸 ${title} ist morgen fällig und ich hab nix davon. Foto? Ich kann viel, aber nicht hellsehen. 🔮`,
+      cool: `📸 Für ${title} (morgen) fehlt mir die Aufgabe. Schick ein Foto, dann mach ich's.`,
+    }),
+    nothingForgotten: () => by({
+      nett: 'Nichts – du bist komplett auf dem Laufenden. ✨',
+      frech: 'Nichts. Ich bin ehrlich beeindruckt. 😏',
+      cool: 'Nix. Alles im Griff. 😎',
+    }),
+    hintDone: (summary: string) => by({
+      nett: `✓ Hab ich gemacht: ${summary}.`,
+      frech: `✓ Erledigt, bevor du's gemerkt hast: ${summary}. 💅`,
+      cool: `✓ Gemacht: ${summary}.`,
+    }),
+
+    // ----- Morning Briefing -----
+    briefingGreeting: (name: string, weekday: string) => by({
+      nett: `☀️ Guten Morgen, ${name}! Dein ${weekday}:`,
+      frech: `☀️ Aufstehen, ${name}! 😏 Dein ${weekday}:`,
+      cool: `☀️ Morgen, ${name}. Dein ${weekday}:`,
+    }),
+    briefingQuiet: () => by({
+      nett: 'Heute steht nichts Besonderes an – genieß den Tag! 🌸',
+      frech: 'Heute nix los. Verdächtig. 👀',
+      cool: 'Heute entspannt. 😎',
+    }),
+    briefingClosing: (busy: boolean) => by({
+      nett: busy ? 'Du schaffst das! 💫' : 'Hab einen schönen Tag! 🌸',
+      frech: busy ? 'Und jetzt: Handy weg, ab in den Tag. 😏' : 'Viel Spaß beim Nichtstun. 😏',
+      cool: busy ? 'Packst du. ✌️' : 'Chill. ✌️',
+    }),
+
     toneChanged: () => by({
       nett: 'Okay! Ab jetzt bin ich wieder ganz lieb zu dir. 🌸',
       frech: 'Oh, frech darf ich sein? Das wird lustig. 😏',

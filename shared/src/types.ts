@@ -103,3 +103,32 @@ export interface HealthDay {
   sleepHours: number | null;
   activeMinutes: number | null;
 }
+
+/** Etwas, das Stella bemerkt hat („Was hast du vergessen?“) */
+export interface Hint {
+  /** stabil, z. B. "exam_no_plan:<id>" – damit derselbe Hinweis nicht zweimal kommt */
+  key: string;
+  priority: 'high' | 'normal';
+  text: string;
+  /** Stella kann es gleich erledigen (Knopf) */
+  actionLabel?: string;
+  /** schon als Vorschlag-Karte verschickt */
+  actionId?: string;
+  itemId?: string;
+}
+
+export interface BriefingSection { id: string; title: string; lines: string[] }
+
+/** Der Überblick am Morgen */
+export interface Briefing {
+  date: string;
+  greeting: string;
+  sections: BriefingSection[];
+  hints: Hint[];
+  closing: string;
+  /** alles als eine Chat-Nachricht */
+  text: string;
+  /** wann es heute kommt bzw. kam (HH:MM), null = aus */
+  time: string | null;
+  sent: boolean;
+}

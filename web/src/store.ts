@@ -18,6 +18,7 @@ export interface Me {
     eveningTime?: string; studyTime?: string; stepGoal?: number;
     books?: BookConfig[]; homeworkAutopilot?: boolean; mailAutoTrash?: boolean; tone?: Tone;
     permissions?: Partial<Record<ActionGroup, PermissionLevel>>;
+    briefing?: string;
   };
   integrations: {
     books: Record<BookProvider, { connected: boolean; cookies: boolean; email: string | null }>;

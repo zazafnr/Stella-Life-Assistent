@@ -22,6 +22,7 @@ struct TodayView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         header.rise(0)
+                        BriefingCardView(onChat: { go(.chat) })
                         dueCard.rise(1)
                         HStack(spacing: 14) {
                             examCard
@@ -398,5 +399,124 @@ struct LessonChip: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(hasHomework ? Theme.pink.opacity(0.4) : Theme.border, style: StrokeStyle(lineWidth: 1, dash: lesson.cancelled ? [4, 3] : []))
         )
+    }
+}
+
+/// Oben auf „Heute“: morgens der Überblick, den ganzen Tag „Mir ist aufgefallen“
+@MainActor
+struct BriefingCardView: View {
+    var onChat: () -> Void
+    @Environment(Store.self) private var store
+    @State private var briefing: Briefing?
+    @State private var gone: Set<String> = []
+
+    private let icons = ["school": "🏫", "due": "📌", "plan": "🗓️", "tomorrow": "🌙", "done": "✅", "inbox": "✉️"]
+
+    var body: some View {
+        let morning = Calendar.current.component(.hour, from: Date()) < 12
+        let sections = morning ? (briefing?.sections ?? []) : []
+        let hints = (briefing?.hints ?? []).filter { !gone.contains($0.key) }
+        Group {
+            if !sections.isEmpty || !hints.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    if !sections.isEmpty {
+                        Text("DEIN ÜBERBLICK").eyebrow()
+                        ForEach(sections) { s in
+                            HStack(alignment: .top, spacing: 12) {
+                                Text(icons[s.id] ?? "•").font(.system(size: 18)).frame(width: 26)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(s.title).font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.text)
+                                    ForEach(Array(s.lines.enumerated()), id: \.offset) { _, line in
+                                        Text(line).font(.system(size: 14)).foregroundStyle(Theme.muted)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if !hints.isEmpty {
+                        Text("MIR IST AUFGEFALLEN").eyebrow(color: Theme.pinkText).padding(.top, sections.isEmpty ? 0 : 4)
+                        ForEach(hints) { h in
+                            HintRowView(hint: h, onChat: onChat, onGone: { withAnimation(.spring) { _ = gone.insert(h.key) } })
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .card()
+                .rise(1)
+            }
+        }
+        .task(id: store.lastSync) { await load() }
+    }
+
+    private func load() async {
+        if let b = try? await API.shared.get("/api/briefing", as: Briefing.self) { briefing = b }
+    }
+}
+
+@MainActor
+struct HintRowView: View {
+    var hint: Hint
+    var onChat: () -> Void
+    var onGone: () -> Void
+    @Environment(Store.self) private var store
+    @State private var busy = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(Bubble.markdown(hint.text))
+                .font(.system(size: 15))
+                .foregroundStyle(Theme.text)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                if let id = hint.actionId, store.actions[id]?.proposed == true {
+                    ActionCardView(id: id)
+                } else if let label = hint.actionLabel {
+                    Button(label) { Task { await accept(thenChat: false) } }
+                        .buttonStyle(SmallButton())
+                        .disabled(busy)
+                } else if let label = hint.answerInChat {
+                    Button(label) { Task { await accept(thenChat: true) } }
+                        .buttonStyle(SmallButton())
+                }
+                Button {
+                    onGone()
+                    Task { _ = try? await API.shared.send("POST", "/api/hints/\(escaped)/dismiss", as: OK.self) }
+                } label: {
+                    Label("Passt schon", systemImage: "xmark").font(.system(size: 13, weight: .semibold))
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(hint.high ? Theme.pinkTint : Color(hex: 0xEEF4FD), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private var escaped: String { hint.key.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: ":/"))) ?? hint.key }
+
+    private func accept(thenChat: Bool) async {
+        busy = true
+        defer { busy = false }
+        struct Result: Decodable { var status: String }
+        do {
+            _ = try await API.shared.send("POST", "/api/hints/\(escaped)/accept", as: Result.self)
+            if thenChat { onChat() } else { Haptics.success(); onGone() }
+            await store.sync()
+        } catch {
+            if thenChat { onChat() }
+        }
+    }
+}
+
+/** Kleiner blauer Knopf (Hinweise, Karten) */
+struct SmallButton: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(Theme.blue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
     }
 }

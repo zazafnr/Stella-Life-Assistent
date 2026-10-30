@@ -4,6 +4,7 @@ import { api, useStore } from '../store.ts';
 import type { Tab } from '../App.tsx';
 import { Icon, type IconName } from '../ui/Icon.tsx';
 import { Confetti, Ring, Sky, StarMark } from '../ui/Decor.tsx';
+import { BriefingCard } from './BriefingCard.tsx';
 
 interface Lesson { date: string; start: string; subject: string | null; code: string | null; status: string }
 interface InboxEntry { source: string; category: string | null; action: string | null; createdAt: string }
@@ -91,6 +92,8 @@ export function Today({ go }: { go: (t: Tab) => void }) {
             <StarMark size={20} />
           </button>
         </header>
+
+        <BriefingCard onChat={() => go('chat')} />
 
         <section className="card" aria-label={dueLabel}>
           <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>

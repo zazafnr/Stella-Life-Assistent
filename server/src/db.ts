@@ -198,6 +198,17 @@ const MIGRATIONS: string[] = [
   CREATE INDEX actions_user ON actions(user_id, updated_at);
   ALTER TABLE messages ADD COLUMN action_id TEXT;
   `,
+  `
+  -- Hinweise („Was hast du vergessen?“): wann zugestellt, welcher Vorschlag dazu, weggeklickt?
+  CREATE TABLE hints_state (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    key TEXT NOT NULL,
+    delivered_at TEXT,
+    action_id TEXT,
+    dismissed_at TEXT,
+    PRIMARY KEY (user_id, key)
+  );
+  `,
 ];
 
 function migrate() {
@@ -241,6 +252,8 @@ export interface UserSettings {
   mailAutoTrash?: boolean;
   /** wie Stella schreibt: nett, frech oder cool */
   tone?: Tone;
+  /** Morning Briefing: "auto" = vor der ersten Stunde, "HH:MM" = feste Zeit, "off" = aus */
+  briefing?: string;
   /** was Stella von sich aus darf (je Bereich), siehe actions.ts */
   permissions?: Partial<Record<ActionGroup, PermissionLevel>>;
 }
