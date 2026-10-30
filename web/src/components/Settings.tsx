@@ -8,13 +8,14 @@ import { Mail } from './settings/Mail.tsx';
 import { Untis } from './settings/Untis.tsx';
 import { Handwriting } from './settings/Handwriting.tsx';
 import { Server } from './settings/Server.tsx';
+import { Addresses } from './settings/Addresses.tsx';
 import { FinanceSetup } from './settings/Finance.tsx';
 import { ActionLog, MemoryView, Permissions } from './settings/Assistant.tsx';
 import { Icon, type IconName } from '../ui/Icon.tsx';
 import { Sheet, Sky, StarMark, Switch, showToast } from '../ui/Decor.tsx';
 import { VERSION } from '../version.ts';
 
-type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'finance' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server' | 'delete';
+type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'finance' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server' | 'addresses' | 'delete';
 
 interface AiStatusData { configured: boolean; chain: string[]; visionChain: string[]; coolingDown: string[]; usedToday: number; dailyLimit: number }
 
@@ -113,6 +114,11 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
             <span className="grow"><span className="list-title">Profil</span><span className="list-sub">{profileSummary(me)}</span></span>
             <Icon name="chevron" size={16} />
           </button>
+          <button type="button" className="list-row" onClick={() => setSheet('addresses')}>
+            <span className="icon-tile green" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="mail" size={18} /></span>
+            <span className="grow"><span className="list-title">Mail an Stella</span><span className="list-sub">stella@evolsior.com – von deinen Adressen aus schreiben</span></span>
+            <Icon name="chevron" size={16} />
+          </button>
           <button type="button" className="list-row" onClick={() => openOnboarding('welcome')}>
             <span className="icon-tile blue" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="sparkle" size={18} /></span>
             <span className="grow"><span className="list-title">Einführung wiederholen</span><span className="list-sub">Stella neu auf dich einstellen</span></span>
@@ -205,6 +211,7 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
       {sheet === 'ai' && ai && <Sheet title="KI" onClose={() => setSheet(null)}><AiDetails ai={ai} /></Sheet>}
       {sheet === 'perms' && <Sheet title="Was Stella selbst darf" onClose={() => setSheet(null)}><Permissions /></Sheet>}
       {sheet === 'memory' && <Sheet title="Was Stella über dich weiß" onClose={() => setSheet(null)}><MemoryView /></Sheet>}
+      {sheet === 'addresses' && <Sheet title="Mail an Stella" onClose={() => setSheet(null)}><Addresses /></Sheet>}
       {sheet === 'server' && <Sheet title="Server" onClose={() => setSheet(null)}><Server /></Sheet>}
       {sheet === 'delete' && <Sheet title="Konto löschen" onClose={() => setSheet(null)}><DeleteAccount onDeleted={() => { setSheet(null); logoutLocal(); }} /></Sheet>}
       {sheet === 'log' && <Sheet title="Was Stella getan hat" onClose={() => setSheet(null)}><ActionLog /></Sheet>}

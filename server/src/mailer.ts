@@ -3,6 +3,7 @@
 
 import nodemailer, { type Transporter } from 'nodemailer';
 import { smtpKey, type SmtpKey } from './keys.ts';
+import { logMail } from './maillog.ts';
 
 let factory: (smtp: SmtpKey) => Pick<Transporter, 'sendMail'> = (smtp) => nodemailer.createTransport({
   host: smtp.host, port: smtp.port, secure: smtp.port === 465, auth: { user: smtp.user, pass: smtp.pass },
@@ -36,9 +37,28 @@ export function systemSender(from: string | undefined, kind: MailKind): { from?:
   return { from: from!, replyTo: `support@${domain}` };
 }
 
-export async function sendSystemMail(to: string, subject: string, text: string, kind: MailKind = 'noreply'): Promise<void> {
+export interface MailExtra {
+  /** wofür die Mail ist – erscheint gezählt im Firmen-Dashboard */
+  purpose?: string;
+  userId?: string | null;
+  /** Antwort in einem Verlauf */
+  inReplyTo?: string;
+  references?: string[];
+}
+
+export async function sendSystemMail(to: string, subject: string, text: string, kind: MailKind = 'noreply', extra: MailExtra = {}): Promise<void> {
   const smtp = smtpKey();
-  if (!smtp) throw new Error('Kein Mail-Absender eingerichtet');
+  const purpose = extra.purpose ?? (kind === 'stella' ? 'stella_reply' : 'system');
+  if (!smtp) { logMail('out', purpose, 'failed', { to, userId: extra.userId, detail: 'kein Absender eingerichtet' }); throw new Error('Kein Mail-Absender eingerichtet'); }
   const who = systemSender(smtp.from, kind);
-  await factory(smtp).sendMail({ from: who.from ?? `Stella <${smtp.user}>`, ...(who.replyTo ? { replyTo: who.replyTo } : {}), to, subject, text });
+  try {
+    await factory(smtp).sendMail({
+      from: who.from ?? `Stella <${smtp.user}>`, ...(who.replyTo ? { replyTo: who.replyTo } : {}), to, subject, text,
+      ...(extra.inReplyTo ? { inReplyTo: extra.inReplyTo, references: extra.references?.length ? extra.references : [extra.inReplyTo] } : {}),
+    });
+    logMail('out', purpose, 'ok', { to, userId: extra.userId });
+  } catch (err) {
+    logMail('out', purpose, 'failed', { to, userId: extra.userId, detail: (err as Error).message });
+    throw err;
+  }
 }

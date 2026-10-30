@@ -1,0 +1,10 @@
+{
+  "name": "stella-mail",
+  "main": "src/index.js",
+  "compatibility_date": "2025-09-01",
+  "vars": {
+    "STELLA_URL": "https://stella.evolsior.com"
+  }
+  // Geheimer Schlüssel: INBOUND_SECRET (Cloudflare → Workers → stella-mail → Settings → Variables and Secrets → Secret).
+  // Den Schlüssel erzeugt Stella: Einstellungen → Server → „Mail an Stella“.
+}

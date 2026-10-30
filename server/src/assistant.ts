@@ -51,11 +51,11 @@ const v = (t: Turn) => voice(t.user.settings.tone);
 
 /** `conversationId`: in welchem Chat geschrieben wird (alter Chat fortsetzen); ohne Angabe der neueste von heute. */
 export async function handleChat(user: User, text: string, clientId: string | null, imageIds: string[] = [], conversationId: string | null = null,
-  extra: { attachments?: Attachment[] } = {}): Promise<ChatResponse> {
+  extra: { attachments?: Attachment[]; detailed?: boolean } = {}): Promise<ChatResponse> {
   if (clientId && findMessageByClientId(user.id, clientId)) return { messages: [], items: [] }; // schon verarbeitet
   const convId = (conversationId && getConversation(user.id, conversationId)?.id) || todayConversation(user.id)!;
   // alles, was während dieser Anfrage geschrieben wird (auch in Hilfsfunktionen), landet in diesem Chat
-  const res = await chatContext.run({ userId: user.id, conversationId: convId }, () => handleChatIn(user, text, clientId, imageIds, convId, extra.attachments ?? []));
+  const res = await chatContext.run({ userId: user.id, conversationId: convId, detailed: extra.detailed }, () => handleChatIn(user, text, clientId, imageIds, convId, extra.attachments ?? []));
   void maybeTitle(user.id, convId).catch(() => {});
   return { ...res, conversationId: convId };
 }
@@ -711,6 +711,9 @@ const TOOLS: ToolDef[] = [
   },
 ];
 
+/** Antworten per E-Mail: einfache Aufträge kurz bestätigen, Fragen ausführlich beantworten */
+const STYLE_DETAILED = 'Stil: Die Antwort geht per E-Mail. Einfache Aufträge bestätigst du kurz in ein, zwei Sätzen. Fragen beantwortest du ausführlich und gut gegliedert (kurze Absätze oder Aufzählungen mit „- “), ohne Floskeln.';
+
 function systemPrompt(user: User, today: string): string {
   const lb = buildLagebild(user, 8);
   return `Du bist Stella, der persönliche Assistent von ${user.name}. Motto: "Let Stella handle your life."
@@ -720,7 +723,7 @@ Jetzt: ${WEEKDAYS_DE[weekdayOf(today)]}, ${today}, ${timeIn(user.timeZone)} Uhr 
 
 Regeln:
 - Antworte auf Deutsch.
-- ${STYLE_RULES}
+- ${chatContext.getStore()?.detailed ? STYLE_DETAILED : STYLE_RULES}
 - ${toneInstruction(user.settings.tone)}
 - HANDELN statt erklären: Wenn ${user.name} etwas organisiert, geplant, verschoben, abgesagt oder vorbereitet haben will, tu es mit den Werkzeugen (mehrere Schritte sind ok). Rechne Daten selbst aus (YYYY-MM-DD).
 - Manche Aktionen brauchen die Zustimmung von ${user.name}: Dann bekommt ${user.name} eine Karte mit Ja/Nein – sag nur kurz, dass du gefragt hast.

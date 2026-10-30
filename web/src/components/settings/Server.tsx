@@ -27,6 +27,7 @@ export function Server() {
     <>
       {(['groq', 'openrouter'] as const).map((n) => <KeyCard key={n} name={n} status={keys[n]} onChange={setKeys} />)}
       <SmtpCard status={keys.smtp} onChange={setKeys} />
+      <InboundCard />
       <Invites />
     </>
   );
@@ -107,6 +108,23 @@ function SmtpCard({ status, onChange }: { status: KeyStatus; onChange: (k: Keys)
           {status.set && <button type="button" className="link danger" onClick={() => void put(null, 'Gelöscht.')}>Entfernen</button>}
         </div>
       </form>
+      {view}
+    </Section>
+  );
+}
+
+/** Schlüssel zwischen dem Cloudflare-Worker für stella@ und diesem Server */
+function InboundCard() {
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const [secret, setSecret] = useState('');
+  const [run, view, busy] = useAction();
+  useEffect(() => { api<{ configured: boolean }>('/api/admin/inbound').then((r) => setConfigured(r.configured)).catch(() => {}); }, []);
+  return (
+    <Section title="Mail an Stella (stella@)">
+      <p className="muted small">Cloudflare reicht Mails an stella@ über einen Worker an diesen Server weiter. Beide teilen einen geheimen Schlüssel. Er wird nur einmal angezeigt – kopiere ihn in Cloudflare (Worker „stella-mail“ → Variables and Secrets → INBOUND_SECRET).</p>
+      <p className="small">{configured ? <strong style={{ color: 'var(--green)' }}>Schlüssel gesetzt</strong> : <strong style={{ color: 'var(--pink-text)' }}>Fehlt</strong>}</p>
+      <button type="button" className="btn" disabled={busy} onClick={() => void run(async () => { const r = await api<{ secret: string }>('/api/admin/inbound-secret', { method: 'POST' }); setSecret(r.secret); setConfigured(true); }, configured ? 'Neuer Schlüssel erzeugt – der alte ist ungültig.' : 'Schlüssel erzeugt.')}>{configured ? 'Neuen Schlüssel erzeugen' : 'Schlüssel erzeugen'}</button>
+      {secret && <><p className="small">Jetzt kopieren, danach ist er nicht mehr sichtbar:</p><div className="copy-row"><code style={{ wordBreak: 'break-all' }}>{secret}</code><button type="button" className="btn" onClick={() => void navigator.clipboard.writeText(secret)}>Kopieren</button></div></>}
       {view}
     </Section>
   );

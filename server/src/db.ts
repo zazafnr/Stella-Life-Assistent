@@ -381,6 +381,40 @@ const MIGRATIONS: string[] = [
   ALTER TABLE items ADD COLUMN recurrence TEXT;
   ALTER TABLE items ADD COLUMN recurrence_paused INTEGER NOT NULL DEFAULT 0;
   `,
+  `
+  -- Paket 11: Mit Stella per E-Mail schreiben (verknüpfte Adressen), Mail-Protokoll fürs Firmen-Dashboard
+  CREATE TABLE user_emails (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    verified INTEGER NOT NULL DEFAULT 0,
+    code_hash TEXT,
+    code_expires TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    sent_at TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX user_emails_verified ON user_emails(email) WHERE verified = 1;
+  CREATE INDEX user_emails_user ON user_emails(user_id);
+  CREATE TABLE mail_log (
+    id TEXT PRIMARY KEY,
+    at TEXT NOT NULL,
+    direction TEXT NOT NULL,
+    purpose TEXT NOT NULL,
+    status TEXT NOT NULL,
+    user_id TEXT,
+    domain TEXT,
+    detail TEXT
+  );
+  CREATE INDEX mail_log_at ON mail_log(at);
+  CREATE TABLE inbound_mail (
+    message_id TEXT PRIMARY KEY,
+    at TEXT NOT NULL,
+    sender TEXT NOT NULL,
+    outcome TEXT NOT NULL
+  );
+  CREATE INDEX inbound_mail_sender ON inbound_mail(sender, at);
+  `,
 ];
 
 function migrate() {
@@ -579,7 +613,7 @@ export function itemsChangedSince(userId: string, since: string): Item[] {
 // ---------- Chats (Konversationen) und Nachrichten ----------
 
 /** In welchem Chat gerade geantwortet wird – gilt für alles, was während einer Chat-Anfrage passiert (auch tief in Hilfsfunktionen). */
-export const chatContext = new AsyncLocalStorage<{ userId: string; conversationId: string }>();
+export const chatContext = new AsyncLocalStorage<{ userId: string; conversationId: string; detailed?: boolean }>();
 
 type ConversationRow = { id: string; user_id: string; title: string | null; day: string; created_at: string; updated_at: string };
 
