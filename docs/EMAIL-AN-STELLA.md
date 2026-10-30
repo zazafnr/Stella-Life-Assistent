@@ -11,6 +11,7 @@ Mail → Cloudflare Email Routing → Email Worker (workers/stella-mail)
 
 ## Regeln
 
+- Weitere Adressen verknüpft man mit einem Klick über **„Mit Google bestätigen“** (nur Bereiche `openid email`, kein Zugriff aufs Postfach, braucht keine Google-Prüfung) oder per Code. Wer ein Gmail-Postfach über „Mit Google anmelden“ verbindet, hat diese Adresse automatisch bestätigt. Der Google-Knopf erscheint erst, wenn der Server einen Google-OAuth-Zugang hat (`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, siehe `docs/google-oauth.md`; für „nur Adresse“ reicht der Zustimmungsbildschirm mit `openid` und `email`).
 - Antwort nur an **bestätigte Adressen** eines Kontos (Konto-Adresse oder unter Einstellungen → „Mail an Stella“ per Code bestätigt, höchstens 5 zusätzliche).
 - Unbekannter Absender: ein kurzer zweisprachiger Hinweis („Konto anlegen und Adresse verknüpfen“), höchstens einmal pro Absender und Tag, insgesamt höchstens 200 am Tag.
 - Keine Antwort auf automatische Mails (`Auto-Submitted`, `Precedence: bulk/list`, `List-Id`, noreply-/mailer-daemon-Absender) – keine Schleifen.

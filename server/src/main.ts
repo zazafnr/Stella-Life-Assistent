@@ -24,14 +24,14 @@ import { lessonsFor, syncUntis, testUntis, type UntisCredentials } from './untis
 import { FILE_TYPES, filePath, saveDataUrl, saveFile } from './files.ts';
 import type { BookProvider } from './db.ts';
 import { ackNotesEntry, notesInbox, usesFreeNotes } from './notes.ts';
-import { finishGoogle, finishTarget, googleAuthUrl, googleConfigured, readState, type OAuthClient } from './oauth.ts';
+import { finishGoogle, finishGoogleLink, finishTarget, googleAuthUrl, googleConfigured, readState, type OAuthClient } from './oauth.ts';
 import { approve, GROUPS, isGroup, isLevel, levelFor, listActions, perform, reject, undo } from './actions.ts';
 import { LlmUnavailable } from './llm.ts';
 import { buildBriefing } from './briefing.ts';
 import { cleanBlocks, planWeek } from './weekplan.ts';
 import { acceptHint, dismissHint } from './hints.ts';
 import { registerAdminRoutes } from './admin.ts';
-import { registerAddressRoutes, registerInboundRoute } from './inbound.ts';
+import { linkVerifiedAddress, registerAddressRoutes, registerInboundRoute } from './inbound.ts';
 import { registerOverviewRoutes } from './overview.ts';
 import { registerFinanceRoutes, recordPayment } from './finance.ts';
 import { registerGoalRoutes } from './goals.ts';
@@ -108,10 +108,23 @@ app.get('/api/oauth/google/callback', async (req, reply) => {
   if (!state) return reply.code(400).type('text/html; charset=utf-8').send(finishTarget('desktop', false, 'Der Link ist abgelaufen. Bitte in Stella nochmal auf „Mit Google anmelden“ tippen.').html);
   let result: ReturnType<typeof finishTarget>;
   if (q.error || !q.code) {
-    result = finishTarget(state.c, false, q.error === 'access_denied' ? 'Du hast die Anmeldung abgebrochen.' : `Google meldet: ${str(q.error, 100) || 'kein Code'}`);
+    result = finishTarget(state.c, false, q.error === 'access_denied' ? 'Du hast die Anmeldung abgebrochen.' : `Google meldet: ${str(q.error, 100) || 'kein Code'}`, state.p === 'link' ? 'link' : 'gmail');
+  } else if (state.p === 'link') {
+    // nur Adresse bestätigen: Stella antwortet danach auch Mails von dieser Adresse
+    try {
+      const user = getUser(state.u);
+      if (!user) throw new Error('Konto nicht gefunden');
+      const email = await finishGoogleLink(str(q.code, 2000));
+      linkVerifiedAddress(user, email);
+      result = finishTarget(state.c, true, `${email} ist verknüpft – du kannst Stella jetzt von dieser Adresse schreiben.`, 'link');
+    } catch (err) {
+      result = finishTarget(state.c, false, (err as Error).message, 'link');
+    }
   } else {
     try {
       const account = await finishGoogle(state.u, str(q.code, 2000));
+      // ein per Google verbundenes Postfach ist als Adresse schon bestätigt
+      try { const u = getUser(state.u); if (u) linkVerifiedAddress(u, account.user); } catch { /* gehört schon zu einem Konto oder Limit: egal */ }
       void checkAllMail(state.u).catch(() => {});
       result = finishTarget(state.c, true, `${account.user} ist verbunden – Stella sortiert ab jetzt deine Mails.`);
     } catch (err) {

@@ -15,6 +15,7 @@ import { db, getUser, newId, now, type User } from './db.ts';
 import { SYSTEM_SCOPE } from './keys.ts';
 import { logMail } from './maillog.ts';
 import { mailerConfigured, sendSystemMail } from './mailer.ts';
+import { googleConfigured, googleLinkUrl, type OAuthClient } from './oauth.ts';
 
 const CODE_MINUTES = 15;
 const MAX_ATTEMPTS = 5;
@@ -90,6 +91,21 @@ export function verifyAddress(user: User, id: string, rawCode: unknown): LinkedA
     db.prepare('UPDATE user_emails SET verified = 1, code_hash = NULL, code_expires = NULL WHERE id = ?').run(id);
   } catch {
     throw new HttpError(409, 'Diese Adresse gehört inzwischen zu einem anderen Konto.');
+  }
+  return listAddresses(user);
+}
+
+/** Eine Adresse, die ein Anbieter (z. B. Google) schon bestätigt hat, sofort verknüpfen – ohne Code. */
+export function linkVerifiedAddress(user: User, raw: string): LinkedAddress[] {
+  const email = clean(raw);
+  if (!EMAIL_RE.test(email)) throw new HttpError(400, 'Das ist keine gültige E-Mail-Adresse.');
+  const owner = findUserByAddress(email);
+  if (owner && owner.id !== user.id) throw new HttpError(409, 'Diese Adresse gehört schon zu einem anderen Konto.');
+  if (!owner) {
+    db.prepare('DELETE FROM user_emails WHERE email = ? AND verified = 0').run(email);
+    const count = (db.prepare('SELECT COUNT(*) AS n FROM user_emails WHERE user_id = ?').get(user.id) as { n: number }).n;
+    if (count >= MAX_ADDRESSES) throw new HttpError(400, `Du kannst höchstens ${MAX_ADDRESSES} zusätzliche Adressen verknüpfen.`);
+    db.prepare('INSERT INTO user_emails (id, user_id, email, verified, attempts, created_at) VALUES (?, ?, ?, 1, 0, ?)').run(newId(), user.id, email, now());
   }
   return listAddresses(user);
 }
@@ -235,6 +251,12 @@ export function registerInboundRoute(app: FastifyInstance) {
 export function registerAddressRoutes(api: FastifyInstance) {
   api.get('/api/me/emails', async (req) => ({ emails: listAddresses(req.user) }));
   api.post('/api/me/emails', async (req) => ({ emails: await addAddress(req.user, (req.body as { email?: unknown } | undefined)?.email) }));
+  /** „Mit Google bestätigen“: Google sagt, dass die Adresse dem Nutzer gehört, kein Code nötig */
+  api.post('/api/me/emails/google', async (req) => {
+    if (!googleConfigured()) throw new HttpError(400, 'Die Google-Anmeldung ist auf diesem Server noch nicht eingerichtet.');
+    const c = String(((req.body ?? {}) as { client?: unknown }).client ?? '');
+    return { url: googleLinkUrl(req.user.id, (['web', 'desktop', 'ios'].includes(c) ? c : 'web') as OAuthClient) };
+  });
   api.post<{ Params: { id: string } }>('/api/me/emails/:id/verify', async (req) => ({ emails: verifyAddress(req.user, req.params.id, (req.body as { code?: unknown } | undefined)?.code) }));
   api.delete<{ Params: { id: string } }>('/api/me/emails/:id', async (req) => ({ emails: removeAddress(req.user, req.params.id) }));
 }
