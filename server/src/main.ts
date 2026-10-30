@@ -31,6 +31,8 @@ import { buildBriefing } from './briefing.ts';
 import { cleanBlocks, planWeek } from './weekplan.ts';
 import { acceptHint, dismissHint } from './hints.ts';
 import { registerAdminRoutes } from './admin.ts';
+import { registerAddressRoutes, registerInboundRoute } from './inbound.ts';
+import { registerOverviewRoutes } from './overview.ts';
 import { registerFinanceRoutes, recordPayment } from './finance.ts';
 import { registerGoalRoutes } from './goals.ts';
 import { registerStellaPlanRoutes } from './stellaplan.ts';
@@ -81,6 +83,17 @@ app.get('/api/status', async () => ({
 }));
 
 registerSignupRoutes(app, publicUser);
+registerInboundRoute(app);
+
+// Das Firmen-Dashboard liegt auf eigener Adresse (Cloudflare) und liest nur Admin- und Login-Routen.
+const DASHBOARD_ORIGINS = (process.env.STELLA_DASHBOARD_ORIGINS ?? 'https://dashboard.evolsior.com').split(',').map((s) => s.trim()).filter(Boolean);
+app.addHook('onRequest', async (req, reply) => {
+  const origin = req.headers.origin;
+  if (!origin || !DASHBOARD_ORIGINS.includes(origin) || !(req.url.startsWith('/api/admin/') || req.url === '/api/auth/login')) return;
+  reply.header('access-control-allow-origin', origin).header('vary', 'origin')
+    .header('access-control-allow-headers', 'authorization, content-type').header('access-control-allow-methods', 'GET, POST, OPTIONS').header('access-control-max-age', '600');
+  if (req.method === 'OPTIONS') return reply.code(204).send();
+});
 
 app.post('/api/auth/login', async (req) => {
   const b = req.body as Record<string, unknown>;
@@ -174,6 +187,8 @@ app.register(async (api) => {
   });
 
   registerAdminRoutes(api);
+  registerOverviewRoutes(api);
+  registerAddressRoutes(api);
   registerListRoutes(api);
   registerGoalRoutes(api);
   registerFinanceRoutes(api);

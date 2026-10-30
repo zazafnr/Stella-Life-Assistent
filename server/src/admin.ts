@@ -2,6 +2,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import { HttpError, requireOwner } from './auth.ts';
+import { rotateInboundSecret, inboundSecretSet } from './inbound.ts';
 import { isKeyName, keyStatus, setKey, testKey } from './keys.ts';
 import { createInvite, deleteInvite, listInvites, registrationMode } from './signup.ts';
 
@@ -20,6 +21,10 @@ export function registerAdminRoutes(api: FastifyInstance) {
     const result = await testKey(req.params.name);
     return { ...result, keys: keyStatus() };
   });
+
+  // Schlüssel zwischen dem Cloudflare-Worker für stella@ und diesem Server. Wird nur beim Erzeugen angezeigt.
+  api.get('/api/admin/inbound', { preHandler: requireOwner }, async () => ({ configured: inboundSecretSet() }));
+  api.post('/api/admin/inbound-secret', { preHandler: requireOwner }, async () => ({ secret: rotateInboundSecret(), configured: true }));
 
   // Einladungscodes für neue Konten (Registrierungsmodus „invite“)
   api.get('/api/admin/invites', { preHandler: requireOwner }, async () => ({ mode: registrationMode(), invites: listInvites() }));

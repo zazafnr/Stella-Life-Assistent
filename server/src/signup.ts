@@ -75,7 +75,7 @@ function issueCode(user: User) {
 
 async function mailCode(user: User, code: string) {
   await sendSystemMail(user.email, `Dein Stella-Code: ${code}`,
-    `Hallo ${user.name},\n\ndein Bestätigungs-Code für Stella lautet:\n\n    ${code}\n\nEr gilt ${CODE_MINUTES} Minuten. Falls du dich nicht bei Stella angemeldet hast, kannst du diese Mail einfach ignorieren.\n\nStella by EVOLSIOR – Built to become`);
+    `Hallo ${user.name},\n\ndein Bestätigungs-Code für Stella lautet:\n\n    ${code}\n\nEr gilt ${CODE_MINUTES} Minuten. Falls du dich nicht bei Stella angemeldet hast, kannst du diese Mail einfach ignorieren.\n\nStella by EVOLSIOR – Built to become`, 'noreply', { purpose: 'verification', userId: user.id });
 }
 
 export async function startSignup(b: { name: string; email: string; password: string; timeZone: string; device?: string; invite?: string }) {
