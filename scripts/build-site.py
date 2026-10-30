@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Baut die statische Website (evolsior.com) aus site-src/ nach site/.
+"""Baut die statische Website (evolsior.com) aus site-src/ nach site/public/.
 
     python3 scripts/build-site.py
 
-Cloudflare Pages liefert den Ordner site/ aus (kein Build-Befehl nötig). Quellen: site-src/.
+Cloudflare (Workers mit statischen Dateien) liefert site/public/ aus, Konfiguration: site/wrangler.jsonc. Quellen: site-src/.
 Bilder der App liegen in site/assets/stella/ (siehe docs/WEBSITE.md).
 """
 import os, re, sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-SRC, OUT = os.path.join(ROOT, 'site-src'), os.path.join(ROOT, 'site')
+SRC, OUT = os.path.join(ROOT, 'site-src'), os.path.join(ROOT, 'site', 'public')
 BASE = 'https://evolsior.com'
 MARK = '<svg viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><rect x="10" y="5" width="18" height="5" rx="2.5"/><rect x="4" y="13.5" width="18" height="5" rx="2.5"/><rect x="10" y="22" width="18" height="5" rx="2.5"/></svg>'
 LINKS = {'__HOME__': '/', '__STELLA__': '/stella', '__IMPRINT__': '/imprint', '__PRIVACY__': '/privacy'}
@@ -95,6 +95,6 @@ def main():
   Cache-Control: public, max-age=31536000, immutable
 ''')
     write('favicon.svg', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#09090B"/><g fill="#fff"><rect x="10" y="6" width="16" height="4.4" rx="2.2"/><rect x="6" y="13.8" width="16" height="4.4" rx="2.2"/><rect x="10" y="21.6" width="16" height="4.4" rx="2.2"/></g></svg>\n')
-    print('site/ gebaut')
+    print('site/public/ gebaut')
 
 main()
