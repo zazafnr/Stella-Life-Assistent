@@ -3,6 +3,7 @@
 import {
   addDays, buildStudyPlan, DEFAULT_PREFS, nextOccurrence, planReminders, zonedToUtc, todayIn, type Item, type ParsedEntry,
 } from '@stella/shared';
+import { tr } from './locale.ts';
 import { nextLessonDate } from './untis.ts';
 import {
   addReminder, clearOpenReminders, createItem, enqueueJob, getItem, getItemRaw, listItems, type NewItem, updateItem, type User,
@@ -85,7 +86,7 @@ export function createStudyPlan(user: User, examId: string, focuses?: string[]):
   return plan.map((s, i) => addItem(user, {
     kind: 'study',
     subject: exam.subject,
-    title: `Lernen: ${exam.title}`,
+    title: tr(user, 'planner.studyTitle', { title: exam.title }),
     detail: focuses?.[i] ?? s.focus,
     due: s.date,
     time: prefsOf(user).studyTime,

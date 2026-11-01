@@ -122,10 +122,11 @@
   var body = document.getElementById('demo-body'), tags = $$('#demo-tags button');
   if (!body) return;
   var S = [
-    { u: 'Remind me every Monday to take out the trash.', b: 'Done. Every Monday at 08:00 I will remind you: “Trash”.', w: 'Recurring reminder created' },
-    { u: 'I want to run three times a week.', b: 'New goal: Running, 3× a week. I will check in on Sunday evening.', w: 'Goal created · weekly check-in' },
+    { u: 'Remind me every Monday to take out the bins.', b: 'Done. Every Monday at 08:00 I will remind you: “Take out the bins”.', w: 'Recurring reminder created' },
+    { u: 'I want to run three times a week.', b: 'New goal: running, 3× a week. I will check in on Sunday evening.', w: 'Goal created · weekly check-in' },
+    { u: 'Physics homework due tomorrow, the forces worksheet.', b: 'Noted. I will remind you tonight at 19:00. Send me a photo of the worksheet and I will solve it.', w: 'Homework added · reminder set' },
     { u: 'Put milk and eggs on the shopping list.', b: 'Added to the shopping list: milk, eggs.', w: 'Added to shopping list' },
-    { u: 'How much did I spend this week?', b: 'This week you spent € 87.99 across 6 payments. Most of it on shopping.', w: 'Spending summary · 6 payments' }
+    { u: 'Find an Italian place for Friday at eight.', b: 'Three places nearby are open at 20:00, the closest is 450 m away. I put the booking links below. I cannot see free tables, so please check when you book.', w: 'Restaurant search · opening hours checked' }
   ];
   var cur = 0, token = 0, timers = [];
   var later = function (fn, ms) { var id = setTimeout(fn, ms); timers.push(id); };

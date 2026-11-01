@@ -69,3 +69,29 @@
 .cta-card h2 { font-size: clamp(54px, 11vw, 160px); letter-spacing: -.055em; line-height: .9; }
 .cta-card .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
 .cta-halo { left: 90%; top: 110%; width: 760px; height: 760px; opacity: .8; z-index: -1; }
+
+.steps { list-style: none; margin: 0 0 clamp(40px, 6vw, 72px); padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(20px, 3vw, 40px); }
+.steps li { display: grid; gap: 10px; align-content: start; padding-top: 22px; border-top: 1px solid var(--line-2); }
+.steps .n { font: 500 12px/1 var(--mono); letter-spacing: .12em; color: var(--muted); }
+.steps h3 { font-size: clamp(24px, 2.4vw, 32px); letter-spacing: -.03em; }
+.steps p { color: var(--muted); max-width: 340px; }
+@media (max-width: 760px) { .steps { grid-template-columns: 1fr; } }
+
+.weather { padding-block: clamp(56px, 9vw, 120px); }
+.weather-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(32px, 6vw, 96px); align-items: center; }
+.weather h2 { font-size: clamp(40px, 5.6vw, 76px); letter-spacing: -.045em; line-height: 1; }
+.wx-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; align-content: center; }
+.wx-list li { padding: 12px 18px; border-radius: 999px; font: 500 13px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line-2); }
+.wx-list li:nth-child(5), .wx-list li:nth-child(6) { color: #fff; box-shadow: inset 0 0 0 1px rgba(255,126,179,.6); }
+@media (max-width: 860px) { .weather-grid { grid-template-columns: 1fr; } }
+
+.plans { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.plan { display: grid; align-content: start; gap: 14px; padding: 28px 24px 30px; border-radius: 24px; background: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line); }
+.plan.hot { box-shadow: inset 0 0 0 1px rgba(255,126,179,.55); background: linear-gradient(180deg, rgba(255,126,179,.10), var(--ink-2) 55%); }
+.plan h3 { font-size: 22px; letter-spacing: -.02em; }
+.plan .price { font: 600 44px/1 var(--display); letter-spacing: -.04em; margin: 0; }
+.plan .price small { font: 500 13px/1 var(--mono); letter-spacing: .04em; color: var(--muted); margin-left: 6px; }
+.plan ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 10px; color: var(--muted); font-size: 15px; }
+.plan li::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #3DDC84; margin-right: 10px; vertical-align: middle; }
+@media (max-width: 1000px) { .plans { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .plans { grid-template-columns: 1fr; } }

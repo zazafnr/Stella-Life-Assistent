@@ -673,7 +673,9 @@ enum I18nCatalogs {
  "login.art.2": "Stella liest deine Mails und erinnert dich rechtzeitig",
  "login.art.3": "Schreib oder sprich mit ihr, am Rechner und am Handy",
  "planner.viewWeek": "Woche",
- "planner.viewDay": "Tag"
+ "planner.viewDay": "Tag",
+ "planner.studyTitle": "Lernen: {title}",
+ "planner.doTitle": "Erledigen: {title}"
 }
 """#,
         "en": #"""
@@ -1346,7 +1348,9 @@ enum I18nCatalogs {
  "login.art.2": "Stella reads your mail and reminds you in time",
  "login.art.3": "Write or talk to her, on your computer and your phone",
  "planner.viewWeek": "Week",
- "planner.viewDay": "Day"
+ "planner.viewDay": "Day",
+ "planner.studyTitle": "Study: {title}",
+ "planner.doTitle": "Do: {title}"
 }
 """#,
         "es": #"""
@@ -2019,7 +2023,9 @@ enum I18nCatalogs {
  "login.art.2": "Stella lee tu correo y te avisa a tiempo",
  "login.art.3": "Escríbele o háblale, en el ordenador y en el móvil",
  "planner.viewWeek": "Semana",
- "planner.viewDay": "Día"
+ "planner.viewDay": "Día",
+ "planner.studyTitle": "Estudiar: {title}",
+ "planner.doTitle": "Hacer: {title}"
 }
 """#,
         "fr": #"""
@@ -2692,7 +2698,9 @@ enum I18nCatalogs {
  "login.art.2": "Stella lit tes e-mails et te rappelle à temps",
  "login.art.3": "Écris-lui ou parle-lui, sur ordinateur et sur téléphone",
  "planner.viewWeek": "Semaine",
- "planner.viewDay": "Jour"
+ "planner.viewDay": "Jour",
+ "planner.studyTitle": "Réviser : {title}",
+ "planner.doTitle": "Faire : {title}"
 }
 """#,
         "it": #"""
@@ -3365,7 +3373,9 @@ enum I18nCatalogs {
  "login.art.2": "Stella legge le tue mail e ti avvisa in tempo",
  "login.art.3": "Scrivile o parlale, dal computer e dal telefono",
  "planner.viewWeek": "Settimana",
- "planner.viewDay": "Giorno"
+ "planner.viewDay": "Giorno",
+ "planner.studyTitle": "Studiare: {title}",
+ "planner.doTitle": "Fare: {title}"
 }
 """#,
         "pl": #"""
@@ -4060,7 +4070,9 @@ enum I18nCatalogs {
  "login.art.2": "Stella czyta Twoją pocztę i przypomina na czas",
  "login.art.3": "Pisz lub mów do niej, na komputerze i telefonie",
  "planner.viewWeek": "Tydzień",
- "planner.viewDay": "Dzień"
+ "planner.viewDay": "Dzień",
+ "planner.studyTitle": "Nauka: {title}",
+ "planner.doTitle": "Zrób: {title}"
 }
 """#,
         "pt-BR": #"""
@@ -4733,7 +4745,9 @@ enum I18nCatalogs {
  "login.art.2": "A Stella lê seus e-mails e lembra você a tempo",
  "login.art.3": "Escreva ou fale com ela, no computador e no celular",
  "planner.viewWeek": "Semana",
- "planner.viewDay": "Dia"
+ "planner.viewDay": "Dia",
+ "planner.studyTitle": "Estudar: {title}",
+ "planner.doTitle": "Fazer: {title}"
 }
 """#,
         "tr": #"""
@@ -5406,7 +5420,9 @@ enum I18nCatalogs {
  "login.art.2": "Stella e-postalarını okur ve seni zamanında uyarır",
  "login.art.3": "Ona yaz ya da konuş, bilgisayarda ve telefonda",
  "planner.viewWeek": "Hafta",
- "planner.viewDay": "Gün"
+ "planner.viewDay": "Gün",
+ "planner.studyTitle": "Çalış: {title}",
+ "planner.doTitle": "Yap: {title}"
 }
 """#,
     ]

@@ -61,12 +61,12 @@ def page(path, title, description, body, og='/assets/og.png', noindex=False):
 '''
 
 def main():
-    imgs = ':root { --img-chat: url(/assets/stella/chat.jpg); --img-goals: url(/assets/stella/goals.jpg); --img-money: url(/assets/stella/money.jpg); --img-plan: url(/assets/stella/plan.jpg); }'
+    imgs = ':root { ' + ' '.join(f'--img-{n}: url(/assets/stella/{n}.jpg);' for n in ['goals', 'plan', 'plans']) + ' }'
     write('assets/site.css', '\n'.join([read('common.css'), imgs, read('index.css'), read('stella.css'), read('legal.css')]))
     write('assets/site.js', read('common.js') + '\n' + read('stella.js'))
 
     write('index.html', page('/index', 'EVOLSIOR – Built to become', 'EVOLSIOR builds calm, precise apps that grow with the people who use them. Home of Stella, a personal assistant for your whole life.', read('index.body.html')))
-    write('stella/index.html', page('/stella', 'Stella – Let Stella handle it | EVOLSIOR', 'Stella is a personal assistant for your whole life. Plans, reminders, mail, errands, goals and money, handled in one conversation.', read('stella.body.html')))
+    write('stella/index.html', page('/stella', 'Stella – Let Stella handle it | EVOLSIOR', 'Stella is an AI personal assistant for your whole day. Plans, homework, reminders, mail, restaurants, news and goals, handled in one conversation on iPhone, desktop, web and Telegram.', read('stella.body.html')))
 
     legal = read('legal.body.html')
     head, rest = legal.split('<main id="main">', 1)
