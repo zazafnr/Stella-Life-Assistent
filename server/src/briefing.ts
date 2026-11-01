@@ -14,6 +14,7 @@ import { notify } from './channels/deliver.ts';
 import { tr, userLocale, voiceOf } from './locale.ts';
 import { warmWeather, weatherLine } from './weather.ts';
 import { buildDigest, digestOf } from './news/digest.ts';
+import { screentimeWeekLines } from './screentime.ts';
 
 const LEAD_MINUTES = 45;
 
@@ -83,7 +84,7 @@ export function buildBriefing(user: User, lb: Lagebild = buildLagebild(user, 3))
   }
 
   // Sonntags: Rückblick auf die Wochenziele
-  const goalLines = goalBriefingLines(user, lb.today);
+  const goalLines = [...goalBriefingLines(user, lb.today), ...screentimeWeekLines(user, lb.today)];
   if (goalLines.length) sections.push({ id: 'goals', title: tr(user, 'briefing.section.goals'), lines: goalLines });
 
   // Was Stella seit gestern Abend erledigt hat

@@ -778,3 +778,8 @@ textarea.cookies { min-height: 90px; font-family: ui-monospace, monospace; font-
 .errand-status { font-weight: 600; }
 .errand-status.in_stock { color: var(--green); }
 .errand-status.unclear { color: var(--pink-text); }
+
+/* Bildschirmzeit (Paket 13): kleine Balken je Tag, rosa = Limit erreicht */
+.st-bars { display: flex; align-items: flex-end; gap: 3px; height: 40px; margin-top: 6px; }
+.st-bar { flex: 1; border-radius: 3px; background: var(--blue); opacity: .55; min-height: 3px; }
+.st-bar.over { background: var(--pink); opacity: .9; }

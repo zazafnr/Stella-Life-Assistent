@@ -100,6 +100,12 @@ struct RootView: View {
             }
             .task { store.start() }
             .task(id: store.me?.id) { if store.me != nil { WeatherService.shared.start(permission: store.me?.settings.locationPermission) } }
+            // Bildschirmzeit (nur im Xcode-Build): gesammelte Ereignisse der Erweiterung zum Server schicken
+            .task(id: store.me?.id) {
+                #if canImport(FamilyControls) && STELLA_SCREENTIME
+                if store.me != nil { await ScreenTimeManager.shared.syncEvents() }
+                #endif
+            }
             .transition(.opacity)
         } else {
             LoginView()

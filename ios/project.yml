@@ -1,0 +1,119 @@
+# XcodeGen: erzeugt Stella.xcodeproj (in der CI, nicht eingecheckt).
+#   brew install xcodegen && xcodegen generate --spec ios/project.yml
+#
+# Das Projekt nutzt DIESELBEN Quelldateien wie Stella.swiftpm (App, Core, Design, Views) und ergänzt die Bildschirmzeit:
+#   · StellaActivityMonitor  – DeviceActivityMonitor-Erweiterung (Schwellen, lokale Mitteilung, Sperre)
+#   · StellaActivityReport   – DeviceActivityReport-Erweiterung (Bildschirmzeit anzeigen)
+#   · App Group group.app.stella.ios, Entitlement com.apple.developer.family-controls, Associated Domains (Anmelde-Link)
+# Die Bildschirmzeit-Teile der App stehen hinter `#if canImport(FamilyControls) && STELLA_SCREENTIME`; Stella.swiftpm baut in Swift Playgrounds ohne sie.
+#
+# Zum Signieren: in Xcode unter „Signing & Capabilities“ das Team wählen (Team-ID aus dem Apple-Developer-Konto) – für alle drei Ziele.
+# Family Controls (Distribution) muss bei Apple beantragt sein, sonst bleibt Bildschirmzeit im TestFlight- und App-Store-Build aus.
+name: Stella
+options:
+  bundleIdPrefix: app.stella
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+targets:
+  Stella:
+    type: application
+    platform: iOS
+    supportedDestinations: [iOS]
+    sources:
+      - path: Stella.swiftpm/App
+      - path: Stella.swiftpm/Core
+      - path: Stella.swiftpm/Design
+      - path: Stella.swiftpm/Views
+      - path: Stella.swiftpm/Assets.xcassets
+      - path: Resources
+        buildPhase: resources
+    dependencies:
+      - target: StellaActivityMonitor
+      - target: StellaActivityReport
+    entitlements:
+      path: Stella.entitlements
+    info:
+      path: Stella-Info.plist
+      properties:
+        CFBundleDisplayName: Stella
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UIApplicationSceneManifest: { UIApplicationSupportsMultipleScenes: false }
+        # englische Standardtexte; die Übersetzungen liegen in Resources/<sprache>.lproj/InfoPlist.strings (scripts/gen-infoplist.ts)
+        NSCameraUsageDescription: Take photos of worksheets and notebook entries so Stella can read them.
+        NSPhotoLibraryUsageDescription: Choose photos of worksheets for Stella.
+        NSMotionUsageDescription: Stella counts your steps for your daily goal.
+        NSMicrophoneUsageDescription: Stella records your voice messages so you do not have to type.
+        NSLocationWhenInUseUsageDescription: "Stella uses your location only while you use the app: to show shops and pharmacies nearby for your errands, to find restaurants and prepare reservations, and to add weather and local news to your morning briefing. Your exact location is not stored."
+        CFBundleLocalizations: [en, de, es, fr, it, pt-BR, tr, pl]
+        CFBundleDevelopmentRegion: en
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.stella.ios
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) STELLA_SCREENTIME"
+  StellaActivityMonitor:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Extensions/StellaActivityMonitor
+        excludes: ["Info.plist", "*.entitlements"]
+      - path: Stella.swiftpm/Core/ScreenTime.swift
+    entitlements:
+      path: Extensions/StellaActivityMonitor/StellaActivityMonitor.entitlements
+    info:
+      path: Extensions/StellaActivityMonitor/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.stella.ios.activity-monitor
+        INFOPLIST_FILE: Extensions/StellaActivityMonitor/Info.plist
+        SKIP_INSTALL: YES
+  StellaActivityReport:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Extensions/StellaActivityReport
+        excludes: ["Info.plist", "*.entitlements"]
+    entitlements:
+      path: Extensions/StellaActivityReport/StellaActivityReport.entitlements
+    info:
+      path: Extensions/StellaActivityReport/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.stella.ios.activity-report
+        INFOPLIST_FILE: Extensions/StellaActivityReport/Info.plist
+        SKIP_INSTALL: YES
+  StellaTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+      - path: Stella.swiftpm/Core/ScreenTime.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.stella.ios.tests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  StellaTests:
+    build:
+      targets:
+        StellaTests: all
+    test:
+      targets: [StellaTests]
+  Stella:
+    build:
+      targets:
+        Stella: all
+        StellaActivityMonitor: all
+        StellaActivityReport: all
+    run:
+      config: Debug

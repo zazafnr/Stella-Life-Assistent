@@ -1,0 +1,6 @@
+/* ERZEUGT von scripts/gen-infoplist.ts – nicht von Hand ändern. */
+"NSCameraUsageDescription" = "Rób zdjęcia kart pracy i notatek z zeszytu, żeby Stella mogła je czytać.";
+"NSPhotoLibraryUsageDescription" = "Wybieraj zdjęcia kart pracy dla Stelli.";
+"NSMotionUsageDescription" = "Stella liczy twoje kroki na potrzeby dziennego celu.";
+"NSMicrophoneUsageDescription" = "Stella nagrywa twoje wiadomości głosowe, żeby nie trzeba było pisać.";
+"NSLocationWhenInUseUsageDescription" = "Stella używa twojej lokalizacji tylko wtedy, gdy korzystasz z aplikacji: aby pokazać pobliskie sklepy i apteki przy sprawunkach, znaleźć restauracje i przygotować rezerwacje oraz dodać pogodę i lokalne wiadomości do porannego briefingu. Twoja dokładna lokalizacja nie jest zapisywana.";

@@ -17,7 +17,8 @@ import { notify } from './channels/deliver.ts';
 import { nextLessonDate } from './untis.ts';
 import { budgetStatus, euro } from './finance.ts';
 import { activeGoals, parseGoalQuick, staleGoals } from './goals.ts';
-import { voiceOf } from './locale.ts';
+import { tr, voiceOf } from './locale.ts';
+import { screentimeHints } from './screentime.ts';
 
 export interface FoundHint extends Hint {
   action?: { type: ActionType; params: ActionParams[ActionType]; label: string };
@@ -134,6 +135,11 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
   for (const m of hasFeature(user, 'mails') ? lb.importantInbox : []) {
     if (!m.needsReply || m.source !== 'email' || Date.parse(m.createdAt) > halfDay) continue;
     out.push({ key: `reply:${m.id}`, priority: 'normal', text: v.hintReply(m.sender ?? 'Jemand', m.summary), open: { tab: 'inbox', label: 'Antwort schreiben' } });
+  }
+
+  // Bildschirmzeit: das Limit war an mindestens 3 der letzten 4 Tage erreicht (einmal pro Woche und Ziel, im Ton der Person)
+  for (const h of screentimeHints(user, lb.today)) {
+    out.push({ key: h.key, priority: 'normal', text: tr(user, `screentime.hint.${user.settings.tone ?? 'nett'}`, { name: h.goal.name, count: h.count }), open: { tab: 'goals', label: tr(user, 'screentime.title') } });
   }
 
   // Ziele ohne Eintrag seit zwei Wochen (höchstens einmal im Monat je Ziel)

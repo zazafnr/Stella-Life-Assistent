@@ -36,6 +36,7 @@ import { buildBriefing } from './briefing.ts';
 import { registerWeatherRoutes, warmWeather } from './weather.ts';
 import { registerNewsRoutes } from './news/routes.ts';
 import { registerErrandRoutes } from './errands/routes.ts';
+import { registerScreenTimeRoutes } from './screentime.ts';
 import { buildDigest } from './news/digest.ts';
 import { registerTelegramRoutes, registerTelegramWebhook, telegramConfigured } from './channels/telegram.ts';
 import { cleanBlocks, planWeek } from './weekplan.ts';
@@ -678,6 +679,7 @@ app.register(async (api) => {
   registerTelegramRoutes(api);
   registerNewsRoutes(api);
   registerErrandRoutes(api);
+  registerScreenTimeRoutes(api);
 
   // ----- Plan my week: Vorschlag ansehen, Blöcke abwählen, übernehmen -----
   api.get('/api/weekplan', async (req) => {

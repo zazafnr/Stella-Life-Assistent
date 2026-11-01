@@ -530,6 +530,31 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (user_id, date)
   );
   `,
+  // Paket 13: Bildschirmzeit-Ziele (iOS). Der Server kennt nur Name, Limit und erreichte Schwellen – nie App-Daten.
+  `
+  CREATE TABLE screentime_goals (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    limit_minutes INTEGER NOT NULL,
+    shield INTEGER NOT NULL DEFAULT 0,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX screentime_goals_user ON screentime_goals(user_id);
+  CREATE TABLE screentime_events (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    goal_id TEXT NOT NULL REFERENCES screentime_goals(id) ON DELETE CASCADE,
+    day TEXT NOT NULL,
+    minutes INTEGER NOT NULL,
+    percent INTEGER NOT NULL,
+    at TEXT NOT NULL,
+    UNIQUE (goal_id, day, minutes)
+  );
+  CREATE INDEX screentime_events_user_day ON screentime_events(user_id, day);
+  `,
 ];
 
 function migrate() {
