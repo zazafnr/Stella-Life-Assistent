@@ -38,6 +38,8 @@ export interface AudioInput {
   audioId?: string;
   clientId?: string | null;
   conversationId?: string | null;
+  /** kam über diesen Kanal herein (Telegram) */
+  via?: 'telegram';
 }
 
 export async function handleAudio(user: User, input: AudioInput): Promise<ChatResponse & { transcript: string; transcriptRaw: string; audioId: string }> {
@@ -75,7 +77,7 @@ export async function handleAudio(user: User, input: AudioInput): Promise<ChatRe
     id: audioId, kind: 'audio', caption: 'Sprachnachricht', ...(input.durationSec ? { duration: Math.round(input.durationSec) } : {}),
     transcriptRaw: clean.raw, ...(clean.cleaned ? { transcript: clean.text } : {}),
   };
-  const res = await handleChat(user, clean.text, input.clientId ?? null, [], input.conversationId ?? null, { attachments: [attachment] });
+  const res = await handleChat(user, clean.text, input.clientId ?? null, [], input.conversationId ?? null, { attachments: [attachment], via: input.via });
   return { ...res, transcript: clean.text, transcriptRaw: clean.raw, audioId };
 }
 

@@ -4,7 +4,7 @@ import { Section, useAction } from './ui.tsx';
 import { WEATHER_TYPES, isWeatherType } from '@stella/shared';
 import { forceWeather, forcedWeather } from '../../weather.ts';
 
-type Name = 'anthropic' | 'groq' | 'openrouter' | 'smtp' | 'stripe';
+type Name = 'anthropic' | 'groq' | 'openrouter' | 'smtp' | 'stripe' | 'telegram';
 interface KeyStatus { set: boolean; source: 'env' | 'app' | null; lastOk: string | null; lastError: string | null }
 type Keys = Record<Name, KeyStatus>;
 
@@ -13,6 +13,7 @@ const TITLES: Record<Name, { title: string; hint: string; field: string }> = {
   groq: { title: 'Groq-API-Key', hint: 'Mails einordnen, Chat-Titel und Sprachnachrichten. Kostenlos erhältlich auf console.groq.com.', field: 'gsk_…' },
   openrouter: { title: 'OpenRouter-API-Key', hint: 'Für Chat und Planer. Ohne Eintrag hier gilt der Schlüssel aus der Server-Umgebung.', field: 'sk-or-…' },
   stripe: { title: 'Stripe (Bezahlung der Abos)', hint: 'Geheimer Schlüssel (sk_…) und Webhook-Geheimnis (whsec_…). Webhook-URL in Stripe: https://stella.evolsior.com/api/billing/webhook – Ereignisse: checkout.session.completed, customer.subscription.updated, customer.subscription.deleted.', field: '' },
+  telegram: { title: 'Telegram-Bot', hint: 'Bot-Token von @BotFather (Name z. B. „Stella by EVOLSIOR“, Befehle /start, /briefing, /stop). Beim Speichern setzt der Server den Webhook selbst: https://stella.evolsior.com/api/channels/telegram/webhook.', field: '123456789:AAE…' },
   smtp: { title: 'E-Mail-Absender (SMTP)', hint: 'Von hier gehen die Bestätigungs-Codes bei der Registrierung raus. Der Absender (z. B. Stella <noreply@evolsior.com>) bestimmt die Domain: Antworten gehen an support@ dieser Domain, Mails, die Stella dir schreibt, kommen von stella@.', field: '' },
 };
 
@@ -29,7 +30,7 @@ export function Server() {
   if (!keys) return <p className="muted">⏳ Einen Moment…</p>;
   return (
     <>
-      {(['anthropic', 'groq', 'openrouter'] as const).map((n) => <KeyCard key={n} name={n} status={keys[n]} onChange={setKeys} />)}
+      {(['anthropic', 'groq', 'openrouter', 'telegram'] as const).map((n) => <KeyCard key={n} name={n} status={keys[n]} onChange={setKeys} />)}
       <FallbackCard />
       <SmtpCard status={keys.smtp} onChange={setKeys} />
       <StripeCard status={keys.stripe} onChange={setKeys} />
@@ -52,7 +53,7 @@ function StatusLine({ s }: { s: KeyStatus }) {
   );
 }
 
-function KeyCard({ name, status, onChange }: { name: 'anthropic' | 'groq' | 'openrouter'; status: KeyStatus; onChange: (k: Keys) => void }) {
+function KeyCard({ name, status, onChange }: { name: 'anthropic' | 'groq' | 'openrouter' | 'telegram'; status: KeyStatus; onChange: (k: Keys) => void }) {
   const [run, view] = useAction();
   const [value, setValue] = useState('');
   const t = TITLES[name];

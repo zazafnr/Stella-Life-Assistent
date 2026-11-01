@@ -207,6 +207,27 @@ und plant die nächste Erinnerung (`advanceRecurring`); pausiert sind sie ohne E
 > [`docs/plan/stella-v3.md`](plan/stella-v3.md). **Finanzen** sind dort vorerst ausgeblendet
 > (`STELLA_FEATURE_FINANCE=true` schaltet sie wieder ein; Code, Tabellen und Tests bleiben).
 
+### Kanäle: Telegram heute, WhatsApp später (v3, Paket 10)
+
+- `server/src/channels/channel.ts` beschreibt einen Kanal (`send`), `deliver.ts` entscheidet mit `notify()`, wohin Stella von sich aus schreibt
+  (`settings.notifyVia`: `push` und/oder `telegram`). Briefing, Hinweise, Erinnerungen, Ziele, Hausübungen, WebUntis und Wochenplan gehen darüber.
+  Ist Telegram gewählt, aber nicht verknüpft oder fehlgeschlagen, kommt die Nachricht trotzdem als Push an. Die Mail-Pipeline (`inbound.ts`) bleibt, wie sie ist.
+- **Telegram:** Bot-Token unter Einstellungen → Server (verschlüsselt, Bereich `__system__`). Beim Speichern setzt der Server den Webhook
+  `/api/channels/telegram/webhook` mit zufälligem `secret_token`; der Header `X-Telegram-Bot-Api-Secret-Token` wird bei jeder Anfrage geprüft (sonst 401).
+- Verknüpfen: Einmal-Token (10 Minuten, nur der Hash liegt in `channel_tokens`) → `https://t.me/<Bot>?start=<token>` → `/start <token>` legt `channel_links` an.
+  `/stop` oder „Trennen“ in der App entfernt sie.
+- Eingehend: Text → `handleChat`, Sprachnachricht (OGG) → `handleAudio` (inkl. Aufräumen aus Paket 9), Foto → Anhang → `handleChat`. Die Nachrichten
+  stehen in derselben Tages-Konversation wie in der App, markiert mit `via = 'telegram'` (in der App ein kleines Symbol). Limits der Abos gelten gleich.
+  Telegram-Wiederholungen werden über die `update_id` erkannt, Aktualisierungen je Chat nacheinander verarbeitet.
+- Ausgehend: Markdown → Telegram-HTML (alles wird escaped), Aktionskarten als Inline-Knöpfe (Ja / Nein / Rückgängig → `approve` / `reject` / `undo`),
+  höchstens eine Nachricht pro Sekunde und Chat. Unbekannte Chats bekommen höchstens drei Erklärungen pro Stunde.
+
+**WhatsApp (nur vorbereitet, `channels/whatsapp.ts`):**
+- Meta erlaubt allgemeine KI-Assistenten in der EU nur vorläufig (seit 2026, 12 Monate) und gegen eine Gebühr pro Nachricht.
+- Proaktive Nachrichten brauchen von Meta freigegebene Vorlagen (etwa 2–5 Cent pro Stück).
+- Nötig wären die Meta-Unternehmensverifizierung und eine eigene Nummer.
+- Wenn es kommt, dann nur ab Pro.
+
 ### Abos und Limits (v3, Paket 5)
 
 - Abos: Free, Plus (8 €), Pro (15 €), Max (35 €) – Definition und Startwerte in `shared/src/plans.ts`, Überschreibungen

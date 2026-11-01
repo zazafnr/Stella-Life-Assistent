@@ -116,6 +116,11 @@ export const config = {
     baseUrl: env.STELLA_WEATHER_URL ?? 'https://api.open-meteo.com',
     geoipDb: env.STELLA_GEOIP_DB ?? path.join(env.STELLA_DATA_DIR ?? path.join(import.meta.dirname, '../../data'), 'geoip/dbip-city-lite.mmdb'),
   },
+  /** Telegram-Bot (Schlüssel unter Einstellungen → Server); `minGapMs`: höchstens eine Nachricht pro Sekunde und Chat */
+  telegram: {
+    baseUrl: env.TELEGRAM_BASE_URL ?? 'https://api.telegram.org',
+    minGapMs: Number(env.TELEGRAM_MIN_GAP_MS ?? 1000),
+  },
   /** Download-Link von FreeNotes, sobald es die App gibt; leer = „Benachrichtige mich“ in der Einführung */
   freenotesUrl: env.STELLA_FREENOTES_URL ?? '',
   features: {

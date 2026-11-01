@@ -7,7 +7,7 @@ import { addAttachment, addMessage, addReminder, enqueueJob, getItem, getUser, t
 import { renderHandwriting } from './handwriting.ts';
 import { complete, type ContentPart } from './llm.ts';
 import { changeItem } from './planner.ts';
-import { pushToUser } from './push.ts';
+import { notify } from './channels/deliver.ts';
 import { filePath, saveFile } from './files.ts';
 import { usesFreeNotes } from './notes.ts';
 import { voiceOf } from './locale.ts';
@@ -126,7 +126,7 @@ export async function solveHomework(userId: string, itemId: string, attempt = 0)
 
   const msg = voiceOf(getUser(userId) ?? { settings: {} }).solved(`${item.title}${item.detail ? ` (${item.detail})` : ''}`, usesFreeNotes(userId));
   addMessage(userId, 'assistant', msg, { attachments: [attachment] });
-  await pushToUser(userId, { title: 'Stella', body: msg.replace(/\*\*/g, ''), tag: itemId });
+  await notify(userId, { title: 'Stella', body: msg.replace(/\*\*/g, ''), text: msg, tag: itemId });
 }
 
 /** Statt "Morgen fällig" am Vorabend nur kurz: erledigt. */

@@ -465,6 +465,7 @@ struct Bubble: View {
                         if let card = message.card, card.type == "places" { PlacesCardView(card: card) }
                         if let card = message.card, card.type == "spending" { SpendingCardView(card: card) }
                         HStack(spacing: 4) {
+                            if message.via == "telegram" { Image(systemName: "paperplane.fill").accessibilityLabel("Telegram") }
                             Text(time)
                             if message.pending == true { Image(systemName: "clock") }
                         }

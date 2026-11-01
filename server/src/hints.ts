@@ -13,7 +13,7 @@ import { buildLagebild, toMin, type Lagebild } from './context.ts';
 import { hasFeature, isLearner, isSchool } from './profile.ts';
 import { addMessage, db, getUser, now, setPending, type PendingType, type User } from './db.ts';
 import { bookFor } from './planner.ts';
-import { pushToUser } from './push.ts';
+import { notify } from './channels/deliver.ts';
 import { nextLessonDate } from './untis.ts';
 import { budgetStatus, euro } from './finance.ts';
 import { activeGoals, parseGoalQuick, staleGoals } from './goals.ts';
@@ -225,7 +225,7 @@ export async function deliverHint(user: User, h: FoundHint, push: boolean): Prom
   }
   if (h.pending) setPending(user.id, h.pending.type, h.pending.itemId);
   markDelivered(user.id, h.key, actionId);
-  if (push) await pushToUser(user.id, { title: 'Stella', body: text.replace(/\*\*/g, ''), tag: h.key });
+  if (push) await notify(user.id, { title: 'Stella', body: text.replace(/\*\*/g, ''), text, tag: h.key });
 }
 
 /** Hinweis über den Knopf auf „Heute“ erledigen lassen – das ist Zustimmung des Nutzers */

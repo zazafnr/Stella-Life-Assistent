@@ -58,6 +58,14 @@ struct SettingsView: View {
                         Text(L("settings.languageSub"))
                     }
 
+                    if me.flags?.telegram == true {
+                        Section {
+                            NavigationLink { TelegramView() } label: {
+                                row(L("settings.telegram.title"), symbol: "paperplane.fill", tint: Theme.blue, detail: L("settings.telegram.sub"))
+                            }
+                        }
+                    }
+
                     Section {
                         Button { store.onboardingRequest = .situation } label: {
                             row("Profil", symbol: "person.crop.circle", tint: Theme.pink, detail: Self.profileSummary(me))

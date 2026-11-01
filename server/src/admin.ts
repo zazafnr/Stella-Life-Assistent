@@ -9,6 +9,7 @@ import { isLocale, isPlanId, LOCALES, DEFAULT_LOCALE, PLAN_IDS, PLANS } from '@s
 import { billingOverview, giftPlan, planFor, planOverrides, setPlanOverrides, subscriptionOf } from './billing.ts';
 import { db } from './db.ts';
 import { announceFreenotes } from './notes.ts';
+import { registerWebhook, unregisterWebhook } from './channels/telegram.ts';
 import { renderTemplate, SAMPLE, TEMPLATE_NAMES, type TemplateName } from './email/templates.ts';
 
 export function registerAdminRoutes(api: FastifyInstance) {
@@ -17,8 +18,12 @@ export function registerAdminRoutes(api: FastifyInstance) {
   api.put('/api/admin/keys', { preHandler: requireOwner }, async (req) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     if (!isKeyName(b.name)) throw new HttpError(400, 'Unbekannter Schlüssel.');
+    const empty = b.value === null || b.value === '' || b.value === undefined;
+    if (b.name === 'telegram' && empty) await unregisterWebhook();
     setKey(b.name, b.value);
-    return { keys: keyStatus() };
+    // Telegram: nach dem Speichern den Webhook setzen (Ergebnis steht danach im Schlüssel-Status)
+    const webhook = b.name === 'telegram' && !empty ? await registerWebhook() : undefined;
+    return { keys: keyStatus(), ...(webhook ? { webhook } : {}) };
   });
 
   api.post<{ Params: { name: string } }>('/api/admin/keys/:name/test', { preHandler: requireOwner }, async (req) => {

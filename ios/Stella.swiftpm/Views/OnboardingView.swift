@@ -434,6 +434,7 @@ struct OnboardingView: View {
             lines.append(L("onboarding.sum.briefing", ["when": briefing == "auto" ? L("onboarding.sum.briefingAuto") : L("onboarding.sum.briefingAt", ["time": briefing])]))
         }
         lines.append(L("onboarding.sum.tone", ["tone": L("tone.\(tone.rawValue)").lowercased()]))
+        if store.me?.flags?.telegram == true { lines.append(L("onboarding.sum.telegram")) }
         return lines
     }
 

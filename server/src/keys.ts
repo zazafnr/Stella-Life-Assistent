@@ -2,19 +2,23 @@
 // dann was der Owner in den Einstellungen unter „Server“ eingetragen hat – verschlüsselt im Bereich __system__.
 // Ein Schlüssel verlässt den Server nie: die Oberfläche bekommt nur „gesetzt / fehlt / zuletzt OK“.
 
+import { randomBytes } from 'node:crypto';
 import nodemailer from 'nodemailer';
 import { config } from './config.ts';
 import { deleteSecret, getSecret, HttpError, setSecret } from './auth.ts';
 import { now } from './db.ts';
 
 export const SYSTEM_SCOPE = '__system__';
-export const KEY_NAMES = ['anthropic', 'groq', 'openrouter', 'smtp', 'stripe'] as const;
+export const KEY_NAMES = ['anthropic', 'groq', 'openrouter', 'smtp', 'stripe', 'telegram'] as const;
 export type KeyName = (typeof KEY_NAMES)[number];
 export const isKeyName = (v: unknown): v is KeyName => KEY_NAMES.includes(v as KeyName);
 
 export interface SmtpKey { host: string; port: number; user: string; pass: string; from?: string }
 /** Stripe: geheimer Schlüssel (sk_…) und Signatur-Geheimnis des Webhooks (whsec_…) */
 export interface StripeKey { secretKey: string; webhookSecret: string }
+
+/** Telegram: Bot-Token von @BotFather, geheimes Webhook-Token (wir erzeugen es) und der Benutzername des Bots */
+export interface TelegramKey { token: string; secret: string; username?: string }
 
 type ApiKeyName = 'anthropic' | 'groq' | 'openrouter';
 
@@ -40,6 +44,18 @@ export function stripeKey(): StripeKey | null {
   return secretKey ? { secretKey, webhookSecret } : null;
 }
 
+export function telegramKey(): TelegramKey | null {
+  const stored = getSecret<TelegramKey>(SYSTEM_SCOPE, 'telegram');
+  const token = process.env.TELEGRAM_BOT_TOKEN || stored?.token || '';
+  return token ? { token, secret: stored?.secret ?? '', ...(stored?.username ? { username: stored.username } : {}) } : null;
+}
+
+/** Benutzernamen des Bots merken (nach getMe) */
+export function saveTelegramUsername(username: string) {
+  const k = telegramKey();
+  if (k) setSecret(SYSTEM_SCOPE, 'telegram', { ...k, username });
+}
+
 interface Health { ok: boolean; at: string; error?: string }
 const lastRecorded = new Map<string, number>();
 
@@ -56,7 +72,7 @@ export interface KeyStatus { set: boolean; source: 'env' | 'app' | null; lastOk:
 export function keyStatus(): Record<KeyName, KeyStatus> {
   const out = {} as Record<KeyName, KeyStatus>;
   for (const name of KEY_NAMES) {
-    const fromEnv = name !== 'smtp' && name !== 'stripe' && !!ENV_KEY[name]();
+    const fromEnv = name !== 'smtp' && name !== 'stripe' && name !== 'telegram' && !!ENV_KEY[name]();
     const fromApp = !!getSecret(SYSTEM_SCOPE, name);
     const h = getSecret<Health>(SYSTEM_SCOPE, `status:${name}`);
     out[name] = {
@@ -97,11 +113,18 @@ function cleanStripe(v: unknown): StripeKey {
   return { secretKey, webhookSecret };
 }
 
+function cleanTelegram(v: unknown): TelegramKey {
+  const token = typeof v === 'string' ? v.trim() : typeof (v as { token?: unknown })?.token === 'string' ? (v as { token: string }).token.trim() : '';
+  if (!/^\d{6,12}:[A-Za-z0-9_-]{30,}$/.test(token)) throw new HttpError(400, 'Das sieht nicht nach einem Bot-Token von @BotFather aus (123456:ABC…).');
+  const old = getSecret<TelegramKey>(SYSTEM_SCOPE, 'telegram');
+  return { token, secret: old?.token === token && old.secret ? old.secret : randomBytes(24).toString('hex') };
+}
+
 /** Eintragen oder (mit null/leer) löschen. */
 export function setKey(name: KeyName, value: unknown) {
   const empty = value === null || value === '' || value === undefined;
   if (empty) { deleteSecret(SYSTEM_SCOPE, name); deleteSecret(SYSTEM_SCOPE, `status:${name}`); return; }
-  setSecret(SYSTEM_SCOPE, name, name === 'smtp' ? cleanSmtp(value) : name === 'stripe' ? cleanStripe(value) : cleanKey(value));
+  setSecret(SYSTEM_SCOPE, name, name === 'smtp' ? cleanSmtp(value) : name === 'stripe' ? cleanStripe(value) : name === 'telegram' ? cleanTelegram(value) : cleanKey(value));
   deleteSecret(SYSTEM_SCOPE, `status:${name}`);
   lastRecorded.delete(name);
 }
@@ -116,6 +139,13 @@ export async function testKey(name: KeyName): Promise<{ ok: boolean; message: st
       const transport = nodemailer.createTransport({ host: smtp.host, port: smtp.port, secure: smtp.port === 465, auth: { user: smtp.user, pass: smtp.pass }, connectionTimeout: 10_000, greetingTimeout: 10_000 });
       await transport.verify();
       result = { ok: true, message: 'Anmeldung beim Mail-Server hat geklappt.' };
+    } else if (name === 'telegram') {
+      const k = telegramKey();
+      if (!k) return { ok: false, message: 'Telegram ist noch nicht eingetragen.' };
+      const res = await fetch(`${config.telegram.baseUrl}/bot${k.token}/getMe`, { signal: AbortSignal.timeout(15_000) });
+      const me = (await res.json().catch(() => ({}))) as { ok?: boolean; result?: { username?: string } };
+      if (res.ok && me.ok && me.result?.username) { saveTelegramUsername(me.result.username); result = { ok: true, message: `Der Bot @${me.result.username} antwortet.` }; }
+      else result = { ok: false, message: res.status === 401 ? 'Telegram lehnt den Token ab.' : `Telegram antwortet mit Fehler ${res.status}.` };
     } else if (name === 'stripe') {
       const k = stripeKey();
       if (!k) return { ok: false, message: 'Stripe ist noch nicht eingetragen.' };

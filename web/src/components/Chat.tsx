@@ -205,7 +205,7 @@ export function Chat() {
                       {m.actionId && <ActionCard id={m.actionId} />}
                       {m.card?.type === 'places' && <PlacesCard card={m.card} />}
                       {m.card?.type === 'spending' && <SpendingCard card={m.card} />}
-                      <span className="meta">{m.pending ? t('chat.sending') : timeLabel(m.createdAt, locale)}</span>
+                      <span className="meta">{m.via === 'telegram' && <span title="Telegram" aria-label="Telegram" style={{ marginRight: 4 }}><Icon name="send" size={11} /></span>}{m.pending ? t('chat.sending') : timeLabel(m.createdAt, locale)}</span>
                     </div>
                   </div>
                 </div>

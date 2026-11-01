@@ -35,6 +35,7 @@ struct ServerKeysView: View {
     @State private var anthropicInput = ""
     @State private var groqInput = ""
     @State private var openrouterInput = ""
+    @State private var telegramInput = ""
     @State private var host = "smtp.gmail.com"
     @State private var port = "465"
     @State private var user = ""
@@ -67,6 +68,8 @@ struct ServerKeysView: View {
                        hint: "Mails einordnen, Chat-Titel und Sprachnachrichten. Kostenlos erhältlich auf console.groq.com.")
             keySection(name: "openrouter", title: "OpenRouter-API-Key", input: $openrouterInput, placeholder: "sk-or-…",
                        hint: "Für Chat und Planer. Ohne Eintrag hier gilt der Schlüssel aus der Server-Umgebung.")
+            keySection(name: "telegram", title: "Telegram-Bot", input: $telegramInput, placeholder: "123456789:AAE…",
+                       hint: "Bot-Token von @BotFather (Befehle /start, /briefing, /stop). Beim Speichern setzt der Server den Webhook selbst.")
             smtpSection
             invitesSection
             if let message {

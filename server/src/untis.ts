@@ -12,7 +12,7 @@ import {
   addMessage, db, getItemByExternalId, getUser, notifyOnce, type User,
 } from './db.ts';
 import { addItem, changeItem } from './planner.ts';
-import { pushToUser } from './push.ts';
+import { notify } from './channels/deliver.ts';
 import { voiceOf } from './locale.ts';
 
 export interface UntisCredentials {
@@ -90,7 +90,7 @@ export function lessonsFor(userId: string, from: Ymd, to: Ymd) {
 async function say(user: User, text: string, key: string) {
   if (!notifyOnce(user.id, key)) return;
   addMessage(user.id, 'assistant', text);
-  await pushToUser(user.id, { title: 'Stella', body: text.replace(/\*\*/g, ''), tag: key });
+  await notify(user.id, { title: 'Stella', body: text.replace(/\*\*/g, ''), text, tag: key });
 }
 
 export async function syncUntis(userId: string) {

@@ -34,6 +34,7 @@ import { approve, GROUPS, isGroup, isLevel, levelFor, listActions, perform, reje
 import { LlmUnavailable } from './llm.ts';
 import { buildBriefing } from './briefing.ts';
 import { registerWeatherRoutes, warmWeather } from './weather.ts';
+import { registerTelegramRoutes, registerTelegramWebhook, telegramConfigured } from './channels/telegram.ts';
 import { cleanBlocks, planWeek } from './weekplan.ts';
 import { acceptHint, dismissHint } from './hints.ts';
 import { registerAdminRoutes } from './admin.ts';
@@ -74,7 +75,7 @@ function publicUser(user: User) {
   return {
     id: user.id, name: user.name, email: user.email, timeZone: user.timeZone, settings: visibleSettings(user.settings), role: user.role,
     /** Serverweite Funktions-Schalter für die Oberflächen (z. B. Einführung ohne „Ausgaben“) */
-    flags: { finance: config.features.finance, freenotesUrl: config.freenotesUrl || null },
+    flags: { finance: config.features.finance, freenotesUrl: config.freenotesUrl || null, telegram: telegramConfigured() },
     ingestUrl: `${config.publicUrl}/api/ingest/${user.ingestToken}`,
     integrations: {
       books: Object.fromEntries((Object.keys(PROVIDERS) as BookProvider[]).map((p) => {
@@ -101,6 +102,7 @@ registerSignupRoutes(app, publicUser);
 registerInboundRoute(app);
 registerUndoRoutes(app);
 registerBillingWebhook(app);
+registerTelegramWebhook(app);
 registerLoginRoutes(app);
 registerLoginApi(app);
 setPublicUser(publicUser);
@@ -280,6 +282,11 @@ app.register(async (api) => {
     if (b.country !== undefined) {
       if (!isCountry(b.country)) throw new HttpError(400, 'Unknown country.');
       patch.country = b.country;
+    }
+    if (b.notifyVia !== undefined) {
+      const via = Array.isArray(b.notifyVia) ? [...new Set(b.notifyVia.filter((v): v is 'push' | 'telegram' => v === 'push' || v === 'telegram'))] : [];
+      if (!via.length) throw new HttpError(400, 'notifyVia: push und/oder telegram.');
+      patch.notifyVia = via;
     }
     if (b.locationPermission !== undefined) {
       if (!isLocationPermission(b.locationPermission)) throw new HttpError(400, 'Unknown location state.');
@@ -665,6 +672,7 @@ app.register(async (api) => {
   // ----- Morning Briefing & Hinweise -----
   api.get('/api/briefing', async (req) => { await warmWeather(req.user); return buildBriefing(req.user); });
   registerWeatherRoutes(api);
+  registerTelegramRoutes(api);
 
   // ----- Plan my week: Vorschlag ansehen, Blöcke abwählen, übernehmen -----
   api.get('/api/weekplan', async (req) => {

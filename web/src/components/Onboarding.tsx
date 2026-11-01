@@ -168,6 +168,7 @@ export function Onboarding({ onDone, startAt = 'language' }: { onDone: (after?: 
     d.features.includes('goals') && t('onboarding.sum.goals'),
     d.briefing !== 'off' && t('onboarding.sum.briefing', { when: briefingWhen }),
     t('onboarding.sum.tone', { tone: t(`tone.${d.tone}`).toLowerCase() }),
+    me.flags?.telegram && t('onboarding.sum.telegram'),
   ].filter(Boolean) as string[];
 
   return (

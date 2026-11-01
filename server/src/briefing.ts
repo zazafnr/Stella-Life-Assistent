@@ -10,7 +10,7 @@ import { buildLagebild, isoWeekday, toHhmm, toMin, type Lagebild } from './conte
 import { addMessage, db, getUser, notifyOnce, type User } from './db.ts';
 import { goalBriefingLines } from './goals.ts';
 import { deliverHint, findHints, isDelivered } from './hints.ts';
-import { pushToUser } from './push.ts';
+import { notify } from './channels/deliver.ts';
 import { tr, userLocale, voiceOf } from './locale.ts';
 import { warmWeather, weatherLine } from './weather.ts';
 
@@ -127,12 +127,13 @@ export async function maybeSendBriefing(userId: string): Promise<boolean> {
   const b = buildBriefing(user, lb);
   // Die Hinweise kommen gleich danach als eigene Nachrichten – mit Vorschlag als Karte (Ja/Nein)
   const pending = findHints(user, buildLagebild(user, 8)).filter((h) => !isDelivered(userId, h.key));
-  addMessage(userId, 'assistant', [b.greeting, ...(b.sections.length ? sectionsText(b.sections) : [voiceOf(user).briefingQuiet()]),
+  const fullText = [b.greeting, ...(b.sections.length ? sectionsText(b.sections) : [voiceOf(user).briefingQuiet()]),
     pending.length ? tr(user, 'briefing.alsoNoticed', { count: pending.length }) : b.closing,
-  ].join('\n\n'));
+  ].join('\n\n');
+  addMessage(userId, 'assistant', fullText);
   for (const h of pending) await deliverHint(user, h, false);
   const summary = b.sections.flatMap((s) => s.lines).slice(0, 3).join(' · ') || tr(user, 'briefing.nothing');
-  await pushToUser(userId, { title: b.greeting.replace(/:$/, ''), body: summary, tag: `briefing-${lb.today}` });
+  await notify(userId, { title: b.greeting.replace(/:$/, ''), body: summary, text: fullText, tag: `briefing-${lb.today}` });
   return true;
 }
 

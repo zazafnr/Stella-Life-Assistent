@@ -17,7 +17,7 @@ import { buildLagebild, freeSlots, isoWeekday, toHhmm, toMin, type DayContext, t
 import { addMessage, db, getItem, getUser, type User } from './db.ts';
 import { isDelivered, markDelivered } from './hints.ts';
 import { complete, llmAvailable } from './llm.ts';
-import { pushToUser } from './push.ts';
+import { notify } from './channels/deliver.ts';
 import { voiceOf } from './locale.ts';
 import { consumeQuota } from './billing.ts';
 import { resolveTier } from './router.ts';
@@ -377,7 +377,7 @@ export async function maybeOfferWeek(userId: string): Promise<void> {
   const { result } = offerWeekPlan(user, plan, { intro: v.weekPlanOffer(), source: 'auto' });
   markDelivered(userId, key, result.status === 'refused' ? undefined : result.actionId);
   if (result.status !== 'refused') {
-    await pushToUser(userId, { title: 'Stella', body: `${v.weekPlanOffer()} ${plan.blocks.length} Blöcke – schau kurz drüber.`, tag: key });
+    await notify(userId, { title: 'Stella', body: `${v.weekPlanOffer()} ${plan.blocks.length} Blöcke – schau kurz drüber.`, tag: key });
   }
 }
 

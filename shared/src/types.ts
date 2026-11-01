@@ -60,6 +60,8 @@ export interface ChatMessage {
   /** gehört zu einer Aktion (Vorschlag mit Ja/Nein oder Erledigtes mit „Rückgängig“) */
   actionId?: string;
   card?: MessageCard;
+  /** kam über diesen Kanal herein bzw. ging dorthin (in der App ein kleines Symbol) */
+  via?: 'telegram';
 }
 
 /** Wie viel Stella von sich aus tun darf */

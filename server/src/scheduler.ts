@@ -16,7 +16,7 @@ import { fetchBookPage } from './books.ts';
 import { advanceRecurring } from './planner.ts';
 import { solveHomework } from './homework.ts';
 import { sendGoalCheckIns } from './goals.ts';
-import { pushToUser } from './push.ts';
+import { notify } from './channels/deliver.ts';
 
 type ReminderRow = { id: string; user_id: string; item_id: string | null; message: string; with_attachments: number; always: number };
 type JobRow = { id: string; user_id: string; type: string; payload: string; attempts: number };
@@ -46,7 +46,7 @@ export async function sendDueReminders() {
     // Erledigung mit Ort: eine Karte „Läden in der Nähe“ – der Standort wird erst beim Öffnen und nur einmal abgefragt
     const card = item?.place ? { type: 'places' as const, category: item.place.category, label: item.place.label, itemId: item.id } : undefined;
     addMessage(r.user_id, 'assistant', text, { attachments, card });
-    await pushToUser(r.user_id, { title: 'Stella', body: r.message, url: '/', tag: r.item_id ?? r.id });
+    await notify(r.user_id, { title: 'Stella', body: r.message, url: '/', tag: r.item_id ?? r.id });
     // Dauerauftrag: die nächste Erinnerung gleich anlegen
     const owner = item?.recurrence ? getUser(r.user_id) : null;
     if (item && owner) advanceRecurring(owner, item);

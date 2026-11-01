@@ -59,11 +59,11 @@ const day = (t: Turn, ymd: string, rel = true) => dayFor(t.user, ymd, rel ? t.to
 
 /** `conversationId`: in welchem Chat geschrieben wird (alter Chat fortsetzen); ohne Angabe der neueste von heute. */
 export async function handleChat(user: User, text: string, clientId: string | null, imageIds: string[] = [], conversationId: string | null = null,
-  extra: { attachments?: Attachment[]; detailed?: boolean } = {}): Promise<ChatResponse> {
+  extra: { attachments?: Attachment[]; detailed?: boolean; via?: 'telegram' } = {}): Promise<ChatResponse> {
   if (clientId && findMessageByClientId(user.id, clientId)) return { messages: [], items: [] }; // schon verarbeitet
   const convId = (conversationId && getConversation(user.id, conversationId)?.id) || todayConversation(user.id)!;
   // alles, was während dieser Anfrage geschrieben wird (auch in Hilfsfunktionen), landet in diesem Chat
-  const res = await chatContext.run({ userId: user.id, conversationId: convId, detailed: extra.detailed }, () => handleChatIn(user, text, clientId, imageIds, convId, extra.attachments ?? []));
+  const res = await chatContext.run({ userId: user.id, conversationId: convId, detailed: extra.detailed, via: extra.via }, () => handleChatIn(user, text, clientId, imageIds, convId, extra.attachments ?? []));
   void maybeTitle(user.id, convId).catch(() => {});
   return { ...res, conversationId: convId };
 }

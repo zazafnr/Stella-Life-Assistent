@@ -541,6 +541,7 @@ enum SettingValue: Encodable {
     case string(String)
     case int(Int)
     case bool(Bool)
+    case strings([String])
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.singleValueContainer()
@@ -548,6 +549,7 @@ enum SettingValue: Encodable {
         case .string(let v): try c.encode(v)
         case .int(let v): try c.encode(v)
         case .bool(let v): try c.encode(v)
+        case .strings(let v): try c.encode(v)
         }
     }
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ANIM_MODES, COUNTRIES, countryName, LOCALES, LOCALE_NAMES, TONE_INFO, TONES, type AnimMode, type Tone } from '@stella/shared';
 import { setAnimMode, useAnimMode } from '../weather.ts';
+import { TelegramSheet } from './settings/Telegram.tsx';
 import { useLocale, useT } from '../i18n.ts';
 import { api, logout, logoutLocal, meHas, meIsSchool, refreshMe, useStore, type Me } from '../store.ts';
 import { enablePush, isIos, isStandalone, pushPermission } from '../push.ts';
@@ -18,7 +19,7 @@ import { Icon, type IconName } from '../ui/Icon.tsx';
 import { Sheet, Sky, StarMark, Switch, showToast } from '../ui/Decor.tsx';
 import { VERSION } from '../version.ts';
 
-type SheetId = 'plan' | 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'finance' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server' | 'addresses' | 'delete';
+type SheetId = 'plan' | 'telegram' | 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'finance' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server' | 'addresses' | 'delete';
 
 interface CostSummary { totalMicroUsd: number; requests: number }
 interface AiStatusData {
@@ -66,6 +67,10 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
       id: 'notify', icon: 'bell', tile: 'green', title: t('settings.notify'), sub: t('settings.notifySub'),
       status: perm === 'granted' ? [t('settings.on'), 'ok'] : perm === 'denied' ? [t('settings.blocked'), 'warn'] : [t('settings.turnOn'), 'todo'],
     },
+    ...(me.flags?.telegram ? [{
+      id: 'telegram' as const, icon: 'send' as IconName, tile: 'blue', title: t('settings.telegram.title'), sub: t('settings.telegram.sub'),
+      status: (me.settings.notifyVia?.includes('telegram') ? [t('settings.connected'), 'ok'] : [t('settings.setUp'), 'todo']) as [string, 'ok' | 'todo' | 'warn'],
+    }] : []),
   ];
 
   const school = meIsSchool(me);
@@ -223,6 +228,7 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
       </div>
 
       {sheet === 'plan' && <Sheet title={t('plan.title')} onClose={() => setSheet(null)}><PlanSheet /></Sheet>}
+      {sheet === 'telegram' && <Sheet title={t('settings.telegram.title')} onClose={() => setSheet(null)}><TelegramSheet /></Sheet>}
       {sheet === 'books' && <Sheet title={t('settings.books')} onClose={() => setSheet(null)}><Books me={me} /></Sheet>}
       {sheet === 'untis' && <Sheet title="WebUntis" onClose={() => setSheet(null)}><Untis me={me} /></Sheet>}
       {sheet === 'mail' && <Sheet title={t('settings.email')} onClose={() => setSheet(null)}><Mail me={me} /></Sheet>}

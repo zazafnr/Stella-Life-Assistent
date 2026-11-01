@@ -480,6 +480,25 @@ const MIGRATIONS: string[] = [
   -- bestehende Nutzer: Max als Geschenk ohne Ablauf
   INSERT INTO subscriptions (user_id, plan, status, provider, updated_at) SELECT id, 'max', 'active', 'gift', datetime('now') FROM users;
   `,
+  // Paket 10: Kanäle (Telegram, später WhatsApp)
+  `
+  CREATE TABLE channel_links (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    channel TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, channel),
+    UNIQUE (channel, external_id)
+  );
+  -- Einmal-Token zum Verknüpfen (nur der Hash wird gespeichert)
+  CREATE TABLE channel_tokens (
+    hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    channel TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+  );
+  ALTER TABLE messages ADD COLUMN via TEXT;
+  `,
 ];
 
 function migrate() {
@@ -541,6 +560,8 @@ export interface UserSettings {
   lastPlace?: { lat: number; lon: number; at: string };
   /** Wer benachrichtigt werden will, wenn etwas Neues da ist (z. B. FreeNotes) */
   notify?: { freenotes?: boolean };
+  /** Wohin Stella von sich aus schreibt (Briefing, Erinnerungen, Hinweise): push und/oder telegram. Standard: push. */
+  notifyVia?: ('push' | 'telegram')[];
   /** 'pending': die Einführung wird beim nächsten Öffnen gezeigt; 'done': erledigt oder übersprungen */
   onboarding?: 'pending' | 'done';
 }
@@ -688,7 +709,7 @@ export function itemsChangedSince(userId: string, since: string): Item[] {
 // ---------- Chats (Konversationen) und Nachrichten ----------
 
 /** In welchem Chat gerade geantwortet wird – gilt für alles, was während einer Chat-Anfrage passiert (auch tief in Hilfsfunktionen). */
-export const chatContext = new AsyncLocalStorage<{ userId: string; conversationId: string; detailed?: boolean }>();
+export const chatContext = new AsyncLocalStorage<{ userId: string; conversationId: string; detailed?: boolean; via?: ChatMessage['via'] }>();
 
 type ConversationRow = { id: string; user_id: string; title: string | null; day: string; created_at: string; updated_at: string };
 
@@ -737,12 +758,13 @@ export function backfillConversations() {
 }
 backfillConversations();
 
-type MsgRow = { id: string; client_id: string | null; role: string; text: string; attachments: string; created_at: string; action_id?: string | null; card?: string | null };
+type MsgRow = { id: string; client_id: string | null; role: string; text: string; attachments: string; created_at: string; action_id?: string | null; card?: string | null; via?: string | null };
 const toMessage = (r: MsgRow): ChatMessage => ({
   id: r.id, clientId: r.client_id, role: r.role as ChatMessage['role'], text: r.text,
   attachments: JSON.parse(r.attachments), createdAt: r.created_at,
   ...(r.action_id ? { actionId: r.action_id } : {}),
   ...(r.card ? { card: JSON.parse(r.card) as ChatMessage['card'] } : {}),
+  ...(r.via === 'telegram' ? { via: 'telegram' as const } : {}),
 });
 
 export function findMessageByClientId(userId: string, clientId: string): ChatMessage | null {
@@ -755,13 +777,14 @@ export function findMessageByClientId(userId: string, clientId: string): ChatMes
  * sonst im neuesten Chat von heute – so auch alles, was Stella von sich aus schickt (Briefing, Hinweise, Erinnerungen).
  */
 export function addMessage(userId: string, role: ChatMessage['role'], text: string,
-  opts: { clientId?: string | null; attachments?: Attachment[]; createdAt?: string; actionId?: string; conversationId?: string; card?: ChatMessage['card'] } = {}): ChatMessage {
+  opts: { clientId?: string | null; attachments?: Attachment[]; createdAt?: string; actionId?: string; conversationId?: string; card?: ChatMessage['card']; via?: ChatMessage['via'] } = {}): ChatMessage {
   const id = newId();
   const ctx = chatContext.getStore();
   const conversationId = opts.conversationId ?? (ctx?.userId === userId ? ctx.conversationId : todayConversation(userId)!);
   const createdAt = opts.createdAt ?? now();
-  db.prepare('INSERT INTO messages (id, user_id, client_id, role, text, attachments, created_at, action_id, conversation_id, card) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(id, userId, opts.clientId ?? null, role, text, JSON.stringify(opts.attachments ?? []), createdAt, opts.actionId ?? null, conversationId, opts.card ? JSON.stringify(opts.card) : null);
+  const via = opts.via ?? (ctx?.userId === userId ? ctx.via : undefined) ?? null;
+  db.prepare('INSERT INTO messages (id, user_id, client_id, role, text, attachments, created_at, action_id, conversation_id, card, via) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, userId, opts.clientId ?? null, role, text, JSON.stringify(opts.attachments ?? []), createdAt, opts.actionId ?? null, conversationId, opts.card ? JSON.stringify(opts.card) : null, via);
   db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ? AND updated_at < ?').run(createdAt, conversationId, createdAt);
   return toMessage(db.prepare('SELECT * FROM messages WHERE id = ?').get(id) as MsgRow);
 }

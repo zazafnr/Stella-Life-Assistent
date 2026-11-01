@@ -17,7 +17,7 @@ export interface Me {
   /** der erste Nutzer ist 'owner' und sieht „Server“ in den Einstellungen */
   role?: 'owner' | 'user';
   /** serverweite Funktions-Schalter (z. B. Finanzen ausgeblendet) */
-  flags?: { finance?: boolean; freenotesUrl?: string | null };
+  flags?: { finance?: boolean; freenotesUrl?: string | null; telegram?: boolean };
   settings: {
     eveningTime?: string; studyTime?: string; stepGoal?: number;
     books?: BookConfig[]; homeworkAutopilot?: boolean; mailAutoTrash?: boolean; tone?: Tone;
@@ -28,6 +28,7 @@ export interface Me {
     onboarding?: 'pending' | 'done';
     locationPermission?: 'granted' | 'denied' | 'later';
     notify?: { freenotes?: boolean };
+    notifyVia?: ('push' | 'telegram')[];
     /** Sprache und Land (Paket 2) */
     locale?: Locale;
     country?: string;

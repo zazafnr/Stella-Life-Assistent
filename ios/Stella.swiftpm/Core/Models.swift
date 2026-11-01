@@ -58,6 +58,8 @@ struct ChatMessage: Codable, Hashable, Identifiable {
     var failedAudioId: String?
     /** Karte unter der Nachricht, z. B. „Läden in der Nähe“ */
     var card: MessageCard?
+    /** kam über diesen Kanal herein bzw. ging dorthin: "telegram" (kleines Symbol) */
+    var via: String?
 
     var isUser: Bool { role == "user" }
 }
@@ -416,6 +418,8 @@ struct UserSettings: Codable, Hashable {
     var locationPermission: String?
     /** Wer benachrichtigt werden will, wenn FreeNotes startet */
     var notify: NotifySettings?
+    /** Wohin Stella von sich aus schreibt: "push" und/oder "telegram" */
+    var notifyVia: [String]?
 }
 
 struct NotifySettings: Codable, Hashable {
@@ -540,6 +544,8 @@ struct ServerFlags: Codable, Hashable {
     var finance: Bool?
     /** Download-Link von FreeNotes, sobald es die App gibt */
     var freenotesUrl: String?
+    /** Telegram-Bot ist auf dem Server eingerichtet */
+    var telegram: Bool?
 }
 
 struct Me: Codable, Hashable {
