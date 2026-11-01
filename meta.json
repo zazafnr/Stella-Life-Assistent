@@ -1,0 +1,27 @@
+{
+  "commit": "08cb6251be83bd7a51fd9a134bb4602c1b60faaa",
+  "branch": "claude/site-stella-showcase",
+  "message": "iOS-Vorschau: alle Screens in Deutsch und Englisch, englische Beispieldaten, Lern-Titel je Sprache",
+  "run": "https://github.com/zazafnr/Stella-Life-Assistent/actions/runs/41317573465",
+  "device": "iPhone 16 Pro",
+  "createdAt": "2026-11-01T15:04:53+00:00",
+  "screens": [
+    "today",
+    "chat",
+    "planner",
+    "inbox",
+    "weekplan",
+    "settings",
+    "goals",
+    "plan",
+    "subscription",
+    "news",
+    "memory",
+    "perms",
+    "lists",
+    "history",
+    "chat-rain",
+    "chat-night"
+  ],
+  "appetize": "https://appetize.io/app/7hedphqd45epodlt5k6olpxife"
+}
