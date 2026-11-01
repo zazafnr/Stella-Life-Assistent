@@ -84,6 +84,7 @@
       /* Ladebildschirm mit dem zuletzt gespeicherten Wetter (localStorage). Dauert nur so lange wie das Laden; ohne Wetter bleibt alles beim Alten. */
       (function () {
         try {
+          if (!window.stellaDesktop) return; /* Wetter gibt es nur in der PC-App */
           if (localStorage.getItem('stella.weatherAnim') === 'off') return;
           var f = JSON.parse(localStorage.getItem('stella.forceWeather') || 'null');
           var w = JSON.parse(localStorage.getItem('stella.weather') || 'null');

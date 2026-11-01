@@ -5,6 +5,7 @@ import {
 } from '../store.ts';
 import { rememberLocale, useLocale, useT } from '../i18n.ts';
 import { Sky, StarMark } from '../ui/Decor.tsx';
+import { Icon } from '../ui/Icon.tsx';
 
 type Mode = 'login' | 'register' | 'wait' | 'link' | 'reset' | 'newpass';
 
@@ -100,11 +101,18 @@ export function Login() {
 
   return (
     <div className="login">
-      <Sky />
-      <form className="login-card rise" onSubmit={submit}>
-        <div className="login-star"><StarMark size={34} /></div>
-        <h1 className="display">Stella</h1>
-        <p className="tagline">{t('auth.tagline')}</p>
+      <aside className="login-art" aria-hidden="false">
+        <Sky />
+        <span className="login-star"><StarMark size={34} /></span>
+        <h1 className="display">{t('auth.tagline')}</h1>
+        <ul>
+          {(['login.art.1', 'login.art.2', 'login.art.3'] as const).map((k) => <li key={k}><Icon name="check" size={18} stroke={2.6} />{t(k)}</li>)}
+        </ul>
+        <p className="by-evolsior" style={{ marginTop: 24 }}>by EVOLSIOR</p>
+      </aside>
+      <div className="login-form-side">
+      <form className="login-card" onSubmit={submit}>
+        <h2 className="display login-brand">Stella</h2>
         {title && <h2 style={{ margin: '4px 0 0', fontSize: 20 }}>{title}</h2>}
 
         {mode === 'wait' && (
@@ -163,8 +171,8 @@ export function Login() {
           <select value={locale} aria-label={t('auth.language')} onChange={(e) => { if (isLocale(e.target.value)) rememberLocale(e.target.value); }}>
             {LOCALES.map((l) => <option key={l} value={l}>{LOCALE_NAMES[l]}</option>)}
           </select></label>
-        <p className="by-evolsior">by EVOLSIOR</p>
       </form>
+      </div>
     </div>
   );
 }

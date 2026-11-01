@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { startWeatherOnce } from './weather.ts';
-import { meHas, meIsSchool, refreshMe, startBackgroundSync, useStore } from './store.ts';
+import { meHas, meIsSchool, newConversation, refreshMe, startBackgroundSync, useStore } from './store.ts';
 import { Today } from './components/Today.tsx';
 import { Chat } from './components/Chat.tsx';
 import { Planner } from './components/Planner.tsx';
@@ -14,7 +14,9 @@ import { Intro, dismissBoot, introShown } from './components/Intro.tsx';
 import { Onboarding } from './components/Onboarding.tsx';
 import { Login } from './components/Login.tsx';
 import { Icon, type IconName } from './ui/Icon.tsx';
-import { Sky, StarMark, showToast } from './ui/Decor.tsx';
+import { StarMark, showToast } from './ui/Decor.tsx';
+import { CommandPalette, Topbar, type PaletteEntry } from './ui/Shell.tsx';
+import { isDesktopApp } from './platform.ts';
 import { useHtmlLang, useT } from './i18n.ts';
 
 export type Tab = 'today' | 'chat' | 'planner' | 'goals' | 'inbox' | 'health' | 'finance' | 'plan' | 'settings';
@@ -33,7 +35,8 @@ function initialTab(): Tab {
   return ALL.includes(hash) ? hash : 'today';
 }
 
-const isDesktopApp = typeof window !== 'undefined' && 'stellaDesktop' in window;
+const SIDE_KEY = 'stella.sidebar';
+const readCollapsed = () => { try { return localStorage.getItem(SIDE_KEY) === '1'; } catch { return false; } };
 
 export function App() {
   const t = useT();
@@ -70,42 +73,72 @@ export function App() {
   }, [token]);
   useEffect(() => {
     if (!isDesktopApp) return;
-    // Fensterknöpfe oben rechts sitzen auf dem Himmel – nur im Chat mit Seitenspalte auf Weiß
-    const paint = () => window.stellaDesktop?.setTitleBarColor?.(tab === 'chat' && innerWidth >= 1240 ? '#FAFCFF' : '#D2E7FE');
-    paint();
-    addEventListener('resize', paint);
-    return () => removeEventListener('resize', paint);
-  }, [tab]);
+    document.documentElement.classList.toggle('is-mac', window.stellaDesktop?.platform === 'darwin');
+    // Fensterknöpfe sitzen auf dem oberen Band, das fast weiß ist
+    window.stellaDesktop?.setTitleBarColor?.('#FCFDFE');
+  }, []);
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const toggleSide = () => setCollapsed((c) => { try { localStorage.setItem(SIDE_KEY, c ? '0' : '1'); } catch { /* ohne Speicher geht es auch */ } return !c; });
+  const [palette, setPalette] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPalette((p) => !p); }
+    };
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, []);
 
   const school = meIsSchool(me);
   const openHomework = useMemo(() => (school ? Object.values(items).filter((i) => i.kind === 'homework' && i.status === 'open' && !i.deleted).length : 0), [items, school]);
 
   const introLayer = intro ? <Intro onDone={() => setIntro(false)} /> : null;
 
+  const main = TABS.filter(([id]) => (id !== 'inbox' || meHas(me, 'mails')) && (id !== 'goals' || meHas(me, 'goals')));
+  const more: [Tab, IconName, string][] = [
+    ...(meHas(me, 'health') ? [['health', 'heart', 'nav.health'] as [Tab, IconName, string]] : []),
+    ...(meHas(me, 'finance') ? [['finance', 'wallet', 'nav.finance'] as [Tab, IconName, string]] : []),
+    ['plan', 'star', 'settings.plan'],
+  ];
+  const titleOf = (id: Tab) => t(id === 'plan' ? 'settings.plan' : `nav.${id}`);
+  const startChat = useCallback(async () => {
+    try { await newConversation(); setTab('chat'); } catch (err) { showToast((err as Error).message, true); }
+  }, []);
+  const entries: PaletteEntry[] = [
+    ...[...main, ...more, ['settings', 'gear', 'nav.settings'] as [Tab, IconName, string]].map(([id, icon, label]): PaletteEntry => ({ id, group: 'pages', label: t(label), icon, run: () => setTab(id) })),
+    { id: 'new-chat', group: 'actions', label: t('palette.newChat'), icon: 'plus', run: () => void startChat() },
+  ];
+  const initial = (me?.name ?? '?').trim().charAt(0).toUpperCase();
+
   if (!token) return <>{introLayer}<Login /></>;
+
+  const link = ([id, icon, label]: [Tab, IconName, string]) => (
+    <button key={id} type="button" className={tab === id ? 'side-link active' : 'side-link'} onClick={() => setTab(id)} aria-current={tab === id ? 'page' : undefined} title={collapsed ? t(label) : undefined}>
+      <Icon name={icon} size={18} /><span className="label">{t(label)}</span>
+      {id === 'planner' && openHomework > 0 && <span className="side-badge">{openHomework}</span>}
+    </button>
+  );
 
   return (
     <>
     {introLayer}
     {showOnboarding && <Onboarding startAt={showOnboarding.startAt} onDone={(after) => { setOnboarding(null); if (after === 'settings') setTab('settings'); }} />}
-    <div className="app">
-      <div className="desktop-drag" aria-hidden="true" />
+    {palette && <CommandPalette entries={entries} onClose={() => setPalette(false)} />}
+    <div className={collapsed ? 'app collapsed' : 'app'}>
       <nav className="sidebar" aria-label={t('nav.navigation')}>
-        <div className="brand"><span style={{ color: 'var(--pink)' }}><StarMark size={18} /></span>Stella</div>
-        {TABS.filter(([id]) => (id !== 'inbox' || meHas(me, 'mails')) && (id !== 'goals' || meHas(me, 'goals'))).map(([id, icon, label]) => (
-          <button key={id} type="button" className={tab === id ? 'side-link active' : 'side-link'} onClick={() => setTab(id)} aria-current={tab === id ? 'page' : undefined}>
-            <Icon name={icon} size={19} />{t(label)}
-            {id === 'planner' && openHomework > 0 && <span className="side-badge">{openHomework}</span>}
-          </button>
-        ))}
-        {meHas(me, 'health') && <button type="button" className={tab === 'health' ? 'side-link active' : 'side-link'} onClick={() => setTab('health')}><Icon name="heart" size={19} />{t('nav.health')}</button>}
-        {meHas(me, 'finance') && <button type="button" className={tab === 'finance' ? 'side-link active' : 'side-link'} onClick={() => setTab('finance')}><Icon name="wallet" size={19} />{t('nav.finance')}</button>}
+        <div className="brand"><span className="mark"><StarMark size={16} /></span><span className="name display">Stella</span></div>
+        {main.map(link)}
+        <div className="side-group">{t('shell.more')}</div>
+        {more.map(link)}
         <div className="side-spacer" />
-        <button type="button" className={tab === 'settings' ? 'side-link active' : 'side-link'} onClick={() => setTab('settings')}><Icon name="gear" size={19} />{t('nav.settings')}</button>
+        {link(['settings', 'gear', 'nav.settings'])}
+        <button type="button" className="side-link" onClick={toggleSide} aria-label={collapsed ? t('shell.expand') : t('shell.collapse')} title={collapsed ? t('shell.expand') : t('shell.collapse')}>
+          <Icon name="sidebar" size={18} /><span className="label">{collapsed ? t('shell.expand') : t('shell.collapse')}</span>
+        </button>
+        <div className="side-user"><span className="avatar" aria-hidden="true">{initial}</span><span className="who"><span>{me?.name ?? ''}</span><span className="small muted">{me?.email ?? ''}</span></span></div>
       </nav>
 
       <main className="content">
-        {!online && <div className="offline-bar">{t('app.offlineBar')}</div>}
+        <Topbar title={titleOf(tab)} onSearch={() => setPalette(true)} />
         {tab === 'today' && <Today go={setTab} />}
         {tab === 'chat' && <Chat />}
         {tab === 'planner' && <Planner />}
@@ -118,7 +151,7 @@ export function App() {
       </main>
 
       <nav className="tabbar" aria-label={t('nav.navigation')}>
-        {TABS.filter(([id]) => (id !== 'inbox' || meHas(me, 'mails')) && (id !== 'goals' || meHas(me, 'goals'))).map(([id, icon, label]) => (
+        {main.map(([id, icon, label]) => (
           <button key={id} type="button" className={tab === id ? 'tab active' : 'tab'} onClick={() => setTab(id)} aria-current={tab === id ? 'page' : undefined}>
             <Icon name={icon} size={22} />{t(label)}
           </button>

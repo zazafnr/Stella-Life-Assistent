@@ -3,7 +3,7 @@ import { FINANCE_CATEGORIES, formatDateDe, todayIn, type FinanceCategory, type F
 import { api, useStore } from '../store.ts';
 import type { Tab } from '../App.tsx';
 import { Icon } from '../ui/Icon.tsx';
-import { Sheet, Sky, showToast } from '../ui/Decor.tsx';
+import { Sheet, showToast } from '../ui/Decor.tsx';
 
 export const CATEGORY_COLOR: Record<FinanceCategory, string> = {
   Lebensmittel: '#34C77B', 'Essen & Trinken': '#FF9F43', Transport: '#1F6FEB', Shopping: '#FF7EB3',
@@ -41,15 +41,7 @@ export function Finance({ back, go }: { back: () => void; go: (tab: Tab) => void
 
   return (
     <div className="page">
-      <Sky />
-      <div className="page-inner stagger">
-        <header className="page-head">
-          <div className="row" style={{ gap: 4 }}>
-            <button type="button" className="icon-btn" aria-label="Zurück" onClick={back}><Icon name="back" size={18} /></button>
-            <h1 className="display">Ausgaben</h1>
-          </div>
-        </header>
-
+      <div className="page-inner narrow">
         <div className="fin-month">
           <button type="button" className="icon-btn" aria-label="Vorheriger Monat" onClick={() => setMonth(shiftMonth(month, -1))}><Icon name="back" size={18} /></button>
           <strong>{monthLabel(month)}</strong>

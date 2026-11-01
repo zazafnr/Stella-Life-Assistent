@@ -99,10 +99,6 @@ export function Inbox() {
     <div className="page">
       <Sky clouds={false} />
       <div className="page-inner">
-        <header className="page-head rise">
-          <h1 className="display">Inbox</h1>
-          <button type="button" className={filter === 'all' ? 'btn' : 'btn secondary'} style={{ minHeight: 38 }} onClick={() => setFilter('all')}>Alles</button>
-        </header>
 
         {filter === 'important' && focus.length > 0 && (
           <section className="focus-list rise" aria-label="Wichtig für dich">
@@ -117,6 +113,9 @@ export function Inbox() {
               <span className="v">{n}</span><span className="l">{label}</span>
             </button>
           ))}
+          <button type="button" className={filter === 'all' ? 'counter active' : 'counter'} onClick={() => setFilter('all')} aria-pressed={filter === 'all'}>
+            <span className="v">{entries?.length ?? 0}</span><span className="l">Alles</span>
+          </button>
         </div>
 
         {entries && shown.length === 0 && (

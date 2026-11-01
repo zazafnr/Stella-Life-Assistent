@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addDays, diffDays, formatDateDe, todayIn, type FinanceMonth, type GoalProgress, type Item, type WeatherState } from '@stella/shared';
+import { addDays, diffDays, formatDateDe, todayIn, type FinanceMonth, type GoalProgress, type Item } from '@stella/shared';
 import { api, meHas, useStore } from '../store.ts';
 import { useLocale, useT } from '../i18n.ts';
 import type { Tab } from '../App.tsx';
 import { Icon, type IconName } from '../ui/Icon.tsx';
-import { Confetti, Ring, Sky, StarMark } from '../ui/Decor.tsx';
+import { Confetti, Ring } from '../ui/Decor.tsx';
 import { BriefingCard } from './BriefingCard.tsx';
 import { ListsSheet } from './Lists.tsx';
 import { WeekBar, amount } from './Goals.tsx';
 import { euro } from './Finance.tsx';
 import { StellaPlanCard } from './StellaPlan.tsx';
-import { useWeather } from '../weather.ts';
 
 interface Lesson { date: string; start: string; subject: string | null; code: string | null; status: string }
 interface InboxEntry { source: string; category: string | null; action: string | null; createdAt: string }
@@ -44,16 +43,7 @@ export function ItemStatus({ item, busy }: { item: Item; busy: boolean }) {
   return <span className="pill gray">{t('today.status.open')}</span>;
 }
 
-/** Kleine Wetteranzeige neben dem Datum; die Szenen mit Animation kommen in Paket 8 */
-function WeatherChip({ w }: { w: WeatherState }) {
-  const t = useT();
-  const icon: IconName = w.type === 'clear' ? (w.day ? 'sun' : 'moon') : w.type === 'partly' ? (w.day ? 'sun' : 'moon') : 'cloud';
-  const label = t('weather.chip', { type: t(`weather.type.${w.type}`), temp: w.temp });
-  return <span style={{ marginLeft: 10, display: 'inline-flex', alignItems: 'center', gap: 4 }} aria-label={label} title={label}><Icon name={icon} size={14} />{w.temp}°</span>;
-}
-
 export function Today({ go }: { go: (t: Tab) => void }) {
-  const weather = useWeather();
   const t = useT();
   const locale = useLocale();
   const me = useStore((s) => s.me);
@@ -117,155 +107,162 @@ export function Today({ go }: { go: (t: Tab) => void }) {
   const firstName = (me?.name ?? '').split(' ')[0];
   const dateLabel = new Date().toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
 
+  const heroTitle = firstName ? t('today.greeting.named', { greeting: t(greetingKey()), name: firstName }) : t('today.greeting.plain', { greeting: t(greetingKey()) });
   return (
     <div className="page">
-      <Sky />
-      <div className="glow" aria-hidden="true" style={{ width: 300, height: 300, right: -140, top: 120, background: '#FFC2DA', opacity: 0.35 }} />
-      <div className="page-inner stagger">
-        <header className="page-head">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span className="small muted" style={{ fontWeight: 600 }}>{dateLabel}{weather && <WeatherChip w={weather} />}</span>
-            <h1 className="display">{firstName ? t('today.greeting.named', { greeting: t(greetingKey()), name: firstName }) : t('today.greeting.plain', { greeting: t(greetingKey()) })}</h1>
+      <div className="page-inner">
+        <header className="hero">
+          <div>
+            <div className="when">{dateLabel}</div>
+            <h1 className="display">{heroTitle}</h1>
           </div>
-          <button type="button" className="icon-btn" aria-label={t('nav.settings')} onClick={() => go('settings')} style={{ color: 'var(--pink)' }}>
-            <StarMark size={20} />
-          </button>
+          <div className="actions">
+            <button type="button" className="btn" onClick={() => go('chat')}><Icon name="chat" size={16} />{t('today.tellStella')}</button>
+          </div>
         </header>
 
-        <BriefingCard onOpen={go} />
+        <div className="dash">
+          <section aria-label={dueLabel}>
+            <BriefingCard onOpen={go} />
 
-        {meHas(me, 'shopping') && (
-          <button type="button" className="card interactive row" style={{ justifyContent: 'space-between', gap: 12 }} onClick={() => setListOpen(true)}>
-            <span className="row" style={{ gap: 12 }}>
-              <span className="icon-tile blue" style={{ width: 40, height: 40, borderRadius: 13 }}><Icon name="plus" size={20} /></span>
-              <span style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                <span style={{ fontWeight: 600 }}>{t('today.shopping')}</span>
-                <span className="small muted">{shopCount === null ? t('today.shopping.tap') : shopCount === 0 ? t('today.shopping.none') : t('today.shopping.open', { count: shopCount })}</span>
-              </span>
-            </span>
-            <Icon name="chevron" size={16} />
-          </button>
-        )}
-        {listOpen && <ListsSheet onClose={() => { setListOpen(false); loadShopCount(); }} />}
-
-        <section className="card" aria-label={dueLabel}>
-          <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
-            <span className="eyebrow">{dueLabel}</span>
-            <button type="button" className="link small" onClick={() => go('planner')}>{t('today.planner')}</button>
-          </div>
-          {due.length === 0 && (
-            <div className="row">
-              <span className="icon-tile green"><Icon name="check" size={20} stroke={2.6} /></span>
-              <span>{t('today.allClear')}</span>
-            </div>
-          )}
-          {due.map((i) => {
-            const [icon, color] = KIND_ICON[i.kind] ?? ['sparkle', 'blue'];
-            const isBusy = busy.includes(i.id);
-            return (
-              <div key={i.id} className="today-item">
-                <span className={`icon-tile ${color}`}><Icon name={icon} size={20} /></span>
-                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span style={{ fontWeight: 600 }}>{i.title}</span>
-                  {isBusy && i.status === 'open'
-                    ? <div className="progress"><div className="shimmer" style={{ width: '64%' }} /></div>
-                    : <span className="small muted">{[i.detail, i.due !== tomorrow && i.due ? formatDateDe(i.due, today) : null].filter(Boolean).join(' · ')}</span>}
-                </div>
-                <ItemStatus item={i} busy={isBusy} />
+            <div className="card">
+              <div className="panel-head">
+                <h2 className="eyebrow">{dueLabel}</h2>
+                <button type="button" className="link small" onClick={() => go('planner')}>{t('today.planner')}</button>
               </div>
-            );
-          })}
-        </section>
-
-        <div className="grid-2">
-          <button type="button" className="card interactive" onClick={() => go('planner')} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {exam ? (
-              <>
-                <Ring value={1 - Math.min(diffDays(today, exam.due!), 21) / 21} color="#FF7EB3" label={diffDays(today, exam.due!)} />
-                <span style={{ fontWeight: 600 }}>{exam.title}</span>
-                <span className="small muted">{study ? t('today.studyToday', { what: study.detail ?? t('today.studyDefault') }) : t('today.inDays', { count: diffDays(today, exam.due!) })}</span>
-              </>
-            ) : (
-              <>
-                <span className="icon-tile pink" style={{ width: 64, height: 64, borderRadius: 20 }}><Icon name="exam" size={26} /></span>
-                <span style={{ fontWeight: 600 }}>{t('today.noTests')}</span>
-                <span className="small muted">{t('today.noTestsHint')}</span>
-              </>
-            )}
-          </button>
-          <button type="button" className="card interactive" onClick={() => go('health')} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <Ring value={(steps ?? 0) / goal} color="#34C77B" label={<span style={{ fontSize: 12, color: 'var(--green)' }}>{steps === null ? '–' : `${Math.round(((steps ?? 0) / goal) * 100)} %`}</span>} />
-            <span style={{ fontWeight: 600 }}>{steps === null ? t('today.steps') : t('today.stepsCount', { count: steps.toLocaleString(locale) })}</span>
-            <span className="small muted">Ziel {goal.toLocaleString('de-AT')}</span>
-          </button>
-        </div>
-
-        {lessons && lessons.length > 0 && (
-          <section aria-label={t('today.tomorrowAtSchool')} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div className="row" style={{ justifyContent: 'space-between' }}>
-              <h2>{t('today.tomorrowAtSchool')}</h2>
-              <span className="small muted">{formatDateDe(tomorrow)}</span>
-            </div>
-            <div className="lesson-strip">
-              {lessons.map((l, idx) => {
-                const off = l.status === 'cancelled';
-                const hw = !off && homeworkSubjects.has(l.subject);
+              {due.length === 0 && (
+                <div className="row">
+                  <span className="icon-tile green"><Icon name="check" size={20} stroke={2.6} /></span>
+                  <span>{t('today.allClear')}</span>
+                </div>
+              )}
+              {due.map((i) => {
+                const [icon, color] = KIND_ICON[i.kind] ?? ['sparkle', 'blue'];
+                const isBusy = busy.includes(i.id);
                 return (
-                  <div key={idx} className={`lesson-chip${off ? ' off' : hw ? ' hw' : ''}`}>
-                    <span className="t">{l.start}{off ? t('today.lessonCancelled') : hw ? t('today.lessonHomework') : ''}</span>
-                    <span className="s">{l.subject ?? l.code}</span>
+                  <div key={i.id} className="today-item">
+                    <span className={`icon-tile ${color}`}><Icon name={icon} size={18} /></span>
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontWeight: 600 }}>{i.title}</span>
+                      {isBusy && i.status === 'open'
+                        ? <div className="progress"><div className="shimmer" style={{ width: '64%' }} /></div>
+                        : <span className="small muted">{[i.detail, i.due !== tomorrow && i.due ? formatDateDe(i.due, today) : null].filter(Boolean).join(' · ')}</span>}
+                    </div>
+                    <ItemStatus item={i} busy={isBusy} />
                   </div>
                 );
               })}
             </div>
           </section>
-        )}
 
-        <StellaPlanCard go={go} />
+          <div>
+            <div className="stat-row">
+              <button type="button" className="card interactive stat" onClick={() => go('planner')}>
+                {exam ? (
+                  <>
+                    <Ring value={1 - Math.min(diffDays(today, exam.due!), 21) / 21} color="#FF7EB3" label={diffDays(today, exam.due!)} />
+                    <span style={{ fontWeight: 600 }}>{exam.title}</span>
+                    <span className="small muted">{study ? t('today.studyToday', { what: study.detail ?? t('today.studyDefault') }) : t('today.inDays', { count: diffDays(today, exam.due!) })}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="icon-tile pink" style={{ width: 56, height: 56, borderRadius: 16 }}><Icon name="exam" size={24} /></span>
+                    <span style={{ fontWeight: 600 }}>{t('today.noTests')}</span>
+                    <span className="small muted">{t('today.noTestsHint')}</span>
+                  </>
+                )}
+              </button>
+              <button type="button" className="card interactive stat" onClick={() => go('health')}>
+                <Ring value={(steps ?? 0) / goal} color="#34C77B" label={<span style={{ fontSize: 12, color: 'var(--green)' }}>{steps === null ? '–' : `${Math.round(((steps ?? 0) / goal) * 100)} %`}</span>} />
+                <span style={{ fontWeight: 600 }}>{steps === null ? t('today.steps') : t('today.stepsCount', { count: steps.toLocaleString(locale) })}</span>
+                <span className="small muted">Ziel {goal.toLocaleString('de-AT')}</span>
+              </button>
+            </div>
 
-        {spent && (
-          <button type="button" className="card interactive row" onClick={() => go('finance')}>
-            <span className="icon-tile green"><Icon name="wallet" size={20} /></span>
-            <span style={{ flex: 1 }}>
-              <strong style={{ fontWeight: 600, display: 'block' }}>{t('today.spendingMonth')}</strong>
-              <span className="small muted">{spent.count ? t('today.spendingCount', { amount: euro(spent.cents, spent.currency), count: spent.count }) : t('today.spendingNone')}</span>
-            </span>
-            <Icon name="chevron" size={16} />
-          </button>
-        )}
+            {lessons && lessons.length > 0 && (
+              <section className="card" aria-label={t('today.tomorrowAtSchool')}>
+                <div className="panel-head">
+                  <h2 className="eyebrow">{t('today.tomorrowAtSchool')}</h2>
+                  <span className="small muted">{formatDateDe(tomorrow)}</span>
+                </div>
+                <div className="lesson-strip">
+                  {lessons.map((l, idx) => {
+                    const off = l.status === 'cancelled';
+                    const hw = !off && homeworkSubjects.has(l.subject);
+                    return (
+                      <div key={idx} className={`lesson-chip${off ? ' off' : hw ? ' hw' : ''}`}>
+                        <span className="t">{l.start}{off ? t('today.lessonCancelled') : hw ? t('today.lessonHomework') : ''}</span>
+                        <span className="s">{l.subject ?? l.code}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
-        {goalList.length > 0 && (
-          <button type="button" className="card interactive" onClick={() => go('goals')} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <span className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0 }}>{t('today.yourGoals')}</h2><Icon name="chevron" size={16} /></span>
-            {goalList.slice(0, 3).map((g) => (
-              <span key={g.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span className="row" style={{ justifyContent: 'space-between', fontSize: 14 }}>
-                  <span style={{ fontWeight: 600 }}>{g.title}</span>
-                  <span className="muted small">{amount(g, g.weekValue)} von {amount(g, g.weekTarget)}</span>
+            {goalList.length > 0 && (
+              <button type="button" className="card interactive" onClick={() => go('goals')} style={{ display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'left' }}>
+                <span className="panel-head" style={{ margin: 0 }}><h2 className="eyebrow">{t('today.yourGoals')}</h2><Icon name="chevron" size={16} /></span>
+                {goalList.slice(0, 4).map((g) => (
+                  <span key={g.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span className="row" style={{ justifyContent: 'space-between', fontSize: 14 }}>
+                      <span style={{ fontWeight: 600 }}>{g.title}</span>
+                      <span className="muted small">{amount(g, g.weekValue)} von {amount(g, g.weekTarget)}</span>
+                    </span>
+                    <WeekBar goal={g} />
+                  </span>
+                ))}
+              </button>
+            )}
+          </div>
+
+          <div>
+            {meHas(me, 'shopping') && (
+              <button type="button" className="card interactive row" style={{ justifyContent: 'space-between', gap: 12 }} onClick={() => setListOpen(true)}>
+                <span className="row" style={{ gap: 12 }}>
+                  <span className="icon-tile blue"><Icon name="plus" size={18} /></span>
+                  <span style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                    <span style={{ fontWeight: 600 }}>{t('today.shopping')}</span>
+                    <span className="small muted">{shopCount === null ? t('today.shopping.tap') : shopCount === 0 ? t('today.shopping.none') : t('today.shopping.open', { count: shopCount })}</span>
+                  </span>
                 </span>
-                <WeekBar goal={g} />
+                <Icon name="chevron" size={16} />
+              </button>
+            )}
+            {listOpen && <ListsSheet onClose={() => { setListOpen(false); loadShopCount(); }} />}
+
+            <StellaPlanCard go={go} />
+
+            {spent && (
+              <button type="button" className="card interactive row" onClick={() => go('finance')}>
+                <span className="icon-tile green"><Icon name="wallet" size={18} /></span>
+                <span style={{ flex: 1, textAlign: 'left' }}>
+                  <strong style={{ fontWeight: 600, display: 'block' }}>{t('today.spendingMonth')}</strong>
+                  <span className="small muted">{spent.count ? t('today.spendingCount', { amount: euro(spent.cents, spent.currency), count: spent.count }) : t('today.spendingNone')}</span>
+                </span>
+                <Icon name="chevron" size={16} />
+              </button>
+            )}
+
+            <button type="button" className="card interactive row" onClick={() => go('inbox')}>
+              <span className={important ? 'pulse' : ''} aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: important ? 'var(--pink)' : 'var(--blue-light)' }} />
+              <span style={{ flex: 1, fontSize: 13.5, textAlign: 'left' }}>
+                <strong style={{ fontWeight: 600, display: 'block' }}>{t('today.importantMessages', { count: important })}</strong>
+                <span className="muted">{t('today.inboxMeta', { social, trashed })}</span>
               </span>
-            ))}
-          </button>
-        )}
+              <Icon name="chevron" size={16} />
+            </button>
 
-        <button type="button" className="card interactive row" onClick={() => go('inbox')}>
-          <span className={important ? 'pulse' : ''} aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: important ? 'var(--pink)' : 'var(--blue-light)' }} />
-          <span style={{ flex: 1, fontSize: 14 }}>
-            <strong style={{ fontWeight: 600 }}>{t('today.importantMessages', { count: important })}</strong>
-            <span className="muted">{t('today.inboxMeta', { social, trashed })}</span>
-          </span>
-          <Icon name="chevron" size={16} />
-        </button>
-
-        <button type="button" className="card interactive row" onClick={() => go('chat')}>
-          <span className="icon-tile blue"><Icon name="chat" size={20} /></span>
-          <span style={{ flex: 1 }}>
-            <strong style={{ fontWeight: 600, display: 'block' }}>{t('today.tellStella')}</strong>
-            <span className="small muted">{t('today.tellStellaHint')}</span>
-          </span>
-          <Icon name="chevron" size={16} />
-        </button>
+            <button type="button" className="card interactive row" onClick={() => go('chat')}>
+              <span className="icon-tile pink"><Icon name="chat" size={18} /></span>
+              <span style={{ flex: 1, textAlign: 'left' }}>
+                <strong style={{ fontWeight: 600, display: 'block' }}>{t('today.tellStella')}</strong>
+                <span className="small muted">{t('today.tellStellaHint')}</span>
+              </span>
+              <Icon name="chevron" size={16} />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
