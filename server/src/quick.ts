@@ -17,6 +17,7 @@ export interface QuickAction {
   text?: string;
 }
 
+// „Ausgaben diese Woche“ (needs: 'finance') bleibt in der Liste, hasFeature blendet sie aus, solange der Schalter aus ist.
 const ALL: (QuickAction & { needs?: Parameters<typeof hasFeature>[1] })[] = [
   { id: 'briefing', icon: 'sun', symbol: 'sun.max.fill', label: 'Briefing', kind: 'send', text: 'Briefing', needs: 'planner' },
   { id: 'photo', icon: 'camera', symbol: 'camera.fill', label: 'Foto schicken', kind: 'camera', needs: 'homework' },

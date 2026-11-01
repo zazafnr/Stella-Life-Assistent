@@ -33,6 +33,7 @@ const base = `http://127.0.0.1:${(mock.address() as AddressInfo).port}`;
 
 process.env.STELLA_DATA_DIR = mkdtempSync(path.join(tmpdir(), 'stella-p9-'));
 process.env.STELLA_SECRET = 'test-secret-1234567890';
+process.env.STELLA_FEATURE_FINANCE = 'true';
 process.env.STELLA_ALLOW_REGISTRATION = 'true';
 process.env.OPENROUTER_API_KEY = 'test';
 process.env.OPENROUTER_BASE_URL = base;
@@ -184,7 +185,7 @@ test('Summen: Woche und Monat, nur eigene Buchungen, Vormonat zum Vergleich', as
   const m = month.json();
   assert.equal(m.totalCents, sum(`${today().slice(0, 7)}-01`, `${today().slice(0, 7)}-31`));
   assert.equal(m.transactions.length, rows().filter((r) => r.day.startsWith(today().slice(0, 7))).length);
-  assert.ok(m.categories.length >= 2);
+  assert.equal(m.categories.length, new Set(rows().filter((r) => r.day.startsWith(today().slice(0, 7))).map((r) => r.category)).size, 'eine Zeile je Kategorie des Monats');
   const mias = await app.inject({ method: 'GET', url: '/api/finance', headers: as(mia.token) });
   assert.equal(mias.json().totalCents, 0);
   assert.equal(mias.json().transactions.length, 0);

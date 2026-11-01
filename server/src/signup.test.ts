@@ -6,6 +6,7 @@ import path from 'node:path';
 
 process.env.STELLA_DATA_DIR = mkdtempSync(path.join(tmpdir(), 'stella-signup-'));
 process.env.STELLA_SECRET = 'test-secret-1234567890';
+process.env.STELLA_FEATURE_FINANCE = 'true';
 process.env.OPENROUTER_API_KEY = '';
 process.env.STELLA_REGISTRATION = 'invite';
 
@@ -184,6 +185,23 @@ test('hasFeature: ohne Profil wie bisher (Finanzen braucht Einrichtung), im Job 
   assert.equal(hasFeature(job, 'finance'), true);
   assert.equal(hasFeature(job, 'goals'), false);
   assert.equal(afterWorkTime(job), '17:30', 'ohne Arbeitszeit: 17:30');
+});
+
+test('Finanzen ausgeblendet: Schalter aus → nirgends sichtbar, auch wenn das Profil sie hat', async () => {
+  const { config } = await import('./config.ts');
+  const { quickActions } = await import('./quick.ts');
+  const u = await makeUser('finanz@example.com');
+  const user = { ...getUser(u.id)!, settings: { ...getUser(u.id)!.settings, profile: cleanProfile({ situation: 'work', features: ['finance', 'mails', 'planner'] }) } };
+  assert.equal(hasFeature(user, 'finance'), true, 'Schalter an (Test-Standard)');
+  assert.ok(quickActions(user, 12).actions.some((a) => a.id === 'spending'));
+  config.features.finance = false;
+  try {
+    assert.equal(hasFeature(user, 'finance'), false);
+    assert.ok(!quickActions(user, 12).actions.some((a) => a.id === 'spending'), 'Schnellaktion „Ausgaben“ fehlt');
+    assert.equal(hasFeature(user, 'mails'), true, 'andere Funktionen bleiben');
+  } finally {
+    config.features.finance = true;
+  }
 });
 
 test('Hinweise: Schul-Hinweise (Test ohne Stoff) gibt es nur bei Schule und Studium', async () => {

@@ -26,6 +26,8 @@ const FEATURE_INFO: Record<Feature, { icon: IconName; label: string }> = {
   health: { icon: 'heart', label: 'Gesundheit' },
 };
 const FEATURE_ORDER: Feature[] = ['planner', 'mails', 'homework', 'shopping', 'goals', 'finance', 'health'];
+/** Funktionen, die der Server gerade ausblendet (Schalter), tauchen in der Einführung nicht auf */
+const featureVisible = (f: Feature, me: Me) => f !== 'finance' || !!me.flags?.finance;
 
 const DEFAULT_FEATURES: Record<Situation, Feature[]> = {
   school: ['planner', 'homework', 'mails', 'health'],
@@ -201,7 +203,7 @@ export function Onboarding({ onDone, startAt = 'welcome' }: { onDone: (after?: '
           <>
             <h1 className="display">Wobei soll Stella helfen?</h1>
             <div className="chips" style={{ flexWrap: 'wrap' }}>
-              {FEATURE_ORDER.filter((f) => f !== 'homework' || d.situation === 'school').map((f) => (
+              {FEATURE_ORDER.filter((f) => (f !== 'homework' || d.situation === 'school') && featureVisible(f, me)).map((f) => (
                 <button key={f} type="button" className={d.features.includes(f) ? 'chip active' : 'chip'} aria-pressed={d.features.includes(f)} onClick={() => set('features', toggle(d.features, f))}>
                   <Icon name={FEATURE_INFO[f].icon} size={15} /> {FEATURE_INFO[f].label}
                 </button>

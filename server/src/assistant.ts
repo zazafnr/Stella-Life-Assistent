@@ -711,6 +711,9 @@ const TOOLS: ToolDef[] = [
   },
 ];
 
+/** Werkzeuge für diese Nutzerin: ausgeblendete Funktionen (z. B. Finanzen) bekommt die KI gar nicht erst zu sehen. */
+const toolsFor = (user: User): ToolDef[] => TOOLS.filter((x) => x.function.name !== 'spending_summary' || hasFeature(user, 'finance'));
+
 /** Antworten per E-Mail: einfache Aufträge kurz bestätigen, Fragen ausführlich beantworten */
 const STYLE_DETAILED = 'Stil: Die Antwort geht per E-Mail. Einfache Aufträge bestätigst du kurz in ein, zwei Sätzen. Fragen beantwortest du ausführlich und gut gegliedert (kurze Absätze oder Aufzählungen mit „- “), ohne Floskeln.';
 
@@ -841,7 +844,7 @@ async function runAgent(t: Turn) {
   try {
     for (let step = 0; step < 6; step++) {
       // ab dem zweiten Schritt ist es eine Kette („Handle it“) – dafür das stärkere Modell, falls eingetragen
-      const { message } = await complete(messages, TOOLS, { heavy: step > 0 });
+      const { message } = await complete(messages, toolsFor(t.user), { heavy: step > 0 });
       messages.push({ role: 'assistant', content: message.content ?? '', tool_calls: message.tool_calls });
       if (!message.tool_calls?.length) {
         say(t, message.content?.trim() || '🤔');

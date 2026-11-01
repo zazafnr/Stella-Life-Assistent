@@ -57,9 +57,18 @@ app.setErrorHandler((err, _req, reply) => {
 
 const str = (v: unknown, max = 4000) => (typeof v === 'string' ? v.slice(0, max) : '');
 
+/** Das Profil ohne serverseitig abgeschaltete Funktionen – so blenden alle Oberflächen sie ohne eigenen Code aus. */
+function visibleSettings(settings: User['settings']): User['settings'] {
+  const p = settings.profile;
+  if (!p || config.features.finance) return settings;
+  return { ...settings, profile: { ...p, features: p.features.filter((f) => f !== 'finance') } };
+}
+
 function publicUser(user: User) {
   return {
-    id: user.id, name: user.name, email: user.email, timeZone: user.timeZone, settings: user.settings, role: user.role,
+    id: user.id, name: user.name, email: user.email, timeZone: user.timeZone, settings: visibleSettings(user.settings), role: user.role,
+    /** Serverweite Funktions-Schalter für die Oberflächen (z. B. Einführung ohne „Ausgaben“) */
+    flags: { finance: config.features.finance },
     ingestUrl: `${config.publicUrl}/api/ingest/${user.ingestToken}`,
     integrations: {
       books: Object.fromEntries((Object.keys(PROVIDERS) as BookProvider[]).map((p) => {

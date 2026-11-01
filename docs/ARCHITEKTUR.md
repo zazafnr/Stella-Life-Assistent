@@ -170,6 +170,11 @@ und plant die nächste Erinnerung (`advanceRecurring`); pausiert sind sie ohne E
 > **Stella v2** (Registrierung für alle Lebenslagen, Groq, Chats nach Tagen, Sprache, Listen, Ziele,
 > Ausgaben, „Was Stella vorhat“) steht Paket für Paket in [`docs/plan/stella-v2.md`](plan/stella-v2.md).
 > Ausgeliefert wird mit `scripts/deploy-vps.sh`.
+>
+> **Stella v3** (Claude-Modelle mit Kosten-Router, acht Sprachen, neue E-Mails, Anmelde-Link, Abos mit Limits,
+> Wetter-Animationen, Telegram, News, Alltagsaufgaben, Bildschirmzeit) steht Paket für Paket in
+> [`docs/plan/stella-v3.md`](plan/stella-v3.md). **Finanzen** sind dort vorerst ausgeblendet
+> (`STELLA_FEATURE_FINANCE=true` schaltet sie wieder ein; Code, Tabellen und Tests bleiben).
 
 **Phase 1: dieser Stand** ✅
 Chat, Kurznotizen (auch offline), Planer, Erinnerungen, Lernpläne, Push, Kalender-Abo, Gesundheit und SMS über Kurzbefehle, digi4school (Kalibrierung offen), automatische KI-Modellwahl.

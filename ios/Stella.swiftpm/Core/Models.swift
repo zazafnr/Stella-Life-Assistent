@@ -521,6 +521,10 @@ struct Integrations: Codable, Hashable {
     var googleSignIn: Bool?
 }
 
+struct ServerFlags: Codable, Hashable {
+    var finance: Bool?
+}
+
 struct Me: Codable, Hashable {
     var id: String
     var name: String
@@ -531,11 +535,15 @@ struct Me: Codable, Hashable {
     var integrations: Integrations
     /** der erste Nutzer ist "owner" und sieht „Server“ in den Einstellungen */
     var role: String?
+    /** serverweite Funktions-Schalter (z. B. Finanzen ausgeblendet) */
+    var flags: ServerFlags?
 
     var firstName: String { name.split(separator: " ").first.map(String.init) ?? name }
 
     /** Sieht dieses Profil die Funktion? Ohne Profil (ältere Konten) wie bisher – nur Finanzen braucht eine Einrichtung. */
     func has(_ feature: String) -> Bool {
+        // Finanzen ist serverseitig ausgeblendet, solange der Schalter aus ist (der Server entfernt sie auch aus dem Profil)
+        if feature == "finance" && flags?.finance != true { return false }
         guard let p = settings.profile else { return feature != "finance" }
         if feature == "homework" && p.situation != "school" { return false }
         return p.features.contains(feature)

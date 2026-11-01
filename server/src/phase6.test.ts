@@ -23,6 +23,7 @@ after(() => mock.close());
 
 process.env.STELLA_DATA_DIR = mkdtempSync(path.join(tmpdir(), 'stella-p6-'));
 process.env.STELLA_SECRET = 'test-secret-1234567890';
+process.env.STELLA_FEATURE_FINANCE = 'true';
 process.env.STELLA_ALLOW_REGISTRATION = 'true';
 process.env.OPENROUTER_API_KEY = 'test';
 process.env.OPENROUTER_BASE_URL = `http://127.0.0.1:${(mock.address() as AddressInfo).port}`;

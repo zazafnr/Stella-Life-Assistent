@@ -244,7 +244,7 @@ struct OnboardingView: View {
             case .features:
                 heading("Wobei soll Stella helfen?")
                 FlowLayout {
-                    ForEach(featureOrder.filter { $0 != "homework" || situation == "school" }, id: \.self) { f in
+                    ForEach(featureOrder.filter { ($0 != "homework" || situation == "school") && ($0 != "finance" || store.me?.flags?.finance == true) }, id: \.self) { f in
                         OnbChip(title: featureInfo[f]?.label ?? f, symbol: featureInfo[f]?.symbol, on: features.contains(f)) {
                             if features.contains(f) { features.remove(f) } else { features.insert(f) }
                         }

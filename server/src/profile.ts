@@ -4,9 +4,12 @@
 import { FEATURES, profileHas, profileIsLearner, profileIsSchool, SITUATIONS, AGE_GROUPS, type Feature, type UserProfile } from '@stella/shared';
 import { getUser, updateUserSettings, type User } from './db.ts';
 import { HttpError } from './auth.ts';
+import { config } from './config.ts';
 import { addMemory } from './memory.ts';
 
-export const hasFeature = (user: User, f: Feature) => profileHas(user.settings.profile, f);
+/** Serverweit abgeschaltete Funktionen (config.features) sind für niemanden sichtbar, egal was das Profil sagt. */
+export const featureEnabled = (f: Feature) => f !== 'finance' || config.features.finance;
+export const hasFeature = (user: User, f: Feature) => featureEnabled(f) && profileHas(user.settings.profile, f);
 export const isSchool = (user: User) => profileIsSchool(user.settings.profile);
 /** Schule oder Studium: Tests, Lerneinheiten, Lernpläne */
 export const isLearner = (user: User) => profileIsLearner(user.settings.profile);

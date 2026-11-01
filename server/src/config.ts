@@ -49,6 +49,13 @@ export const config = {
     clientId: env.GOOGLE_CLIENT_ID ?? '',
     clientSecret: env.GOOGLE_CLIENT_SECRET ?? '',
   },
+  /**
+   * Funktions-Schalter. Finanzen ist vorerst ausgeblendet (Code, Tabellen und Tests bleiben):
+   * mit STELLA_FEATURE_FINANCE=true wieder an.
+   */
+  features: {
+    finance: env.STELLA_FEATURE_FINANCE === 'true',
+  },
   webDist: path.resolve(import.meta.dirname, '../../web/dist'),
 };
 
