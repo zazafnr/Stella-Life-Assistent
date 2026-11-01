@@ -8,19 +8,22 @@ import { deleteSecret, getSecret, HttpError, setSecret } from './auth.ts';
 import { now } from './db.ts';
 
 export const SYSTEM_SCOPE = '__system__';
-export const KEY_NAMES = ['groq', 'openrouter', 'smtp'] as const;
+export const KEY_NAMES = ['anthropic', 'groq', 'openrouter', 'smtp'] as const;
 export type KeyName = (typeof KEY_NAMES)[number];
 export const isKeyName = (v: unknown): v is KeyName => KEY_NAMES.includes(v as KeyName);
 
 export interface SmtpKey { host: string; port: number; user: string; pass: string; from?: string }
 
-const ENV_KEY: Record<'groq' | 'openrouter', () => string> = {
+type ApiKeyName = 'anthropic' | 'groq' | 'openrouter';
+
+const ENV_KEY: Record<ApiKeyName, () => string> = {
+  anthropic: () => config.anthropic.apiKey,
   groq: () => config.groq.apiKey,
   openrouter: () => config.openrouter.apiKey,
 };
 
 /** API-Schlüssel für Groq bzw. OpenRouter: Umgebung vor App-Eintrag. Leer = nicht gesetzt. */
-export function serverKey(name: 'groq' | 'openrouter'): string {
+export function serverKey(name: ApiKeyName): string {
   return ENV_KEY[name]() || getSecret<string>(SYSTEM_SCOPE, name) || '';
 }
 
@@ -98,7 +101,11 @@ export async function testKey(name: KeyName): Promise<{ ok: boolean; message: st
     } else {
       const key = serverKey(name);
       if (!key) return { ok: false, message: 'Dafür ist noch kein Schlüssel eingetragen.' };
-      const res = name === 'groq'
+      const res = name === 'anthropic'
+        ? await fetch(`${config.anthropic.baseUrl || 'https://api.anthropic.com'}/v1/models?limit=1`, {
+          signal: AbortSignal.timeout(15_000), headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+        })
+        : name === 'groq'
         ? await fetch(`${config.groq.baseUrl}/chat/completions`, {
           method: 'POST', signal: AbortSignal.timeout(15_000),
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
@@ -113,4 +120,23 @@ export async function testKey(name: KeyName): Promise<{ ok: boolean; message: st
   }
   recordKeyResult(name, result.ok, result.ok ? undefined : result.message, true);
   return result;
+}
+
+// ---------- Einstellungen des Servers (nur Owner) ----------
+// Kleine Schalter, die man ohne Neustart ändern können soll – gleiche verschlüsselte Ablage wie die Schlüssel.
+
+export interface ServerAiSettings {
+  /** Notfall: Wenn Claude ausfällt, darf Stella auf die Gratis-Modelle von OpenRouter ausweichen. Mails gehen nie dorthin. */
+  allowFreeFallback: boolean;
+}
+
+export function serverAiSettings(): ServerAiSettings {
+  const stored = getSecret<Partial<ServerAiSettings>>(SYSTEM_SCOPE, 'setting:ai') ?? {};
+  return { allowFreeFallback: stored.allowFreeFallback ?? process.env.STELLA_ALLOW_FREE_FALLBACK === 'true' };
+}
+
+export function setServerAiSettings(patch: Partial<ServerAiSettings>): ServerAiSettings {
+  const next = { ...serverAiSettings(), ...(typeof patch.allowFreeFallback === 'boolean' ? { allowFreeFallback: patch.allowFreeFallback } : {}) };
+  setSecret(SYSTEM_SCOPE, 'setting:ai', next);
+  return next;
 }

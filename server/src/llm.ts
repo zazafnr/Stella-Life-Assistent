@@ -7,22 +7,13 @@
 
 import { config } from './config.ts';
 import { db } from './db.ts';
-import { recordKeyResult, serverKey } from './keys.ts';
+import { claudeAvailable, completeClaude, type Effort } from './claude.ts';
+import { costOverview } from './costs.ts';
+import { recordKeyResult, serverAiSettings, serverKey } from './keys.ts';
+import { flattenForOpenAi, LlmUnavailable, type LlmMessage, type ToolDef, type Tier } from './llm-types.ts';
 
-export interface ToolCall { id: string; type: 'function'; function: { name: string; arguments: string } }
-
-export type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
-
-export type LlmMessage =
-  | { role: 'system'; content: string }
-  | { role: 'user'; content: string | ContentPart[] }
-  | { role: 'assistant'; content: string | null; tool_calls?: ToolCall[] }
-  | { role: 'tool'; tool_call_id: string; content: string };
-
-export interface ToolDef {
-  type: 'function';
-  function: { name: string; description: string; parameters: Record<string, unknown> };
-}
+export { LlmUnavailable, LlmRefused, flattenForOpenAi } from './llm-types.ts';
+export type { ToolCall, ContentPart, LlmMessage, ToolDef, Tier } from './llm-types.ts';
 
 interface ModelInfo {
   id: string;
@@ -48,7 +39,9 @@ let lastRefresh = 0;
 const cooldownUntil = new Map<string, number>();
 
 /** Gibt es einen OpenRouter-Schlüssel (Umgebung oder in den Einstellungen)? */
-export const llmAvailable = () => !!serverKey('openrouter');
+export const openrouterAvailable = () => !!serverKey('openrouter');
+/** Gibt es irgendeinen Anbieter für Chat-Aufgaben? (Claude oder OpenRouter) */
+export const llmAvailable = () => claudeAvailable() || openrouterAvailable();
 export const groqAvailable = () => !!serverKey('groq');
 
 export type GroqTask = 'classify' | 'title' | 'extract';
@@ -96,10 +89,18 @@ function isFree(model: string): boolean {
 }
 
 export async function modelStatus() {
+  const orKey = openrouterAvailable();
   return {
     configured: llmAvailable(),
-    chain: llmAvailable() ? await modelChain('tools') : [],
-    visionChain: llmAvailable() ? await modelChain('vision') : [],
+    claude: {
+      configured: claudeAvailable(),
+      light: config.anthropic.models.light,
+      heavy: config.anthropic.models.heavy,
+      allowFreeFallback: serverAiSettings().allowFreeFallback,
+    },
+    cost: costOverview(),
+    chain: orKey ? await modelChain('tools') : [],
+    visionChain: orKey ? await modelChain('vision') : [],
     heavy: { tools: config.openrouter.heavyModels, vision: config.openrouter.heavyVisionModels },
     coolingDown: [...cooldownUntil].filter(([, t]) => t > Date.now()).map(([m]) => m),
     usedToday: usageToday(),
@@ -107,8 +108,6 @@ export async function modelStatus() {
     groq: { configured: groqAvailable(), models: config.groq.models, usedToday: usageTodayFor('groq') },
   };
 }
-
-export class LlmUnavailable extends Error {}
 
 // ---------- Tagesbudget ----------
 // OpenRouter zählt Gratis-Anfragen pro Tag (UTC). Hintergrund-Arbeit (Mails sortieren) darf nur
@@ -142,7 +141,7 @@ function checkBudget(background: boolean) {
   if (used >= limit) throw new LlmUnavailable(`Tageslimit von ${limit} KI-Anfragen erreicht (ab 1 Uhr nachts geht's wieder).`);
 }
 
-export interface CompletionResult { message: Extract<LlmMessage, { role: 'assistant' }>; model: string }
+export interface CompletionResult { message: Extract<LlmMessage, { role: 'assistant' }>; model: string; costMicroUsd?: number }
 
 export interface CompleteOptions {
   json?: boolean; vision?: boolean; timeoutMs?: number; background?: boolean; heavy?: boolean;
@@ -151,6 +150,18 @@ export interface CompleteOptions {
   task?: GroqTask;
   /** für den Zähler pro Nutzer */
   userId?: string;
+  /**
+   * Stufe nach Kosten (Paket 1): light = Claude Haiku (fast alles), heavy = Claude Sonnet (nur schwere Aufgaben,
+   * entscheidet `pickTier` im Router). Ohne Angabe: light.
+   */
+  tier?: Tier;
+  /** Denktiefe bei Claude: low für Aufräumen/Titel/Kurzfassungen, medium für den Chat-Agenten */
+  effort?: Effort;
+  /** Inhalte aus Mails o. Ä.: gehen nie an Gratis-Anbieter (OpenRouter) */
+  private?: boolean;
+  maxTokens?: number;
+  /** Server-Werkzeuge von Claude (Websuche …) */
+  serverTools?: Record<string, unknown>[];
 }
 
 // Groq: kurze Pause pro Modell nach 429, damit nicht jede Anfrage erst scheitert
@@ -166,7 +177,7 @@ async function completeGroq(messages: LlmMessage[], tools: ToolDef[] | undefined
     headers: { Authorization: `Bearer ${serverKey('groq')}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model,
-      messages,
+      messages: flattenForOpenAi(messages),
       ...(tools?.length ? { tools, tool_choice: 'auto' } : {}),
       ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
       temperature: 0.2,
@@ -186,18 +197,37 @@ async function completeGroq(messages: LlmMessage[], tools: ToolDef[] | undefined
 }
 
 export async function complete(messages: LlmMessage[], tools?: ToolDef[], opts: CompleteOptions = {}): Promise<CompletionResult> {
-  const groqErrors: string[] = [];
+  const errors: string[] = [];
   if (opts.provider === 'groq' && groqAvailable()) {
     try {
       return await completeGroq(messages, tools, opts);
     } catch (err) {
-      groqErrors.push(`groq: ${(err as Error).message}`);
-      if (!llmAvailable()) throw new LlmUnavailable(`Groq nicht erreichbar.\n${groqErrors.join('\n')}`);
-      // weiter mit der OpenRouter-Kette
+      errors.push(`groq: ${(err as Error).message}`);
+      if (!llmAvailable()) throw new LlmUnavailable(`Groq nicht erreichbar.\n${errors.join('\n')}`);
+      // weiter mit Claude bzw. der OpenRouter-Kette
     }
   }
-  if (!llmAvailable()) throw new LlmUnavailable('Kein OPENROUTER_API_KEY gesetzt.');
-  const errors: string[] = [...groqErrors];
+
+  if (claudeAvailable()) {
+    try {
+      const r = await completeClaude(messages, tools, {
+        tier: opts.tier ?? (opts.heavy ? 'heavy' : 'light'), effort: opts.effort, json: opts.json,
+        timeoutMs: opts.timeoutMs, maxTokens: opts.maxTokens, userId: opts.userId, serverTools: opts.serverTools,
+      });
+      return { message: r.message, model: r.model, costMicroUsd: r.costMicroUsd };
+    } catch (err) {
+      errors.push(`claude: ${(err as Error).message}`);
+      // Mit Claude-Schlüssel ist OpenRouter nur der Notfall – und nur, wenn der Owner das erlaubt. Mail-Inhalte nie.
+      if (opts.private || !serverAiSettings().allowFreeFallback || !openrouterAvailable()) {
+        throw err instanceof LlmUnavailable ? err : new LlmUnavailable(errors.join('\n'));
+      }
+    }
+  } else if (opts.private && !opts.vision) {
+    // ohne Claude: Mail-Inhalte dürfen nicht an die Gratis-Modelle
+    if (!errors.length) errors.push('Kein Claude-Schlüssel für vertrauliche Inhalte.');
+    throw new LlmUnavailable(errors.join('\n'));
+  }
+  if (!openrouterAvailable()) throw new LlmUnavailable('Kein KI-Schlüssel gesetzt (Anthropic oder OpenRouter).');
 
   for (const model of await modelChain(opts.vision ? 'vision' : 'tools', opts.heavy)) {
     if ((cooldownUntil.get(model) ?? 0) > Date.now()) continue;
@@ -217,7 +247,7 @@ export async function complete(messages: LlmMessage[], tools?: ToolDef[], opts: 
         },
         body: JSON.stringify({
           model,
-          messages,
+          messages: flattenForOpenAi(messages),
           ...(tools?.length ? { tools, tool_choice: 'auto' } : {}),
           ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
           temperature: opts.vision ? 0.1 : 0.4,

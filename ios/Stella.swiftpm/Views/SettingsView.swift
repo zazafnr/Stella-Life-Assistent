@@ -178,6 +178,19 @@ struct SettingsView: View {
                         }
                     }
 
+                    if let ai, let claude = ai.claude, claude.configured {
+                        Section {
+                            row("Alltag", symbol: "bolt.fill", tint: Theme.blue, detail: claude.light)
+                            row("Schwere Aufgaben", symbol: "brain", tint: Theme.pink, detail: claude.heavy)
+                            if let cost = ai.cost {
+                                row("Kosten heute", symbol: "eurosign.circle.fill", tint: Theme.green, detail: String(format: "%.2f €", cost.today.totalMicroUsd / 1e6 * cost.eurPerUsd))
+                                row("Kosten diesen Monat", symbol: "calendar", tint: Theme.green, detail: String(format: "%.2f €", cost.month.totalMicroUsd / 1e6 * cost.eurPerUsd))
+                            }
+                        } header: {
+                            Text("Claude")
+                        }
+                    }
+
                     if let ai {
                         Section {
                             VStack(alignment: .leading, spacing: 8) {

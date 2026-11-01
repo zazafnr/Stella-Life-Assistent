@@ -1,6 +1,22 @@
 # Stella: Entscheidungen, Grenzen, Fahrplan
 
-## 1. KI-Modell: OpenRouter, automatisch das beste kostenlose
+## 0. KI seit v3: Claude mit Kosten-Router
+
+Seit v3 (Paket 1) läuft fast alles über **Claude Haiku 5.5** (`light`), schwere Aufgaben über **Claude Sonnet 5.5**
+(`heavy`, nur mit Kontingent). Code: `server/src/claude.ts` (Umwandlung ins Anthropic-Format, Prompt-Caching,
+Wiederholung), `server/src/router.ts` (`pickTier`, `resolveTier`, Kontingent-Stub für Paket 5),
+`server/src/costs.ts` (Kosten je Anfrage/Nutzer/Modell in Mikro-Dollar, Tabelle `llm_cost`).
+
+- **Ausweichkette:** Claude 429/5xx → eine Wiederholung → bei `heavy` Haiku statt Sonnet → OpenRouter nur,
+  wenn der Owner „Notfall-Modelle“ eingeschaltet hat. **Mail-Inhalte gehen nie an Gratis-Anbieter** (`private: true`).
+- **Haiku ruft `escalate`**, wenn eine Aufgabe zu schwer ist; dann läuft der Zug einmal mit Sonnet.
+- **Prompt-Caching:** Werkzeuge und fester Teil des System-Prompts tragen `cache_control`; Datum, Uhrzeit, Lagebild
+  und Gedächtnis kommen als zweiter Systemblock danach.
+- **Preise** stehen in `config.pricing` (pro Mio. Tokens), Modellnamen in `config.anthropic.models`; beides per Env änderbar.
+- **Schlüssel:** `ANTHROPIC_API_KEY` oder Einstellungen → Server → Anthropic (verschlüsselt, mit „Testen“).
+- Ohne Claude-Schlüssel gilt weiter der OpenRouter-Weg unten.
+
+## 1. KI-Modell: OpenRouter, automatisch das beste kostenlose (Notfall bzw. ohne Claude-Schlüssel)
 
 **Stimmt das mit den 10 $?** Ja. Laut den offiziellen [OpenRouter-Limits](https://openrouter.ai/docs/api-reference/limits) gilt:
 - Mit weniger als 10 $ jemals gekauften Credits: **50 Anfragen pro Tag** an `:free`-Modelle.

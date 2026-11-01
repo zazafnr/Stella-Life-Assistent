@@ -3,7 +3,7 @@
 import type { FastifyInstance } from 'fastify';
 import { HttpError, requireOwner } from './auth.ts';
 import { rotateInboundSecret, inboundSecretSet } from './inbound.ts';
-import { isKeyName, keyStatus, setKey, testKey } from './keys.ts';
+import { isKeyName, keyStatus, serverAiSettings, setKey, setServerAiSettings, testKey } from './keys.ts';
 import { createInvite, deleteInvite, listInvites, registrationMode } from './signup.ts';
 
 export function registerAdminRoutes(api: FastifyInstance) {
@@ -20,6 +20,13 @@ export function registerAdminRoutes(api: FastifyInstance) {
     if (!isKeyName(req.params.name)) throw new HttpError(400, 'Unbekannter Schlüssel.');
     const result = await testKey(req.params.name);
     return { ...result, keys: keyStatus() };
+  });
+
+  // KI-Einstellungen des Servers: Notfall-Ausweichen auf Gratis-Modelle ein/aus
+  api.get('/api/admin/ai', { preHandler: requireOwner }, async () => serverAiSettings());
+  api.put('/api/admin/ai', { preHandler: requireOwner }, async (req) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    return setServerAiSettings({ allowFreeFallback: typeof b.allowFreeFallback === 'boolean' ? b.allowFreeFallback : undefined });
   });
 
   // Schlüssel zwischen dem Cloudflare-Worker für stella@ und diesem Server. Wird nur beim Erzeugen angezeigt.

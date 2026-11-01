@@ -44,6 +44,37 @@ export const config = {
       transcribe: env.GROQ_MODEL_TRANSCRIBE ?? 'whisper-large-v3-turbo',
     },
   },
+  /**
+   * Claude (Anthropic): Haiku 5.5 für fast alles, Sonnet 5.5 nur für schwere Aufgaben (mit Kontingent).
+   * Modellnamen und Preise stehen nur hier, damit man sie ohne Code-Änderung anpassen kann.
+   */
+  anthropic: {
+    apiKey: env.ANTHROPIC_API_KEY ?? '',
+    /** leer = https://api.anthropic.com; zum Testen auf einen Mock-Server */
+    baseUrl: env.ANTHROPIC_BASE_URL ?? '',
+    models: {
+      light: env.STELLA_CLAUDE_LIGHT ?? 'claude-haiku-5-5',
+      heavy: env.STELLA_CLAUDE_HEAVY ?? 'claude-sonnet-5-5',
+    },
+    /** strict: true an den Werkzeugen (gültige Argumente garantiert) */
+    strictTools: env.STELLA_CLAUDE_STRICT !== 'false',
+    /** Pause vor dem einen Wiederholungsversuch bei 429/5xx */
+    retryMs: Number(env.STELLA_CLAUDE_RETRY_MS ?? 1500),
+  },
+  /**
+   * Preise in US-Dollar je 1 Mio. Tokens (Stand Oktober 2026). Haiku hat über 100 000 Prompt-Tokens
+   * einen höheren Tarif (`long*`). Unbekannte Modelle kosten 0 und zählen nur die Tokens.
+   */
+  pricing: {
+    models: {
+      'claude-haiku-5-5': { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125, longInput: 0.5, longOutput: 2.5, longThreshold: 100_000 },
+      'claude-sonnet-5-5': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+    } as Record<string, { input: number; output: number; cacheRead?: number; cacheWrite?: number; longInput?: number; longOutput?: number; longThreshold?: number }>,
+    /** US-Dollar je Websuche des Claude-Server-Werkzeugs */
+    webSearch: 0.01,
+    /** Euro je Dollar für die Anzeige in Euro (Dashboard, Einstellungen) */
+    eurPerUsd: Number(env.STELLA_EUR_PER_USD ?? 0.92),
+  },
   /** "Mit Google anmelden" für Gmail – OAuth-Client aus der Google Cloud Console */
   google: {
     clientId: env.GOOGLE_CLIENT_ID ?? '',

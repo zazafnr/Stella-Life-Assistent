@@ -625,7 +625,11 @@ app.register(async (api) => {
     return { fileId: id };
   });
 
-  api.get('/api/ai/status', async () => modelStatus());
+  // Kosten aller Nutzer sieht nur der Owner
+  api.get('/api/ai/status', async (req) => {
+    const { cost, ...status } = await modelStatus();
+    return req.user.role === 'owner' ? { ...status, cost } : status;
+  });
 
   // ----- Morning Briefing & Hinweise -----
   api.get('/api/briefing', async (req) => buildBriefing(req.user));

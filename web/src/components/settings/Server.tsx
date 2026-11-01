@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { api } from '../../store.ts';
 import { Section, useAction } from './ui.tsx';
 
-type Name = 'groq' | 'openrouter' | 'smtp';
+type Name = 'anthropic' | 'groq' | 'openrouter' | 'smtp';
 interface KeyStatus { set: boolean; source: 'env' | 'app' | null; lastOk: string | null; lastError: string | null }
 type Keys = Record<Name, KeyStatus>;
 
 const TITLES: Record<Name, { title: string; hint: string; field: string }> = {
+  anthropic: { title: 'Anthropic-API-Key (Claude)', hint: 'Claude Haiku erledigt fast alles, Claude Sonnet nur schwere Aufgaben. Key aus console.anthropic.com; dort bitte ein Ausgabenlimit setzen.', field: 'sk-ant-…' },
   groq: { title: 'Groq-API-Key', hint: 'Mails einordnen, Chat-Titel und Sprachnachrichten. Kostenlos erhältlich auf console.groq.com.', field: 'gsk_…' },
   openrouter: { title: 'OpenRouter-API-Key', hint: 'Für Chat und Planer. Ohne Eintrag hier gilt der Schlüssel aus der Server-Umgebung.', field: 'sk-or-…' },
   smtp: { title: 'E-Mail-Absender (SMTP)', hint: 'Von hier gehen die Bestätigungs-Codes bei der Registrierung raus. Der Absender (z. B. Stella <noreply@evolsior.com>) bestimmt die Domain: Antworten gehen an support@ dieser Domain, Mails, die Stella dir schreibt, kommen von stella@.', field: '' },
@@ -25,7 +26,8 @@ export function Server() {
   if (!keys) return <p className="muted">⏳ Einen Moment…</p>;
   return (
     <>
-      {(['groq', 'openrouter'] as const).map((n) => <KeyCard key={n} name={n} status={keys[n]} onChange={setKeys} />)}
+      {(['anthropic', 'groq', 'openrouter'] as const).map((n) => <KeyCard key={n} name={n} status={keys[n]} onChange={setKeys} />)}
+      <FallbackCard />
       <SmtpCard status={keys.smtp} onChange={setKeys} />
       <InboundCard />
       <Invites />
@@ -44,7 +46,7 @@ function StatusLine({ s }: { s: KeyStatus }) {
   );
 }
 
-function KeyCard({ name, status, onChange }: { name: 'groq' | 'openrouter'; status: KeyStatus; onChange: (k: Keys) => void }) {
+function KeyCard({ name, status, onChange }: { name: 'anthropic' | 'groq' | 'openrouter'; status: KeyStatus; onChange: (k: Keys) => void }) {
   const [run, view] = useAction();
   const [value, setValue] = useState('');
   const t = TITLES[name];
@@ -72,6 +74,24 @@ function KeyCard({ name, status, onChange }: { name: 'groq' | 'openrouter'; stat
           {status.source === 'app' && <button type="button" className="link danger" onClick={() => void save(null)}>Entfernen</button>}
         </div>
       </form>
+      {view}
+    </Section>
+  );
+}
+
+/** Notfall: bei Ausfall von Claude auf die Gratis-Modelle von OpenRouter ausweichen (Mails gehen nie dorthin) */
+function FallbackCard() {
+  const [on, setOn] = useState<boolean | null>(null);
+  const [run, view] = useAction();
+  useEffect(() => { api<{ allowFreeFallback: boolean }>('/api/admin/ai').then((r) => setOn(r.allowFreeFallback)).catch(() => {}); }, []);
+  if (on === null) return null;
+  return (
+    <Section title="Notfall-Modelle">
+      <p className="muted small">Wenn Claude nicht erreichbar ist, darf Stella auf die Gratis-Modelle von OpenRouter ausweichen. Inhalte aus Mails gehen nie an Gratis-Anbieter, egal wie dieser Schalter steht.</p>
+      <label className="check-row"><input type="checkbox" checked={on} onChange={(e) => void run(async () => {
+        const r = await api<{ allowFreeFallback: boolean }>('/api/admin/ai', { method: 'PUT', json: { allowFreeFallback: e.target.checked } });
+        setOn(r.allowFreeFallback);
+      }, 'Gespeichert.')} /> Bei Claude-Ausfall auf Gratis-Modelle ausweichen</label>
       {view}
     </Section>
   );

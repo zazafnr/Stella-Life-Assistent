@@ -415,6 +415,23 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX inbound_mail_sender ON inbound_mail(sender, at);
   `,
+  `
+  -- v3 Paket 1: KI-Kosten je Tag, Nutzer und Modell (Mikro-Dollar: 1 000 000 = 1 $).
+  -- llm_usage zählt weiter nur Anfragen je Anbieter (Tageslimit von OpenRouter), diese Tabelle die Tokens und Kosten.
+  CREATE TABLE llm_cost (
+    day TEXT NOT NULL,
+    user_id TEXT NOT NULL DEFAULT '',
+    model TEXT NOT NULL,
+    requests INTEGER NOT NULL DEFAULT 0,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_micro_usd INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, user_id, model)
+  );
+  CREATE INDEX llm_cost_user ON llm_cost(user_id, day);
+  `,
 ];
 
 function migrate() {

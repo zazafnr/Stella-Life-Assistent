@@ -24,7 +24,8 @@ import { activeGoals, amountText, describeCadence, extractGoal, extractLog, GOAL
 import { resolvePlace } from './places.ts';
 import { describeRecurrence, nextOccurrence } from '@stella/shared';
 import { euro, spendingCard, spendingFacts, spendingPeriod, SPEND_RE } from './finance.ts';
-import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type ToolDef } from './llm.ts';
+import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type Tier, type ToolDef } from './llm.ts';
+import { pickTier, resolveTier } from './router.ts';
 import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
 
 interface Turn {
@@ -534,7 +535,7 @@ async function refineFocuses(exam: Item, material: string, dates: string[]): Pro
           `Die letzte Einheit ist Wiederholung + Probe-Test. Pro Einheit ein kurzer, konkreter Fokus (max. 12 Wörter). ` +
           `Format: {"sessions": ["…", "…"]}`,
       },
-    ], undefined, { json: true, background: true });
+    ], undefined, { json: true, background: true, tier: 'heavy' });
     const parsed = JSON.parse((message.content ?? '').replace(/^```(json)?|```$/g, '')) as { sessions?: unknown };
     const list = Array.isArray(parsed.sessions) ? parsed.sessions.map(String) : [];
     return list.length === dates.length ? list : null;
@@ -704,6 +705,14 @@ const TOOLS: ToolDef[] = [
   {
     type: 'function',
     function: {
+      name: 'escalate',
+      description: 'Nur wenn die Aufgabe wirklich zu schwer für dich ist (lange mehrstufige Planung, komplexes Rechnen, viele Quellen abwägen): gib sie an ein stärkeres Modell ab. Kostet ein begrenztes Kontingent – nicht für Alltägliches.',
+      parameters: { type: 'object', properties: { reason: { type: 'string', description: 'Ein Satz: warum es zu schwer ist' } }, required: ['reason'] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'forget',
       description: 'Einen gemerkten Eintrag löschen (z. B. "vergiss das", oder wenn er nicht mehr stimmt).',
       parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
@@ -717,12 +726,19 @@ const toolsFor = (user: User): ToolDef[] => TOOLS.filter((x) => x.function.name 
 /** Antworten per E-Mail: einfache Aufträge kurz bestätigen, Fragen ausführlich beantworten */
 const STYLE_DETAILED = 'Stil: Die Antwort geht per E-Mail. Einfache Aufträge bestätigst du kurz in ein, zwei Sätzen. Fragen beantwortest du ausführlich und gut gegliedert (kurze Absätze oder Aufzählungen mit „- “), ohne Floskeln.';
 
-function systemPrompt(user: User, today: string): string {
+/**
+ * System-Prompt in zwei Teilen: `fixed` bleibt zwischen Anfragen gleich (Prompt-Caching), `dynamic` enthält alles
+ * Veränderliche (Datum, Uhrzeit, Lagebild, Gedächtnis). Keine Zeitstempel im festen Teil!
+ */
+export function systemPrompt(user: User, today: string): { fixed: string; dynamic: string } {
   const lb = buildLagebild(user, 8);
-  return `Du bist Stella, der persönliche Assistent von ${user.name}. Motto: "Let Stella handle your life."
-${describeUser(user)} Du nimmst ${user.name} Arbeit ab: Termine, Planung, Nachrichten, Alltag${isSchool(user) ? ', Schule und Lernen' : ''}.
+  return {
+    dynamic: `Jetzt: ${WEEKDAYS_DE[weekdayOf(today)]}, ${today}, ${timeIn(user.timeZone)} Uhr (${user.timeZone}).
 
-Jetzt: ${WEEKDAYS_DE[weekdayOf(today)]}, ${today}, ${timeIn(user.timeZone)} Uhr (${user.timeZone}).
+LAGEBILD
+${lagebildPrompt(lb)}`,
+    fixed: `Du bist Stella, der persönliche Assistent von ${user.name}. Motto: "Let Stella handle your life."
+${describeUser(user)} Du nimmst ${user.name} Arbeit ab: Termine, Planung, Nachrichten, Alltag${isSchool(user) ? ', Schule und Lernen' : ''}.
 
 Regeln:
 - Antworte auf Deutsch.
@@ -730,14 +746,13 @@ Regeln:
 - ${toneInstruction(user.settings.tone)}
 - HANDELN statt erklären: Wenn ${user.name} etwas organisiert, geplant, verschoben, abgesagt oder vorbereitet haben will, tu es mit den Werkzeugen (mehrere Schritte sind ok). Rechne Daten selbst aus (YYYY-MM-DD).
 - Manche Aktionen brauchen die Zustimmung von ${user.name}: Dann bekommt ${user.name} eine Karte mit Ja/Nein – sag nur kurz, dass du gefragt hast.
-- Nutze das Lagebild unten (freie Zeiten, Tests, Lernstand) für Vorschläge. Plane nichts in belegte Zeiten.
+- Nutze das Lagebild und die Uhrzeit im zweiten Systemteil (freie Zeiten, Tests, Lernstand) für Vorschläge. Plane nichts in belegte Zeiten.
 - Erfinde keine Termine oder Fakten. Frag nach, wenn etwas Wichtiges fehlt.
 - Bei Tests/Schularbeiten: Stoff erfragen, dann create_study_plan.
 ${isSchool(user) ? `- Hausübungen erledigst du (solve_homework): Stella löst sie und schreibt sie in Handschrift ins Heft.\n` : ''}
 - GEDÄCHTNIS: Erfährst du etwas Dauerhaftes und Nützliches über ${user.name} (Personen und ihre Rolle, feste Termine/Routinen mit Wochentag und Uhrzeit, Vorlieben, was schwer/leicht fällt, Ziele), speichere es sofort mit remember – ohne nachzufragen und ohne es groß anzukündigen. Nicht speichern: Einmaliges (das ist ein Planer-Eintrag), Banales, Passwörter, Dinge, die schon unten stehen. Ist etwas überholt, ändere oder lösche den alten Eintrag (update_memory/forget). Nutze dein Wissen, ohne es jedes Mal zu erwähnen.
-
-LAGEBILD
-${lagebildPrompt(lb)}`;
+- Ist eine Aufgabe zu schwer für dich (lange Planung, mehrstufiges Rechnen, viele Quellen), ruf escalate auf; dann übernimmt ein stärkeres Modell. Bei allem Alltäglichen nicht.`,
+  };
 }
 
 /** Ergebnis einer Aktion so formulieren, dass das Modell weiß, was passiert ist */
@@ -835,20 +850,32 @@ async function runTool(t: Turn, name: string, args: Record<string, any>): Promis
   }
 }
 
-async function runAgent(t: Turn) {
+async function runAgent(t: Turn, wanted?: Tier, escalated = false) {
   const history = conversationMessages(t.user.id, t.conversationId, 16);
+  const lastUser = [...history].reverse().find((m) => m.role === 'user')?.text;
+  // Der Chat-Agent startet als Haiku; Sonnet nur auf ausdrücklichen Wunsch ("gründlich") oder wenn Haiku `escalate` ruft
+  const { tier, downgraded } = resolveTier(t.user, wanted ?? pickTier(t.user, { text: lastUser, kind: 'chat' }));
+  const sys = systemPrompt(t.user, t.today);
   const messages: LlmMessage[] = [
-    { role: 'system', content: systemPrompt(t.user, t.today) },
+    { role: 'system', content: sys.fixed, dynamic: sys.dynamic },
     ...history.map((m) => ({ role: m.role, content: m.text }) as LlmMessage),
   ];
+  const tools = toolsFor(t.user).filter((x) => x.function.name !== 'escalate' || (tier === 'light' && !escalated));
   try {
     for (let step = 0; step < 6; step++) {
-      // ab dem zweiten Schritt ist es eine Kette („Handle it“) – dafür das stärkere Modell, falls eingetragen
-      const { message } = await complete(messages, toolsFor(t.user), { heavy: step > 0 });
-      messages.push({ role: 'assistant', content: message.content ?? '', tool_calls: message.tool_calls });
+      const { message } = await complete(messages, tools, { tier, effort: 'medium', userId: t.user.id, heavy: tier === 'heavy' });
+      messages.push({ role: 'assistant', content: message.content ?? '', tool_calls: message.tool_calls, raw: message.raw });
       if (!message.tool_calls?.length) {
         say(t, message.content?.trim() || '🤔');
         return;
+      }
+      const wantsMore = message.tool_calls.find((c) => c.function.name === 'escalate');
+      if (wantsMore) {
+        // Haiku sagt: zu schwer. Der Zug wird einmal mit Sonnet wiederholt – wenn Kontingent da ist.
+        if (resolveTier(t.user, 'heavy').tier === 'heavy') return runAgent(t, 'heavy', true);
+        messages.push(...message.tool_calls.map((c) => ({ role: 'tool' as const, tool_call_id: c.id,
+          content: JSON.stringify(c === wantsMore ? { ok: false, info: 'Kein Profi-Kontingent mehr. Mach es so gut du kannst und sag das in einem Satz.' } : { error: 'übersprungen' }) })));
+        continue;
       }
       for (const call of message.tool_calls) {
         let args: Record<string, unknown> = {};
@@ -857,6 +884,7 @@ async function runAgent(t: Turn) {
         messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });
       }
     }
+    void downgraded;
     say(t, 'Das war mir gerade zu kompliziert – versuch es bitte nochmal etwas anders. 🙈');
   } catch (err) {
     if (!(err instanceof LlmUnavailable)) throw err;

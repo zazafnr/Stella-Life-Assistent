@@ -14,6 +14,16 @@ const mock = createServer((req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (req.url === '/models') { res.end(JSON.stringify({ data: [{ id: 'good/model:free', supported_parameters: ['tools'] }] })); return; }
     const json = JSON.parse(body);
+    // Claude-Format (Mail-Inhalte gehen nur an Claude, nie an die Gratis-Modelle)
+    if (req.url?.startsWith('/v1/messages')) {
+      const csys = (json.system as { text: string }[]).map((b) => b.text).join('\n');
+      const answer = (content: unknown[], stop = 'end_turn') => res.end(JSON.stringify({ id: 'm', type: 'message', role: 'assistant', model: json.model, content, stop_reason: stop, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 5 } }));
+      if (csys.includes('E-Mail-Antworten im Namen')) return answer([{ type: 'text', text: 'Sehr geehrte Frau Huber,\n\nich bin morgen leider krank.\n\nLiebe Grüße\nLukas' }]);
+      const inbox = /\[([0-9a-f-]{36})\] email/.exec(csys)?.[1];
+      return JSON.stringify(json.messages).includes('tool_result')
+        ? answer([{ type: 'text', text: 'Hab dir eine Antwort geschrieben – schau kurz drüber.' }])
+        : answer([{ type: 'tool_use', id: 'toolu_r1', name: 'reply_mail', input: { inbox_id: inbox, instruction: 'bin morgen krank' } }], 'tool_use');
+    }
     const sys = String(json.messages[0]?.content ?? '');
     if (sys.includes('E-Mail-Antworten im Namen')) {
       res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'Sehr geehrte Frau Huber,\n\nich bin morgen leider krank.\n\nLiebe Grüße\nLukas' } }] }));
@@ -32,6 +42,8 @@ after(() => mock.close());
 process.env.STELLA_DATA_DIR = mkdtempSync(path.join(tmpdir(), 'stella-p4-'));
 process.env.STELLA_SECRET = 'test-secret-1234567890';
 process.env.OPENROUTER_API_KEY = 'test';
+process.env.ANTHROPIC_API_KEY = 'sk-ant-test-key-123456';
+process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${(mock.address() as AddressInfo).port}`;
 process.env.OPENROUTER_BASE_URL = `http://127.0.0.1:${(mock.address() as AddressInfo).port}`;
 
 const { register } = await import('./auth.ts');

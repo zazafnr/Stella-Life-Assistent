@@ -304,7 +304,7 @@ export async function planWeek(user: User, opts: PlanOptions = {}): Promise<Week
       const { message } = await complete([
         { role: 'system', content: 'Du teilst Prüfungsstoff in Lerneinheiten auf. Antworte nur mit JSON: {"units": ["…", "…"]} – genau so viele Einträge wie verlangt, je höchstens 8 Wörter, in sinnvoller Lernreihenfolge.' },
         { role: 'user', content: `Test: ${exam.title}\nStoff: ${exam.material.slice(0, 1500)}\nAnzahl Lerneinheiten: ${n}` },
-      ], undefined, { json: true, timeoutMs: 45_000, background: true });
+      ], undefined, { json: true, timeoutMs: 45_000, background: true, tier: 'heavy', userId: user.id });
       const units = (JSON.parse(message.content ?? '{}') as { units?: unknown }).units;
       if (Array.isArray(units) && units.length >= n) focuses[parentId] = units.slice(0, n).map((u) => String(u).slice(0, 80));
     } catch { /* ohne KI bleibt die einfache Aufteilung */ }

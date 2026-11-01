@@ -186,7 +186,7 @@ ${JSON.stringify(batch.map((m) => ({ id: m.uid, from: m.from, subject: m.subject
 
 Format: {"mails": [{"id": 123, "category": "important", "summary": "…", "confidence": 0.9, "reason": "…", "deadline": null, "needsReply": false}]}`,
     },
-  ], undefined, { json: true, timeoutMs: 90_000, background: true, provider: 'groq', task: 'classify', userId });
+  ], undefined, { json: true, timeoutMs: 90_000, background: true, provider: 'groq', task: 'classify', userId, private: true });
   const text = message.content ?? '';
   const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as { mails?: Record<string, unknown>[] };
   for (const r of parsed.mails ?? []) {
@@ -425,7 +425,7 @@ export async function draftReply(user: User, eventId: string, instruction = '', 
         `${memories ? `Was du über ${user.name} weißt:\n${memories}\n\n` : ''}` +
         `${instruction ? `Was ${user.name} antworten möchte: ${instruction}` : 'Schreib eine passende, kurze Antwort.'}`,
     },
-  ], undefined, { timeoutMs: 90_000 });
+  ], undefined, { timeoutMs: 90_000, private: true, userId: user.id });
   const body = (message.content ?? '').trim().replace(/^betreff:.*\n+/iu, '');
   if (!body) throw new Error('Kein Entwurf bekommen – bitte nochmal versuchen');
   const subject = /^re:/iu.test(String(ev.text)) ? String(ev.text) : `Re: ${ev.text ?? ''}`;

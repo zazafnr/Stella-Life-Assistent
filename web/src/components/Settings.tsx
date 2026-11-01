@@ -17,7 +17,13 @@ import { VERSION } from '../version.ts';
 
 type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'finance' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server' | 'addresses' | 'delete';
 
-interface AiStatusData { configured: boolean; chain: string[]; visionChain: string[]; coolingDown: string[]; usedToday: number; dailyLimit: number }
+interface CostSummary { totalMicroUsd: number; requests: number }
+interface AiStatusData {
+  configured: boolean; chain: string[]; visionChain: string[]; coolingDown: string[]; usedToday: number; dailyLimit: number;
+  claude?: { configured: boolean; light: string; heavy: string; allowFreeFallback: boolean };
+  cost?: { today: CostSummary; month: CostSummary; eurPerUsd: number };
+}
+const eur = (micro: number, rate: number) => `${((micro / 1e6) * rate).toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 
 export function Settings({ back, openOnboarding, openPlan }: { back: () => void; openOnboarding: (startAt: 'welcome' | 'situation') => void; openPlan: () => void }) {
   const me = useStore((s) => s.me);
@@ -208,7 +214,7 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
       {sheet === 'health' && <Sheet title="Health, SMS & Kalender" onClose={() => setSheet(null)}><Shortcuts me={me} /></Sheet>}
       {sheet === 'finance' && <Sheet title="Ausgaben" onClose={() => setSheet(null)}><FinanceSetup me={me} /></Sheet>}
       {sheet === 'notify' && <Sheet title="Mitteilungen" onClose={() => setSheet(null)}><Notifications onChange={() => setPerm(pushPermission())} /></Sheet>}
-      {sheet === 'ai' && ai && <Sheet title="KI" onClose={() => setSheet(null)}><AiDetails ai={ai} /></Sheet>}
+      {sheet === 'ai' && ai && <Sheet title="KI" onClose={() => setSheet(null)}><AiDetails ai={ai} owner={me.role === 'owner'} /></Sheet>}
       {sheet === 'perms' && <Sheet title="Was Stella selbst darf" onClose={() => setSheet(null)}><Permissions /></Sheet>}
       {sheet === 'memory' && <Sheet title="Was Stella über dich weiß" onClose={() => setSheet(null)}><MemoryView /></Sheet>}
       {sheet === 'addresses' && <Sheet title="Mail an Stella" onClose={() => setSheet(null)}><Addresses me={me} /></Sheet>}
@@ -324,10 +330,18 @@ function Shortcuts({ me }: { me: Me }) {
   );
 }
 
-function AiDetails({ ai }: { ai: AiStatusData }) {
+function AiDetails({ ai, owner }: { ai: AiStatusData; owner: boolean }) {
   return (
     <>
-      <Section title="Verbrauch heute">
+      {ai.claude?.configured && (
+        <Section title="Claude">
+          <p className="small">Alltag: <code>{ai.claude.light}</code><br />Schwere Aufgaben: <code>{ai.claude.heavy}</code></p>
+          {ai.cost && owner && (
+            <p className="small">Kosten heute <strong>{eur(ai.cost.today.totalMicroUsd, ai.cost.eurPerUsd)}</strong> ({ai.cost.today.requests} Anfragen) · diesen Monat <strong>{eur(ai.cost.month.totalMicroUsd, ai.cost.eurPerUsd)}</strong></p>
+          )}
+        </Section>
+      )}
+      <Section title="Verbrauch heute (Gratis-Modelle)">
         <p><strong>{ai.usedToday}</strong> von {ai.dailyLimit} Anfragen. Mails sortieren nutzt höchstens die Hälfte, damit für dich immer etwas übrig bleibt.</p>
       </Section>
       <Section title="Modelle (automatisch gewählt)">

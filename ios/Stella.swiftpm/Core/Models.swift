@@ -663,6 +663,26 @@ struct AIStatus: Codable {
     var configured: Bool
     var usedToday: Int
     var dailyLimit: Int
+    var claude: ClaudeStatus?
+    var cost: AICost?
+}
+
+struct ClaudeStatus: Codable {
+    var configured: Bool
+    var light: String
+    var heavy: String
+    var allowFreeFallback: Bool?
+}
+
+struct AICostSummary: Codable {
+    var totalMicroUsd: Double
+    var requests: Int
+}
+
+struct AICost: Codable {
+    var today: AICostSummary
+    var month: AICostSummary
+    var eurPerUsd: Double
 }
 
 struct OK: Codable { var ok: Bool? }
