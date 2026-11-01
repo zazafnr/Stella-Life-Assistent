@@ -1,8 +1,7 @@
 // Katalog der Nachrichtenquellen für das Morgen-Briefing. Nur seriöse Medien, mehrere Blattlinien je Land, kein Boulevard.
 //
-// WICHTIG: Die Feed-Adressen sind aus dem Gedächtnis eingetragen und wurden beim Bauen NICHT geprüft (dort gab es keinen Internetzugang).
-// `npx tsx scripts/check-news-feeds.ts` ruft jede Adresse ab und schreibt einen Bericht (erreichbar, Anzahl Meldungen, Fehler).
-// Nicht erreichbare Quellen dann hier streichen. Nutzungsbedingungen der Feeds bitte je Quelle ansehen (siehe docs/news/quellen.md).
+// Die Adressen wurden am 2026-11-01 vom VPS aus mit `npx tsx scripts/check-news-feeds.ts` geprüft; ausgefallene sind ersetzt oder gestrichen.
+// Das Skript ruft jede Adresse ab und schreibt einen Bericht (erreichbar, Anzahl Meldungen, Fehler) – bei Bedarf wiederholen. Nutzungsbedingungen der Feeds bitte je Quelle ansehen (siehe docs/news/quellen.md).
 // Gespeichert werden nur Titel, Teaser und Link – nie der Artikeltext.
 
 export const NEWS_TOPICS = ['politics', 'economy', 'tech', 'science', 'climate', 'health', 'sport', 'culture', 'local'] as const;
@@ -31,7 +30,7 @@ export const NEWS_SOURCES: NewsSource[] = [
   // Österreich
   s('orf', 'ORF', 'AT', 'de', 'https://rss.orf.at/news.xml', 'https://orf.at'),
   s('derstandard', 'Der Standard', 'AT', 'de', 'https://www.derstandard.at/rss', 'https://www.derstandard.at'),
-  s('diepresse', 'Die Presse', 'AT', 'de', 'https://www.diepresse.com/rss/home', 'https://www.diepresse.com'),
+  s('diepresse', 'Die Presse', 'AT', 'de', 'https://www.diepresse.com/rss', 'https://www.diepresse.com'),
   s('kleinezeitung', 'Kleine Zeitung', 'AT', 'de', 'https://www.kleinezeitung.at/rss', 'https://www.kleinezeitung.at'),
   // Deutschland
   s('tagesschau', 'Tagesschau', 'DE', 'de', 'https://www.tagesschau.de/index~rss2.xml', 'https://www.tagesschau.de'),
@@ -58,7 +57,7 @@ export const NEWS_SOURCES: NewsSource[] = [
   s('franceinfo', 'franceinfo', 'FR', 'fr', 'https://www.francetvinfo.fr/titres.rss', 'https://www.francetvinfo.fr'),
   // Spanien
   s('elpais', 'El País', 'ES', 'es', 'https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada', 'https://elpais.com'),
-  s('rtve', 'RTVE', 'ES', 'es', 'https://www.rtve.es/api/noticias.rss', 'https://www.rtve.es/noticias'),
+  s('rtve', 'RTVE', 'ES', 'es', 'https://www.rtve.es/rss/temas_noticias.xml', 'https://www.rtve.es/noticias'),
   // Italien
   s('ansa', 'ANSA', 'IT', 'it', 'https://www.ansa.it/sito/ansait_rss.xml', 'https://www.ansa.it'),
   s('corriere', 'Corriere della Sera', 'IT', 'it', 'https://xml2.corriereobjects.it/rss/homepage.xml', 'https://www.corriere.it'),
@@ -68,12 +67,12 @@ export const NEWS_SOURCES: NewsSource[] = [
   s('bbc-brasil', 'BBC News Brasil', 'BR', 'pt', 'https://feeds.bbci.co.uk/portuguese/rss.xml', 'https://www.bbc.com/portuguese'),
   // Türkei: öffentlich-rechtlich und international, wegen der Lage der Pressefreiheit dort
   s('bbc-turkce', 'BBC Türkçe', 'TR', 'tr', 'https://feeds.bbci.co.uk/turkce/rss.xml', 'https://www.bbc.com/turkce'),
-  s('dw-turkce', 'DW Türkçe', 'TR', 'tr', 'https://rss.dw.com/rdf/rss-tr-all', 'https://www.dw.com/tr'),
   s('euronews-tr', 'Euronews Türkçe', 'TR', 'tr', 'https://tr.euronews.com/rss?format=mrss', 'https://tr.euronews.com'),
   // Polen
-  s('pap', 'PAP', 'PL', 'pl', 'https://www.pap.pl/rss.xml', 'https://www.pap.pl'),
-  s('rzeczpospolita', 'Rzeczpospolita', 'PL', 'pl', 'https://www.rp.pl/rss_main', 'https://www.rp.pl'),
-  s('tvn24', 'TVN24', 'PL', 'pl', 'https://tvn24.pl/najnowsze.xml', 'https://tvn24.pl'),
+  // PAP, Rzeczpospolita und TVN24 lieferten beim Prüfen keine nutzbaren Feeds (leer bzw. 403)
+  s('polsatnews', 'Polsat News', 'PL', 'pl', 'https://www.polsatnews.pl/rss/wszystkie.xml', 'https://www.polsatnews.pl'),
+  s('rmf24', 'RMF24', 'PL', 'pl', 'https://www.rmf24.pl/fakty/feed', 'https://www.rmf24.pl'),
+  s('gazeta', 'Gazeta.pl', 'PL', 'pl', 'https://wiadomosci.gazeta.pl/pub/rss/wiadomosci.htm', 'https://wiadomosci.gazeta.pl'),
 ];
 
 let catalog = NEWS_SOURCES;

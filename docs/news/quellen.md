@@ -4,7 +4,7 @@ Der Katalog steht in `server/src/news/sources.ts`. Jede Quelle hat `id`, `name`,
 
 ## Ehrlicher Stand
 
-- **Die Feed-Adressen wurden beim Bauen nicht geprüft.** In der Bau-Umgebung gab es keinen Zugriff auf externe Seiten. Sie stehen so im Katalog, wie sie bekannt sind.
+- **Geprüft am 2026-11-01 vom VPS aus:** 28 von 34 Adressen liefen. Ersetzt: Die Presse (`/rss`), RTVE (`/rss/temas_noticias.xml`). Gestrichen: DW Türkçe (leer), PAP, Rzeczpospolita und TVN24 (leer bzw. 403), in Polen stattdessen Polsat News, RMF24 und Gazeta.pl. Folha liefert ISO-8859-1; der Abruf liest jetzt den Zeichensatz aus.
 - Dafür gibt es `npx tsx scripts/check-news-feeds.ts`. Es ruft jede Adresse ab, liest sie mit dem echten Parser und schreibt `docs/news/feed-pruefung.md`.
   Quellen, die dort „FEHLT“ zeigen, bitte aus dem Katalog streichen oder die Adresse korrigieren. **Das ist eine Aufgabe für dich** (einmal, vor dem Start).
 - **Reuters und AP** sind bewusst nicht im Katalog: sie bieten keine verlässlichen öffentlichen RSS-Feeds mehr. Stattdessen International: DW, Euronews, BBC.
