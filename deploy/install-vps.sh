@@ -94,7 +94,30 @@ ReadWritePaths=$DATA
 [Install]
 WantedBy=multi-user.target
 EOF
+# IP-Ortsdatenbank (DB-IP Lite) für das ungefähre Wetter ohne Standort: einmal jetzt, danach monatlich
+cat > /etc/systemd/system/stella-geoip.service <<EOF
+[Unit]
+Description=Stella: DB-IP Lite aktualisieren
+
+[Service]
+Type=oneshot
+Environment=STELLA_DATA_DIR=$DATA
+ExecStart=$APP/scripts/update-geoip.sh
+EOF
+cat > /etc/systemd/system/stella-geoip.timer <<EOF
+[Unit]
+Description=Stella: DB-IP Lite monatlich aktualisieren
+
+[Timer]
+OnCalendar=*-*-03 04:15:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
 systemctl daemon-reload
+systemctl enable --now stella-geoip.timer >/dev/null
+systemctl start stella-geoip.service || echo "DB-IP Lite konnte nicht geladen werden – das Wetter ohne Standort nutzt dann die Hauptstadt."
 systemctl enable stella >/dev/null
 systemctl restart stella
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addDays, diffDays, formatDateDe, todayIn, type FinanceMonth, type GoalProgress, type Item } from '@stella/shared';
+import { addDays, diffDays, formatDateDe, todayIn, type FinanceMonth, type GoalProgress, type Item, type WeatherState } from '@stella/shared';
 import { api, meHas, useStore } from '../store.ts';
 import { useLocale, useT } from '../i18n.ts';
 import type { Tab } from '../App.tsx';
@@ -10,6 +10,7 @@ import { ListsSheet } from './Lists.tsx';
 import { WeekBar, amount } from './Goals.tsx';
 import { euro } from './Finance.tsx';
 import { StellaPlanCard } from './StellaPlan.tsx';
+import { useWeather } from '../weather.ts';
 
 interface Lesson { date: string; start: string; subject: string | null; code: string | null; status: string }
 interface InboxEntry { source: string; category: string | null; action: string | null; createdAt: string }
@@ -43,7 +44,16 @@ export function ItemStatus({ item, busy }: { item: Item; busy: boolean }) {
   return <span className="pill gray">{t('today.status.open')}</span>;
 }
 
+/** Kleine Wetteranzeige neben dem Datum; die Szenen mit Animation kommen in Paket 8 */
+function WeatherChip({ w }: { w: WeatherState }) {
+  const t = useT();
+  const icon: IconName = w.type === 'clear' ? (w.day ? 'sun' : 'moon') : w.type === 'partly' ? (w.day ? 'sun' : 'moon') : 'cloud';
+  const label = t('weather.chip', { type: t(`weather.type.${w.type}`), temp: w.temp });
+  return <span style={{ marginLeft: 10, display: 'inline-flex', alignItems: 'center', gap: 4 }} aria-label={label} title={label}><Icon name={icon} size={14} />{w.temp}°</span>;
+}
+
 export function Today({ go }: { go: (t: Tab) => void }) {
+  const weather = useWeather();
   const t = useT();
   const locale = useLocale();
   const me = useStore((s) => s.me);
@@ -114,7 +124,7 @@ export function Today({ go }: { go: (t: Tab) => void }) {
       <div className="page-inner stagger">
         <header className="page-head">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span className="small muted" style={{ fontWeight: 600 }}>{dateLabel}</span>
+            <span className="small muted" style={{ fontWeight: 600 }}>{dateLabel}{weather && <WeatherChip w={weather} />}</span>
             <h1 className="display">{firstName ? t('today.greeting.named', { greeting: t(greetingKey()), name: firstName }) : t('today.greeting.plain', { greeting: t(greetingKey()) })}</h1>
           </div>
           <button type="button" className="icon-btn" aria-label={t('nav.settings')} onClick={() => go('settings')} style={{ color: 'var(--pink)' }}>

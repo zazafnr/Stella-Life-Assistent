@@ -11,3 +11,4 @@ export * from './i18n/countries.ts';
 export * from './i18n/t.ts';
 export * from './plans.ts';
 export * from './onboarding.ts';
+export * from './weather.ts';

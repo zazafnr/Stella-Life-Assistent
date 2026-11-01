@@ -33,6 +33,7 @@ import { finishGoogle, finishGoogleLink, finishTarget, googleAuthUrl, googleConf
 import { approve, GROUPS, isGroup, isLevel, levelFor, listActions, perform, reject, undo } from './actions.ts';
 import { LlmUnavailable } from './llm.ts';
 import { buildBriefing } from './briefing.ts';
+import { registerWeatherRoutes, warmWeather } from './weather.ts';
 import { cleanBlocks, planWeek } from './weekplan.ts';
 import { acceptHint, dismissHint } from './hints.ts';
 import { registerAdminRoutes } from './admin.ts';
@@ -662,7 +663,8 @@ app.register(async (api) => {
   });
 
   // ----- Morning Briefing & Hinweise -----
-  api.get('/api/briefing', async (req) => buildBriefing(req.user));
+  api.get('/api/briefing', async (req) => { await warmWeather(req.user); return buildBriefing(req.user); });
+  registerWeatherRoutes(api);
 
   // ----- Plan my week: Vorschlag ansehen, Blöcke abwählen, übernehmen -----
   api.get('/api/weekplan', async (req) => {

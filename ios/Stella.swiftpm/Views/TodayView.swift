@@ -61,12 +61,27 @@ struct TodayView: View {
 
     // MARK: Teile
 
+    /// Kleine Wetteranzeige; die Szenen mit Animation kommen in Paket 8
+    private static func weatherSymbol(_ w: WeatherState) -> String {
+        switch w.type {
+        case "clear", "partly": return w.day ? "sun.max.fill" : "moon.stars.fill"
+        default: return "cloud.fill"
+        }
+    }
+
     private var header: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(Date().formatted(.dateTime.locale(Locale(identifier: "de_AT")).weekday(.wide).day().month(.wide)))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.muted)
+                HStack(spacing: 10) {
+                    Text(Date().formatted(.dateTime.locale(Locale(identifier: "de_AT")).weekday(.wide).day().month(.wide)))
+                    if let w = WeatherService.shared.current {
+                        Label("\(w.temp)°", systemImage: Self.weatherSymbol(w))
+                            .labelStyle(.titleAndIcon)
+                            .accessibilityLabel(L("weather.chip", ["type": L("weather.type.\(w.type)"), "temp": w.temp]))
+                    }
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.muted)
                 Text("\(greeting), \(store.me?.firstName ?? "du")!")
                     .font(Theme.display(32))
                     .foregroundStyle(Theme.text)

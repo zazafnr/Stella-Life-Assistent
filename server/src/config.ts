@@ -111,6 +111,11 @@ export const config = {
    * Funktions-Schalter. Finanzen ist vorerst ausgeblendet (Code, Tabellen und Tests bleiben):
    * mit STELLA_FEATURE_FINANCE=true wieder an.
    */
+  /** Wetter (Open-Meteo, kostenlos ohne Key) und die IP-Ortsdatenbank DB-IP Lite (scripts/update-geoip.sh lädt sie monatlich) */
+  weather: {
+    baseUrl: env.STELLA_WEATHER_URL ?? 'https://api.open-meteo.com',
+    geoipDb: env.STELLA_GEOIP_DB ?? path.join(env.STELLA_DATA_DIR ?? path.join(import.meta.dirname, '../../data'), 'geoip/dbip-city-lite.mmdb'),
+  },
   /** Download-Link von FreeNotes, sobald es die App gibt; leer = „Benachrichtige mich“ in der Einführung */
   freenotesUrl: env.STELLA_FREENOTES_URL ?? '',
   features: {

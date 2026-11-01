@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { startWeatherOnce } from './weather.ts';
 import { meHas, meIsSchool, refreshMe, startBackgroundSync, useStore } from './store.ts';
 import { Today } from './components/Today.tsx';
 import { Chat } from './components/Chat.tsx';
@@ -55,6 +56,7 @@ export function App() {
   useEffect(() => { const t = setTimeout(() => setReady(true), 4000); return () => clearTimeout(t); }, []);
   useEffect(() => { if (ready) dismissBoot(); }, [ready]);
   useEffect(() => { if (token) startBackgroundSync(); }, [token]);
+  useEffect(() => { if (token && hasMe) startWeatherOnce(); }, [token, hasMe]);
   useEffect(() => { if (token && !hasMe) void refreshMe().catch(() => {}); }, [token, hasMe]);
   useEffect(() => { history.replaceState(null, '', tab === 'today' ? location.pathname : `#${tab}`); }, [tab]);
   useEffect(() => { document.documentElement.classList.toggle('is-desktop', isDesktopApp); }, []);

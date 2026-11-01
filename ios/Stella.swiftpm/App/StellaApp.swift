@@ -99,6 +99,7 @@ struct RootView: View {
                 }
             }
             .task { store.start() }
+            .task(id: store.me?.id) { if store.me != nil { WeatherService.shared.start(permission: store.me?.settings.locationPermission) } }
             .transition(.opacity)
         } else {
             LoginView()

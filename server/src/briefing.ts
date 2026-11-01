@@ -12,6 +12,7 @@ import { goalBriefingLines } from './goals.ts';
 import { deliverHint, findHints, isDelivered } from './hints.ts';
 import { pushToUser } from './push.ts';
 import { tr, userLocale, voiceOf } from './locale.ts';
+import { warmWeather, weatherLine } from './weather.ts';
 
 const LEAD_MINUTES = 45;
 
@@ -31,6 +32,10 @@ export function buildBriefing(user: User, lb: Lagebild = buildLagebild(user, 3))
   const today = lb.days[0]!;
   const tomorrow = lb.days[1];
   const sections: BriefingSection[] = [];
+
+  // Wetter (aus dem Zwischenspeicher; maybeSendBriefing und die Route holen es vorher)
+  const weather = weatherLine(user);
+  if (weather) sections.push({ id: 'weather', title: tr(user, 'briefing.section.weather'), lines: [weather] });
 
   // Schule
   const lessons = today.lessons;
@@ -118,6 +123,7 @@ export async function maybeSendBriefing(userId: string): Promise<boolean> {
   if (!time || nowHhmm < time || nowHhmm >= '12:00') return false;
   if (!notifyOnce(userId, `briefing:${lb.today}`)) return false;
 
+  await warmWeather(user);
   const b = buildBriefing(user, lb);
   // Die Hinweise kommen gleich danach als eigene Nachrichten – mit Vorschlag als Karte (Ja/Nein)
   const pending = findHints(user, buildLagebild(user, 8)).filter((h) => !isDelivered(userId, h.key));

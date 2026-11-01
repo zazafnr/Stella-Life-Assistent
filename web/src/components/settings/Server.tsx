@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../store.ts';
 import { Section, useAction } from './ui.tsx';
+import { WEATHER_TYPES, isWeatherType } from '@stella/shared';
+import { forceWeather, forcedWeather } from '../../weather.ts';
 
 type Name = 'anthropic' | 'groq' | 'openrouter' | 'smtp' | 'stripe';
 interface KeyStatus { set: boolean; source: 'env' | 'app' | null; lastOk: string | null; lastError: string | null }
@@ -34,6 +36,7 @@ export function Server() {
       <PlansAdmin />
       <InboundCard />
       <Invites />
+      <DevWeather />
     </>
   );
 }
@@ -249,6 +252,30 @@ function Invites() {
         </div>
       ))}
       {view}
+    </Section>
+  );
+}
+
+/** Entwickler: Wetter erzwingen (alle Typen, Tag und Nacht) für Screenshots und Abnahme. Gilt nur in diesem Browser. */
+function DevWeather() {
+  const [f, setF] = useState(() => forcedWeather());
+  const set = (type: string, day: boolean) => {
+    const next = isWeatherType(type) ? { type, day } : null;
+    forceWeather(next);
+    setF(next);
+  };
+  return (
+    <Section title="Entwickler: Wetter erzwingen">
+      <p className="muted small">Zeigt in diesem Browser immer das gewählte Wetter statt des echten. „Aus“ stellt es zurück.</p>
+      <div className="form-grid two">
+        <label>Wetter<select value={f?.type ?? ''} onChange={(e) => set(e.target.value, f?.day ?? true)}>
+          <option value="">Aus (echtes Wetter)</option>
+          {WEATHER_TYPES.map((x) => <option key={x} value={x}>{x}</option>)}
+        </select></label>
+        <label>Tageszeit<select value={f?.day === false ? 'night' : 'day'} disabled={!f} onChange={(e) => f && set(f.type, e.target.value === 'day')}>
+          <option value="day">Tag</option><option value="night">Nacht</option>
+        </select></label>
+      </div>
     </Section>
   );
 }

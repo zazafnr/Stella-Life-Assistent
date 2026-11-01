@@ -537,6 +537,8 @@ export interface UserSettings {
   country?: string;
   /** Standort: in der Einführung beantwortet ('later' = später noch einmal fragen) */
   locationPermission?: 'granted' | 'denied' | 'later';
+  /** Zuletzt bekannter Ort, auf etwa 1 km gerundet – für Wetter, Briefing und News. Der genaue Standort wird nie gespeichert. */
+  lastPlace?: { lat: number; lon: number; at: string };
   /** Wer benachrichtigt werden will, wenn etwas Neues da ist (z. B. FreeNotes) */
   notify?: { freenotes?: boolean };
   /** 'pending': die Einführung wird beim nächsten Öffnen gezeigt; 'done': erledigt oder übersprungen */

@@ -183,10 +183,19 @@ struct SettingsView: View {
                             NavigationLink { ServerKeysView() } label: {
                                 row("Schlüssel & Absender", symbol: "key.horizontal", tint: Theme.blue, detail: nil)
                             }
+                            Picker("Wetter erzwingen", selection: Binding(
+                                get: { WeatherService.shared.forced ?? "" },
+                                set: { WeatherService.shared.forced = $0.isEmpty ? nil : $0 })) {
+                                Text("Aus (echtes Wetter)").tag("")
+                                ForEach(WeatherState.types, id: \.self) { t in
+                                    Text("\(t) · Tag").tag(t)
+                                    Text("\(t) · Nacht").tag("\(t):night")
+                                }
+                            }
                         } header: {
                             Text("Server")
                         } footer: {
-                            Text("Groq, OpenRouter und der Mail-Absender für Bestätigungs-Codes – nur für dich als Owner sichtbar.")
+                            Text("Groq, OpenRouter und der Mail-Absender für Bestätigungs-Codes – nur für dich als Owner sichtbar. „Wetter erzwingen“ zeigt auf diesem Gerät immer das gewählte Wetter (für Screenshots und Abnahme).")
                         }
                     }
 
