@@ -58,6 +58,12 @@ struct SettingsView: View {
                         Text(L("settings.languageSub"))
                     }
 
+                    Section {
+                        NavigationLink { NewsSettingsView() } label: {
+                            row(L("settings.news.title"), symbol: "newspaper.fill", tint: Theme.pink, detail: L("settings.news.sub"))
+                        }
+                    }
+
                     if me.flags?.telegram == true {
                         Section {
                             NavigationLink { TelegramView() } label: {

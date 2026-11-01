@@ -29,6 +29,7 @@ export interface Me {
     locationPermission?: 'granted' | 'denied' | 'later';
     notify?: { freenotes?: boolean };
     notifyVia?: ('push' | 'telegram')[];
+    news?: { enabled?: boolean; asked?: boolean };
     /** Sprache und Land (Paket 2) */
     locale?: Locale;
     country?: string;

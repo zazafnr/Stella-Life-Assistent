@@ -228,6 +228,13 @@ und plant die nächste Erinnerung (`advanceRecurring`); pausiert sind sie ohne E
 - Nötig wären die Meta-Unternehmensverifizierung und eine eigene Nummer.
 - Wenn es kommt, dann nur ab Pro.
 
+### News im Briefing (v3, Paket 11)
+
+- `server/src/news/`: `sources.ts` (Katalog), `feed.ts` (RSS/Atom/RDF lesen, Themen, Feed-Suche), `cluster.ts` (Gruppen), `store.ts` (Abruf alle 30 Minuten, ETag, Löschen nach 3 Tagen),
+  `digest.ts` (Auswahl und Kurzfassung durch Haiku), `ask.ts` (Frage am ersten Tag), `routes.ts` (Einstellungen, Lieblingszeitung).
+- Gespeichert werden nur Titel, Teaser und Link (`news_items`). Eigene Feed-Adressen der Nutzer werden gegen interne Adressen geschützt (`net.ts`, SSRF).
+- Quellen, Prüfung der Feeds und Nutzungsbedingungen: `docs/news/quellen.md`.
+
 ### Abos und Limits (v3, Paket 5)
 
 - Abos: Free, Plus (8 €), Pro (15 €), Max (35 €) – Definition und Startwerte in `shared/src/plans.ts`, Überschreibungen

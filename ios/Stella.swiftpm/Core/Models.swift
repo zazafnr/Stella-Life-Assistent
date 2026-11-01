@@ -155,6 +155,7 @@ struct QuickActions: Codable {
 
 /** Karte unter einer Stella-Nachricht (derzeit: Läden in der Nähe) */
 struct MessageCard: Codable, Hashable {
+    /** "places", "spending" oder "news_ask" (Frage am ersten Tag) */
     var type: String
     /** Läden-Karte */
     var category: String?
@@ -165,6 +166,21 @@ struct MessageCard: Codable, Hashable {
     var totalCents: Int?
     var count: Int?
     var categories: [SpendingLine]?
+
+    enum CodingKeys: String, CodingKey { case type, category, label, itemId, currency, totalCents, count, categories }
+
+    // Karten ohne Beschriftung (news_ask) sollen nicht am Decodieren scheitern
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        type = try c.decode(String.self, forKey: .type)
+        category = try c.decodeIfPresent(String.self, forKey: .category)
+        label = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
+        itemId = try c.decodeIfPresent(String.self, forKey: .itemId)
+        currency = try c.decodeIfPresent(String.self, forKey: .currency)
+        totalCents = try c.decodeIfPresent(Int.self, forKey: .totalCents)
+        count = try c.decodeIfPresent(Int.self, forKey: .count)
+        categories = try c.decodeIfPresent([SpendingLine].self, forKey: .categories)
+    }
 }
 
 struct SpendingLine: Codable, Hashable {
@@ -420,6 +436,13 @@ struct UserSettings: Codable, Hashable {
     var notify: NotifySettings?
     /** Wohin Stella von sich aus schreibt: "push" und/oder "telegram" */
     var notifyVia: [String]?
+    /** News im Briefing */
+    var news: NewsPrefs?
+}
+
+struct NewsPrefs: Codable, Hashable {
+    var enabled: Bool?
+    var asked: Bool?
 }
 
 struct NotifySettings: Codable, Hashable {
@@ -473,6 +496,16 @@ struct BriefingSection: Codable, Hashable, Identifiable {
     var lines: [String]
 }
 
+/** Eine Meldung im Briefing: ein neutraler Satz, die Quelle und der Link zum Artikel */
+struct NewsEntry: Codable, Hashable, Identifiable {
+    var sentence: String
+    var source: String
+    var url: String
+    var publishedAt: String
+    var favorite: Bool?
+    var id: String { url }
+}
+
 struct Briefing: Codable {
     var date: String
     var greeting: String
@@ -482,6 +515,7 @@ struct Briefing: Codable {
     var text: String
     var time: String?
     var sent: Bool
+    var news: [NewsEntry]?
 }
 
 enum Tone: String, CaseIterable, Identifiable {

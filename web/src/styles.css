@@ -763,3 +763,10 @@ textarea.cookies { min-height: 90px; font-family: ui-monospace, monospace; font-
 .bubble.assistant .voice-play { background: var(--blue-tint, #E6F0FF); color: var(--blue); }
 .voice-raw-btn { border: 0; background: none; color: inherit; font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; padding: 0 2px; opacity: .85; }
 .voice-raw { margin: 4px 0 6px; padding: 8px 10px; border-radius: 12px; background: rgba(255, 255, 255, .16); font-size: 13px; font-style: italic; }
+
+/* News im Briefing (Paket 11) */
+.news-list { list-style: none; padding: 0; margin: 4px 0 0; display: flex; flex-direction: column; gap: 8px; }
+.news-list a { display: flex; flex-direction: column; gap: 2px; color: inherit; text-decoration: none; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.news-list li:last-child a { border-bottom: 0; }
+.news-sentence { font-size: 15px; line-height: 1.35; }
+.news-list a:hover .news-sentence, .news-list a:focus-visible .news-sentence { text-decoration: underline; }

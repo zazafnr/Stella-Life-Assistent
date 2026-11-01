@@ -499,6 +499,37 @@ const MIGRATIONS: string[] = [
   );
   ALTER TABLE messages ADD COLUMN via TEXT;
   `,
+  // Paket 11: Nachrichten (nur Titel, Teaser und Link; nach 3 Tagen gelöscht)
+  `
+  CREATE TABLE news_items (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL,
+    url TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    teaser TEXT NOT NULL DEFAULT '',
+    published_at TEXT NOT NULL,
+    topics TEXT NOT NULL DEFAULT '[]',
+    cluster_id TEXT NOT NULL,
+    fetched_at TEXT NOT NULL
+  );
+  CREATE INDEX news_items_published ON news_items(published_at);
+  CREATE INDEX news_items_cluster ON news_items(cluster_id);
+  CREATE TABLE news_feeds (
+    source_id TEXT PRIMARY KEY,
+    feed_url TEXT NOT NULL,
+    etag TEXT,
+    last_modified TEXT,
+    status TEXT,
+    error TEXT,
+    fetched_at TEXT
+  );
+  CREATE TABLE news_digest (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    date TEXT NOT NULL,
+    json TEXT NOT NULL,
+    PRIMARY KEY (user_id, date)
+  );
+  `,
 ];
 
 function migrate() {

@@ -17,6 +17,7 @@ import { handleChat } from '../assistant.ts';
 import { briefingText } from '../briefing.ts';
 import { recordKeyResult, saveTelegramUsername, telegramKey } from '../keys.ts';
 import { tr } from '../locale.ts';
+import { defaultNews, saveNews } from '../news/digest.ts';
 import type { Channel, OutboundMessage } from './channel.ts';
 import { markdownToTelegramHtml, splitForTelegram } from './telegramHtml.ts';
 
@@ -297,6 +298,12 @@ async function onCallback(cb: NonNullable<TgUpdate['callback_query']>, chat: str
   const user = userByChat(chat);
   const answer = (text?: string) => tg('answerCallbackQuery', { callback_query_id: cb.id, ...(text ? { text } : {}) }).catch(() => {});
   if (!user) return void (await answer());
+  const news = /^n:([yn])$/.exec(cb.data ?? '');
+  if (news) {
+    if (news[1] === 'y') saveNews(user, defaultNews(user)); else saveNews(user, { enabled: false, asked: true });
+    await answer();
+    return void (await sendTo(chat, { text: tr(user, news[1] === 'y' ? 'news.ask.yesDone' : 'news.ask.noDone') }));
+  }
   const m = /^([aru]):([0-9a-f-]{36})$/.exec(cb.data ?? '');
   if (!m) return void (await answer());
   try {

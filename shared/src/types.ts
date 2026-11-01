@@ -44,6 +44,7 @@ export interface Item {
 /** Karte unter einer Stella-Nachricht (z. B. Läden in der Nähe) */
 export type MessageCard =
   | { type: 'places'; category: string; label: string; itemId: string | null }
+  | { type: 'news_ask' }
   | { type: 'spending'; label: string; from: string; to: string; currency: string; totalCents: number; count: number; categories: { category: string; cents: number }[] };
 
 export interface ChatMessage {
@@ -162,6 +163,9 @@ export interface Hint {
 
 export interface BriefingSection { id: string; title: string; lines: string[] }
 
+/** Eine Meldung im Briefing: ein neutraler Satz, die Quelle und der Link zum Artikel */
+export interface NewsEntry { sentence: string; source: string; url: string; publishedAt: string; favorite?: boolean }
+
 /** Der Überblick am Morgen */
 export interface Briefing {
   date: string;
@@ -174,6 +178,8 @@ export interface Briefing {
   /** wann es heute kommt bzw. kam (HH:MM), null = aus */
   time: string | null;
   sent: boolean;
+  /** Karte „News“ (nur wenn die Person sie eingeschaltet hat und es etwas gibt) */
+  news?: NewsEntry[];
 }
 
 /** Ein Block im Wochenplan – wird beim Übernehmen ein Eintrag (Art „study“) */

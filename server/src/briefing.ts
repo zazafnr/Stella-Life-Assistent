@@ -13,6 +13,7 @@ import { deliverHint, findHints, isDelivered } from './hints.ts';
 import { notify } from './channels/deliver.ts';
 import { tr, userLocale, voiceOf } from './locale.ts';
 import { warmWeather, weatherLine } from './weather.ts';
+import { buildDigest, digestOf } from './news/digest.ts';
 
 const LEAD_MINUTES = 45;
 
@@ -36,6 +37,13 @@ export function buildBriefing(user: User, lb: Lagebild = buildLagebild(user, 3))
   // Wetter (aus dem Zwischenspeicher; maybeSendBriefing und die Route holen es vorher)
   const weather = weatherLine(user);
   if (weather) sections.push({ id: 'weather', title: tr(user, 'briefing.section.weather'), lines: [weather] });
+
+  // News: aus dem Zwischenspeicher (maybeSendBriefing und die Route bauen sie vorher)
+  const news = digestOf(user);
+  if (news.length) {
+    const hhmm = (iso: string) => new Intl.DateTimeFormat('de-AT', { timeZone: user.timeZone, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso));
+    sections.push({ id: 'news', title: tr(user, 'briefing.section.news'), lines: news.map((n) => `${n.sentence} ([${n.source}](${n.url}), ${hhmm(n.publishedAt)})`) });
+  }
 
   // Schule
   const lessons = today.lessons;
@@ -108,7 +116,7 @@ export function buildBriefing(user: User, lb: Lagebild = buildLagebild(user, 3))
   if (hints.length) body.push(`**${tr(user, 'briefing.noticed')}**\n${hints.map((h) => `• ${h.text}`).join('\n')}`);
   const text = [greeting, ...(body.length ? body : [v.briefingQuiet()]), closing].join('\n\n');
   const time = briefingTime(user, lb);
-  return { date: lb.today, greeting, sections, hints, closing, text, time, sent: isSent(user.id, lb.today) };
+  return { date: lb.today, greeting, sections, hints, closing, text, time, sent: isSent(user.id, lb.today), ...(news.length ? { news } : {}) };
 }
 
 const isSent = (userId: string, date: string) => !!(db.prepare('SELECT 1 FROM notified WHERE user_id = ? AND key = ?').get(userId, `briefing:${date}`));
@@ -124,6 +132,7 @@ export async function maybeSendBriefing(userId: string): Promise<boolean> {
   if (!notifyOnce(userId, `briefing:${lb.today}`)) return false;
 
   await warmWeather(user);
+  await buildDigest(user).catch(() => []);
   const b = buildBriefing(user, lb);
   // Die Hinweise kommen gleich danach als eigene Nachrichten – mit Vorschlag als Karte (Ja/Nein)
   const pending = findHints(user, buildLagebild(user, 8)).filter((h) => !isDelivered(userId, h.key));
