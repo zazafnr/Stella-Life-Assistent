@@ -59,6 +59,14 @@ struct SettingsView: View {
                     }
 
                     Section {
+                        NavigationLink { PlanSettingsView() } label: {
+                            row(L("plan.current"), symbol: "star.fill", tint: Theme.pink, detail: nil)
+                        }
+                    } header: {
+                        Text(L("plan.title"))
+                    }
+
+                    Section {
                         NavigationLink { NewsSettingsView() } label: {
                             row(L("settings.news.title"), symbol: "newspaper.fill", tint: Theme.pink, detail: L("settings.news.sub"))
                         }
