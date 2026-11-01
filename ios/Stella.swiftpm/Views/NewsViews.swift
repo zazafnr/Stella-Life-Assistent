@@ -28,7 +28,7 @@ struct NewsSettingsView: View {
         var defaultCountries: [String]
     }
     struct Found: Codable { var name: String; var feedUrl: String; var sample: [String] }
-    struct Body: Encodable {
+    struct SaveBody: Encodable {
         var enabled: Bool?
         var topics: [String]?
         var countries: [String]?
@@ -46,7 +46,7 @@ struct NewsSettingsView: View {
         Form {
             if let d = data {
                 Section {
-                    Toggle(L("settings.news.enable"), isOn: Binding(get: { d.settings.enabled }, set: { v in Task { await save(Body(enabled: v)) } }))
+                    Toggle(L("settings.news.enable"), isOn: Binding(get: { d.settings.enabled }, set: { v in Task { await save(SaveBody(enabled: v)) } }))
                 } footer: {
                     Text(L("settings.news.sub"))
                 }
@@ -54,7 +54,7 @@ struct NewsSettingsView: View {
                     Section(L("settings.news.topics")) {
                         FlowLayout {
                             ForEach(d.topics, id: \.self) { x in
-                                OnbChip(title: L("news.topic.\(x)"), on: d.settings.topics.contains(x)) { Task { await save(Body(topics: toggled(d.settings.topics, x))) } }
+                                OnbChip(title: L("news.topic.\(x)"), on: d.settings.topics.contains(x)) { Task { await save(SaveBody(topics: toggled(d.settings.topics, x))) } }
                             }
                         }
                     }
@@ -63,7 +63,7 @@ struct NewsSettingsView: View {
                         FlowLayout {
                             ForEach(d.countries, id: \.self) { c in
                                 OnbChip(title: c == "INT" ? L("settings.news.international") : I18n.countryName(c, locale: I18n.shared.locale), on: chosen.contains(c)) {
-                                    Task { await save(Body(countries: toggled(chosen, c))) }
+                                    Task { await save(SaveBody(countries: toggled(chosen, c))) }
                                 }
                             }
                         }
@@ -74,7 +74,7 @@ struct NewsSettingsView: View {
                                 HStack {
                                     Text(f.name)
                                     Spacer()
-                                    Button(L("settings.news.remove"), role: .destructive) { Task { await save(Body(favorites: d.settings.favorites.filter { $0.feedUrl != f.feedUrl })) } }
+                                    Button(L("settings.news.remove"), role: .destructive) { Task { await save(SaveBody(favorites: d.settings.favorites.filter { $0.feedUrl != f.feedUrl })) } }
                                 }
                             }
                             if d.settings.favorites.count < d.limits.maxFavorites {
@@ -90,7 +90,7 @@ struct NewsSettingsView: View {
                                     ForEach(found.sample, id: \.self) { Text($0).font(.system(size: 13)).foregroundStyle(Theme.muted) }
                                 }
                                 Button(L("settings.news.use")) {
-                                    Task { await save(Body(favorites: d.settings.favorites + [Fav(name: found.name, feedUrl: found.feedUrl)])); self.found = nil; query = "" }
+                                    Task { await save(SaveBody(favorites: d.settings.favorites + [Fav(name: found.name, feedUrl: found.feedUrl)])); self.found = nil; query = "" }
                                 }
                             }
                         } header: {
@@ -114,7 +114,7 @@ struct NewsSettingsView: View {
 
     private func toggled(_ list: [String], _ x: String) -> [String] { list.contains(x) ? list.filter { $0 != x } : list + [x] }
 
-    private func save(_ body: Body) async {
+    private func save(_ body: SaveBody) async {
         error = nil
         do {
             data = try await API.shared.send("PUT", "/api/news", body: body, as: View_.self)
@@ -141,7 +141,7 @@ struct NewsAskCardView: View {
             HStack(spacing: 8) {
                 Button(L("news.ask.yes")) {
                     Task {
-                        _ = try? await API.shared.send("PUT", "/api/news", body: NewsSettingsView.Body(enabled: true), as: NewsSettingsView.View_.self)
+                        _ = try? await API.shared.send("PUT", "/api/news", body: NewsSettingsView.SaveBody(enabled: true), as: NewsSettingsView.View_.self)
                         showSheet = true
                     }
                 }
