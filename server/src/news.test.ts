@@ -351,3 +351,10 @@ test('Alle Abrufe zusammen: Katalog + Lieblingsquellen, Fehler zählen, alte Mel
   assert.equal(r.failed, 0);
   assert.ok(owner.user.id);
 });
+
+test('Zeichensatz: ISO-8859-1 aus dem XML-Kopf oder Content-Type wird richtig gelesen, sonst UTF-8', () => {
+  const latin = Buffer.from('<?xml version="1.0" encoding="ISO-8859-1"?><title>ambição</title>', 'latin1');
+  assert.match(net.decode(latin, 'application/xml'), /ambição/);
+  assert.match(net.decode(Buffer.from('<title>ambição</title>', 'latin1'), 'text/xml; charset=iso-8859-1'), /ambição/);
+  assert.match(net.decode(Buffer.from('<title>Überraschung</title>', 'utf8'), null), /Überraschung/);
+});

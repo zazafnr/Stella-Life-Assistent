@@ -25,6 +25,13 @@ export async function assertPublicUrl(raw: string): Promise<URL> {
   return u;
 }
 
+/** Zeichensatz aus Content-Type oder XML-Kopf (manche Feeds, z. B. Folha, liefern ISO-8859-1), sonst UTF-8 */
+export function decode(buf: Buffer, contentType?: string | null): string {
+  const head = buf.subarray(0, 200).toString('latin1');
+  const label = /charset=([\w-]+)/i.exec(contentType ?? '')?.[1] ?? /<\?xml[^>]*encoding=["']([\w-]+)["']/i.exec(head)?.[1] ?? 'utf-8';
+  try { return new TextDecoder(label).decode(buf); } catch { return buf.toString('utf8'); }
+}
+
 export interface Fetched { status: number; body: string; etag?: string; lastModified?: string; url: string }
 
 /** Abruf mit Zeitlimit, Größenlimit und (bei `strict`) Prüfung jeder Weiterleitung */
@@ -43,7 +50,7 @@ export async function fetchText(url: string, opts: { strict?: boolean; etag?: st
     if (res.status === 304) return { status: 304, body: '', url: current, etag: opts.etag, lastModified: opts.lastModified };
     const buf = Buffer.from(await res.arrayBuffer());
     if (buf.length > MAX_BYTES) throw new Error('Antwort zu groß.');
-    return { status: res.status, body: buf.toString('utf8'), url: current, etag: res.headers.get('etag') ?? undefined, lastModified: res.headers.get('last-modified') ?? undefined };
+    return { status: res.status, body: decode(buf, res.headers.get('content-type')), url: current, etag: res.headers.get('etag') ?? undefined, lastModified: res.headers.get('last-modified') ?? undefined };
   }
   throw new Error('Zu viele Weiterleitungen.');
 }
