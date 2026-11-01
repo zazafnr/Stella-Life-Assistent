@@ -244,8 +244,15 @@ jobs:
       - name: Unit-Tests (Schwellen, Textauswahl)
         run: |
           set -o pipefail
+          # ein vorhandenes iPhone-Gerät nehmen (der Name „iPhone 16“ steht nicht auf jedem Runner-Image)
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)["devices"]
+          phones = [x for k, v in d.items() if "iOS" in k for x in v if x["name"].startswith("iPhone")]
+          pro = [x for x in phones if "Pro" in x["name"] and "Max" not in x["name"]]
+          print((pro or phones)[-1]["udid"])')
           xcodebuild test -project ios/Stella.xcodeproj -scheme StellaTests \
-            -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGNING_ALLOWED=NO 2>&1 | tail -30
+            -destination "id=$UDID" CODE_SIGNING_ALLOWED=NO 2>&1 | tail -30
 
       - name: App mit Erweiterungen kompilieren (ohne Signatur)
         run: |
