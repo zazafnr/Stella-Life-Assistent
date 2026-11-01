@@ -6,6 +6,10 @@ struct Attachment: Codable, Hashable, Identifiable {
     var id: String
     var kind: String
     var caption: String?
+    /** Sprachnachricht: Länge in Sekunden, Rohtext von Whisper und aufgeräumter Text */
+    var duration: Int?
+    var transcriptRaw: String?
+    var transcript: String?
 }
 
 struct PlaceRef: Codable, Hashable {

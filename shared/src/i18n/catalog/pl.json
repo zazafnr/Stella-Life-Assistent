@@ -535,5 +535,15 @@
  "settings.weatherAnimSub": "Niebo za czatem",
  "settings.weatherAnim.on": "Włączone",
  "settings.weatherAnim.calm": "Spokojne",
- "settings.weatherAnim.off": "Wyłączone"
+ "settings.weatherAnim.off": "Wyłączone",
+ "voice.via": "Wiadomość głosowa · {duration}",
+ "voice.viaShort": "Wiadomość głosowa",
+ "voice.label": "Wiadomość głosowa",
+ "voice.play": "Odtwórz oryginał",
+ "voice.pause": "Pauza",
+ "voice.loading": "Wczytywanie…",
+ "voice.unavailable": "Niedostępne",
+ "voice.showRaw": "Pokaż oryginalną transkrypcję",
+ "voice.hideRaw": "Ukryj oryginalną transkrypcję",
+ "voice.rawLabel": "Oryginalna transkrypcja"
 }

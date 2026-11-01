@@ -3,7 +3,7 @@ import { addDays, dayLabel as chatDayLabel, todayIn, type Conversation, type Loc
 import { useLocale, useT } from '../i18n.ts';
 import { api, compressImage, newConversation, openConversation, retryAudio, sendAudio, sendMessage, useStore } from '../store.ts';
 import { MAX_SECONDS, recordingSupported, startRecording, type Recording } from '../audio.ts';
-import { AudioPlayer, AuthImage, Lightbox, Rich } from './Rich.tsx';
+import { AudioPlayer, VoiceLine, AuthImage, Lightbox, Rich } from './Rich.tsx';
 import { ItemStatus } from './Today.tsx';
 import { ActionCard } from './ActionCard.tsx';
 import { Icon } from '../ui/Icon.tsx';
@@ -193,7 +193,9 @@ export function Chat() {
                   {showDay && <div className="day-sep">{day}</div>}
                   <div className={`bubble-row ${m.role}`}>
                     <div className={`bubble ${m.role}${m.pending ? ' pending' : ''}`}>
-                      {m.attachments.filter((a) => a.kind === 'audio').map((a) => <AudioPlayer key={a.id} id={a.id} />)}
+                      {m.attachments.filter((a) => a.kind === 'audio').map((a) => (m.role === 'user' && m.text && !m.failedAudioId
+                        ? <VoiceLine key={a.id} att={a} text={m.text} />
+                        : <AudioPlayer key={a.id} id={a.id} />))}
                       {m.text && <Rich text={m.text} />}
                       {m.failedAudioId && (
                         <button type="button" className="btn small secondary" disabled={thinking}

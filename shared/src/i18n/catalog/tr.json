@@ -513,5 +513,15 @@
  "settings.weatherAnimSub": "Sohbetin arkasındaki gökyüzü",
  "settings.weatherAnim.on": "Açık",
  "settings.weatherAnim.calm": "Sakin",
- "settings.weatherAnim.off": "Kapalı"
+ "settings.weatherAnim.off": "Kapalı",
+ "voice.via": "Sesli mesajla · {duration}",
+ "voice.viaShort": "Sesli mesajla",
+ "voice.label": "Sesli mesaj",
+ "voice.play": "Orijinali oynat",
+ "voice.pause": "Duraklat",
+ "voice.loading": "Yükleniyor…",
+ "voice.unavailable": "Kullanılamıyor",
+ "voice.showRaw": "Orijinal metni göster",
+ "voice.hideRaw": "Orijinal metni gizle",
+ "voice.rawLabel": "Orijinal metin"
 }

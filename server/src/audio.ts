@@ -11,6 +11,7 @@ import { HttpError } from './auth.ts';
 import { db, notifyOnce, type User } from './db.ts';
 import { filePath, saveFile } from './files.ts';
 import { LlmUnavailable, transcribe } from './llm.ts';
+import { cleanTranscript } from './transcript.ts';
 
 export const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 export const MAX_AUDIO_SECONDS = 120;
@@ -39,7 +40,7 @@ export interface AudioInput {
   conversationId?: string | null;
 }
 
-export async function handleAudio(user: User, input: AudioInput): Promise<ChatResponse & { transcript: string; audioId: string }> {
+export async function handleAudio(user: User, input: AudioInput): Promise<ChatResponse & { transcript: string; transcriptRaw: string; audioId: string }> {
   let audioId = input.audioId;
   let mime = input.mime ?? '';
   let data = input.audio;
@@ -68,9 +69,14 @@ export async function handleAudio(user: User, input: AudioInput): Promise<ChatRe
     if (err instanceof LlmUnavailable) throw new AudioFailed(err.message, audioId);
     throw err;
   }
-  const attachment: Attachment = { id: audioId, kind: 'audio', caption: 'Sprachnachricht' };
-  const res = await handleChat(user, transcript, input.clientId ?? null, [], input.conversationId ?? null, { attachments: [attachment] });
-  return { ...res, transcript, audioId };
+  // Aufräumen: Haiku setzt Satzzeichen und entfernt Füllwörter; bei Ausfall gilt der Rohtext (kein Fehler, kein Zähler)
+  const clean = await cleanTranscript(transcript, user);
+  const attachment: Attachment = {
+    id: audioId, kind: 'audio', caption: 'Sprachnachricht', ...(input.durationSec ? { duration: Math.round(input.durationSec) } : {}),
+    transcriptRaw: clean.raw, ...(clean.cleaned ? { transcript: clean.text } : {}),
+  };
+  const res = await handleChat(user, clean.text, input.clientId ?? null, [], input.conversationId ?? null, { attachments: [attachment] });
+  return { ...res, transcript: clean.text, transcriptRaw: clean.raw, audioId };
 }
 
 const str = (v: unknown, max = 200) => (typeof v === 'string' ? v.slice(0, max) : '');

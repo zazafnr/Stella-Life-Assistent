@@ -756,3 +756,10 @@ textarea.cookies { min-height: 90px; font-family: ui-monospace, monospace; font-
 .chat[data-scene='dark'] .bubble.assistant { background: #1B2740; color: #F2F6FF; }
 .chat[data-scene='dark'] .quick-card { background: #1B2740; color: #F2F6FF; }
 @media (prefers-reduced-motion: reduce) { .weather-canvas { transition: none; } }
+
+/* Sprachnachricht (Paket 9): dezente Zeile über dem Text, der Text selbst sieht aus wie getippt */
+.voice-line { display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: .8; margin: -2px 0 4px; user-select: none; -webkit-touch-callout: none; }
+.voice-play { width: 22px; height: 22px; border-radius: 50%; border: 0; display: inline-flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, .25); color: inherit; cursor: pointer; padding: 0; }
+.bubble.assistant .voice-play { background: var(--blue-tint, #E6F0FF); color: var(--blue); }
+.voice-raw-btn { border: 0; background: none; color: inherit; font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; padding: 0 2px; opacity: .85; }
+.voice-raw { margin: 4px 0 6px; padding: 8px 10px; border-radius: 12px; background: rgba(255, 255, 255, .16); font-size: 13px; font-style: italic; }

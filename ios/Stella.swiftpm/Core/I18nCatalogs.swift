@@ -519,7 +519,17 @@ enum I18nCatalogs {
  "settings.weatherAnimSub": "Der Himmel hinter dem Chat",
  "settings.weatherAnim.on": "An",
  "settings.weatherAnim.calm": "Ruhig",
- "settings.weatherAnim.off": "Aus"
+ "settings.weatherAnim.off": "Aus",
+ "voice.via": "Per Sprachnachricht · {duration}",
+ "voice.viaShort": "Per Sprachnachricht",
+ "voice.label": "Sprachnachricht",
+ "voice.play": "Original abspielen",
+ "voice.pause": "Pausieren",
+ "voice.loading": "Lädt …",
+ "voice.unavailable": "Nicht verfügbar",
+ "voice.showRaw": "Original-Abschrift anzeigen",
+ "voice.hideRaw": "Original-Abschrift ausblenden",
+ "voice.rawLabel": "Original-Abschrift"
 }
 """#,
         "en": #"""
@@ -1038,7 +1048,17 @@ enum I18nCatalogs {
  "settings.weatherAnimSub": "Sky behind the chat",
  "settings.weatherAnim.on": "On",
  "settings.weatherAnim.calm": "Calm",
- "settings.weatherAnim.off": "Off"
+ "settings.weatherAnim.off": "Off",
+ "voice.via": "Via voice message · {duration}",
+ "voice.viaShort": "Via voice message",
+ "voice.label": "Voice message",
+ "voice.play": "Play original recording",
+ "voice.pause": "Pause",
+ "voice.loading": "Loading …",
+ "voice.unavailable": "Not available",
+ "voice.showRaw": "Show original transcript",
+ "voice.hideRaw": "Hide original transcript",
+ "voice.rawLabel": "Original transcript"
 }
 """#,
         "es": #"""
@@ -1557,7 +1577,17 @@ enum I18nCatalogs {
  "settings.weatherAnimSub": "El cielo detrás del chat",
  "settings.weatherAnim.on": "Activadas",
  "settings.weatherAnim.calm": "Tranquilas",
- "settings.weatherAnim.off": "Desactivadas"
+ "settings.weatherAnim.off": "Desactivadas",
+ "voice.via": "Por mensaje de voz · {duration}",
+ "voice.viaShort": "Por mensaje de voz",
+ "voice.label": "Mensaje de voz",
+ "voice.play": "Reproducir el original",
+ "voice.pause": "Pausar",
+ "voice.loading": "Cargando…",
+ "voice.unavailable": "No disponible",
+ "voice.showRaw": "Mostrar la transcripción original",
+ "voice.hideRaw": "Ocultar la transcripción original",
+ "voice.rawLabel": "Transcripción original"
 }
 """#,
         "fr": #"""
@@ -2076,7 +2106,17 @@ enum I18nCatalogs {
  "settings.weatherAnimSub": "Le ciel derrière le chat",
  "settings.weatherAnim.on": "Activées",
  "settings.weatherAnim.calm": "Calmes",
- "settings.weatherAnim.off": "Désactivées"
+ "settings.weatherAnim.off": "Désactivées",
+ "voice.via": "Par message vocal · {duration}",
+ "voice.viaShort": "Par message vocal",
+ "voice.label": "Message vocal",
+ "voice.play": "Écouter l’original",
+ "voice.pause": "Pause",
+ "voice.loading": "Chargement…",
+ "voice.unavailable": "Indisponible",
+ "voice.showRaw": "Afficher la transcription d’origine",
+ "voice.hideRaw": "Masquer la transcription d’origine",
+ "voice.rawLabel": "Transcription d’origine"
 }
 """#,
         "it": #"""
@@ -2595,7 +2635,17 @@ enum I18nCatalogs {
  "settings.weatherAnimSub": "Il cielo dietro la chat",
  "settings.weatherAnim.on": "Attive",
  "settings.weatherAnim.calm": "Tranquille",
- "settings.weatherAnim.off": "Disattivate"
+ "settings.weatherAnim.off": "Disattivate",
+ "voice.via": "Da messaggio vocale · {duration}",
+ "voice.viaShort": "Da messaggio vocale",
+ "voice.label": "Messaggio vocale",
+ "voice.play": "Riproduci l’originale",
+ "voice.pause": "Pausa",
+ "voice.loading": "Caricamento…",
+ "voice.unavailable": "Non disponibile",
+ "voice.showRaw": "Mostra la trascrizione originale",
+ "voice.hideRaw": "Nascondi la trascrizione originale",
+ "voice.rawLabel": "Trascrizione originale"
 }
 """#,
         "pl": #"""
@@ -3136,7 +3186,17 @@ enum I18nCatalogs {
  "settings.weatherAnimSub": "Niebo za czatem",
  "settings.weatherAnim.on": "Włączone",
  "settings.weatherAnim.calm": "Spokojne",
- "settings.weatherAnim.off": "Wyłączone"
+ "settings.weatherAnim.off": "Wyłączone",
+ "voice.via": "Wiadomość głosowa · {duration}",
+ "voice.viaShort": "Wiadomość głosowa",
+ "voice.label": "Wiadomość głosowa",
+ "voice.play": "Odtwórz oryginał",
+ "voice.pause": "Pauza",
+ "voice.loading": "Wczytywanie…",
+ "voice.unavailable": "Niedostępne",
+ "voice.showRaw": "Pokaż oryginalną transkrypcję",
+ "voice.hideRaw": "Ukryj oryginalną transkrypcję",
+ "voice.rawLabel": "Oryginalna transkrypcja"
 }
 """#,
         "pt-BR": #"""
@@ -3655,7 +3715,17 @@ enum I18nCatalogs {
  "settings.weatherAnimSub": "O céu atrás do chat",
  "settings.weatherAnim.on": "Ativadas",
  "settings.weatherAnim.calm": "Calmas",
- "settings.weatherAnim.off": "Desativadas"
+ "settings.weatherAnim.off": "Desativadas",
+ "voice.via": "Por mensagem de voz · {duration}",
+ "voice.viaShort": "Por mensagem de voz",
+ "voice.label": "Mensagem de voz",
+ "voice.play": "Reproduzir o original",
+ "voice.pause": "Pausar",
+ "voice.loading": "Carregando…",
+ "voice.unavailable": "Indisponível",
+ "voice.showRaw": "Mostrar a transcrição original",
+ "voice.hideRaw": "Ocultar a transcrição original",
+ "voice.rawLabel": "Transcrição original"
 }
 """#,
         "tr": #"""
@@ -4174,7 +4244,17 @@ enum I18nCatalogs {
  "settings.weatherAnimSub": "Sohbetin arkasındaki gökyüzü",
  "settings.weatherAnim.on": "Açık",
  "settings.weatherAnim.calm": "Sakin",
- "settings.weatherAnim.off": "Kapalı"
+ "settings.weatherAnim.off": "Kapalı",
+ "voice.via": "Sesli mesajla · {duration}",
+ "voice.viaShort": "Sesli mesajla",
+ "voice.label": "Sesli mesaj",
+ "voice.play": "Orijinali oynat",
+ "voice.pause": "Duraklat",
+ "voice.loading": "Yükleniyor…",
+ "voice.unavailable": "Kullanılamıyor",
+ "voice.showRaw": "Orijinal metni göster",
+ "voice.hideRaw": "Orijinal metni gizle",
+ "voice.rawLabel": "Orijinal metin"
 }
 """#,
     ]

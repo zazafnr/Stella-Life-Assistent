@@ -513,5 +513,15 @@
  "settings.weatherAnimSub": "Le ciel derrière le chat",
  "settings.weatherAnim.on": "Activées",
  "settings.weatherAnim.calm": "Calmes",
- "settings.weatherAnim.off": "Désactivées"
+ "settings.weatherAnim.off": "Désactivées",
+ "voice.via": "Par message vocal · {duration}",
+ "voice.viaShort": "Par message vocal",
+ "voice.label": "Message vocal",
+ "voice.play": "Écouter l’original",
+ "voice.pause": "Pause",
+ "voice.loading": "Chargement…",
+ "voice.unavailable": "Indisponible",
+ "voice.showRaw": "Afficher la transcription d’origine",
+ "voice.hideRaw": "Masquer la transcription d’origine",
+ "voice.rawLabel": "Transcription d’origine"
 }

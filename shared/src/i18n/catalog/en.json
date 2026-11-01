@@ -513,5 +513,15 @@
  "settings.weatherAnimSub": "Sky behind the chat",
  "settings.weatherAnim.on": "On",
  "settings.weatherAnim.calm": "Calm",
- "settings.weatherAnim.off": "Off"
+ "settings.weatherAnim.off": "Off",
+ "voice.via": "Via voice message · {duration}",
+ "voice.viaShort": "Via voice message",
+ "voice.label": "Voice message",
+ "voice.play": "Play original recording",
+ "voice.pause": "Pause",
+ "voice.loading": "Loading …",
+ "voice.unavailable": "Not available",
+ "voice.showRaw": "Show original transcript",
+ "voice.hideRaw": "Hide original transcript",
+ "voice.rawLabel": "Original transcript"
 }

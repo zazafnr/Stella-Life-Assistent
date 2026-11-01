@@ -8,6 +8,10 @@ export interface Attachment {
   id: string;
   kind: 'image' | 'audio';
   caption?: string;
+  /** Sprachnachricht: Länge in Sekunden, Rohtext von Whisper und der aufgeräumte Text (Paket 9) */
+  duration?: number;
+  transcriptRaw?: string;
+  transcript?: string;
 }
 
 export interface Item {

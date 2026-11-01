@@ -513,5 +513,15 @@
  "settings.weatherAnimSub": "Der Himmel hinter dem Chat",
  "settings.weatherAnim.on": "An",
  "settings.weatherAnim.calm": "Ruhig",
- "settings.weatherAnim.off": "Aus"
+ "settings.weatherAnim.off": "Aus",
+ "voice.via": "Per Sprachnachricht · {duration}",
+ "voice.viaShort": "Per Sprachnachricht",
+ "voice.label": "Sprachnachricht",
+ "voice.play": "Original abspielen",
+ "voice.pause": "Pausieren",
+ "voice.loading": "Lädt …",
+ "voice.unavailable": "Nicht verfügbar",
+ "voice.showRaw": "Original-Abschrift anzeigen",
+ "voice.hideRaw": "Original-Abschrift ausblenden",
+ "voice.rawLabel": "Original-Abschrift"
 }
