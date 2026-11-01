@@ -5,8 +5,8 @@ import { config } from '../config.ts';
 import { renderEmail, type EmailCard, type EmailParts } from './layout.ts';
 import { markdownToEmail } from './markdown.ts';
 
-export type TemplateName = 'verify-signup' | 'verify-address' | 'login-link' | 'welcome' | 'stella-reply' | 'unknown-sender' | 'subscription';
-export const TEMPLATE_NAMES: TemplateName[] = ['verify-signup', 'verify-address', 'login-link', 'welcome', 'stella-reply', 'unknown-sender', 'subscription'];
+export type TemplateName = 'verify-signup' | 'verify-address' | 'login-link' | 'welcome' | 'stella-reply' | 'unknown-sender' | 'subscription' | 'freenotes-launch';
+export const TEMPLATE_NAMES: TemplateName[] = ['verify-signup', 'verify-address', 'login-link', 'welcome', 'stella-reply', 'unknown-sender', 'subscription', 'freenotes-launch'];
 
 export interface TemplateData {
   name?: string;
@@ -78,6 +78,10 @@ function build(name: TemplateName, locale: Locale, d: TemplateData): { subject: 
     case 'unknown-sender':
       return { subject: tt('unknown.subject'), parts: { ...base, preheader: tt('unknown.preheader'), title: tt('unknown.title'),
         body: [tt('unknown.body'), tt('unknown.body2')], button: { label: tt('unknown.button'), url: d.appUrl ?? config.publicUrl }, reason: tt('footer.reasonSender') } };
+    case 'freenotes-launch':
+      return { subject: tt('freenotes.subject'), parts: { ...base, preheader: tt('freenotes.preheader'), title: tt('freenotes.title'),
+        body: [hello(locale, d.name), tt('freenotes.body')].filter(Boolean), button: { label: tt('freenotes.button'), url: d.appUrl ?? config.freenotesUrl },
+        reason: tt('footer.reasonAccount') } };
     case 'subscription': {
       const ev = d.event ?? 'started';
       return { subject: tt(`subscription.${ev}.subject`, { plan: d.plan ?? '' }), parts: { ...base, preheader: tt('subscription.preheader', { plan: d.plan ?? '' }),

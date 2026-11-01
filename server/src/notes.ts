@@ -1,8 +1,12 @@
 // Verbindung zu FreeNotes (iPad-Heft-App): Gelöste HÜs warten hier, bis FreeNotes sie abholt
 // und Strich für Strich in deiner Handschrift ins passende Fach-Heft schreibt.
 
-import { addDays, todayIn } from '@stella/shared';
+import { addDays, t, todayIn } from '@stella/shared';
 import { db, getUser, notifyOnce, now } from './db.ts';
+import { config } from './config.ts';
+import { userLocale } from './locale.ts';
+import { pushToUser } from './push.ts';
+import { mailerConfigured, sendTemplateMail } from './mailer.ts';
 
 export interface NotesEntry {
   id: string;
@@ -37,4 +41,32 @@ export function ackNotesEntry(userId: string, itemId: string, notebook: string |
   db.prepare('INSERT OR REPLACE INTO notes_deliveries (user_id, item_id, delivered_at, notebook, page) VALUES (?, ?, ?, ?, ?)')
     .run(userId, itemId, now(), notebook, page);
   return true;
+}
+
+/** Wer in der Einführung „Benachrichtige mich“ gewählt hat (und noch keine Nachricht bekam) */
+export function freenotesWaitlist(): string[] {
+  const rows = db.prepare(`SELECT id, settings FROM users`).all() as { id: string; settings: string }[];
+  return rows.filter((r) => { try { return !!JSON.parse(r.settings).notify?.freenotes; } catch { return false; } }).map((r) => r.id)
+    .filter((id) => !db.prepare(`SELECT 1 FROM notified WHERE user_id = ? AND key = 'freenotes-launch'`).get(id));
+}
+
+/**
+ * FreeNotes ist da: Push und Mail an alle auf der Warteliste, jede Person genau einmal.
+ * Braucht `STELLA_FREENOTES_URL`. Der Owner löst das im Dashboard aus (POST /api/admin/freenotes/announce).
+ */
+export async function announceFreenotes(): Promise<{ notified: number; failed: number }> {
+  if (!config.freenotesUrl) throw new Error('STELLA_FREENOTES_URL ist nicht gesetzt.');
+  let notified = 0, failed = 0;
+  for (const id of freenotesWaitlist()) {
+    const user = getUser(id);
+    if (!user) continue;
+    const locale = userLocale(user);
+    try {
+      await pushToUser(id, { title: 'FreeNotes', body: t(locale, 'email.freenotes.title'), url: config.freenotesUrl, tag: 'freenotes-launch' }).catch(() => {});
+      if (mailerConfigured()) await sendTemplateMail(user.email, locale, 'freenotes-launch', { name: user.name.split(' ')[0], appUrl: config.freenotesUrl }, 'stella', { userId: id });
+      notifyOnce(id, 'freenotes-launch');
+      notified++;
+    } catch { failed++; }
+  }
+  return { notified, failed };
 }

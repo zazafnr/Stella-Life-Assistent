@@ -152,7 +152,7 @@ final class Store {
 
     /** Einführung auf Wunsch (Einstellungen) – die erste kommt von selbst, solange `onboarding` auf „pending“ steht */
     var onboardingRequest: OnboardingStart?
-    var activeOnboarding: OnboardingStart? { onboardingRequest ?? (me?.settings.onboarding == "pending" ? .welcome : nil) }
+    var activeOnboarding: OnboardingStart? { onboardingRequest ?? (me?.settings.onboarding == "pending" ? .language : nil) }
 
     func logout() async {
         _ = try? await api.send("POST", "/api/auth/logout", as: OK.self)
@@ -559,6 +559,6 @@ enum Haptics {
 
 /** Wo die Einführung beginnt: ganz vorn oder – zum Bearbeiten des Profils – bei „Was trifft auf dich zu?“ */
 enum OnboardingStart: String, Identifiable {
-    case welcome, situation
+    case language, situation
     var id: String { rawValue }
 }

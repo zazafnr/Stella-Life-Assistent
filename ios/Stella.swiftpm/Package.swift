@@ -37,7 +37,7 @@ let package = Package(
                 .photoLibrary(purposeString: "Wähle Fotos von Arbeitsblättern für Stella aus."),
                 .motion(purposeString: "Stella zählt deine Schritte für dein Tagesziel."),
                 .microphone(purposeString: "Stella nimmt deine Sprachnachrichten auf, damit du nicht tippen musst."),
-                .locationWhenInUse(purposeString: "Stella zeigt dir Läden in deiner Nähe, wenn sie dich an eine Erledigung erinnert. Der Standort wird nur dann abgefragt und nicht gespeichert.")
+                .locationWhenInUse(purposeString: "Stella uses your location only while you use the app: to show shops and pharmacies nearby for your errands, to find restaurants and prepare reservations, and to add weather and local news to your morning briefing. Your exact location is not stored.")
             ],
             appCategory: .productivity
         )

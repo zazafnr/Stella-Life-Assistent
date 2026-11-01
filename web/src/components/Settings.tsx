@@ -27,7 +27,7 @@ interface AiStatusData {
 }
 const eur = (micro: number, rate: number) => `${((micro / 1e6) * rate).toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 
-export function Settings({ back, openOnboarding, openPlan }: { back: () => void; openOnboarding: (startAt: 'welcome' | 'situation') => void; openPlan: () => void }) {
+export function Settings({ back, openOnboarding, openPlan }: { back: () => void; openOnboarding: (startAt: 'language' | 'situation') => void; openPlan: () => void }) {
   const t = useT();
   const locale = useLocale();
   const me = useStore((s) => s.me);
@@ -139,7 +139,7 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
             <span className="grow"><span className="list-title">{t('settings.mailToStella')}</span><span className="list-sub">{t('settings.mailToStellaSub')}</span></span>
             <Icon name="chevron" size={16} />
           </button>
-          <button type="button" className="list-row" onClick={() => openOnboarding('welcome')}>
+          <button type="button" className="list-row" onClick={() => openOnboarding('language')}>
             <span className="icon-tile blue" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="sparkle" size={18} /></span>
             <span className="grow"><span className="list-title">{t('settings.redoIntro')}</span><span className="list-sub">{t('settings.redoIntroSub')}</span></span>
             <Icon name="chevron" size={16} />

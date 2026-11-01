@@ -59,49 +59,44 @@ struct OnboardingView: View {
     @Environment(Store.self) private var store
     @Environment(\.dismiss) private var dismiss
 
-    private enum Step: Hashable { case welcome, name, situation, age, details, features, mail, tone, briefing, done }
-
-    private struct Choice: Identifiable {
-        let id: String
-        let label: String
-    }
-
-    private struct DayChoice: Identifiable {
-        let id: Int
-        let label: String
-    }
+    private enum Step: Hashable { case language, welcome, name, situation, freenotes, age, details, features, location, mail, tone, briefing, done }
 
     private struct SituationInfo: Identifiable {
         let id: String
         let symbol: String
-        let label: String
-        let sub: String
     }
 
     private let situations = [
-        SituationInfo(id: "school", symbol: "graduationcap.fill", label: "Schule", sub: "HÜs, Tests, Stundenplan"),
-        SituationInfo(id: "university", symbol: "books.vertical.fill", label: "Studium", sub: "Lehrveranstaltungen, Prüfungen"),
-        SituationInfo(id: "work", symbol: "briefcase.fill", label: "Job", sub: "Arbeitszeiten, Termine, Alltag"),
-        SituationInfo(id: "apprenticeship", symbol: "wrench.and.screwdriver.fill", label: "Lehre", sub: "Betrieb und Berufsschule"),
-        SituationInfo(id: "other", symbol: "sparkles", label: "Etwas anderes", sub: "Elternzeit, Pause, alles Mögliche"),
+        SituationInfo(id: "school", symbol: "graduationcap.fill"), SituationInfo(id: "university", symbol: "books.vertical.fill"),
+        SituationInfo(id: "work", symbol: "briefcase.fill"), SituationInfo(id: "apprenticeship", symbol: "wrench.and.screwdriver.fill"),
+        SituationInfo(id: "other", symbol: "sparkles"),
     ]
-    private let ages = [Choice(id: "u14", label: "unter 14"), Choice(id: "14-17", label: "14–17"), Choice(id: "18-24", label: "18–24"),
-                        Choice(id: "25-34", label: "25–34"), Choice(id: "35-49", label: "35–49"), Choice(id: "50+", label: "50+")]
-    private let levels = ["Unterstufe", "Mittelstufe", "Oberstufe", "Berufsschule"]
-    private let days = [DayChoice(id: 1, label: "Mo"), DayChoice(id: 2, label: "Di"), DayChoice(id: 3, label: "Mi"), DayChoice(id: 4, label: "Do"),
-                        DayChoice(id: 5, label: "Fr"), DayChoice(id: 6, label: "Sa"), DayChoice(id: 7, label: "So")]
+    private let ages = ["u14", "14-17", "18-24", "25-34", "35-49", "50+"]
+    /// Gespeichert wird weiterhin der deutsche Stufenname, angezeigt die Übersetzung
+    private let levels: [(value: String, key: String)] = [("Unterstufe", "lower"), ("Mittelstufe", "middle"), ("Oberstufe", "upper"), ("Berufsschule", "vocational")]
+    /// Montag = 1 … Sonntag = 7, Kurzname in der gewählten Sprache
+    private func weekdayLabel(_ n: Int) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: I18n.shared.locale)
+        return f.shortStandaloneWeekdaySymbols[n % 7]
+    }
+    private let dayIds = [1, 2, 3, 4, 5, 6, 7]
     private let featureOrder = ["planner", "mails", "homework", "shopping", "goals", "finance", "health"]
-    private let featureInfo: [String: (symbol: String, label: String)] = [
-        "mails": ("envelope.fill", "Mails sortieren"), "planner": ("calendar", "Planer & Erinnerungen"), "homework": ("book.fill", "Hausübungen"),
-        "shopping": ("cart.fill", "Einkaufsliste"), "goals": ("star.fill", "Ziele"), "finance": ("eurosign.circle.fill", "Ausgaben"), "health": ("heart.fill", "Gesundheit"),
+    private let featureSymbol: [String: String] = [
+        "mails": "envelope.fill", "planner": "calendar", "homework": "book.fill", "shopping": "cart.fill", "goals": "star.fill",
+        "finance": "eurosign.circle.fill", "health": "heart.fill",
     ]
-    private let briefings = [Choice(id: "auto", label: "Automatisch"), Choice(id: "06:30", label: "06:30"), Choice(id: "07:00", label: "07:00"),
-                              Choice(id: "07:30", label: "07:30"), Choice(id: "08:00", label: "08:00"), Choice(id: "off", label: "Kein Briefing")]
+    private let briefingTimes = ["06:30", "07:00", "07:30", "08:00"]
 
     @State private var index = 0
     @State private var started = false
     @State private var busy = false
     @State private var error: String?
+
+    @State private var country = "AT"
+    @State private var locationAnswer: String?
+    @State private var notifyFreenotes = false
+    @State private var locator = OneShotLocation()
 
     @State private var name = ""
     @State private var situation: String?
@@ -128,7 +123,8 @@ struct OnboardingView: View {
 
     private var steps: [Step] {
         let hasDetails = ["school", "university", "work", "apprenticeship"].contains(situation ?? "")
-        return [.welcome, .name, .situation, .age] + (hasDetails ? [.details] : []) + [.features, .mail, .tone, .briefing, .done]
+        return [.language, .welcome, .name, .situation] + (situation == "school" ? [.freenotes] : []) + [.age] + (hasDetails ? [.details] : [])
+            + [.features, .location, .mail, .tone, .briefing, .done]
     }
     private var step: Step { steps[min(index, steps.count - 1)] }
     private var isWork: Bool { situation == "work" || situation == "apprenticeship" }
@@ -175,10 +171,10 @@ struct OnboardingView: View {
             }
             .animation(.spring(response: 0.3), value: index)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Schritt \(index + 1) von \(steps.count)")
+            .accessibilityLabel(L("onboarding.step", ["n": index + 1, "total": steps.count]))
             Spacer()
             if step != .done {
-                Button("Überspringen") { Task { await skip() } }
+                Button(L("common.skip")) { Task { await skip() } }
                     .font(.system(size: 15, weight: .semibold))
                     .disabled(busy)
             }
@@ -189,19 +185,19 @@ struct OnboardingView: View {
     private var navBar: some View {
         HStack {
             if index > 0 && step != .done {
-                Button("Zurück") { go(-1) }
+                Button(L("common.back")) { go(-1) }
                     .buttonStyle(SoftButton(filled: false))
                     .disabled(busy)
             }
             Spacer()
             if step == .done {
                 Button { Task { await finish() } } label: {
-                    if busy { ProgressView().tint(.white) } else { Text("Los geht’s") }
+                    if busy { ProgressView().tint(.white) } else { Text(L("onboarding.done.start")) }
                 }
                 .buttonStyle(PrimaryButton())
                 .disabled(busy || situation == nil)
             } else {
-                Button("Weiter") { go(1) }
+                Button(L("common.next")) { go(1) }
                     .buttonStyle(PrimaryButton())
                     .disabled(!canNext)
             }
@@ -217,58 +213,96 @@ struct OnboardingView: View {
     @ViewBuilder private var card: some View {
         VStack(alignment: .leading, spacing: 14) {
             switch step {
+            case .language:
+                heading(L("onboarding.language.title"))
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    ForEach(I18n.supported, id: \.self) { l in languageCard(l) }
+                }
+                Picker(L("onboarding.country.label"), selection: $country) {
+                    ForEach(I18n.countries, id: \.self) { c in Text(I18n.countryName(c, locale: I18n.shared.locale)).tag(c) }
+                }
+                .pickerStyle(.menu)
+                paragraph(L("onboarding.country.sub") + " " + L("onboarding.language.sub"))
             case .welcome:
                 HoppingStar(size: 44).frame(maxWidth: .infinity)
-                heading("Schön, dass du da bist!")
-                paragraph("Ich bin Stella und helfe dir im Alltag. Mit ein paar Klicks stelle ich mich auf dein Leben ein – das dauert eine Minute.")
+                heading(L("onboarding.welcome.title"))
+                paragraph(L("onboarding.welcome.text"))
             case .name:
-                heading("Wie soll ich dich nennen?")
-                TextField("Dein Name", text: $name)
+                heading(L("onboarding.name.title"))
+                TextField(L("onboarding.name.label"), text: $name)
                     .textContentType(.givenName)
                     .modifier(InputStyle())
             case .situation:
-                heading("Was trifft auf dich zu?")
+                heading(L("onboarding.situation.title"))
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                     ForEach(situations) { s in situationCard(s) }
                 }
+            case .freenotes:
+                heading(L("onboarding.freenotes.title", ["homework": homework]))
+                NotebookMockup().accessibilityLabel(L("onboarding.freenotes.alt")).frame(maxWidth: .infinity)
+                paragraph(L("onboarding.freenotes.text", ["homework": homework]))
+                if let urlText = store.me?.flags?.freenotesUrl, let url = URL(string: urlText), !urlText.isEmpty {
+                    Link(L("onboarding.freenotes.get"), destination: url).buttonStyle(PrimaryButton())
+                } else if notifyFreenotes {
+                    Label(L("onboarding.freenotes.notified"), systemImage: "checkmark").font(.system(size: 14)).foregroundStyle(Theme.muted)
+                } else {
+                    paragraph(L("onboarding.freenotes.soon"))
+                    Button { notifyFreenotes = true; Haptics.soft() } label: { Label(L("onboarding.freenotes.notify"), systemImage: "bell") }
+                        .buttonStyle(SoftButton(filled: false))
+                }
             case .age:
-                heading("Wie alt bist du?")
-                paragraph("Damit passe ich Ton und Vorschläge an. Du kannst das auch offen lassen.")
+                heading(L("onboarding.age.title"))
+                paragraph(L("onboarding.age.sub"))
                 FlowLayout {
-                    ForEach(ages) { a in
-                        OnbChip(title: a.label, on: age == a.id) { age = age == a.id ? nil : a.id }
+                    ForEach(ages, id: \.self) { a in
+                        OnbChip(title: a == "u14" ? L("onboarding.age.under14") : a.replacingOccurrences(of: "-", with: "–"), on: age == a) { age = age == a ? nil : a }
                     }
                 }
             case .details:
                 details
             case .features:
-                heading("Wobei soll Stella helfen?")
+                heading(L("onboarding.features.title"))
                 FlowLayout {
                     ForEach(featureOrder.filter { ($0 != "homework" || situation == "school") && ($0 != "finance" || store.me?.flags?.finance == true) }, id: \.self) { f in
-                        OnbChip(title: featureInfo[f]?.label ?? f, symbol: featureInfo[f]?.symbol, on: features.contains(f)) {
+                        OnbChip(title: f == "homework" ? homework.prefix(1).uppercased() + homework.dropFirst() : L("onboarding.feature.\(f)"), symbol: featureSymbol[f], on: features.contains(f)) {
                             if features.contains(f) { features.remove(f) } else { features.insert(f) }
                         }
                     }
                 }
-            case .mail:
-                heading("Postfach verbinden?")
-                paragraph("Wenn du magst, sortiert Stella deine Mails in Wichtig, Neutral, Unwichtig und Werbung. Das geht mit Gmail (per „Mit Google anmelden“) oder iCloud.")
-                paragraph("Du findest es später unter Einstellungen → Verbindungen.")
-            case .tone:
-                heading("Wie soll ich schreiben?")
-                TonePicker(selected: tone) { tone = $0 }
-            case .briefing:
-                heading("Wann soll dein Morgen-Briefing kommen?")
-                FlowLayout {
-                    ForEach(briefings) { b in
-                        OnbChip(title: b.label, on: briefing == b.id) { briefing = b.id }
+            case .location:
+                heading(L("onboarding.location.title"))
+                locationReason("mappin.and.ellipse", L("onboarding.location.r1"))
+                locationReason("calendar", L("onboarding.location.r2"))
+                locationReason("cloud.sun.fill", L("onboarding.location.r3"))
+                Text(L("onboarding.location.fine")).font(.system(size: 13)).foregroundStyle(Theme.muted)
+                if locationAnswer == "granted" {
+                    Label(L("onboarding.location.granted"), systemImage: "checkmark").font(.system(size: 14)).foregroundStyle(Theme.muted)
+                } else {
+                    if locationAnswer == "denied" { paragraph(L("onboarding.location.denied")) }
+                    HStack {
+                        Button(L("onboarding.location.allow")) { Task { await askLocation() } }.buttonStyle(PrimaryButton())
+                        Button(L("onboarding.location.later")) { locationAnswer = locationAnswer ?? "later"; go(1) }.buttonStyle(SoftButton(filled: false))
                     }
                 }
-                paragraph("Ein kurzer Überblick über deinen Tag. „Automatisch“ richtet sich nach deinem Stundenplan, sonst nach dem Vormittag.")
+            case .mail:
+                heading(L("onboarding.mail.title"))
+                paragraph(L("onboarding.mail.text"))
+                paragraph(L("onboarding.mail.later"))
+            case .tone:
+                heading(L("onboarding.tone.title"))
+                TonePicker(selected: tone) { tone = $0 }
+            case .briefing:
+                heading(L("onboarding.briefing.title"))
+                FlowLayout {
+                    ForEach(["auto"] + briefingTimes + ["off"], id: \.self) { b in
+                        OnbChip(title: b == "auto" ? L("onboarding.briefing.auto") : (b == "off" ? L("onboarding.briefing.off") : b), on: briefing == b) { briefing = b }
+                    }
+                }
+                paragraph(L("onboarding.briefing.sub"))
             case .done:
                 HoppingStar(size: 44).frame(maxWidth: .infinity)
-                heading("Alles bereit, \(name.split(separator: " ").first.map(String.init) ?? name)!")
-                paragraph("Das macht Stella jetzt für dich:")
+                heading(L("onboarding.done.title", ["name": name.split(separator: " ").first.map(String.init) ?? name]))
+                paragraph(L("onboarding.done.lead"))
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(summary, id: \.self) { line in
                         HStack(alignment: .top, spacing: 10) {
@@ -286,31 +320,69 @@ struct OnboardingView: View {
 
     @ViewBuilder private var details: some View {
         if situation == "school" {
-            heading("In welcher Stufe bist du?")
+            heading(L("onboarding.level.title"))
             FlowLayout {
-                ForEach(levels, id: \.self) { l in OnbChip(title: l, on: level == l) { level = level == l ? "" : l } }
+                ForEach(levels, id: \.value) { l in OnbChip(title: L("onboarding.level.\(l.key)"), on: level == l.value) { level = level == l.value ? "" : l.value } }
             }
-            paragraph("WebUntis und deine Schulbücher richtest du danach in den Einstellungen unter „Verbindungen“ ein.")
+            paragraph(L("onboarding.level.sub"))
         } else if situation == "university" {
-            heading("Wo studierst du?")
-            TextField("z. B. Uni Wien", text: $uni).modifier(InputStyle())
-            paragraph("Deinen Stundenplan holst du dir als Kalender-Abo: Einstellungen → Health, SMS & Kalender (auf der Website).")
+            heading(L("onboarding.uni.title"))
+            TextField(L("onboarding.uni.placeholder"), text: $uni).modifier(InputStyle())
+            paragraph(L("onboarding.uni.sub"))
         } else {
-            heading("Wann arbeitest du?")
+            heading(L("onboarding.work.title"))
             FlowLayout {
-                ForEach(days) { d in
-                    OnbChip(title: d.label, on: workDays.contains(d.id)) {
-                        if workDays.contains(d.id) { workDays.remove(d.id) } else { workDays.insert(d.id) }
+                ForEach(dayIds, id: \.self) { d in
+                    OnbChip(title: weekdayLabel(d), on: workDays.contains(d)) {
+                        if workDays.contains(d) { workDays.remove(d) } else { workDays.insert(d) }
                     }
                 }
             }
             HStack {
-                DatePicker("von", selection: $from, displayedComponents: .hourAndMinute)
-                DatePicker("bis", selection: $to, displayedComponents: .hourAndMinute)
+                DatePicker(L("onboarding.work.from"), selection: $from, displayedComponents: .hourAndMinute)
+                DatePicker(L("onboarding.work.to"), selection: $to, displayedComponents: .hourAndMinute)
             }
-            if toText <= fromText { Text("Das Ende muss nach dem Beginn liegen.").font(.system(size: 13)).foregroundStyle(Theme.pinkText) }
-            OnbChip(title: "Ich pendle", on: commute) { commute.toggle() }
-            paragraph("In dieser Zeit plane ich nichts ein, und „nach der Arbeit“ heißt für mich \(toText).")
+            if toText <= fromText { Text(L("onboarding.work.endError")).font(.system(size: 13)).foregroundStyle(Theme.pinkText) }
+            OnbChip(title: L("onboarding.work.commute"), on: commute) { commute.toggle() }
+            paragraph(L("onboarding.work.sub", ["end": toText]))
+        }
+    }
+
+    private var homework: String { I18n.homeworkPlural(locale: I18n.shared.locale, country: country) }
+
+    private func languageCard(_ l: String) -> some View {
+        let on = I18n.shared.locale == l
+        return Button {
+            I18n.shared.set(l)
+            if I18n.countryLocale[country] != l { country = I18n.guessCountry(locale: l) }
+            Task { try? await store.updateSettings(["locale": .string(l)]) }
+            Haptics.soft()
+        } label: {
+            Text(I18n.names[l] ?? l)
+                .font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.text)
+                .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                .padding(.horizontal, 12)
+                .background(on ? Theme.blueTint.opacity(0.7) : Theme.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(on ? Theme.blue : Theme.border, lineWidth: 2))
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    private func locationReason(_ symbol: String, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbol).font(.system(size: 15)).foregroundStyle(Theme.blue).frame(width: 22)
+            Text(text).font(.system(size: 15)).foregroundStyle(Theme.text).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /** „Standort freigeben“: erst nach der Erklär-Folie löst iOS die Systemabfrage aus (iOS fragt nur einmal) */
+    private func askLocation() async {
+        do {
+            _ = try await locator.request()
+            locationAnswer = "granted"
+        } catch {
+            locationAnswer = "denied"
         }
     }
 
@@ -327,8 +399,8 @@ struct OnboardingView: View {
                     .foregroundStyle(Theme.blue)
                     .frame(width: 40, height: 40)
                     .background(Theme.blueTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                Text(s.label).font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.text)
-                Text(s.sub).font(.system(size: 12)).foregroundStyle(Theme.muted).multilineTextAlignment(.leading)
+                Text(L("onboarding.situation.\(s.id).label")).font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.text)
+                Text(L("onboarding.situation.\(s.id).sub", ["homework": homework.prefix(1).uppercased() + homework.dropFirst()])).font(.system(size: 12)).foregroundStyle(Theme.muted).multilineTextAlignment(.leading)
             }
             .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
             .padding(12)
@@ -349,17 +421,19 @@ struct OnboardingView: View {
 
     private var summary: [String] {
         var lines: [String] = []
-        if situation == "school" { lines.append("Stundenplan, HÜs und Tests im Blick – mit Lernplänen.") }
-        if situation == "university" { lines.append("Prüfungen und Lernpläne im Blick.") }
+        if situation == "school" { lines.append(L("onboarding.sum.school", ["homework": homework])) }
+        if situation == "university" { lines.append(L("onboarding.sum.university")) }
         if isWork {
-            let names = days.filter { workDays.contains($0.id) }.map(\.label).joined(separator: ", ")
-            lines.append("Plant nie in deine Arbeitszeit (\(names) \(fromText)–\(toText)). „Nach der Arbeit“ heißt \(toText).")
+            let names = dayIds.filter { workDays.contains($0) }.map { weekdayLabel($0) }.joined(separator: ", ")
+            lines.append(L("onboarding.sum.work", ["days": names, "start": fromText, "end": toText]))
         }
-        if features.contains("mails") { lines.append("Sortiert deine Mails: wichtig, neutral, unwichtig, Werbung.") }
-        if features.contains("shopping") { lines.append("Führt deine Einkaufsliste und erinnert an Erledigungen.") }
-        if features.contains("goals") { lines.append("Hilft dir, Ziele im Auge zu behalten.") }
-        if briefing != "off" { lines.append("Schickt dir ein Morgen-Briefing (\(briefing == "auto" ? "automatisch" : "um \(briefing)")).") }
-        lines.append("Schreibt im Ton „\(tone.label.lowercased())“.")
+        if features.contains("mails") { lines.append(L("onboarding.sum.mails")) }
+        if features.contains("shopping") { lines.append(L("onboarding.sum.shopping")) }
+        if features.contains("goals") { lines.append(L("onboarding.sum.goals")) }
+        if briefing != "off" {
+            lines.append(L("onboarding.sum.briefing", ["when": briefing == "auto" ? L("onboarding.sum.briefingAuto") : L("onboarding.sum.briefingAt", ["time": briefing])]))
+        }
+        lines.append(L("onboarding.sum.tone", ["tone": L("tone.\(tone.rawValue)").lowercased()]))
         return lines
     }
 
@@ -379,6 +453,9 @@ struct OnboardingView: View {
         name = me.name
         tone = Tone(rawValue: me.settings.tone ?? "nett") ?? .nett
         briefing = me.settings.briefing ?? "auto"
+        country = me.settings.country ?? I18n.guessCountry(locale: I18n.shared.locale)
+        locationAnswer = me.settings.locationPermission
+        notifyFreenotes = me.settings.notify?.freenotes == true
         if let p = me.settings.profile {
             situation = p.situation
             age = p.ageGroup
@@ -392,7 +469,7 @@ struct OnboardingView: View {
                 commute = w.commute ?? false
             }
         }
-        if startAt == .situation { index = 2 }
+        if startAt == .situation { index = steps.firstIndex(of: .situation) ?? 0 }
     }
 
     private func profile() -> UserProfile {
@@ -409,7 +486,12 @@ struct OnboardingView: View {
         error = nil
         defer { busy = false }
         do {
-            try await store.updateSettings(["name": .string(name.trimmingCharacters(in: .whitespaces)), "tone": .string(tone.rawValue), "briefing": .string(briefing)])
+            var patch: [String: SettingValue] = [
+                "name": .string(name.trimmingCharacters(in: .whitespaces)), "tone": .string(tone.rawValue), "briefing": .string(briefing),
+                "locale": .string(I18n.shared.locale), "country": .string(country), "notifyFreenotes": .bool(notifyFreenotes),
+            ]
+            if let locationAnswer { patch["locationPermission"] = .string(locationAnswer) }
+            try await store.updateSettings(patch)
             let _: Me = try await API.shared.send("PUT", "/api/profile", body: profile())
             await store.refreshMe()
             store.onboardingRequest = nil
@@ -423,9 +505,42 @@ struct OnboardingView: View {
     private func skip() async {
         busy = true
         defer { busy = false }
+        try? await store.updateSettings(["locale": .string(I18n.shared.locale), "country": .string(country)])
         _ = try? await API.shared.send("POST", "/api/profile/skip", as: Me.self)
         await store.refreshMe()
         store.onboardingRequest = nil
         dismiss()
+    }
+}
+
+/** Gestaltetes Mockup einer Heftseite mit Handschrift für die FreeNotes-Folie */
+struct NotebookMockup: View {
+    var body: some View {
+        Canvas { ctx, size in
+            let page = CGRect(origin: .zero, size: size).insetBy(dx: 2, dy: 2)
+            ctx.fill(Path(roundedRect: page, cornerRadius: 10), with: .color(Color(red: 1, green: 0.99, blue: 0.97)))
+            ctx.stroke(Path(roundedRect: page, cornerRadius: 10), with: .color(Color(red: 0.85, green: 0.83, blue: 0.77)), lineWidth: 1)
+            for i in 0..<4 {
+                let y = size.height * (0.27 + 0.17 * Double(i))
+                var line = Path(); line.move(to: CGPoint(x: 16, y: y)); line.addLine(to: CGPoint(x: size.width - 16, y: y))
+                ctx.stroke(line, with: .color(Color(red: 0.79, green: 0.86, blue: 0.95)), lineWidth: 1)
+            }
+            var margin = Path(); margin.move(to: CGPoint(x: 30, y: 6)); margin.addLine(to: CGPoint(x: 30, y: size.height - 6))
+            ctx.stroke(margin, with: .color(Color(red: 0.94, green: 0.72, blue: 0.72)), lineWidth: 1)
+            let ink = Color(red: 0.18, green: 0.29, blue: 0.54)
+            for (row, length) in [(0, 0.78), (1, 0.7), (2, 0.4)] {
+                let y = size.height * (0.25 + 0.17 * Double(row))
+                var path = Path(); path.move(to: CGPoint(x: 40, y: y))
+                var x = 40.0
+                while x < 40 + (size.width - 70) * length {
+                    path.addQuadCurve(to: CGPoint(x: x + 12, y: y), control: CGPoint(x: x + 6, y: y - (Int(x / 12) % 2 == 0 ? 10 : 5)))
+                    x += 12
+                }
+                ctx.stroke(path, with: .color(ink), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            }
+        }
+        .frame(height: 140)
+        .frame(maxWidth: 300)
+        .accessibilityElement(children: .ignore)
     }
 }

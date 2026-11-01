@@ -10,7 +10,7 @@ import path from 'node:path';
 
 const WEB = path.resolve(import.meta.dirname, '../../../web/src');
 const OPEN = new Set([
-  'components/Onboarding.tsx', 'components/Inbox.tsx', 'components/Goals.tsx', 'components/Planner.tsx', 'components/Finance.tsx',
+  'components/Inbox.tsx', 'components/Goals.tsx', 'components/Planner.tsx', 'components/Finance.tsx',
   'components/StellaPlan.tsx', 'components/PlacesCard.tsx', 'components/WeekPlanSheet.tsx', 'components/Lists.tsx', 'components/Rich.tsx',
   'components/ActionCard.tsx', 'components/BriefingCard.tsx', 'components/Health.tsx', 'components/Settings.tsx',
   'components/settings/Server.tsx', 'components/settings/Books.tsx', 'components/settings/Mail.tsx', 'components/settings/Assistant.tsx',

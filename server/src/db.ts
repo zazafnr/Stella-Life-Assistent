@@ -535,6 +535,10 @@ export interface UserSettings {
   locale?: Locale;
   /** Land (ISO-3166) für Schulbegriffe, News und Wetter-Rückfall */
   country?: string;
+  /** Standort: in der Einführung beantwortet ('later' = später noch einmal fragen) */
+  locationPermission?: 'granted' | 'denied' | 'later';
+  /** Wer benachrichtigt werden will, wenn etwas Neues da ist (z. B. FreeNotes) */
+  notify?: { freenotes?: boolean };
   /** 'pending': die Einführung wird beim nächsten Öffnen gezeigt; 'done': erledigt oder übersprungen */
   onboarding?: 'pending' | 'done';
 }

@@ -49,6 +49,7 @@
 | `email.subscription.changed.body` | Your plan was changed. The new limits apply from now on. | Dein Abo wurde geändert. Die neuen Limits gelten ab sofort. |
 | `email.subscription.cancelled.title` | Subscription cancelled | Abo gekündigt |
 | `email.subscription.cancelled.body` | You keep {plan} until {until}. After that, Stella continues with the free plan. | Du behältst {plan} bis {until}. Danach läuft Stella mit dem kostenlosen Abo weiter. |
+| `location.ask.text` | For this I would need your location. Only while you use Stella, and it is not stored. Allow it? | Dafür bräuchte ich deinen Standort. Nur während du Stella benutzt, und er wird nicht gespeichert. Freigeben? |
 
 **Briefing-Gruß und Erinnerung in den drei Tönen**
 
@@ -111,6 +112,7 @@
 | `email.subscription.changed.body` | Your plan was changed. The new limits apply from now on. | Tu plan se ha cambiado. Los nuevos límites valen desde ahora. |
 | `email.subscription.cancelled.title` | Subscription cancelled | Suscripción cancelada |
 | `email.subscription.cancelled.body` | You keep {plan} until {until}. After that, Stella continues with the free plan. | Conservas {plan} hasta el {until}. Después, Stella sigue con el plan gratuito. |
+| `location.ask.text` | For this I would need your location. Only while you use Stella, and it is not stored. Allow it? | Para esto necesitaría tu ubicación. Solo mientras usas Stella, y no se guarda. ¿Permitirla? |
 
 **Briefing-Gruß und Erinnerung in den drei Tönen**
 
@@ -173,6 +175,7 @@
 | `email.subscription.changed.body` | Your plan was changed. The new limits apply from now on. | Ton abonnement a été modifié. Les nouvelles limites s'appliquent dès maintenant. |
 | `email.subscription.cancelled.title` | Subscription cancelled | Abonnement résilié |
 | `email.subscription.cancelled.body` | You keep {plan} until {until}. After that, Stella continues with the free plan. | Tu gardes {plan} jusqu'au {until}. Ensuite, Stella continue avec l'offre gratuite. |
+| `location.ask.text` | For this I would need your location. Only while you use Stella, and it is not stored. Allow it? | Pour cela, j’aurais besoin de ta position. Seulement pendant que tu utilises Stella, et elle n’est pas enregistrée. L’autoriser ? |
 
 **Briefing-Gruß und Erinnerung in den drei Tönen**
 
@@ -235,6 +238,7 @@
 | `email.subscription.changed.body` | Your plan was changed. The new limits apply from now on. | Il tuo abbonamento è stato modificato. I nuovi limiti valgono da subito. |
 | `email.subscription.cancelled.title` | Subscription cancelled | Abbonamento annullato |
 | `email.subscription.cancelled.body` | You keep {plan} until {until}. After that, Stella continues with the free plan. | Mantieni {plan} fino al {until}. Poi Stella continua con il piano gratuito. |
+| `location.ask.text` | For this I would need your location. Only while you use Stella, and it is not stored. Allow it? | Per questo mi servirebbe la tua posizione. Solo mentre usi Stella, e non viene salvata. La consenti? |
 
 **Briefing-Gruß und Erinnerung in den drei Tönen**
 
@@ -297,6 +301,7 @@
 | `email.subscription.changed.body` | Your plan was changed. The new limits apply from now on. | Seu plano foi alterado. Os novos limites valem a partir de agora. |
 | `email.subscription.cancelled.title` | Subscription cancelled | Assinatura cancelada |
 | `email.subscription.cancelled.body` | You keep {plan} until {until}. After that, Stella continues with the free plan. | Você mantém o {plan} até {until}. Depois, a Stella continua no plano gratuito. |
+| `location.ask.text` | For this I would need your location. Only while you use Stella, and it is not stored. Allow it? | Para isso eu precisaria da sua localização. Só enquanto você usa a Stella, e ela não é guardada. Permitir? |
 
 **Briefing-Gruß und Erinnerung in den drei Tönen**
 
@@ -359,6 +364,7 @@
 | `email.subscription.changed.body` | Your plan was changed. The new limits apply from now on. | Aboneliğin değiştirildi. Yeni limitler hemen geçerli. |
 | `email.subscription.cancelled.title` | Subscription cancelled | Abonelik iptal edildi |
 | `email.subscription.cancelled.body` | You keep {plan} until {until}. After that, Stella continues with the free plan. | {plan} planın {until} tarihine kadar sürer. Sonrasında Stella ücretsiz planla devam eder. |
+| `location.ask.text` | For this I would need your location. Only while you use Stella, and it is not stored. Allow it? | Bunun için konumuna ihtiyacım var. Yalnızca Stella’yı kullanırken ve saklanmaz. İzin verir misin? |
 
 **Briefing-Gruß und Erinnerung in den drei Tönen**
 
@@ -421,6 +427,7 @@
 | `email.subscription.changed.body` | Your plan was changed. The new limits apply from now on. | Twój plan został zmieniony. Nowe limity obowiązują od teraz. |
 | `email.subscription.cancelled.title` | Subscription cancelled | Subskrypcja anulowana |
 | `email.subscription.cancelled.body` | You keep {plan} until {until}. After that, Stella continues with the free plan. | {plan} masz do {until}. Potem Stella działa dalej w planie darmowym. |
+| `location.ask.text` | For this I would need your location. Only while you use Stella, and it is not stored. Allow it? | Do tego potrzebowałabym twojej lokalizacji. Tylko gdy korzystasz ze Stelli, i nie jest zapisywana. Udostępnić? |
 
 **Briefing-Gruß und Erinnerung in den drei Tönen**
 

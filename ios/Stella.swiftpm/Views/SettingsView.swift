@@ -57,7 +57,7 @@ struct SettingsView: View {
                         Button { store.onboardingRequest = .situation } label: {
                             row("Profil", symbol: "person.crop.circle", tint: Theme.pink, detail: Self.profileSummary(me))
                         }
-                        Button { store.onboardingRequest = .welcome } label: {
+                        Button { store.onboardingRequest = .language } label: {
                             row("Einführung wiederholen", symbol: "sparkles", tint: Theme.blue, detail: nil)
                         }
                     } header: {
@@ -439,7 +439,7 @@ struct TonePicker: View {
                                 .font(.system(size: 30))
                                 .scaleEffect(on ? 1.18 : 1)
                                 .rotationEffect(.degrees(on ? -6 : 0))
-                            Text(tone.label)
+                            Text(L("tone.\(tone.rawValue)"))
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(Theme.text)
                         }
@@ -452,7 +452,7 @@ struct TonePicker: View {
                     .accessibilityAddTraits(on ? .isSelected : [])
                 }
             }
-            Text("„\(current.example)“")
+            Text("„\(L("tone.\(current.rawValue).example"))“")
                 .font(.system(size: 14).italic())
                 .foregroundStyle(Theme.muted)
                 .id(current)

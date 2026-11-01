@@ -2,7 +2,7 @@ import { createReadStream, existsSync } from 'node:fs';
 import path from 'node:path';
 import Fastify, { type FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
-import { addDays, isCountry, isLocale, isTone, todayIn, voice, type Item } from '@stella/shared';
+import { addDays, isCountry, isLocale, isLocationPermission, isTone, todayIn, voice, type Item } from '@stella/shared';
 import { userLocale } from './locale.ts';
 import { registerUndoRoutes } from './email/undo.ts';
 import { currentPlanId, maxMailboxes, registerBillingRoutes, registerBillingWebhook } from './billing.ts';
@@ -73,7 +73,7 @@ function publicUser(user: User) {
   return {
     id: user.id, name: user.name, email: user.email, timeZone: user.timeZone, settings: visibleSettings(user.settings), role: user.role,
     /** Serverweite Funktions-Schalter für die Oberflächen (z. B. Einführung ohne „Ausgaben“) */
-    flags: { finance: config.features.finance },
+    flags: { finance: config.features.finance, freenotesUrl: config.freenotesUrl || null },
     ingestUrl: `${config.publicUrl}/api/ingest/${user.ingestToken}`,
     integrations: {
       books: Object.fromEntries((Object.keys(PROVIDERS) as BookProvider[]).map((p) => {
@@ -280,6 +280,11 @@ app.register(async (api) => {
       if (!isCountry(b.country)) throw new HttpError(400, 'Unknown country.');
       patch.country = b.country;
     }
+    if (b.locationPermission !== undefined) {
+      if (!isLocationPermission(b.locationPermission)) throw new HttpError(400, 'Unknown location state.');
+      patch.locationPermission = b.locationPermission;
+    }
+    if (typeof b.notifyFreenotes === 'boolean') patch.notify = { ...(req.user.settings.notify ?? {}), freenotes: b.notifyFreenotes };
     if (b.weekPlan !== undefined) {
       if (b.weekPlan !== 'sunday' && b.weekPlan !== 'off') throw new HttpError(400, 'Wochenplan: "sunday" oder "off"');
       patch.weekPlan = b.weekPlan;

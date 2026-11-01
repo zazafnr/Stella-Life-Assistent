@@ -81,6 +81,42 @@ final class I18n {
     }
 }
 
+/// Länder, die Stella anbietet (wie COUNTRIES in shared/src/i18n/countries.ts), und das Schulwort für „Hausaufgaben“
+extension I18n {
+    static let countries = ["AT", "DE", "CH", "LI", "IT", "FR", "ES", "PT", "BR", "TR", "PL", "GB", "IE", "US", "CA", "AU", "MX", "AR", "OTHER"]
+    /// typische Sprache je Land (COUNTRY_LOCALE)
+    static let countryLocale: [String: String] = [
+        "AT": "de", "DE": "de", "CH": "de", "LI": "de", "IT": "it", "FR": "fr", "ES": "es", "MX": "es", "AR": "es", "PT": "pt-BR", "BR": "pt-BR",
+        "TR": "tr", "PL": "pl", "GB": "en", "IE": "en", "US": "en", "CA": "en", "AU": "en",
+    ]
+
+    /// Gleich wie schoolTerms(locale, country).homeworkPlural in shared (Österreich sagt „Hausübungen“)
+    static func homeworkPlural(locale: String, country: String?) -> String {
+        if locale == "de", country == "AT" { return "Hausübungen" }
+        switch locale {
+        case "de": return "Hausaufgaben"
+        case "es": return "deberes"
+        case "fr": return "devoirs"
+        case "it": return "compiti"
+        case "pt-BR": return "lições de casa"
+        case "tr": return "ödevler"
+        case "pl": return "zadania domowe"
+        default: return "homework"
+        }
+    }
+
+    /// Landesname in der aktuellen Sprache
+    static func countryName(_ code: String, locale: String) -> String {
+        code == "OTHER" ? I18n.shared.text("country.other") : (Locale(identifier: locale).localizedString(forRegionCode: code) ?? code)
+    }
+
+    /// Land aus der Region des Geräts, sonst das typische Land der Sprache
+    static func guessCountry(locale: String) -> String {
+        if let region = Locale.current.region?.identifier, countries.contains(region), region != "OTHER" { return region }
+        return countryLocale.first(where: { $0.value == locale })?.key ?? "OTHER"
+    }
+}
+
 /// `L("nav.today")`, `L("today.greeting.named", ["greeting": "Hello", "name": "Mia"])`
 @MainActor
 func L(_ key: String, _ vars: [String: Any] = [:]) -> String { I18n.shared.text(key, vars) }

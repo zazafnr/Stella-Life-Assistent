@@ -111,6 +111,8 @@ export const config = {
    * Funktions-Schalter. Finanzen ist vorerst ausgeblendet (Code, Tabellen und Tests bleiben):
    * mit STELLA_FEATURE_FINANCE=true wieder an.
    */
+  /** Download-Link von FreeNotes, sobald es die App gibt; leer = „Benachrichtige mich“ in der Einführung */
+  freenotesUrl: env.STELLA_FREENOTES_URL ?? '',
   features: {
     finance: env.STELLA_FEATURE_FINANCE === 'true',
   },

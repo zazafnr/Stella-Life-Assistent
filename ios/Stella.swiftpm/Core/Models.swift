@@ -408,6 +408,14 @@ struct UserSettings: Codable, Hashable {
     /** Sprache der Oberfläche (en, de, es, fr, it, pt-BR, tr, pl) und Land (ISO-3166) */
     var locale: String?
     var country: String?
+    /** Standort aus der Einführung: "granted", "denied" oder "later" */
+    var locationPermission: String?
+    /** Wer benachrichtigt werden will, wenn FreeNotes startet */
+    var notify: NotifySettings?
+}
+
+struct NotifySettings: Codable, Hashable {
+    var freenotes: Bool?
 }
 
 /** Ein Block im Wochenplan-Vorschlag */
@@ -526,6 +534,8 @@ struct Integrations: Codable, Hashable {
 
 struct ServerFlags: Codable, Hashable {
     var finance: Bool?
+    /** Download-Link von FreeNotes, sobald es die App gibt */
+    var freenotesUrl: String?
 }
 
 struct Me: Codable, Hashable {

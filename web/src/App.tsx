@@ -43,8 +43,8 @@ export function App() {
   const [tab, setTab] = useState<Tab>(initialTab);
   const me = useStore((s) => s.me);
   /** Einführung: beim ersten Mal von selbst (onboarding = pending), später aus den Einstellungen */
-  const [onboarding, setOnboarding] = useState<{ startAt: 'welcome' | 'situation' } | null>(null);
-  const showOnboarding = onboarding ?? (me?.settings.onboarding === 'pending' ? { startAt: 'welcome' as const } : null);
+  const [onboarding, setOnboarding] = useState<{ startAt: 'language' | 'situation' } | null>(null);
+  const showOnboarding = onboarding ?? (me?.settings.onboarding === 'pending' ? { startAt: 'language' as const } : null);
 
   const hasMe = useStore((s) => !!s.me);
   const lastSync = useStore((s) => s.lastSync);

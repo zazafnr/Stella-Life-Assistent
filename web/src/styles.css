@@ -743,3 +743,5 @@ textarea.cookies { min-height: 90px; font-family: ui-monospace, monospace; font-
 .undo-bar { position: fixed; z-index: 30; left: 16px; right: 16px; bottom: calc(var(--tabbar-h, 64px) + 28px + env(safe-area-inset-bottom)); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: 18px; background: var(--text); color: #fff; box-shadow: var(--shadow-lg); font-size: 14px; }
 .undo-bar .btn.ghost { color: #BFD9FF; }
 @media (min-width: 900px) { .undo-bar { left: auto; right: 32px; bottom: 32px; max-width: 420px; } }
+.onb-notebook { width: 100%; max-width: 320px; align-self: center; border-radius: 12px; box-shadow: var(--shadow); }
+.onb-summary li svg { flex: none; margin-top: 2px; }
