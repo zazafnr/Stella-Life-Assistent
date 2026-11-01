@@ -61,7 +61,7 @@ def page(path, title, description, body, og='/assets/og.png', noindex=False):
 '''
 
 def main():
-    imgs = ':root { ' + ' '.join(f'--img-{n}: url(/assets/stella/{n}.jpg);' for n in ['chat', 'today', 'weekplan', 'goals', 'inbox', 'plan', 'rain', 'night']) + ' }'
+    imgs = ':root { ' + ' '.join(f'--img-{n}: url(/assets/stella/{n}.jpg);' for n in ['chat', 'goals', 'plan']) + ' }'
     write('assets/site.css', '\n'.join([read('common.css'), imgs, read('index.css'), read('stella.css'), read('legal.css')]))
     write('assets/site.js', read('common.js') + '\n' + read('stella.js'))
 
