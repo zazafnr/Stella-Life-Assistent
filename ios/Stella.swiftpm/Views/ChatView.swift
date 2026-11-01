@@ -464,6 +464,9 @@ struct Bubble: View {
                         if let id = message.actionId { ActionCardView(id: id) }
                         if let card = message.card, card.type == "places" { PlacesCardView(card: card) }
                         if let card = message.card, card.type == "news_ask" { NewsAskCardView() }
+                        if let card = message.card, card.type == "restaurants" { RestaurantsCardView(card: card) }
+                        if let card = message.card, card.type == "availability" { AvailabilityCardView(card: card) }
+                        if let card = message.card, card.type == "location_ask" { LocationAskCardView() }
                         if let card = message.card, card.type == "spending" { SpendingCardView(card: card) }
                         HStack(spacing: 4) {
                             if message.via == "telegram" { Image(systemName: "paperplane.fill").accessibilityLabel("Telegram") }

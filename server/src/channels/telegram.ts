@@ -18,6 +18,7 @@ import { briefingText } from '../briefing.ts';
 import { recordKeyResult, saveTelegramUsername, telegramKey } from '../keys.ts';
 import { tr } from '../locale.ts';
 import { defaultNews, saveNews } from '../news/digest.ts';
+import { planReservation } from '../errands/routes.ts';
 import type { Channel, OutboundMessage } from './channel.ts';
 import { markdownToTelegramHtml, splitForTelegram } from './telegramHtml.ts';
 
@@ -148,6 +149,9 @@ export async function sendTo(chatId: string, msg: OutboundMessage): Promise<void
   }
 }
 
+const distanceText = (m: number) => (m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`);
+const userLocaleTag = (u: User) => u.settings.locale ?? 'en';
+
 /** Eine Chat-Nachricht von Stella → Telegram-Nachricht (Vorschläge mit Ja/Nein, Erledigtes mit „Rückgängig“) */
 export function toOutbound(user: User, m: ChatMessage): OutboundMessage {
   let text = m.text;
@@ -158,6 +162,18 @@ export function toOutbound(user: User, m: ChatMessage): OutboundMessage {
     else if (a?.canUndo) buttons.push({ label: tr(user, 'telegram.undo'), action: `u:${a.id}` });
   }
   if (m.card?.type === 'places') text += `\n\n${tr(user, 'telegram.places', { link: config.publicUrl })}`;
+  if (m.card?.type === 'restaurants') {
+    text += `\n\n${m.card.items.map((r, i) => {
+      const open = r.openNow === true ? tr(user, 'errand.openNow') : r.openNow === false ? tr(user, 'errand.closed') : tr(user, 'errand.hoursUnknown');
+      const book = r.bookingUrl ? `[${tr(user, 'errand.reserve')}](${r.bookingUrl})` : r.phone ? `${tr(user, 'errand.call')}: ${r.phone}` : r.website ? `[${tr(user, 'errand.website')}](${r.website})` : '';
+      return `${i + 1}. **${r.name}** · ${r.cuisine.join(', ') || r.kind} · ${distanceText(r.distanceM)} · ${open}\n   ${book}${book ? ' · ' : ''}[${tr(user, 'errand.route')}](${r.appleMapsUrl})`;
+    }).join('\n')}`;
+    if (m.card.when) buttons.push(...m.card.items.slice(0, 3).map((r, i) => ({ label: `${tr(user, 'errand.plan')} ${i + 1}`, action: `p:${m.id}:${i}` })));
+  }
+  if (m.card?.type === 'availability') {
+    const label = (s: string) => tr(user, s === 'in_stock' ? 'errand.inStock' : s === 'orderable' ? 'errand.orderable' : 'errand.unclear');
+    text += `\n\n${m.card.items.map((r) => `• **${r.retailer}**${r.store ? ` (${r.store})` : ''}: ${label(r.status)} · ${r.url ? `[${r.source}](${r.url})` : r.source}${r.status === 'unclear' && r.phone ? ` · ${tr(user, 'errand.call')}: ${r.phone}` : ''}`).join('\n')}\n${tr(user, 'errand.checkedAt', { time: new Intl.DateTimeFormat(userLocaleTag(user), { hour: '2-digit', minute: '2-digit', timeZone: user.timeZone }).format(new Date(m.card.checkedAt)) })}`;
+  }
   return { text, ...(buttons.length ? { buttons } : {}) };
 }
 
@@ -298,6 +314,18 @@ async function onCallback(cb: NonNullable<TgUpdate['callback_query']>, chat: str
   const user = userByChat(chat);
   const answer = (text?: string) => tg('answerCallbackQuery', { callback_query_id: cb.id, ...(text ? { text } : {}) }).catch(() => {});
   if (!user) return void (await answer());
+  const plan = /^p:([0-9a-f-]{36}):([0-2])$/.exec(cb.data ?? '');
+  if (plan) {
+    const row = db.prepare('SELECT card FROM messages WHERE id = ? AND user_id = ?').get(plan[1], user.id) as { card: string | null } | undefined;
+    const card = row?.card ? (JSON.parse(row.card) as ChatMessage['card']) : null;
+    const item = card?.type === 'restaurants' ? card.items[Number(plan[2])] : undefined;
+    if (!item || card?.type !== 'restaurants' || !card.when) { await answer(); return; }
+    await answer(tr(user, 'telegram.done'));
+    const r = planReservation(user, { name: item.name, when: card.when, people: card.people, address: item.address, phone: item.phone });
+    if (r.status !== 'refused') await sendTo(chat, { text: tr(user, 'errand.planned', { name: item.name }), buttons: [{ label: tr(user, 'telegram.undo'), action: `u:${r.actionId}` }] });
+    else await sendTo(chat, { text: r.reason });
+    return;
+  }
   const news = /^n:([yn])$/.exec(cb.data ?? '');
   if (news) {
     if (news[1] === 'y') saveNews(user, defaultNews(user)); else saveNews(user, { enabled: false, asked: true });

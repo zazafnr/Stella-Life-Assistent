@@ -41,10 +41,56 @@ export interface Item {
   recurrencePaused?: boolean;
 }
 
+/** Ein Vorschlag auf der Restaurant-Karte */
+export interface RestaurantCardItem {
+  id: string;
+  name: string;
+  /** restaurant, cafe oder bar */
+  kind: string;
+  cuisine: string[];
+  distanceM: number;
+  /** true = zum gewünschten Zeitpunkt offen, false = zu, null = unbekannt (wird so gesagt) */
+  openNow: boolean | null;
+  openingHours: string | null;
+  address: string | null;
+  phone: string | null;
+  website: string | null;
+  lat: number;
+  lon: number;
+  appleMapsUrl: string;
+  osmUrl: string;
+  /** direkte Buchungsadresse (TheFork, OpenTable …), falls erkannt */
+  bookingUrl?: string;
+  bookingService?: string;
+}
+
+/** Wie man reservieren kann: Link zu einem Buchungsdienst, Anruf oder nur die Webseite */
+export interface BookingOption {
+  kind: 'link' | 'phone' | 'website' | 'none';
+  service?: string;
+  url?: string;
+  phone?: string;
+  telUrl?: string;
+}
+
+/** Ein Händler auf der Verfügbarkeits-Karte. `unclear` heißt: Stella weiß es nicht und sagt das. */
+export interface AvailabilityItem {
+  retailer: string;
+  store?: string;
+  status: 'in_stock' | 'orderable' | 'unclear';
+  source: string;
+  url?: string;
+  phone?: string;
+  note?: string;
+}
+
 /** Karte unter einer Stella-Nachricht (z. B. Läden in der Nähe) */
 export type MessageCard =
   | { type: 'places'; category: string; label: string; itemId: string | null }
   | { type: 'news_ask' }
+  | { type: 'restaurants'; when: string | null; people: number | null; items: RestaurantCardItem[] }
+  | { type: 'availability'; product: string; checkedAt: string; items: AvailabilityItem[] }
+  | { type: 'location_ask' }
   | { type: 'spending'; label: string; from: string; to: string; currency: string; totalCents: number; count: number; categories: { category: string; cents: number }[] };
 
 export interface ChatMessage {

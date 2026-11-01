@@ -6,7 +6,7 @@ import {
 } from '@stella/shared';
 import {
   addAttachment, addMessage, chatContext, clearPending, conversationMessages, db, enqueueJob, findMessageByClientId, getConversation,
-  getItem, getPending, listItems, setPending, todayConversation, type User,
+  getItem, getPending, listItems, notifyOnce, setPending, todayConversation, type User,
 } from './db.ts';
 import { PROVIDERS } from './books.ts';
 import { lessonsFor } from './untis.ts';
@@ -25,8 +25,12 @@ import { resolvePlace } from './places.ts';
 import { describeRecurrence, describeRecurrenceEn, nextOccurrence } from '@stella/shared';
 import { euro, spendingCard, spendingFacts, spendingPeriod, SPEND_RE } from './finance.ts';
 import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type Tier, type ToolDef } from './llm.ts';
-import { pickTier, resolveTier } from './router.ts';
-import { consumeQuota, nextPlan, paywallHintDue, planFor, quotaFor } from './billing.ts';
+import { ERRAND_RE, pickTier, resolveTier } from './router.ts';
+import { consumeQuota, nextPlan, paywallHintDue, planAllows, planFor, quotaFor } from './billing.ts';
+import { findRestaurants } from './errands/restaurants.ts';
+import { bookingOptions } from './errands/booking.ts';
+import { errandPlace } from './errands/place.ts';
+import { shouldAskLocation } from './location.ts';
 import type { PlanId } from '@stella/shared';
 import { dayFor, tr, userLocale, userTerms } from './locale.ts';
 import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
@@ -41,10 +45,15 @@ interface Turn {
   changed: Map<string, Item>;
   /** Fotos, die mit der Nachricht kamen (z. B. Arbeitsblatt) */
   images: Attachment[];
+  /** Karte, die ein Werkzeug vorbereitet hat (Restaurants, Verfügbarkeit); hängt an der nächsten Antwort */
+  card?: ChatMessage['card'];
 }
 
-const say = (t: Turn, text: string, attachments: ChatMessage['attachments'] = []) =>
-  t.replies.push(addMessage(t.user.id, 'assistant', text, { attachments }));
+const say = (t: Turn, text: string, attachments: ChatMessage['attachments'] = []) => {
+  const card = t.card;
+  t.card = undefined;
+  t.replies.push(addMessage(t.user.id, 'assistant', text, { attachments, ...(card ? { card } : {}) }));
+};
 /** Antwort mit Aktions-Karte („Rückgängig“) */
 const sayA = (t: Turn, text: string, actionId?: string) => t.replies.push(addMessage(t.user.id, 'assistant', text, { actionId }));
 /** Nachrichten aus Aktionen (Rückfragen, „✓ erledigt“) direkt in die Chat-Antwort */
@@ -556,7 +565,61 @@ async function refineFocuses(exam: Item, material: string, dates: string[]): Pro
 
 const KINDS = ['homework', 'exam', 'assignment', 'event', 'todo', 'study', 'reminder'];
 
+/** Alltagsaufgaben: nur als Profi-Aufgabe (Sonnet) und nur mit dem passenden Abo */
+const ERRAND_TOOLS = new Set(['find_restaurants', 'booking_options', 'report_availability']);
+
 const TOOLS: ToolDef[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'find_restaurants',
+      description: 'Findet Restaurants, Cafés und Bars in der Nähe (OpenStreetMap), sortiert nach Entfernung und geöffnet zur gewünschten Zeit, inkl. Buchungslink bzw. Telefon. Zeigt automatisch eine Karte. Du kannst NICHT selbst reservieren.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Name oder Stichwort, optional' },
+          cuisine: { type: 'string', description: 'Küche, z. B. italienisch, Sushi, vegan' },
+          when: { type: 'string', description: 'Wunschzeitpunkt YYYY-MM-DDTHH:MM (Ortszeit), leer = jetzt' },
+          people: { type: 'number', description: 'Personenzahl, falls genannt' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'booking_options',
+      description: 'Sucht auf der Webseite eines Lokals nach einem Buchungsdienst (TheFork, OpenTable, Quandoo, resmio, Bookatable, Tablein, Google). Liefert den direkten Link, sonst die Telefonnummer.',
+      parameters: { type: 'object', properties: { name: { type: 'string' }, website: { type: 'string' }, phone: { type: 'string' } }, required: ['name'] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'report_availability',
+      description: 'Zeigt dem Nutzer die Karte „Verfügbarkeit“, NACHDEM du mit der Websuche geprüft hast, wo ein Produkt zu haben ist. Status nur „in_stock“ oder „orderable“, wenn eine Quelle es belegt – sonst „unclear“. Keine erfundenen Bestände.',
+      parameters: {
+        type: 'object',
+        properties: {
+          product: { type: 'string' },
+          results: {
+            type: 'array', maxItems: 5,
+            items: {
+              type: 'object',
+              properties: {
+                retailer: { type: 'string' }, store: { type: 'string', description: 'Filiale, falls bekannt' },
+                status: { type: 'string', enum: ['in_stock', 'orderable', 'unclear'] },
+                source: { type: 'string', description: 'woher die Angabe stammt, z. B. Webseite des Händlers' },
+                url: { type: 'string' }, phone: { type: 'string' }, note: { type: 'string' },
+              },
+              required: ['retailer', 'status', 'source'],
+            },
+          },
+        },
+        required: ['product', 'results'],
+      },
+    },
+  },
   {
     type: 'function',
     function: {
@@ -729,7 +792,12 @@ const TOOLS: ToolDef[] = [
 ];
 
 /** Werkzeuge für diese Nutzerin: ausgeblendete Funktionen (z. B. Finanzen) bekommt die KI gar nicht erst zu sehen. */
-const toolsFor = (user: User): ToolDef[] => TOOLS.filter((x) => x.function.name !== 'spending_summary' || hasFeature(user, 'finance'));
+const toolsFor = (user: User, tier: Tier = 'light', errand = false): ToolDef[] => TOOLS
+  .filter((x) => x.function.name !== 'spending_summary' || hasFeature(user, 'finance'))
+  .filter((x) => !ERRAND_TOOLS.has(x.function.name) || (errand && tier === 'heavy' && planAllows(user, 'webTasks')));
+
+/** Websuche und Seitenabruf von Claude (Server-Werkzeuge) – nur für Alltagsaufgaben in der Profi-Stufe */
+const SERVER_TOOLS = [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 }, { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 3 }];
 
 /** Antworten per E-Mail: einfache Aufträge kurz bestätigen, Fragen ausführlich beantworten */
 const STYLE_DETAILED = 'Style: the answer goes out by email. Confirm simple tasks briefly in one or two sentences. Answer questions in detail and well structured (short paragraphs or bullet lists with "- "), no filler phrases.';
@@ -759,7 +827,7 @@ ${isSchool(user) ? `- School words in ${user.name}'s country: homework = "${term
 - Use the situation report (second system block: free time, tests, learning progress) and the current time for suggestions. Never plan into busy times.
 - Never invent appointments or facts. Ask if something important is missing.
 - For tests/exams: ask for the material, then call create_study_plan.
-${isSchool(user) ? `- You do the homework (solve_homework): Stella solves it and writes it into the notebook in handwriting.\n` : ''}- You cannot book, buy or pay for anything. Say so openly, prepare everything and give the next step.
+${isSchool(user) ? `- You do the homework (solve_homework): Stella solves it and writes it into the notebook in handwriting.\n` : ''}- You cannot book, buy or pay for anything. Say so openly, prepare everything and give the next step. Never invent opening hours or stock: if a source is missing, say it is unclear.
 - MEMORY: when you learn something lasting and useful about ${user.name} (people and their role, fixed appointments/routines with weekday and time, preferences, what is hard/easy, goals), save it right away with remember – without asking and without announcing it. Do not save: one-off things (that is a planner entry), trivia, passwords, things already in the situation report. If something is outdated, change or delete the old entry (update_memory/forget). Use what you know without mentioning it every time.
 - If a task is too hard for you (long multi-step planning, multi-step maths, weighing many sources), call escalate; a stronger model then takes over. Not for everyday things.`,
   };
@@ -786,6 +854,45 @@ async function runTool(t: Turn, name: string, args: Record<string, any>): Promis
         kind: KINDS.includes(args.kind) ? args.kind : 'todo', title: String(args.title), subject: args.subject ?? null,
         detail: args.detail ?? null, due: args.due, time: args.time ?? null, material: args.material ?? null, source: 'ai',
       });
+    }
+    case 'find_restaurants': {
+      const place = errandPlace(u);
+      if (!place) {
+        // ohne Ort: einmal mit derselben Erklärung nachfragen (Karte „Standort“), sonst nur der Hinweis an das Modell
+        if (shouldAskLocation(u) && notifyOnce(u.id, 'location-ask-restaurant')) t.card = { type: 'location_ask' };
+        return { error: 'Ich kenne deinen Ort nicht. Sag dem Nutzer in einem Satz, dass du dafür seinen Standort brauchst (die Karte dazu kommt gleich) oder dass er eine Stadt nennen soll.' };
+      }
+      const people = Number.isFinite(Number(args.people)) ? Math.max(1, Math.min(30, Number(args.people))) : null;
+      const { items, when } = await findRestaurants(u.id, u.timeZone, place.lat, place.lon, { query: args.query, cuisine: args.cuisine, when: args.when });
+      if (!items.length) return { results: [], info: 'Nichts Passendes gefunden. Sag das ehrlich und schlag vor, die Küche oder die Uhrzeit zu ändern.' };
+      // Buchungsmöglichkeit je Lokal (Webseite des Lokals, mit Schutz vor internen Adressen)
+      await Promise.all(items.map(async (it) => {
+        const b = await bookingOptions(it).catch(() => null);
+        if (b?.kind === 'link') { it.bookingUrl = b.url; it.bookingService = b.service; }
+      }));
+      t.card = { type: 'restaurants', when, people, items };
+      return {
+        approximateLocation: place.approximate,
+        note: 'Die Karte mit „Reservieren“ (Link oder Anruf), „Route“ und „In den Planer“ wird automatisch gezeigt. Du kannst nicht selbst reservieren. Öffnungszeiten nur nennen, wenn openNow true/false ist; null heißt unbekannt.',
+        results: items.map((i) => ({ name: i.name, kind: i.kind, cuisine: i.cuisine, distanceM: i.distanceM, openNow: i.openNow, openingHours: i.openingHours, bookingService: i.bookingService ?? null, hasBookingLink: !!i.bookingUrl, phone: i.phone })),
+      };
+    }
+    case 'booking_options':
+      return bookingOptions({ name: String(args.name ?? ''), website: args.website ? String(args.website) : null, phone: args.phone ? String(args.phone) : null });
+    case 'report_availability': {
+      const STATUS = ['in_stock', 'orderable', 'unclear'];
+      const results = (Array.isArray(args.results) ? args.results : []).slice(0, 5).map((r: Record<string, unknown>) => ({
+        retailer: String(r.retailer ?? '').slice(0, 80), ...(r.store ? { store: String(r.store).slice(0, 80) } : {}),
+        // ohne Quelle kein „lagernd“: lieber ehrlich „unklar“
+        status: STATUS.includes(String(r.status)) && String(r.source ?? '').trim() ? (r.status as 'in_stock' | 'orderable' | 'unclear') : ('unclear' as const),
+        source: String(r.source ?? '').slice(0, 120) || '–',
+        ...(typeof r.url === 'string' && /^https?:\/\//i.test(r.url) ? { url: r.url.slice(0, 500) } : {}),
+        ...(typeof r.phone === 'string' ? { phone: r.phone.slice(0, 40) } : {}),
+        ...(r.note ? { note: String(r.note).slice(0, 160) } : {}),
+      })).filter((r: { retailer: string }) => r.retailer);
+      if (!results.length) return { error: 'results fehlt' };
+      t.card = { type: 'availability', product: String(args.product ?? '').slice(0, 120), checkedAt: new Date().toISOString(), items: results };
+      return { ok: true, note: 'Die Karte wird gezeigt. Bei „unclear“ sag ehrlich, dass du es nicht weißt, und biete die Telefonnummer an.' };
     }
     case 'list_entries':
       return listItems(u.id, { from: args.from ?? t.today, to: args.to, kind: args.kind, includeDone: args.include_done })
@@ -873,6 +980,10 @@ function limitReachedText(t: Turn, limit: number, planId: PlanId): string {
 }
 
 async function runAgent(t: Turn, wanted?: Tier, escalated = false) {
+  // Alltagsaufgaben (Restaurants, Reservieren, Verfügbarkeit): nur ab Plus – vorher prüfen, damit es kein Kontingent kostet
+  const recentUser = conversationMessages(t.user.id, t.conversationId, 8).filter((m) => m.role === 'user').slice(-3).map((m) => m.text);
+  const errand = recentUser.some((x) => ERRAND_RE.test(x));
+  if (errand && !escalated && !planAllows(t.user, 'webTasks') && ERRAND_RE.test(recentUser.at(-1) ?? '')) { say(t, tr(t.user, 'paywall.errands')); return; }
   // Eine KI-Nachricht zählt einmal pro Nutzernachricht (die Wiederholung mit Sonnet zählt nicht extra)
   if (!escalated) {
     const q = quotaFor(t.user, 'ai_message');
@@ -882,7 +993,7 @@ async function runAgent(t: Turn, wanted?: Tier, escalated = false) {
   const history = conversationMessages(t.user.id, t.conversationId, 16);
   const lastUser = [...history].reverse().find((m) => m.role === 'user')?.text;
   // Der Chat-Agent startet als Haiku; Sonnet nur auf ausdrücklichen Wunsch ("gründlich") oder wenn Haiku `escalate` ruft
-  const asked = wanted ?? pickTier(t.user, { text: lastUser, kind: 'chat' });
+  const asked = wanted ?? (errand ? 'heavy' : pickTier(t.user, { text: lastUser, kind: 'chat' }));
   const { tier, downgraded, reason } = resolveTier(t.user, asked);
   // Profi-Aufgabe verbraucht (einmal je Zug). Ist sie leer, macht Haiku weiter – und Stella sagt das in einem Satz.
   if (tier === 'heavy') consumeQuota(t.user, 'pro_task');
@@ -892,11 +1003,11 @@ async function runAgent(t: Turn, wanted?: Tier, escalated = false) {
     { role: 'system', content: sys.fixed, dynamic: sys.dynamic },
     ...history.map((m) => ({ role: m.role, content: m.text }) as LlmMessage),
   ];
-  const tools = toolsFor(t.user).filter((x) => x.function.name !== 'escalate' || (tier === 'light' && !escalated));
+  const tools = toolsFor(t.user, tier, errand).filter((x) => x.function.name !== 'escalate' || (tier === 'light' && !escalated));
   let escalateNote = '';
   try {
     for (let step = 0; step < 6; step++) {
-      const { message } = await complete(messages, tools, { tier, effort: 'medium', userId: t.user.id, heavy: tier === 'heavy' });
+      const { message } = await complete(messages, tools, { tier, effort: 'medium', userId: t.user.id, heavy: tier === 'heavy', ...(errand && tier === 'heavy' && planAllows(t.user, 'webTasks') ? { serverTools: SERVER_TOOLS } : {}) });
       messages.push({ role: 'assistant', content: message.content ?? '', tool_calls: message.tool_calls, raw: message.raw });
       if (!message.tool_calls?.length) {
         say(t, `${message.content?.trim() || '🤔'}${downgradeNote || escalateNote ? `\n\n_${downgradeNote || escalateNote}_` : ''}`);

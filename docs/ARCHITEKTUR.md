@@ -228,6 +228,17 @@ und plant die nächste Erinnerung (`advanceRecurring`); pausiert sind sie ohne E
 - Nötig wären die Meta-Unternehmensverifizierung und eine eigene Nummer.
 - Wenn es kommt, dann nur ab Pro.
 
+### Alltagsaufgaben (v3, Paket 12)
+
+- Stella **kann nicht selbst buchen, kaufen oder bezahlen** und sagt das offen (Prompt und Karte). Sie findet, vergleicht und bereitet vor.
+- `server/src/errands/`: `restaurants.ts` (Overpass, gleicher Zwischenspeicher und gleiche Bremse wie `places.ts`; Entfernung, „zur Wunschzeit offen“), `booking.ts`
+  (erkennt TheFork, OpenTable, Quandoo, resmio, Bookatable, Tablein und Google „Reservieren“ auf der Webseite des Lokals; Abruf mit Schutz vor internen Adressen),
+  `place.ts` (zuletzt bekannter gerundeter Ort, sonst Nachfrage mit der Standort-Karte), `routes.ts` („In den Planer“ legt einen Termin über die Rechte-Stufen an, mit „Rückgängig“).
+- Agent-Werkzeuge `find_restaurants`, `booking_options`, `report_availability` plus die Server-Werkzeuge `web_search` und `web_fetch` von Claude (je höchstens 3 Nutzungen)
+  gibt es nur in der Profi-Stufe (Sonnet), nur bei einer Alltagsaufgabe (`ERRAND_RE` im Router) und nur ab Plus (`webTasks`). Free bekommt einen Hinweis, ohne dass ein Modell läuft.
+- Karten `restaurants`, `availability` und `location_ask` erscheinen in Web, iOS und (als Text mit Knöpfen) in Telegram. „Lagernd“ oder „bestellbar“ nur mit Quelle, sonst „unklar“.
+- Händler-Adapter (`server/src/stores/`) sind bewusst nicht gebaut: erst, wenn die Websuche bei einer großen Kette nachweislich versagt.
+
 ### News im Briefing (v3, Paket 11)
 
 - `server/src/news/`: `sources.ts` (Katalog), `feed.ts` (RSS/Atom/RDF lesen, Themen, Feed-Suche), `cluster.ts` (Gruppen), `store.ts` (Abruf alle 30 Minuten, ETag, Löschen nach 3 Tagen),

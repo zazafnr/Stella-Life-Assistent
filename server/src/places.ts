@@ -13,8 +13,8 @@ const CACHE_MS = 24 * 3600_000;
 const CELL_DEG = 0.0045; // ≈ 500 m
 const PER_HOUR = 30;
 
-const overpassUrls = () => (process.env.OVERPASS_URL ? [process.env.OVERPASS_URL] : ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter']);
-const userAgent = () => `StellaLifeAssistant/2.0 (persoenlicher Assistent; Kontakt ueber ${config.publicUrl})`;
+export const overpassUrls = () => (process.env.OVERPASS_URL ? [process.env.OVERPASS_URL] : ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter']);
+export const userAgent = () => `StellaLifeAssistant/2.0 (persoenlicher Assistent; Kontakt ueber ${config.publicUrl})`;
 
 // ---------- Entfernung, Zelle ----------
 
@@ -72,7 +72,7 @@ interface RawPlace { name: string | null; lat: number; lon: number; hours: strin
 let lastCall = 0;
 let chain: Promise<unknown> = Promise.resolve();
 /** Overpass ist ein geteilter Gratis-Dienst: höchstens eine Anfrage gleichzeitig, mit Abstand */
-function serial<T>(fn: () => Promise<T>): Promise<T> {
+export function serial<T>(fn: () => Promise<T>): Promise<T> {
   const run = chain.then(async () => {
     const wait = lastCall + (process.env.OVERPASS_URL ? 0 : 1500) - Date.now();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
@@ -112,14 +112,14 @@ async function fetchPlaces(tag: string, lat: number, lon: number): Promise<RawPl
 }
 
 const hourly = new Map<string, number[]>();
-function limit(userId: string) {
+export function limit(userId: string) {
   const cutoff = Date.now() - 3600_000;
   const list = (hourly.get(userId) ?? []).filter((t) => t > cutoff);
   if (list.length >= PER_HOUR) throw new HttpError(429, 'Zu viele Ladensuchen in kurzer Zeit – versuch es später nochmal.');
   hourly.set(userId, [...list, Date.now()]);
 }
 
-const r5 = (n: number) => Number(n.toFixed(5));
+export const r5 = (n: number) => Number(n.toFixed(5));
 
 export const mapsLinks = (name: string, lat0: number, lon0: number) => ({
   appleMapsUrl: `https://maps.apple.com/?daddr=${r5(lat0)},${r5(lon0)}&q=${encodeURIComponent(name)}`,

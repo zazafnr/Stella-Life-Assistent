@@ -37,10 +37,14 @@ const THOROUGH_RE = /\b(gr[üu]ndlich|genau(?:er|e)?|sorgf[äa]ltig|thorough(?:l
  * heavy: Bild lösen (Hausübung-Autopilot, Arbeitsblatt-Foto), Wochenplaner mit KI, Recherche, ausdrücklich „gründlich“.
  * Alles andere light. Der Chat-Agent startet immer als light und ruft bei Bedarf selbst `escalate` auf.
  */
+/** Restaurants, Reservieren, Verfügbarkeit („lagernd?“) in den unterstützten Sprachen: Profi-Aufgabe mit Websuche */
+export const ERRAND_RE = /\b(restaurant\w*|reserv\w*|tisch\s+(?:für|fuer)|essen\s+gehen|abendessen\s+gehen|lagernd|auf\s+lager|vorr[äa]tig|verf[üu]gbar\w*|in\s+stock|available|book\s+a\s+table|table\s+for|where\s+can\s+i\s+(?:buy|get)|wo\s+(?:bekomme|kriege)\s+ich|mesa\s+para|reservar|restaurante|en\s+stock|disponible|r[ée]server|une\s+table|en\s+rupture|tavolo\s+per|prenot\w+|disponibil\w+|mesa\s+para|dispon[íi]vel|em\s+estoque|masa\s+ayırt\w*|rezervasyon|stokta|rezerwacj\w*|stolik|dost[ęe]pn\w+|w\s+magazynie)\b/i;
+
 export function pickTier(_user: User, input: TierInput): Tier {
   if (input.hasImage && input.solve) return 'heavy';
   if (input.kind === 'homework' || input.kind === 'weekplan' || input.kind === 'research') return 'heavy';
   if (input.text && THOROUGH_RE.test(input.text)) return 'heavy';
+  if (input.kind === 'chat' && input.text && ERRAND_RE.test(input.text)) return 'heavy';
   return 'light';
 }
 

@@ -9,6 +9,7 @@ import { ActionCard } from './ActionCard.tsx';
 import { Icon } from '../ui/Icon.tsx';
 import { CloudSky, Sheet, StarMark, showToast } from '../ui/Decor.tsx';
 import { NewsAskCard } from './NewsAsk.tsx';
+import { AvailabilityCardView, LocationAskCard, RestaurantsCardView } from './ErrandCards.tsx';
 import { WeatherBackground, useSceneMode } from '../weather/WeatherBackground.tsx';
 import { useAnimMode, useWeather } from '../weather.ts';
 import { ListsSheet } from './Lists.tsx';
@@ -206,6 +207,9 @@ export function Chat() {
                       {m.actionId && <ActionCard id={m.actionId} />}
                       {m.card?.type === 'places' && <PlacesCard card={m.card} />}
                       {m.card?.type === 'news_ask' && <NewsAskCard />}
+                      {m.card?.type === 'restaurants' && <RestaurantsCardView card={m.card} />}
+                      {m.card?.type === 'availability' && <AvailabilityCardView card={m.card} />}
+                      {m.card?.type === 'location_ask' && <LocationAskCard />}
                       {m.card?.type === 'spending' && <SpendingCard card={m.card} />}
                       <span className="meta">{m.via === 'telegram' && <span title="Telegram" aria-label="Telegram" style={{ marginRight: 4 }}><Icon name="send" size={11} /></span>}{m.pending ? t('chat.sending') : timeLabel(m.createdAt, locale)}</span>
                     </div>

@@ -770,3 +770,11 @@ textarea.cookies { min-height: 90px; font-family: ui-monospace, monospace; font-
 .news-list li:last-child a { border-bottom: 0; }
 .news-sentence { font-size: 15px; line-height: 1.35; }
 .news-list a:hover .news-sentence, .news-list a:focus-visible .news-sentence { text-decoration: underline; }
+
+/* Alltagsaufgaben: Restaurants und Verfügbarkeit (Paket 12) */
+.errand-card { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; padding: 10px 12px; border-radius: 16px; background: rgba(255, 255, 255, .5); border: 1px solid var(--border); }
+.errand-item { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.errand-item:last-of-type { border-bottom: 0; padding-bottom: 0; }
+.errand-status { font-weight: 600; }
+.errand-status.in_stock { color: var(--green); }
+.errand-status.unclear { color: var(--pink-text); }

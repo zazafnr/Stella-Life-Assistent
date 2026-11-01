@@ -166,8 +166,16 @@ struct MessageCard: Codable, Hashable {
     var totalCents: Int?
     var count: Int?
     var categories: [SpendingLine]?
+    /** Restaurant-Karte */
+    var when: String?
+    var people: Int?
+    var restaurants: [RestaurantItem]?
+    /** Verfügbarkeits-Karte */
+    var product: String?
+    var checkedAt: String?
+    var availability: [AvailabilityEntry]?
 
-    enum CodingKeys: String, CodingKey { case type, category, label, itemId, currency, totalCents, count, categories }
+    enum CodingKeys: String, CodingKey { case type, category, label, itemId, currency, totalCents, count, categories, when, people, items, product, checkedAt }
 
     // Karten ohne Beschriftung (news_ask) sollen nicht am Decodieren scheitern
     init(from decoder: Decoder) throws {
@@ -180,7 +188,61 @@ struct MessageCard: Codable, Hashable {
         totalCents = try c.decodeIfPresent(Int.self, forKey: .totalCents)
         count = try c.decodeIfPresent(Int.self, forKey: .count)
         categories = try c.decodeIfPresent([SpendingLine].self, forKey: .categories)
+        when = try c.decodeIfPresent(String.self, forKey: .when)
+        people = try c.decodeIfPresent(Int.self, forKey: .people)
+        product = try c.decodeIfPresent(String.self, forKey: .product)
+        checkedAt = try c.decodeIfPresent(String.self, forKey: .checkedAt)
+        // „items“ heißt in beiden Karten gleich, hat aber je Art einen anderen Inhalt
+        if type == "restaurants" { restaurants = try c.decodeIfPresent([RestaurantItem].self, forKey: .items) }
+        if type == "availability" { availability = try c.decodeIfPresent([AvailabilityEntry].self, forKey: .items) }
     }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(type, forKey: .type)
+        try c.encodeIfPresent(category, forKey: .category)
+        try c.encode(label, forKey: .label)
+        try c.encodeIfPresent(itemId, forKey: .itemId)
+        try c.encodeIfPresent(currency, forKey: .currency)
+        try c.encodeIfPresent(totalCents, forKey: .totalCents)
+        try c.encodeIfPresent(count, forKey: .count)
+        try c.encodeIfPresent(categories, forKey: .categories)
+        try c.encodeIfPresent(when, forKey: .when)
+        try c.encodeIfPresent(people, forKey: .people)
+        try c.encodeIfPresent(product, forKey: .product)
+        try c.encodeIfPresent(checkedAt, forKey: .checkedAt)
+        if let restaurants { try c.encode(restaurants, forKey: .items) }
+        if let availability { try c.encode(availability, forKey: .items) }
+    }
+}
+
+/** Ein Vorschlag auf der Restaurant-Karte */
+struct RestaurantItem: Codable, Hashable, Identifiable {
+    var id: String
+    var name: String
+    var kind: String
+    var cuisine: [String]
+    var distanceM: Int
+    var openNow: Bool?
+    var openingHours: String?
+    var address: String?
+    var phone: String?
+    var website: String?
+    var appleMapsUrl: String
+    var bookingUrl: String?
+    var bookingService: String?
+}
+
+/** Ein Händler auf der Verfügbarkeits-Karte */
+struct AvailabilityEntry: Codable, Hashable, Identifiable {
+    var retailer: String
+    var store: String?
+    var status: String
+    var source: String
+    var url: String?
+    var phone: String?
+    var note: String?
+    var id: String { retailer + (store ?? "") }
 }
 
 struct SpendingLine: Codable, Hashable {
