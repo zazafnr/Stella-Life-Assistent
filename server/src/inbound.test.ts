@@ -100,7 +100,8 @@ test('Mail von verknüpfter Adresse: Stella erledigt es und antwortet im selben 
   assert.equal(m.replyTo, 'stella@evolsior.com');
   assert.match(m.subject, /^Re: Zahnarzt/);
   assert.equal(m.inReplyTo, '<w1@x>');
-  assert.match(m.text, /– Stella$/);
+  assert.match(m.text, /Stella by EVOLSIOR · Built to become/, 'Textversion mit Fuß');
+  assert.match((m as unknown as { html: string }).html, /<html lang="de"/, 'HTML-Fassung dabei');
   const items = db.prepare("SELECT COUNT(*) AS n FROM items WHERE user_id = ?").get(owner.id) as { n: number };
   assert.ok(items.n >= 1, 'Stella hat eine Erinnerung angelegt');
 });

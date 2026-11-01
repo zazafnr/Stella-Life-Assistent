@@ -2,7 +2,12 @@ import { createReadStream, existsSync } from 'node:fs';
 import path from 'node:path';
 import Fastify, { type FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
-import { addDays, isTone, todayIn, voice, type Item } from '@stella/shared';
+import { addDays, isCountry, isLocale, isLocationPermission, isTone, todayIn, voice, type Item } from '@stella/shared';
+import { userLocale } from './locale.ts';
+import { registerUndoRoutes } from './email/undo.ts';
+import { currentPlanId, maxMailboxes, registerBillingRoutes, registerBillingWebhook } from './billing.ts';
+import { tr } from './locale.ts';
+import { registerLoginApi, registerLoginRoutes, registerPasswordRoute, setPublicUser } from './loginlink.ts';
 import { config } from './config.ts';
 import {
   deleteSecret, hasSecret, HttpError, login, logout, register, requireUser, setSecret, userByIngestToken, userCount,
@@ -28,6 +33,12 @@ import { finishGoogle, finishGoogleLink, finishTarget, googleAuthUrl, googleConf
 import { approve, GROUPS, isGroup, isLevel, levelFor, listActions, perform, reject, undo } from './actions.ts';
 import { LlmUnavailable } from './llm.ts';
 import { buildBriefing } from './briefing.ts';
+import { registerWeatherRoutes, warmWeather } from './weather.ts';
+import { registerNewsRoutes } from './news/routes.ts';
+import { registerErrandRoutes } from './errands/routes.ts';
+import { registerScreenTimeRoutes } from './screentime.ts';
+import { buildDigest } from './news/digest.ts';
+import { registerTelegramRoutes, registerTelegramWebhook, telegramConfigured } from './channels/telegram.ts';
 import { cleanBlocks, planWeek } from './weekplan.ts';
 import { acceptHint, dismissHint } from './hints.ts';
 import { registerAdminRoutes } from './admin.ts';
@@ -45,7 +56,7 @@ import { currentConversation, listConversations, registerConversationRoutes } fr
 import { addMemory, cleanSchedule, deleteMemory, isCategory, listMemories, MEMORY_CATEGORIES, updateMemory } from './memory.ts';
 
 // trustProxy nur für Caddy auf derselben Maschine – sonst ließe sich die Absender-Adresse fälschen
-const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, bodyLimit: 2 * 1024 * 1024, trustProxy: '127.0.0.1' });
+const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, bodyLimit: 2 * 1024 * 1024, trustProxy: '127.0.0.1', maxParamLength: 1000 });
 app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: 5 * 1024 * 1024 }, (_req, body, done) => done(null, body));
 
 app.setErrorHandler((err, _req, reply) => {
@@ -57,9 +68,18 @@ app.setErrorHandler((err, _req, reply) => {
 
 const str = (v: unknown, max = 4000) => (typeof v === 'string' ? v.slice(0, max) : '');
 
+/** Das Profil ohne serverseitig abgeschaltete Funktionen – so blenden alle Oberflächen sie ohne eigenen Code aus. */
+function visibleSettings(settings: User['settings']): User['settings'] {
+  const p = settings.profile;
+  if (!p || config.features.finance) return settings;
+  return { ...settings, profile: { ...p, features: p.features.filter((f) => f !== 'finance') } };
+}
+
 function publicUser(user: User) {
   return {
-    id: user.id, name: user.name, email: user.email, timeZone: user.timeZone, settings: user.settings, role: user.role,
+    id: user.id, name: user.name, email: user.email, timeZone: user.timeZone, settings: visibleSettings(user.settings), role: user.role,
+    /** Serverweite Funktions-Schalter für die Oberflächen (z. B. Einführung ohne „Ausgaben“) */
+    flags: { finance: config.features.finance, freenotesUrl: config.freenotesUrl || null, telegram: telegramConfigured() },
     ingestUrl: `${config.publicUrl}/api/ingest/${user.ingestToken}`,
     integrations: {
       books: Object.fromEntries((Object.keys(PROVIDERS) as BookProvider[]).map((p) => {
@@ -84,6 +104,12 @@ app.get('/api/status', async () => ({
 
 registerSignupRoutes(app, publicUser);
 registerInboundRoute(app);
+registerUndoRoutes(app);
+registerBillingWebhook(app);
+registerTelegramWebhook(app);
+registerLoginRoutes(app);
+registerLoginApi(app);
+setPublicUser(publicUser);
 
 // Das Firmen-Dashboard liegt auf eigener Adresse (Cloudflare) und liest nur Admin- und Login-Routen.
 const DASHBOARD_ORIGINS = (process.env.STELLA_DASHBOARD_ORIGINS ?? 'https://dashboard.evolsior.com').split(',').map((s) => s.trim()).filter(Boolean);
@@ -209,6 +235,8 @@ app.register(async (api) => {
   registerPlaceRoutes(api);
   registerQuickRoutes(api);
   registerProfileRoutes(api, publicUser);
+  registerPasswordRoute(api);
+  registerBillingRoutes(api);
   registerAudioRoutes(api);
 
   api.get('/api/me', async (req) => publicUser(req.user));
@@ -251,6 +279,24 @@ app.register(async (api) => {
       if (v !== 'auto' && v !== 'off' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) throw new HttpError(400, 'Briefing: "auto", "off" oder HH:MM');
       patch.briefing = v;
     }
+    if (b.locale !== undefined) {
+      if (!isLocale(b.locale)) throw new HttpError(400, 'Unknown language.');
+      patch.locale = b.locale;
+    }
+    if (b.country !== undefined) {
+      if (!isCountry(b.country)) throw new HttpError(400, 'Unknown country.');
+      patch.country = b.country;
+    }
+    if (b.notifyVia !== undefined) {
+      const via = Array.isArray(b.notifyVia) ? [...new Set(b.notifyVia.filter((v): v is 'push' | 'telegram' => v === 'push' || v === 'telegram'))] : [];
+      if (!via.length) throw new HttpError(400, 'notifyVia: push und/oder telegram.');
+      patch.notifyVia = via;
+    }
+    if (b.locationPermission !== undefined) {
+      if (!isLocationPermission(b.locationPermission)) throw new HttpError(400, 'Unknown location state.');
+      patch.locationPermission = b.locationPermission;
+    }
+    if (typeof b.notifyFreenotes === 'boolean') patch.notify = { ...(req.user.settings.notify ?? {}), freenotes: b.notifyFreenotes };
     if (b.weekPlan !== undefined) {
       if (b.weekPlan !== 'sunday' && b.weekPlan !== 'off') throw new HttpError(400, 'Wochenplan: "sunday" oder "off"');
       patch.weekPlan = b.weekPlan;
@@ -272,7 +318,7 @@ app.register(async (api) => {
     const user = getUser(req.user.id)!;
     // Erinnerungen tragen Uhrzeit und Ton in sich → neu erzeugen
     if (patch.eveningTime || patch.studyTime || (patch.tone && patch.tone !== req.user.settings.tone)) rescheduleAll(user);
-    if (patch.tone && patch.tone !== req.user.settings.tone) addMessage(user.id, 'assistant', voice(patch.tone).toneChanged());
+    if (patch.tone && patch.tone !== req.user.settings.tone) addMessage(user.id, 'assistant', voice(patch.tone, patch.locale ?? userLocale(req.user)).toneChanged());
     return publicUser(user);
   });
 
@@ -485,6 +531,11 @@ app.register(async (api) => {
       user: str(b.user, 200).trim(), pass: str(b.pass, 200).replace(/\s+/g, ''),
     };
     if (!account.host || !account.user || !account.pass) throw new HttpError(400, 'Adresse und App-Passwort nötig');
+    const allowed = maxMailboxes(req.user);
+    if (listAccounts(req.user.id).length >= allowed) {
+      const planName = currentPlanId(req.user);
+      throw new HttpError(402, tr(req.user, 'paywall.mailboxes', { plan: planName.charAt(0).toUpperCase() + planName.slice(1), count: allowed }), { upgrade: true });
+    }
     try { await testAccount(account); } catch (err) { throw new HttpError(400, `Anmeldung fehlgeschlagen: ${(err as Error).message}`); }
     saveAccounts(req.user.id, [...listAccounts(req.user.id), account]);
     void checkAllMail(req.user.id).catch(() => {});
@@ -616,10 +667,19 @@ app.register(async (api) => {
     return { fileId: id };
   });
 
-  api.get('/api/ai/status', async () => modelStatus());
+  // Kosten aller Nutzer sieht nur der Owner
+  api.get('/api/ai/status', async (req) => {
+    const { cost, ...status } = await modelStatus();
+    return req.user.role === 'owner' ? { ...status, cost } : status;
+  });
 
   // ----- Morning Briefing & Hinweise -----
-  api.get('/api/briefing', async (req) => buildBriefing(req.user));
+  api.get('/api/briefing', async (req) => { await warmWeather(req.user); await buildDigest(req.user).catch(() => []); return buildBriefing(req.user); });
+  registerWeatherRoutes(api);
+  registerTelegramRoutes(api);
+  registerNewsRoutes(api);
+  registerErrandRoutes(api);
+  registerScreenTimeRoutes(api);
 
   // ----- Plan my week: Vorschlag ansehen, Blöcke abwählen, übernehmen -----
   api.get('/api/weekplan', async (req) => {

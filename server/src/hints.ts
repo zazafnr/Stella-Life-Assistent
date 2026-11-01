@@ -13,10 +13,12 @@ import { buildLagebild, toMin, type Lagebild } from './context.ts';
 import { hasFeature, isLearner, isSchool } from './profile.ts';
 import { addMessage, db, getUser, now, setPending, type PendingType, type User } from './db.ts';
 import { bookFor } from './planner.ts';
-import { pushToUser } from './push.ts';
+import { notify } from './channels/deliver.ts';
 import { nextLessonDate } from './untis.ts';
 import { budgetStatus, euro } from './finance.ts';
 import { activeGoals, parseGoalQuick, staleGoals } from './goals.ts';
+import { tr, voiceOf } from './locale.ts';
+import { screentimeHints } from './screentime.ts';
 
 export interface FoundHint extends Hint {
   action?: { type: ActionType; params: ActionParams[ActionType]; label: string };
@@ -42,7 +44,7 @@ export function findSlot(lb: Lagebild, minutes: number, before: string, preferre
 }
 
 export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): FoundHint[] {
-  const v = voice(user.settings.tone);
+  const v = voiceOf(user);
   const out: FoundHint[] = [];
   const tomorrow = addDays(lb.today, 1);
   const studyTime = user.settings.studyTime ?? '16:30';
@@ -135,6 +137,11 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
     out.push({ key: `reply:${m.id}`, priority: 'normal', text: v.hintReply(m.sender ?? 'Jemand', m.summary), open: { tab: 'inbox', label: 'Antwort schreiben' } });
   }
 
+  // Bildschirmzeit: das Limit war an mindestens 3 der letzten 4 Tage erreicht (einmal pro Woche und Ziel, im Ton der Person)
+  for (const h of screentimeHints(user, lb.today)) {
+    out.push({ key: h.key, priority: 'normal', text: tr(user, `screentime.hint.${user.settings.tone ?? 'nett'}`, { name: h.goal.name, count: h.count }), open: { tab: 'goals', label: tr(user, 'screentime.title') } });
+  }
+
   // Ziele ohne Eintrag seit zwei Wochen (höchstens einmal im Monat je Ziel)
   for (const { goal, weeks } of hasFeature(user, 'goals') ? staleGoals(user, lb.today) : []) {
     out.push({ key: `goal_stale:${goal.id}:${lb.today.slice(0, 7)}`, priority: 'normal', text: v.goalStale(goal.title, weeks), open: { tab: 'goals', label: 'Ziele ansehen' } });
@@ -212,7 +219,7 @@ export async function deliverHint(user: User, h: FoundHint, push: boolean): Prom
     const r = perform(user, h.action.type, h.action.params as never, { source: 'auto', question: h.text, quiet: true });
     if (r.status === 'done') {
       actionId = r.actionId;
-      text = voice(user.settings.tone).hintDone((db.prepare('SELECT summary FROM actions WHERE id = ?').get(r.actionId) as { summary: string }).summary);
+      text = voiceOf(user).hintDone((db.prepare('SELECT summary FROM actions WHERE id = ?').get(r.actionId) as { summary: string }).summary);
       addMessage(user.id, 'assistant', text, { actionId });
     } else if (r.status === 'proposed') {
       actionId = r.actionId;
@@ -224,7 +231,7 @@ export async function deliverHint(user: User, h: FoundHint, push: boolean): Prom
   }
   if (h.pending) setPending(user.id, h.pending.type, h.pending.itemId);
   markDelivered(user.id, h.key, actionId);
-  if (push) await pushToUser(user.id, { title: 'Stella', body: text.replace(/\*\*/g, ''), tag: h.key });
+  if (push) await notify(user.id, { title: 'Stella', body: text.replace(/\*\*/g, ''), text, tag: h.key });
 }
 
 /** Hinweis über den Knopf auf „Heute“ erledigen lassen – das ist Zustimmung des Nutzers */

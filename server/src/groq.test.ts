@@ -139,6 +139,6 @@ test('ohne Groq-Schlüssel und ohne OpenRouter: klare Meldung', async () => {
 
 test('transcribe: Whisper über Groq, Deutsch, Text wird getrimmt', async () => {
   setKey('groq', 'gsk_geheimer-test-schluessel');
-  const text = await transcribe(Buffer.from('fake-audio'), 'audio/mp4', { userId: owner.user.id });
+  const text = await transcribe(Buffer.from('fake-audio'), 'audio/mp4', { userId: owner.user.id, language: 'de' });
   assert.equal(text, 'Schreib Milch und Eier auf die Einkaufsliste.');
 });

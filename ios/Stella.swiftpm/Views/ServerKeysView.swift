@@ -32,8 +32,10 @@ struct ServerKeysView: View {
     }
 
     @State private var keys: [String: KeyStatus] = [:]
+    @State private var anthropicInput = ""
     @State private var groqInput = ""
     @State private var openrouterInput = ""
+    @State private var telegramInput = ""
     @State private var host = "smtp.gmail.com"
     @State private var port = "465"
     @State private var user = ""
@@ -59,10 +61,15 @@ struct ServerKeysView: View {
 
     var body: some View {
         Form {
+            keySection(name: "anthropic", title: "Anthropic-API-Key (Claude)", input: $anthropicInput, placeholder: "sk-ant-…",
+                       hint: "Claude Haiku erledigt fast alles, Claude Sonnet nur schwere Aufgaben. Key aus console.anthropic.com; dort bitte ein Ausgabenlimit setzen.")
+            fallbackSection
             keySection(name: "groq", title: "Groq-API-Key", input: $groqInput, placeholder: "gsk_…",
                        hint: "Mails einordnen, Chat-Titel und Sprachnachrichten. Kostenlos erhältlich auf console.groq.com.")
             keySection(name: "openrouter", title: "OpenRouter-API-Key", input: $openrouterInput, placeholder: "sk-or-…",
                        hint: "Für Chat und Planer. Ohne Eintrag hier gilt der Schlüssel aus der Server-Umgebung.")
+            keySection(name: "telegram", title: "Telegram-Bot", input: $telegramInput, placeholder: "123456789:AAE…",
+                       hint: "Bot-Token von @BotFather (Befehle /start, /briefing, /stop). Beim Speichern setzt der Server den Webhook selbst.")
             smtpSection
             invitesSection
             if let message {
@@ -100,6 +107,28 @@ struct ServerKeysView: View {
             Text(title)
         } footer: {
             Text(hint)
+        }
+    }
+
+    @State private var allowFreeFallback = false
+    private struct AiSettings: Codable { var allowFreeFallback: Bool }
+
+    private var fallbackSection: some View {
+        Section {
+            Toggle("Bei Claude-Ausfall auf Gratis-Modelle ausweichen", isOn: Binding(
+                get: { allowFreeFallback },
+                set: { v in allowFreeFallback = v; Task { await setFallback(v) } }))
+        } header: {
+            Text("Notfall-Modelle")
+        } footer: {
+            Text("Inhalte aus Mails gehen nie an Gratis-Anbieter, egal wie dieser Schalter steht.")
+        }
+    }
+
+    private func setFallback(_ on: Bool) async {
+        await run("Gespeichert.") {
+            let r: AiSettings = try await API.shared.send("PUT", "/api/admin/ai", body: AiSettings(allowFreeFallback: on))
+            allowFreeFallback = r.allowFreeFallback
         }
     }
 
@@ -184,6 +213,7 @@ struct ServerKeysView: View {
         do {
             let r: KeysResponse = try await API.shared.get("/api/admin/keys")
             keys = r.keys
+            if let ai: AiSettings = try? await API.shared.get("/api/admin/ai") { allowFreeFallback = ai.allowFreeFallback }
             if let inv: InvitesResponse = try? await API.shared.get("/api/admin/invites") {
                 invites = inv.invites
                 registrationMode = inv.mode ?? "invite"

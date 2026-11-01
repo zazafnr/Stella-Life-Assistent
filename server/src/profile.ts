@@ -4,9 +4,12 @@
 import { FEATURES, profileHas, profileIsLearner, profileIsSchool, SITUATIONS, AGE_GROUPS, type Feature, type UserProfile } from '@stella/shared';
 import { getUser, updateUserSettings, type User } from './db.ts';
 import { HttpError } from './auth.ts';
+import { config } from './config.ts';
 import { addMemory } from './memory.ts';
 
-export const hasFeature = (user: User, f: Feature) => profileHas(user.settings.profile, f);
+/** Serverweit abgeschaltete Funktionen (config.features) sind für niemanden sichtbar, egal was das Profil sagt. */
+export const featureEnabled = (f: Feature) => f !== 'finance' || config.features.finance;
+export const hasFeature = (user: User, f: Feature) => featureEnabled(f) && profileHas(user.settings.profile, f);
 export const isSchool = (user: User) => profileIsSchool(user.settings.profile);
 /** Schule oder Studium: Tests, Lerneinheiten, Lernpläne */
 export const isLearner = (user: User) => profileIsLearner(user.settings.profile);
@@ -70,16 +73,19 @@ export function skipProfile(user: User): User {
   return applyProfile(user, { situation: 'other', features: ['mails', 'planner', 'shopping', 'goals', 'health'] });
 }
 
-/** Ein Satz für KI-Prompts: wer der Nutzer ist (Schule, Studium, Job …) */
+/** Ein Satz für KI-Prompts (englisch): wer der Nutzer ist (Schule, Studium, Job …) */
 export function describeUser(user: User): string {
   const p = user.settings.profile;
   const name = user.name;
-  if (!p || p.situation === 'school') return `${name} geht in Österreich zur Schule${p?.school?.level ? ` (${p.school.level})` : ''}.`;
-  if (p.situation === 'university') return `${name} studiert${p.university?.name ? ` (${p.university.name})` : ''}.`;
-  if (p.situation === 'work') return `${name} arbeitet${p.workHours ? ` (${p.workHours.start}–${p.workHours.end})` : ''}.`;
-  if (p.situation === 'apprenticeship') return `${name} macht eine Lehre.`;
-  return `${name} steht mitten im Alltag.`;
+  const country = user.settings.country ? ` in ${COUNTRY_NAMES[user.settings.country] ?? user.settings.country}` : '';
+  if (!p || p.situation === 'school') return `${name} goes to school${country}${p?.school?.level ? ` (${p.school.level})` : ''}.`;
+  if (p.situation === 'university') return `${name} is a university student${p.university?.name ? ` (${p.university.name})` : ''}.`;
+  if (p.situation === 'work') return `${name} works${p.workHours ? ` (${p.workHours.start}–${p.workHours.end})` : ''}.`;
+  if (p.situation === 'apprenticeship') return `${name} is doing an apprenticeship.`;
+  return `${name} is in the middle of everyday life.`;
 }
+
+const COUNTRY_NAMES: Record<string, string> = { AT: 'Austria', DE: 'Germany', CH: 'Switzerland', LI: 'Liechtenstein', IT: 'Italy', FR: 'France', ES: 'Spain', PT: 'Portugal', BR: 'Brazil', TR: 'Turkey', PL: 'Poland', GB: 'the UK', IE: 'Ireland', US: 'the US', CA: 'Canada', AU: 'Australia', MX: 'Mexico', AR: 'Argentina' };
 
 /** Kurzform für „einen Schüler“ / „eine Person“ in Aufgaben-Prompts (z. B. Mails sortieren) */
 export function whoIs(user: User): string {

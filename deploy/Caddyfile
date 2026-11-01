@@ -2,3 +2,15 @@
 	encode zstd gzip
 	reverse_proxy stella:8787
 }
+
+# Anmelde-Links aus den Mails (login.<domain>): nur die Link-Seite und die Apple-Datei
+login.{$STELLA_DOMAIN} {
+	encode zstd gzip
+	@link path /v/* /.well-known/apple-app-site-association
+	handle @link {
+		reverse_proxy stella:8787
+	}
+	handle {
+		respond "Not found" 404
+	}
+}

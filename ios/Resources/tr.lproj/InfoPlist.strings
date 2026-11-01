@@ -1,0 +1,6 @@
+/* ERZEUGT von scripts/gen-infoplist.ts – nicht von Hand ändern. */
+"NSCameraUsageDescription" = "Stella okuyabilsin diye çalışma kâğıtlarının ve defter notlarının fotoğrafını çek.";
+"NSPhotoLibraryUsageDescription" = "Stella için çalışma kâğıtlarının fotoğraflarını seç.";
+"NSMotionUsageDescription" = "Stella günlük hedefin için adımlarını sayar.";
+"NSMicrophoneUsageDescription" = "Stella, yazmak zorunda kalmaman için sesli mesajlarını kaydeder.";
+"NSLocationWhenInUseUsageDescription" = "Stella konumunu yalnızca uygulamayı kullandığın sürece kullanır: işlerin için yakındaki dükkânları ve eczaneleri göstermek, restoran bulup rezervasyon hazırlamak ve sabah özetine hava durumu ile yerel haberleri eklemek için. Tam konumun saklanmaz.";

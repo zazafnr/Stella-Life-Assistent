@@ -42,10 +42,41 @@ struct SettingsView: View {
                     }
 
                     Section {
+                        Picker(L("settings.language"), selection: Binding(
+                            get: { I18n.shared.locale },
+                            set: { l in I18n.shared.set(l); Task { await save(["locale": .string(l)]) } })) {
+                            ForEach(I18n.supported, id: \.self) { l in Text(I18n.names[l] ?? l).tag(l) }
+                        }
+                        Picker(L("settings.weatherAnim"), selection: Binding(
+                            get: { WeatherService.shared.animMode },
+                            set: { WeatherService.shared.animMode = $0 })) {
+                            ForEach(["on", "calm", "off"], id: \.self) { m in Text(L("settings.weatherAnim.\(m)")).tag(m) }
+                        }
+                    } header: {
+                        Text(L("settings.languageTitle"))
+                    } footer: {
+                        Text(L("settings.languageSub"))
+                    }
+
+                    Section {
+                        NavigationLink { NewsSettingsView() } label: {
+                            row(L("settings.news.title"), symbol: "newspaper.fill", tint: Theme.pink, detail: L("settings.news.sub"))
+                        }
+                    }
+
+                    if me.flags?.telegram == true {
+                        Section {
+                            NavigationLink { TelegramView() } label: {
+                                row(L("settings.telegram.title"), symbol: "paperplane.fill", tint: Theme.blue, detail: L("settings.telegram.sub"))
+                            }
+                        }
+                    }
+
+                    Section {
                         Button { store.onboardingRequest = .situation } label: {
                             row("Profil", symbol: "person.crop.circle", tint: Theme.pink, detail: Self.profileSummary(me))
                         }
-                        Button { store.onboardingRequest = .welcome } label: {
+                        Button { store.onboardingRequest = .language } label: {
                             row("Einführung wiederholen", symbol: "sparkles", tint: Theme.blue, detail: nil)
                         }
                     } header: {
@@ -171,10 +202,32 @@ struct SettingsView: View {
                             NavigationLink { ServerKeysView() } label: {
                                 row("Schlüssel & Absender", symbol: "key.horizontal", tint: Theme.blue, detail: nil)
                             }
+                            Picker("Wetter erzwingen", selection: Binding(
+                                get: { WeatherService.shared.forced ?? "" },
+                                set: { WeatherService.shared.forced = $0.isEmpty ? nil : $0 })) {
+                                Text("Aus (echtes Wetter)").tag("")
+                                ForEach(WeatherState.types, id: \.self) { t in
+                                    Text("\(t) · Tag").tag(t)
+                                    Text("\(t) · Nacht").tag("\(t):night")
+                                }
+                            }
                         } header: {
                             Text("Server")
                         } footer: {
-                            Text("Groq, OpenRouter und der Mail-Absender für Bestätigungs-Codes – nur für dich als Owner sichtbar.")
+                            Text("Groq, OpenRouter und der Mail-Absender für Bestätigungs-Codes – nur für dich als Owner sichtbar. „Wetter erzwingen“ zeigt auf diesem Gerät immer das gewählte Wetter (für Screenshots und Abnahme).")
+                        }
+                    }
+
+                    if let ai, let claude = ai.claude, claude.configured {
+                        Section {
+                            row("Alltag", symbol: "bolt.fill", tint: Theme.blue, detail: claude.light)
+                            row("Schwere Aufgaben", symbol: "brain", tint: Theme.pink, detail: claude.heavy)
+                            if let cost = ai.cost {
+                                row("Kosten heute", symbol: "eurosign.circle.fill", tint: Theme.green, detail: String(format: "%.2f €", cost.today.totalMicroUsd / 1e6 * cost.eurPerUsd))
+                                row("Kosten diesen Monat", symbol: "calendar", tint: Theme.green, detail: String(format: "%.2f €", cost.month.totalMicroUsd / 1e6 * cost.eurPerUsd))
+                            }
+                        } header: {
+                            Text("Claude")
                         }
                     }
 
@@ -414,7 +467,7 @@ struct TonePicker: View {
                                 .font(.system(size: 30))
                                 .scaleEffect(on ? 1.18 : 1)
                                 .rotationEffect(.degrees(on ? -6 : 0))
-                            Text(tone.label)
+                            Text(L("tone.\(tone.rawValue)"))
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(Theme.text)
                         }
@@ -427,7 +480,7 @@ struct TonePicker: View {
                     .accessibilityAddTraits(on ? .isSelected : [])
                 }
             }
-            Text("„\(current.example)“")
+            Text("„\(L("tone.\(current.rawValue).example"))“")
                 .font(.system(size: 14).italic())
                 .foregroundStyle(Theme.muted)
                 .id(current)

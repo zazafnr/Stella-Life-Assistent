@@ -6,6 +6,10 @@ struct Attachment: Codable, Hashable, Identifiable {
     var id: String
     var kind: String
     var caption: String?
+    /** Sprachnachricht: Länge in Sekunden, Rohtext von Whisper und aufgeräumter Text */
+    var duration: Int?
+    var transcriptRaw: String?
+    var transcript: String?
 }
 
 struct PlaceRef: Codable, Hashable {
@@ -54,6 +58,8 @@ struct ChatMessage: Codable, Hashable, Identifiable {
     var failedAudioId: String?
     /** Karte unter der Nachricht, z. B. „Läden in der Nähe“ */
     var card: MessageCard?
+    /** kam über diesen Kanal herein bzw. ging dorthin: "telegram" (kleines Symbol) */
+    var via: String?
 
     var isUser: Bool { role == "user" }
 }
@@ -149,6 +155,7 @@ struct QuickActions: Codable {
 
 /** Karte unter einer Stella-Nachricht (derzeit: Läden in der Nähe) */
 struct MessageCard: Codable, Hashable {
+    /** "places", "spending" oder "news_ask" (Frage am ersten Tag) */
     var type: String
     /** Läden-Karte */
     var category: String?
@@ -159,6 +166,83 @@ struct MessageCard: Codable, Hashable {
     var totalCents: Int?
     var count: Int?
     var categories: [SpendingLine]?
+    /** Restaurant-Karte */
+    var when: String?
+    var people: Int?
+    var restaurants: [RestaurantItem]?
+    /** Verfügbarkeits-Karte */
+    var product: String?
+    var checkedAt: String?
+    var availability: [AvailabilityEntry]?
+
+    enum CodingKeys: String, CodingKey { case type, category, label, itemId, currency, totalCents, count, categories, when, people, items, product, checkedAt }
+
+    // Karten ohne Beschriftung (news_ask) sollen nicht am Decodieren scheitern
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        type = try c.decode(String.self, forKey: .type)
+        category = try c.decodeIfPresent(String.self, forKey: .category)
+        label = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
+        itemId = try c.decodeIfPresent(String.self, forKey: .itemId)
+        currency = try c.decodeIfPresent(String.self, forKey: .currency)
+        totalCents = try c.decodeIfPresent(Int.self, forKey: .totalCents)
+        count = try c.decodeIfPresent(Int.self, forKey: .count)
+        categories = try c.decodeIfPresent([SpendingLine].self, forKey: .categories)
+        when = try c.decodeIfPresent(String.self, forKey: .when)
+        people = try c.decodeIfPresent(Int.self, forKey: .people)
+        product = try c.decodeIfPresent(String.self, forKey: .product)
+        checkedAt = try c.decodeIfPresent(String.self, forKey: .checkedAt)
+        // „items“ heißt in beiden Karten gleich, hat aber je Art einen anderen Inhalt
+        if type == "restaurants" { restaurants = try c.decodeIfPresent([RestaurantItem].self, forKey: .items) }
+        if type == "availability" { availability = try c.decodeIfPresent([AvailabilityEntry].self, forKey: .items) }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(type, forKey: .type)
+        try c.encodeIfPresent(category, forKey: .category)
+        try c.encode(label, forKey: .label)
+        try c.encodeIfPresent(itemId, forKey: .itemId)
+        try c.encodeIfPresent(currency, forKey: .currency)
+        try c.encodeIfPresent(totalCents, forKey: .totalCents)
+        try c.encodeIfPresent(count, forKey: .count)
+        try c.encodeIfPresent(categories, forKey: .categories)
+        try c.encodeIfPresent(when, forKey: .when)
+        try c.encodeIfPresent(people, forKey: .people)
+        try c.encodeIfPresent(product, forKey: .product)
+        try c.encodeIfPresent(checkedAt, forKey: .checkedAt)
+        if let restaurants { try c.encode(restaurants, forKey: .items) }
+        if let availability { try c.encode(availability, forKey: .items) }
+    }
+}
+
+/** Ein Vorschlag auf der Restaurant-Karte */
+struct RestaurantItem: Codable, Hashable, Identifiable {
+    var id: String
+    var name: String
+    var kind: String
+    var cuisine: [String]
+    var distanceM: Int
+    var openNow: Bool?
+    var openingHours: String?
+    var address: String?
+    var phone: String?
+    var website: String?
+    var appleMapsUrl: String
+    var bookingUrl: String?
+    var bookingService: String?
+}
+
+/** Ein Händler auf der Verfügbarkeits-Karte */
+struct AvailabilityEntry: Codable, Hashable, Identifiable {
+    var retailer: String
+    var store: String?
+    var status: String
+    var source: String
+    var url: String?
+    var phone: String?
+    var note: String?
+    var id: String { retailer + (store ?? "") }
 }
 
 struct SpendingLine: Codable, Hashable {
@@ -405,6 +489,26 @@ struct UserSettings: Codable, Hashable {
     var profile: UserProfile?
     /** "pending": die Einführung kommt beim nächsten Öffnen; "done": erledigt oder übersprungen */
     var onboarding: String?
+    /** Sprache der Oberfläche (en, de, es, fr, it, pt-BR, tr, pl) und Land (ISO-3166) */
+    var locale: String?
+    var country: String?
+    /** Standort aus der Einführung: "granted", "denied" oder "later" */
+    var locationPermission: String?
+    /** Wer benachrichtigt werden will, wenn FreeNotes startet */
+    var notify: NotifySettings?
+    /** Wohin Stella von sich aus schreibt: "push" und/oder "telegram" */
+    var notifyVia: [String]?
+    /** News im Briefing */
+    var news: NewsPrefs?
+}
+
+struct NewsPrefs: Codable, Hashable {
+    var enabled: Bool?
+    var asked: Bool?
+}
+
+struct NotifySettings: Codable, Hashable {
+    var freenotes: Bool?
 }
 
 /** Ein Block im Wochenplan-Vorschlag */
@@ -454,6 +558,16 @@ struct BriefingSection: Codable, Hashable, Identifiable {
     var lines: [String]
 }
 
+/** Eine Meldung im Briefing: ein neutraler Satz, die Quelle und der Link zum Artikel */
+struct NewsEntry: Codable, Hashable, Identifiable {
+    var sentence: String
+    var source: String
+    var url: String
+    var publishedAt: String
+    var favorite: Bool?
+    var id: String { url }
+}
+
 struct Briefing: Codable {
     var date: String
     var greeting: String
@@ -463,6 +577,7 @@ struct Briefing: Codable {
     var text: String
     var time: String?
     var sent: Bool
+    var news: [NewsEntry]?
 }
 
 enum Tone: String, CaseIterable, Identifiable {
@@ -521,6 +636,14 @@ struct Integrations: Codable, Hashable {
     var googleSignIn: Bool?
 }
 
+struct ServerFlags: Codable, Hashable {
+    var finance: Bool?
+    /** Download-Link von FreeNotes, sobald es die App gibt */
+    var freenotesUrl: String?
+    /** Telegram-Bot ist auf dem Server eingerichtet */
+    var telegram: Bool?
+}
+
 struct Me: Codable, Hashable {
     var id: String
     var name: String
@@ -531,11 +654,15 @@ struct Me: Codable, Hashable {
     var integrations: Integrations
     /** der erste Nutzer ist "owner" und sieht „Server“ in den Einstellungen */
     var role: String?
+    /** serverweite Funktions-Schalter (z. B. Finanzen ausgeblendet) */
+    var flags: ServerFlags?
 
     var firstName: String { name.split(separator: " ").first.map(String.init) ?? name }
 
     /** Sieht dieses Profil die Funktion? Ohne Profil (ältere Konten) wie bisher – nur Finanzen braucht eine Einrichtung. */
     func has(_ feature: String) -> Bool {
+        // Finanzen ist serverseitig ausgeblendet, solange der Schalter aus ist (der Server entfernt sie auch aus dem Profil)
+        if feature == "finance" && flags?.finance != true { return false }
         guard let p = settings.profile else { return feature != "finance" }
         if feature == "homework" && p.situation != "school" { return false }
         return p.features.contains(feature)
@@ -655,6 +782,26 @@ struct AIStatus: Codable {
     var configured: Bool
     var usedToday: Int
     var dailyLimit: Int
+    var claude: ClaudeStatus?
+    var cost: AICost?
+}
+
+struct ClaudeStatus: Codable {
+    var configured: Bool
+    var light: String
+    var heavy: String
+    var allowFreeFallback: Bool?
+}
+
+struct AICostSummary: Codable {
+    var totalMicroUsd: Double
+    var requests: Int
+}
+
+struct AICost: Codable {
+    var today: AICostSummary
+    var month: AICostSummary
+    var eurPerUsd: Double
 }
 
 struct OK: Codable { var ok: Bool? }

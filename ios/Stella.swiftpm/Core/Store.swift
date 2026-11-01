@@ -82,10 +82,10 @@ final class Store {
     /** Gibt die E-Mail-Adresse zurück, wenn erst ein Code aus der Bestätigungs-Mail eingegeben werden muss */
     @discardableResult
     func authenticate(register: Bool, name: String, email: String, password: String, invite: String = "") async throws -> String? {
-        struct Body: Encodable { var name: String; var email: String; var password: String; var device: String; var timeZone: String; var invite: String }
+        struct Body: Encodable { var name: String; var email: String; var password: String; var device: String; var timeZone: String; var invite: String; var locale: String }
         let body = Body(name: name, email: email, password: password,
                         device: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone",
-                        timeZone: TimeZone.current.identifier, invite: invite)
+                        timeZone: TimeZone.current.identifier, invite: invite, locale: I18n.shared.locale)
         let res: SignupResponse = try await api.send("POST", register ? "/api/auth/register" : "/api/auth/login", body: body)
         if res.needsVerification == true { return res.email ?? email }
         guard let token = res.token, let user = res.user else { throw APIError(message: "Antwort vom Server nicht verstanden", status: -1) }
@@ -98,6 +98,27 @@ final class Store {
         let res: AuthResponse = try await api.send("POST", "/api/auth/verify",
             body: Body(email: email, code: code, device: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"))
         await beginSession(token: res.token, user: res.user)
+    }
+
+    /// „Mit E-Mail-Link anmelden“ bzw. „Passwort vergessen“: Link per Mail anfordern (Antwort ist immer gleich)
+    func requestLink(email: String, reset: Bool) async throws {
+        struct Body: Encodable { var email: String; var purpose: String; var locale: String }
+        _ = try await api.send("POST", "/api/auth/link/request", body: Body(email: email, purpose: reset ? "reset" : "login", locale: I18n.shared.locale), as: OK.self)
+    }
+
+    /// Code vom Link, der auf einem anderen Gerät bzw. im Browser geöffnet wurde. Gibt den Zweck zurück ("login", "reset", "signup").
+    func verifyLinkCode(email: String, code: String) async throws -> String {
+        struct Body: Encodable { var email: String; var code: String; var device: String }
+        struct Res: Decodable { var token: String; var user: Me; var purpose: String? }
+        let res: Res = try await api.send("POST", "/api/auth/link/code",
+            body: Body(email: email, code: code, device: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"))
+        await beginSession(token: res.token, user: res.user)
+        return res.purpose ?? "login"
+    }
+
+    func setPassword(_ password: String) async throws {
+        struct Body: Encodable { var password: String }
+        _ = try await api.send("PUT", "/api/me/password", body: Body(password: password), as: OK.self)
     }
 
     func resendCode(email: String) async throws {
@@ -131,7 +152,7 @@ final class Store {
 
     /** Einführung auf Wunsch (Einstellungen) – die erste kommt von selbst, solange `onboarding` auf „pending“ steht */
     var onboardingRequest: OnboardingStart?
-    var activeOnboarding: OnboardingStart? { onboardingRequest ?? (me?.settings.onboarding == "pending" ? .welcome : nil) }
+    var activeOnboarding: OnboardingStart? { onboardingRequest ?? (me?.settings.onboarding == "pending" ? .language : nil) }
 
     func logout() async {
         _ = try? await api.send("POST", "/api/auth/logout", as: OK.self)
@@ -520,6 +541,7 @@ enum SettingValue: Encodable {
     case string(String)
     case int(Int)
     case bool(Bool)
+    case strings([String])
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.singleValueContainer()
@@ -527,6 +549,7 @@ enum SettingValue: Encodable {
         case .string(let v): try c.encode(v)
         case .int(let v): try c.encode(v)
         case .bool(let v): try c.encode(v)
+        case .strings(let v): try c.encode(v)
         }
     }
 }
@@ -538,6 +561,6 @@ enum Haptics {
 
 /** Wo die Einführung beginnt: ganz vorn oder – zum Bearbeiten des Profils – bei „Was trifft auf dich zu?“ */
 enum OnboardingStart: String, Identifiable {
-    case welcome, situation
+    case language, situation
     var id: String { rawValue }
 }

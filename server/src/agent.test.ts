@@ -111,7 +111,7 @@ test('freie Frage → KI ruft Werkzeug auf → Termin im Planer, Ausweichen bei 
   assert.ok(calls.some((c) => c.model === 'busy/model:free'));
   assert.ok(calls.some((c) => c.model === 'good/model:free'));
   // Systemprompt enthält das heutige Datum, damit die KI rechnen kann
-  assert.match(calls.at(-1)!.messages[0].content, /Jetzt: .*Uhr/);
+  assert.match(calls.at(-1)!.messages[0].content, /Now: .*\d\d:\d\d/);
 });
 
 test('HÜ-Autopilot: Foto → gelöst, in Handschrift, erledigt, Vorabend-Info statt Erinnerung', async () => {

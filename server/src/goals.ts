@@ -11,7 +11,7 @@ import { isoWeekday } from './context.ts';
 import { addMessage, db, getUser, newId, notifyOnce, now, type User } from './db.ts';
 import { complete, groqAvailable, llmAvailable } from './llm.ts';
 import { hasFeature } from './profile.ts';
-import { pushToUser } from './push.ts';
+import { notify } from './channels/deliver.ts';
 
 type Row = { id: string; title: string; why: string | null; metric: string; unit: string; target: number; cadence: string; minutes: number | null; check_in: string | null; status: string; created_at: string };
 const toGoal = (r: Row): Goal => ({
@@ -261,7 +261,7 @@ export async function sendGoalCheckIns(userId: string) {
     if (!checkInDue(g, today, nowHhmm) || !notifyOnce(userId, `goal-checkin:${g.id}:${today}`)) continue;
     const text = checkInText(user, progress(user, g, today));
     addMessage(userId, 'assistant', text);
-    await pushToUser(userId, { title: 'Stella', body: text.replace(/\*\*/g, ''), tag: `goal-${g.id}` });
+    await notify(userId, { title: 'Stella', body: text.replace(/\*\*/g, ''), text, tag: `goal-${g.id}` });
   }
 }
 

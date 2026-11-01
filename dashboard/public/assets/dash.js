@@ -78,6 +78,8 @@
     if (!t) { view('login'); return; }
     $('load-err').textContent = '';
     document.body.classList.add('busy');
+    mailUi();
+    subsUi();
     fetch(API + '/api/admin/overview?days=' + days, { headers: { authorization: 'Bearer ' + t } })
       .then(function (r) {
         if (r.status === 401 || r.status === 403) { signOut('Your session has ended. Please sign in again.'); return null; }
@@ -218,6 +220,86 @@
     var last = pts[pts.length - 1]; c.appendChild(svg('circle', { cx: last[0], cy: last[1], r: 4, fill: 'var(--c1)' }));
     ticks(c, series, L, W - step, H, n);
   }
+
+  // ---------- Abos: Nutzer pro Abo, Kosten pro Nutzer, Marge ----------
+  var eur = function (n) { return Number(n || 0).toLocaleString('en-US', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 }); };
+  var PLAN = { free: 'Free', plus: 'Plus', pro: 'Pro', max: 'Max' };
+  function subsUi() {
+    var t = currentToken();
+    if (!t) return;
+    fetch(API + '/api/admin/billing-overview?days=' + days, { headers: { authorization: 'Bearer ' + t } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (b) {
+        if (!b) return;
+        $('sub-hint').textContent = 'Last ' + b.days + ' days · cost per user is AI usage in euros; margin is per month after tax and Stripe fees';
+        var tiles = $('sub-tiles'); clear(tiles);
+        var paying = 0, users = 0; b.plans.forEach(function (p) { paying += p.paying; users += p.users; });
+        tiles.appendChild(tile('Monthly revenue', eur(b.mrrCents / 100), ['from ' + paying + ' paying']));
+        tiles.appendChild(tile('AI cost', eur(b.totalCostEur), ['last ' + b.days + ' days']));
+        tiles.appendChild(tile('Paying', fmt(paying), [users ? Math.round(paying / users * 100) + ' % of ' + fmt(users) + ' accounts' : '–']));
+        var body = $('sub-plans'); clear(body);
+        b.plans.forEach(function (p) {
+          var tr = document.createElement('tr');
+          [PLAN[p.plan] || p.plan, fmt(p.users), fmt(p.paying), eur(p.avgCostEur), eur(p.p95CostEur), eur(p.marginPerUserEur)].forEach(function (v, i) {
+            var td = el('td', v, i ? 'n' : null);
+            if (i === 5 && p.marginPerUserEur < 0) td.className = 'n bad';
+            tr.appendChild(td);
+          });
+          body.appendChild(tr);
+        });
+        var top = $('sub-top'); clear(top);
+        if (!b.topUsers.length) { var r0 = document.createElement('tr'); var c0 = el('td', 'No usage yet.', 'empty'); c0.colSpan = 4; r0.appendChild(c0); top.appendChild(r0); }
+        b.topUsers.forEach(function (u) {
+          var tr = document.createElement('tr');
+          [String(u.rank), u.name, PLAN[u.plan] || u.plan, eur(u.costEur)].forEach(function (v, i) { tr.appendChild(el('td', v, i === 3 ? 'n' : null)); });
+          top.appendChild(tr);
+        });
+      }).catch(function () { /* nur Owner sehen die Abos */ });
+  }
+  subsUi();
+
+  // ---------- E-Mail-Vorschau: alle Vorlagen mit Beispieldaten, hell/dunkel, Desktop/Handy ----------
+  var mail = { template: 'verify-signup', locale: 'en', ready: false };
+  function mailUi() {
+    var t = currentToken();
+    if (!t || mail.ready) return;
+    fetch(API + '/api/admin/mail-preview', { headers: { authorization: 'Bearer ' + t } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (list) {
+        if (!list) return;
+        mail.ready = true;
+        var tpl = $('mail-templates'), loc = $('mail-locales');
+        list.templates.forEach(function (name) {
+          var b = el('button', name, null); b.type = 'button'; b.setAttribute('aria-pressed', String(name === mail.template));
+          b.addEventListener('click', function () { mail.template = name; Array.prototype.forEach.call(tpl.children, function (x) { x.setAttribute('aria-pressed', String(x === b)); }); mailShow(); });
+          tpl.appendChild(b);
+        });
+        list.locales.forEach(function (l) {
+          var b = el('button', l, null); b.type = 'button'; b.setAttribute('aria-pressed', String(l === mail.locale));
+          b.addEventListener('click', function () { mail.locale = l; Array.prototype.forEach.call(loc.children, function (x) { x.setAttribute('aria-pressed', String(x === b)); }); mailShow(); });
+          loc.appendChild(b);
+        });
+        mailShow();
+      }).catch(function () { /* nur Owner sehen die Vorschau */ });
+  }
+  function mailShow() {
+    var t = currentToken();
+    fetch(API + '/api/admin/mail-preview/' + mail.template + '?format=json&locale=' + mail.locale, { headers: { authorization: 'Bearer ' + t } })
+      .then(function (r) { return r.json(); })
+      .then(function (m) {
+        var grid = $('mail-grid'); clear(grid);
+        // Dunkel erzwingen: die Vorlage fragt prefers-color-scheme – im Vorschau-Rahmen ersetzen wir die Bedingung
+        var dark = m.html.replace('@media (prefers-color-scheme: dark)', '@media all');
+        var light = m.html.replace('@media (prefers-color-scheme: dark)', '@media not all');
+        [['Desktop · light', light, 640], ['Desktop · dark', dark, 640], ['Phone · light', light, 375], ['Phone · dark', dark, 375]].forEach(function (v) {
+          var fig = el('figure', null, null), cap = el('figcaption', v[0], null), fr = document.createElement('iframe');
+          fr.title = v[0]; fr.setAttribute('sandbox', ''); fr.srcdoc = v[1];
+          if (v[2] === 375) { fr.style.maxWidth = '375px'; }
+          fig.appendChild(cap); fig.appendChild(fr); grid.appendChild(fig);
+        });
+      });
+  }
+  mailUi();
 
   // Beim Neuladen: gespeicherte Sitzung weiterverwenden, sonst Anmeldung
   if (token()) { view('dash'); load(); } else { view('login'); }

@@ -16,7 +16,9 @@ import { fetchBookPage } from './books.ts';
 import { advanceRecurring } from './planner.ts';
 import { solveHomework } from './homework.ts';
 import { sendGoalCheckIns } from './goals.ts';
-import { pushToUser } from './push.ts';
+import { notify } from './channels/deliver.ts';
+import { fetchAllFeeds } from './news/store.ts';
+import { maybeAskNews } from './news/ask.ts';
 
 type ReminderRow = { id: string; user_id: string; item_id: string | null; message: string; with_attachments: number; always: number };
 type JobRow = { id: string; user_id: string; type: string; payload: string; attempts: number };
@@ -46,7 +48,7 @@ export async function sendDueReminders() {
     // Erledigung mit Ort: eine Karte „Läden in der Nähe“ – der Standort wird erst beim Öffnen und nur einmal abgefragt
     const card = item?.place ? { type: 'places' as const, category: item.place.category, label: item.place.label, itemId: item.id } : undefined;
     addMessage(r.user_id, 'assistant', text, { attachments, card });
-    await pushToUser(r.user_id, { title: 'Stella', body: r.message, url: '/', tag: r.item_id ?? r.id });
+    await notify(r.user_id, { title: 'Stella', body: r.message, url: '/', tag: r.item_id ?? r.id });
     // Dauerauftrag: die nächste Erinnerung gleich anlegen
     const owner = item?.recurrence ? getUser(r.user_id) : null;
     if (item && owner) advanceRecurring(owner, item);
@@ -87,7 +89,10 @@ async function every(key: string, ms: number, fn: () => Promise<void>) {
 
 async function periodic() {
   await every('mail-bodies', 6 * 3600_000, async () => { purgeMailBodies(); }).catch((err) => console.warn('Mail-Cache:', err.message));
+  // Nachrichten: alle 30 Minuten zentral für alle Nutzer
+  await every('news-feeds', 30 * 60_000, async () => { await fetchAllFeeds(); }).catch((err) => console.warn('News:', err.message));
   for (const userId of allUserIds()) {
+    await every(`news-ask:${userId}`, 10 * 60_000, async () => { await maybeAskNews(userId); }).catch((err) => console.warn('News-Frage:', err.message));
     if (listAccounts(userId).length) {
       await every(`mail:${userId}`, 5 * 60_000, () => checkAllMail(userId)).catch((err) => console.warn('Mail:', err.message));
     }

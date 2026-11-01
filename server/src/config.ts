@@ -13,6 +13,33 @@ export const config = {
   secret: env.STELLA_SECRET ?? '',
   /** Nach dem ersten Konto weitere Registrierungen erlauben? */
   allowRegistration: env.STELLA_ALLOW_REGISTRATION === 'true',
+  /** Absender-Angaben im Fuß jeder Mail (Pflicht für geschäftliche Mails in AT/DE) */
+  mail: {
+    /** Firmenadresse im Mail-Fuß – bitte in der Server-Umgebung (STELLA_COMPANY_ADDRESS) eintragen */
+    company: env.STELLA_COMPANY_ADDRESS ?? 'EVOLSIOR',
+    imprintUrl: env.STELLA_IMPRINT_URL ?? 'https://evolsior.com/imprint',
+    privacyUrl: env.STELLA_PRIVACY_URL ?? 'https://evolsior.com/privacy',
+    /** Hier liegen die Bilder der Mails (web/public/mail wird mit der Web-App ausgeliefert) */
+    assetsUrl: env.STELLA_MAIL_ASSETS_URL ?? 'https://stella.evolsior.com/mail',
+  },
+  /** Adresse der Anmelde-Links aus den Mails (eigener Name auf demselben Server: login.stella.evolsior.com) */
+  loginUrl: env.STELLA_LOGIN_URL ?? env.STELLA_PUBLIC_URL ?? `http://localhost:${env.PORT ?? 8787}`,
+  /** Cookie-Domain für das wartende Gerät; leer = aus loginUrl ableiten (stella.evolsior.com) */
+  loginCookieDomain: env.STELLA_LOGIN_COOKIE_DOMAIN ?? '',
+  /** Apple-Team-ID für Universal Links (apple-app-site-association); leer = aus */
+  appleTeamId: env.STELLA_APPLE_TEAM_ID ?? '',
+  /** Stripe (Bezahlung der Abos). Schlüssel stehen verschlüsselt in den Server-Einstellungen, nicht hier. */
+  stripe: {
+    baseUrl: env.STRIPE_BASE_URL ?? 'https://api.stripe.com',
+    /** Stripe Tax: Umsatzsteuer je EU-Land (OSS) automatisch */
+    automaticTax: env.STELLA_STRIPE_TAX !== 'false',
+    /** Steuer-Code „Software as a Service“ */
+    taxCode: env.STELLA_STRIPE_TAX_CODE ?? 'txcd_10103001',
+  },
+  /** Abo für Konten ohne eigenes Abo (Standard Free; der Owner bekommt immer Max; Tests setzen max) */
+  defaultPlan: env.STELLA_DEFAULT_PLAN ?? 'free',
+  /** Sprache für Konten ohne eigene Einstellung (Standard Englisch; Tests setzen Deutsch) */
+  defaultLocale: env.STELLA_DEFAULT_LOCALE ?? 'en',
   defaultTimeZone: env.STELLA_TIMEZONE ?? 'Europe/Vienna',
   openrouter: {
     apiKey: env.OPENROUTER_API_KEY ?? '',
@@ -44,10 +71,60 @@ export const config = {
       transcribe: env.GROQ_MODEL_TRANSCRIBE ?? 'whisper-large-v3-turbo',
     },
   },
+  /**
+   * Claude (Anthropic): Haiku 5.5 für fast alles, Sonnet 5.5 nur für schwere Aufgaben (mit Kontingent).
+   * Modellnamen und Preise stehen nur hier, damit man sie ohne Code-Änderung anpassen kann.
+   */
+  anthropic: {
+    apiKey: env.ANTHROPIC_API_KEY ?? '',
+    /** leer = https://api.anthropic.com; zum Testen auf einen Mock-Server */
+    baseUrl: env.ANTHROPIC_BASE_URL ?? '',
+    models: {
+      light: env.STELLA_CLAUDE_LIGHT ?? 'claude-haiku-5-5',
+      heavy: env.STELLA_CLAUDE_HEAVY ?? 'claude-sonnet-5-5',
+    },
+    /** strict: true an den Werkzeugen (gültige Argumente garantiert) */
+    strictTools: env.STELLA_CLAUDE_STRICT !== 'false',
+    /** Pause vor dem einen Wiederholungsversuch bei 429/5xx */
+    retryMs: Number(env.STELLA_CLAUDE_RETRY_MS ?? 1500),
+  },
+  /**
+   * Preise in US-Dollar je 1 Mio. Tokens (Stand Oktober 2026). Haiku hat über 100 000 Prompt-Tokens
+   * einen höheren Tarif (`long*`). Unbekannte Modelle kosten 0 und zählen nur die Tokens.
+   */
+  pricing: {
+    models: {
+      'claude-haiku-5-5': { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125, longInput: 0.5, longOutput: 2.5, longThreshold: 100_000 },
+      'claude-sonnet-5-5': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+    } as Record<string, { input: number; output: number; cacheRead?: number; cacheWrite?: number; longInput?: number; longOutput?: number; longThreshold?: number }>,
+    /** US-Dollar je Websuche des Claude-Server-Werkzeugs */
+    webSearch: 0.01,
+    /** Euro je Dollar für die Anzeige in Euro (Dashboard, Einstellungen) */
+    eurPerUsd: Number(env.STELLA_EUR_PER_USD ?? 0.92),
+  },
   /** "Mit Google anmelden" für Gmail – OAuth-Client aus der Google Cloud Console */
   google: {
     clientId: env.GOOGLE_CLIENT_ID ?? '',
     clientSecret: env.GOOGLE_CLIENT_SECRET ?? '',
+  },
+  /**
+   * Funktions-Schalter. Finanzen ist vorerst ausgeblendet (Code, Tabellen und Tests bleiben):
+   * mit STELLA_FEATURE_FINANCE=true wieder an.
+   */
+  /** Wetter (Open-Meteo, kostenlos ohne Key) und die IP-Ortsdatenbank DB-IP Lite (scripts/update-geoip.sh lädt sie monatlich) */
+  weather: {
+    baseUrl: env.STELLA_WEATHER_URL ?? 'https://api.open-meteo.com',
+    geoipDb: env.STELLA_GEOIP_DB ?? path.join(env.STELLA_DATA_DIR ?? path.join(import.meta.dirname, '../../data'), 'geoip/dbip-city-lite.mmdb'),
+  },
+  /** Telegram-Bot (Schlüssel unter Einstellungen → Server); `minGapMs`: höchstens eine Nachricht pro Sekunde und Chat */
+  telegram: {
+    baseUrl: env.TELEGRAM_BASE_URL ?? 'https://api.telegram.org',
+    minGapMs: Number(env.TELEGRAM_MIN_GAP_MS ?? 1000),
+  },
+  /** Download-Link von FreeNotes, sobald es die App gibt; leer = „Benachrichtige mich“ in der Einführung */
+  freenotesUrl: env.STELLA_FREENOTES_URL ?? '',
+  features: {
+    finance: env.STELLA_FEATURE_FINANCE === 'true',
   },
   webDist: path.resolve(import.meta.dirname, '../../web/dist'),
 };

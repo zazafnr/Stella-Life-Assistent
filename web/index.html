@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
@@ -29,6 +29,46 @@
       html[data-first] #boot > * { visibility: hidden; }
       @keyframes boot-hop { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-6px) rotate(10deg); } }
       @media (prefers-reduced-motion: reduce) { #boot .star { animation: none; } }
+
+      /* Wetter im Ladebildschirm (Paket 8): abgespeckte Fassung der Szene aus CSS, das Skript unten liest das gespeicherte Wetter */
+      #boot > .star, #boot > .name, #boot > .by { position: relative; z-index: 2; }
+      #boot .wx-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; }
+      #boot .wx-layer i { position: absolute; top: -30px; width: 1px; height: 16px; background: rgba(235, 243, 252, .55); transform: rotate(9deg); animation: wx-fall .8s linear infinite; }
+      #boot[data-wx=heavy_rain] .wx-layer i, #boot[data-wx=thunder] .wx-layer i { height: 22px; background: rgba(235, 243, 252, .6); }
+      #boot[data-wx=snow] .wx-layer i, #boot[data-wx=sleet] .wx-layer i { width: 5px; height: 5px; border-radius: 50%; background: rgba(255, 255, 255, .95); transform: none; animation-name: wx-snow; animation-timing-function: ease-in-out; }
+      #boot .wx-cloud { position: absolute; z-index: 1; width: 170px; height: 54px; border-radius: 50%; background: var(--wx-cloud, rgba(255, 255, 255, .85)); filter: blur(9px); animation: wx-drift 90s linear infinite; }
+      #boot[data-day='1'][data-wx=clear]::after { content: ''; position: absolute; right: -40px; top: -40px; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 244, 205, .95) 0%, rgba(255, 236, 190, .5) 28%, rgba(255, 236, 190, 0) 68%); z-index: 1; }
+      #boot[data-day='0'][data-wx=clear]::before, #boot[data-day='0'][data-wx=partly]::before { content: ''; position: absolute; inset: 0; z-index: 1;
+        background: radial-gradient(1.5px 1.5px at 12% 14%, #fff, transparent), radial-gradient(1px 1px at 28% 32%, #fff, transparent), radial-gradient(1.5px 1.5px at 44% 10%, #fff, transparent),
+          radial-gradient(1px 1px at 61% 24%, #fff, transparent), radial-gradient(1.5px 1.5px at 76% 12%, #fff, transparent), radial-gradient(1px 1px at 90% 30%, #fff, transparent),
+          radial-gradient(1px 1px at 20% 52%, #fff, transparent), radial-gradient(1.5px 1.5px at 52% 46%, #fff, transparent), radial-gradient(1px 1px at 84% 56%, #fff, transparent); animation: wx-twinkle 4s ease-in-out infinite; }
+      @keyframes wx-fall { to { transform: translate(40px, 112vh) rotate(9deg); } }
+      @keyframes wx-snow { 0% { transform: translate(0, 0); } 50% { transform: translate(18px, 56vh); } 100% { transform: translate(-6px, 112vh); } }
+      @keyframes wx-drift { from { transform: translateX(-220px); } to { transform: translateX(110vw); } }
+      @keyframes wx-twinkle { 0%, 100% { opacity: .9; } 50% { opacity: .55; } }
+      @media (prefers-reduced-motion: reduce) { #boot .wx-layer i, #boot .wx-cloud, #boot::before { animation: none; } }
+      /* wx:start – erzeugt von scripts/gen-boot-weather.ts, nicht von Hand ändern */
+      #boot[data-wx=clear][data-day='1'] { background: linear-gradient(180deg, #6DB3EE 0%, #EAF5FF 100%); }
+      #boot[data-wx=clear][data-day='0'] { background: linear-gradient(180deg, #060C24 0%, #1B2B55 100%); color: #F2F6FF; }
+      #boot[data-wx=partly][data-day='1'] { background: linear-gradient(180deg, #7DB6E8 0%, #E6F0F8 100%); }
+      #boot[data-wx=partly][data-day='0'] { background: linear-gradient(180deg, #0A1230 0%, #222F55 100%); color: #F2F6FF; }
+      #boot[data-wx=cloudy][data-day='1'] { background: linear-gradient(180deg, #A5B6C8 0%, #DDE3EA 100%); }
+      #boot[data-wx=cloudy][data-day='0'] { background: linear-gradient(180deg, #121A2E 0%, #2A3550 100%); color: #F2F6FF; }
+      #boot[data-wx=fog][data-day='1'] { background: linear-gradient(180deg, #C2CBD3 0%, #E8EBEE 100%); }
+      #boot[data-wx=fog][data-day='0'] { background: linear-gradient(180deg, #1B2233 0%, #3A4458 100%); color: #F2F6FF; }
+      #boot[data-wx=drizzle][data-day='1'] { background: linear-gradient(180deg, #94A6B9 0%, #C9D3DC 100%); }
+      #boot[data-wx=drizzle][data-day='0'] { background: linear-gradient(180deg, #101828 0%, #26324A 100%); color: #F2F6FF; }
+      #boot[data-wx=rain][data-day='1'] { background: linear-gradient(180deg, #8A9DB1 0%, #B7C4D0 100%); }
+      #boot[data-wx=rain][data-day='0'] { background: linear-gradient(180deg, #0E1626 0%, #243146 100%); color: #F2F6FF; }
+      #boot[data-wx=heavy_rain][data-day='1'] { background: linear-gradient(180deg, #3E4D60 0%, #55657A 100%); color: #F2F6FF; }
+      #boot[data-wx=heavy_rain][data-day='0'] { background: linear-gradient(180deg, #0A101C 0%, #1D283A 100%); color: #F2F6FF; }
+      #boot[data-wx=thunder][data-day='1'] { background: linear-gradient(180deg, #2F3A4C 0%, #4C5A6E 100%); color: #F2F6FF; }
+      #boot[data-wx=thunder][data-day='0'] { background: linear-gradient(180deg, #080D18 0%, #1A2232 100%); color: #F2F6FF; }
+      #boot[data-wx=snow][data-day='1'] { background: linear-gradient(180deg, #B6C7DA 0%, #E4EBF3 100%); }
+      #boot[data-wx=snow][data-day='0'] { background: linear-gradient(180deg, #1A2540 0%, #3A4A6B 100%); color: #F2F6FF; }
+      #boot[data-wx=sleet][data-day='1'] { background: linear-gradient(180deg, #A6B4C2 0%, #D3DAE0 100%); }
+      #boot[data-wx=sleet][data-day='0'] { background: linear-gradient(180deg, #141C30 0%, #2E3A54 100%); color: #F2F6FF; }
+      /* wx:end */
     </style>
     <script>
       try { if (!localStorage.getItem('evolsiorIntroShown')) document.documentElement.setAttribute('data-first', ''); } catch (e) {}
@@ -40,6 +80,45 @@
       <div class="name">Stella</div>
       <div class="by">by EVOLSIOR</div>
     </div>
+    <script>
+      /* Ladebildschirm mit dem zuletzt gespeicherten Wetter (localStorage). Dauert nur so lange wie das Laden; ohne Wetter bleibt alles beim Alten. */
+      (function () {
+        try {
+          if (localStorage.getItem('stella.weatherAnim') === 'off') return;
+          var f = JSON.parse(localStorage.getItem('stella.forceWeather') || 'null');
+          var w = JSON.parse(localStorage.getItem('stella.weather') || 'null');
+          var type = (f && f.type) || (w && w.type);
+          if (!type) return;
+          var day = f ? f.day !== false : !(w && w.day === false);
+          var b = document.getElementById('boot');
+          b.setAttribute('data-wx', type);
+          b.setAttribute('data-day', day ? '1' : '0');
+          var cloud = !day ? 'rgba(78,92,120,.8)' : /rain|thunder|sleet/.test(type) ? 'rgba(120,132,148,.85)' : type === 'cloudy' ? 'rgba(225,230,236,.9)' : 'rgba(255,255,255,.85)';
+          b.style.setProperty('--wx-cloud', cloud);
+          var layer = document.createElement('div');
+          layer.className = 'wx-layer';
+          var drops = { drizzle: 14, rain: 24, heavy_rain: 38, thunder: 38, snow: 22, sleet: 18 }[type] || 0;
+          var snowy = type === 'snow' || type === 'sleet';
+          for (var i = 0; i < drops; i++) {
+            var d = document.createElement('i');
+            d.style.left = Math.random() * 100 + '%';
+            d.style.animationDelay = -Math.random() * 3 + 's';
+            d.style.animationDuration = snowy ? 4 + Math.random() * 3 + 's' : 0.6 + Math.random() * 0.5 + 's';
+            layer.appendChild(d);
+          }
+          var clouds = { clear: 1, partly: 2, cloudy: 4, fog: 3, drizzle: 3, rain: 4, heavy_rain: 5, thunder: 5, snow: 3, sleet: 3 }[type] || 0;
+          for (var c = 0; c < clouds; c++) {
+            var el = document.createElement('div');
+            el.className = 'wx-cloud';
+            el.style.top = 6 + Math.random() * 34 + '%';
+            el.style.transform = 'scale(' + (0.7 + Math.random() * 0.9) + ')';
+            el.style.animationDelay = -Math.random() * 90 + 's';
+            b.insertBefore(el, b.firstChild);
+          }
+          b.insertBefore(layer, b.firstChild);
+        } catch (e) {}
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -5,14 +5,17 @@ import { Icon } from '../ui/Icon.tsx';
 import { showToast } from '../ui/Decor.tsx';
 import { ActionCard } from './ActionCard.tsx';
 import { Rich } from './Rich.tsx';
+import { NewsList } from './settings/News.tsx';
+import { useLocale } from '../i18n.ts';
 
-const ICON: Record<string, string> = { school: '🏫', due: '📌', plan: '🗓️', tomorrow: '🌙', done: '✅', inbox: '✉️', goals: '🎯', finance: '💶' };
+const ICON: Record<string, string> = { news: '📰', school: '🏫', due: '📌', plan: '🗓️', tomorrow: '🌙', done: '✅', inbox: '✉️', goals: '🎯', finance: '💶' };
 
 /** Oben auf „Heute“: morgens der Überblick, den ganzen Tag „Mir ist aufgefallen“ */
 export function BriefingCard({ onOpen }: { onOpen: (tab: 'chat' | 'inbox' | 'goals' | 'finance') => void }) {
   const lastSync = useStore((s) => s.lastSync);
   const [b, setB] = useState<Briefing | null>(null);
   const [gone, setGone] = useState<string[]>([]);
+  const locale = useLocale();
 
   useEffect(() => { api<Briefing>('/api/briefing').then(setB).catch(() => {}); }, [lastSync]);
   if (!b) return null;
@@ -33,7 +36,7 @@ export function BriefingCard({ onOpen }: { onOpen: (tab: 'chat' | 'inbox' | 'goa
                 <span className="briefing-icon" aria-hidden="true">{ICON[s.id] ?? '•'}</span>
                 <div>
                   <span className="briefing-title">{s.title}</span>
-                  {s.lines.map((l, i) => <span key={i} className="briefing-line">{l}</span>)}
+                  {s.id === 'news' && b.news?.length ? <NewsList items={b.news} locale={locale} /> : s.lines.map((l, i) => <span key={i} className="briefing-line">{l}</span>)}
                 </div>
               </div>
             ))}

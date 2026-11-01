@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { ScreenTimeCard } from './ScreenTime.tsx';
 import { formatDateDe, todayIn, type GoalProgress } from '@stella/shared';
 import { api, useStore } from '../store.ts';
 import { Icon } from '../ui/Icon.tsx';
@@ -276,6 +277,7 @@ export function Goals() {
           </section>
         )}
         {active.map((g) => <GoalCard key={g.id} goal={g} tz={tz} onChange={upsert} onRemoved={(id) => setGoals((gs) => (gs ?? []).filter((x) => x.id !== id))} />)}
+        <ScreenTimeCard />
         {rest.length > 0 && <span className="eyebrow">Pausiert und erreicht</span>}
         {rest.map((g) => <GoalCard key={g.id} goal={g} tz={tz} onChange={upsert} onRemoved={(id) => setGoals((gs) => (gs ?? []).filter((x) => x.id !== id))} />)}
       </div>

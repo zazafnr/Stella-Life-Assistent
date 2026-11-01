@@ -31,6 +31,20 @@ struct GoalsView: View {
                             emptyCard.rise(1)
                         }
                         ForEach(active) { goal in card(goal) }
+                        NavigationLink { ScreenTimeView() } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "hourglass").foregroundStyle(Theme.blue)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(L("screentime.title")).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
+                                    Text(L("screentime.sub")).font(.system(size: 13)).foregroundStyle(Theme.muted)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.system(size: 13)).foregroundStyle(Theme.faint)
+                            }
+                            .padding(14)
+                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
                         if !rest.isEmpty {
                             Text("PAUSIERT UND ERREICHT")
                                 .font(.system(size: 12, weight: .bold))

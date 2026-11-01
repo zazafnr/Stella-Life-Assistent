@@ -5,8 +5,8 @@
 
 import { useSyncExternalStore } from 'react';
 import {
-  formatDateDe, interpret, profileHas, profileIsLearner, profileIsSchool, todayIn, type ActionEntry, type ActionGroup, type ChatMessage, type ChatResponse, type Conversation, type Item, type PermissionLevel,
-  type SyncResponse, type Tone, type Feature, type UserProfile,
+  formatDateDe, interpret, t as translate, profileHas, profileIsLearner, profileIsSchool, todayIn, type ActionEntry, type ActionGroup, type ChatMessage, type ChatResponse, type Conversation, type Item, type PermissionLevel,
+  type Locale, type SyncResponse, type Tone, type Feature, type UserProfile,
 } from '@stella/shared';
 
 export type BookProvider = 'digi4school' | 'scook';
@@ -16,6 +16,8 @@ export interface Me {
   id: string; name: string; email: string; timeZone: string; ingestUrl: string;
   /** der erste Nutzer ist 'owner' und sieht „Server“ in den Einstellungen */
   role?: 'owner' | 'user';
+  /** serverweite Funktions-Schalter (z. B. Finanzen ausgeblendet) */
+  flags?: { finance?: boolean; freenotesUrl?: string | null; telegram?: boolean };
   settings: {
     eveningTime?: string; studyTime?: string; stepGoal?: number;
     books?: BookConfig[]; homeworkAutopilot?: boolean; mailAutoTrash?: boolean; tone?: Tone;
@@ -24,6 +26,13 @@ export interface Me {
     weekPlan?: 'sunday' | 'off';
     profile?: UserProfile;
     onboarding?: 'pending' | 'done';
+    locationPermission?: 'granted' | 'denied' | 'later';
+    notify?: { freenotes?: boolean };
+    notifyVia?: ('push' | 'telegram')[];
+    news?: { enabled?: boolean; asked?: boolean };
+    /** Sprache und Land (Paket 2) */
+    locale?: Locale;
+    country?: string;
   };
   integrations: {
     books: Record<BookProvider, { connected: boolean; cookies: boolean; email: string | null }>;
@@ -114,20 +123,69 @@ function startSession(token: string, user: Me) {
 
 /** Anmelden oder registrieren. Bei einem neuen Konto (nicht das erste) schickt der Server erst einen Code per Mail: Ergebnis `{ needsVerification }`. */
 export async function authenticate(mode: 'login' | 'register', body: Record<string, string>): Promise<{ needsVerification: true; email: string } | undefined> {
-  const res = await api<{ token?: string; user?: Me; needsVerification?: boolean; email?: string }>(`/api/auth/${mode}`, {
+  const res = await api<{ token?: string; user?: Me; needsVerification?: boolean; email?: string; requestId?: string; deviceSecret?: string }>(`/api/auth/${mode}`, {
     method: 'POST', json: { ...body, device: deviceName(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
   });
-  if (res.needsVerification) return { needsVerification: true, email: res.email ?? body.email! };
+  if (res.needsVerification) {
+    if (res.requestId && res.deviceSecret) pendingLogin.set({ requestId: res.requestId, deviceSecret: res.deviceSecret, email: res.email ?? body.email!, purpose: 'signup' });
+    return { needsVerification: true, email: res.email ?? body.email! };
+  }
   await startSession(res.token!, res.user!);
   return undefined;
 }
 
-export async function verifyEmail(email: string, code: string) {
-  const { token, user } = await api<{ token: string; user: Me }>('/api/auth/verify', { method: 'POST', json: { email, code, device: deviceName() } });
-  await startSession(token, user);
+// ---------- Anmelden mit Link aus der Mail (Paket 5a) ----------
+// Beim Anfordern bekommt dieses Gerät ein Geheimnis (zusätzlich zum Cookie). Es wartet auf die Bestätigung und holt sich
+// dann die Sitzung ab. Öffnet man den Link auf einem anderen Gerät, tippt man dort angezeigten Code hier ein.
+
+export interface PendingLogin { requestId: string; deviceSecret: string; email: string; purpose: 'signup' | 'login' | 'reset' }
+const PENDING_KEY = 'stella.pending';
+
+export const pendingLogin = {
+  get(): PendingLogin | null {
+    try { const v = JSON.parse(localStorage.getItem(PENDING_KEY) ?? 'null') as PendingLogin | null; return v?.requestId && v.deviceSecret ? v : null; } catch { return null; }
+  },
+  set(p: PendingLogin) { try { localStorage.setItem(PENDING_KEY, JSON.stringify(p)); } catch { /* ohne Speicher geht es ohne Neuladen */ } },
+  clear() { try { localStorage.removeItem(PENDING_KEY); } catch { /* egal */ } },
+};
+
+/** „Mit E-Mail-Link anmelden“ bzw. „Passwort vergessen“ */
+export async function requestLoginLink(email: string, purpose: 'login' | 'reset', locale: string): Promise<PendingLogin> {
+  const r = await api<{ requestId: string; deviceSecret: string }>('/api/auth/link/request', { method: 'POST', json: { email, purpose, locale } });
+  const p: PendingLogin = { requestId: r.requestId, deviceSecret: r.deviceSecret, email, purpose };
+  pendingLogin.set(p);
+  return p;
 }
 
-export const resendCode = (email: string) => api<{ ok: boolean }>('/api/auth/resend', { method: 'POST', json: { email } });
+/** Wartendes Gerät: schon bestätigt? Gibt bei Erfolg den Zweck zurück (bei `reset` fehlt noch das neue Passwort). */
+export async function claimLogin(p: PendingLogin): Promise<{ purpose: PendingLogin['purpose'] } | null> {
+  const res = await api<{ pending?: boolean; token?: string; user?: Me; purpose?: PendingLogin['purpose'] }>('/api/auth/link/claim', { method: 'POST', json: { requestId: p.requestId, deviceSecret: p.deviceSecret, device: deviceName() } });
+  if (res.pending || !res.token) return null;
+  pendingLogin.clear();
+  await startSession(res.token, res.user!);
+  return { purpose: res.purpose ?? p.purpose };
+}
+
+/** Code vom Link auf einem anderen Gerät */
+export async function submitLoginCode(p: PendingLogin | null, email: string, code: string): Promise<{ purpose: PendingLogin['purpose'] }> {
+  const res = await api<{ token: string; user: Me; purpose: PendingLogin['purpose'] }>(p ? '/api/auth/link/code' : '/api/auth/verify',
+    { method: 'POST', json: p ? { requestId: p.requestId, deviceSecret: p.deviceSecret, code, device: deviceName() } : { email, code, device: deviceName() } });
+  pendingLogin.clear();
+  await startSession(res.token, res.user);
+  return { purpose: res.purpose ?? p?.purpose ?? 'signup' };
+}
+
+export async function verifyEmail(email: string, code: string) {
+  return submitLoginCode(pendingLogin.get(), email, code);
+}
+
+export async function resendCode(email: string) {
+  const r = await api<{ ok: boolean; requestId?: string; deviceSecret?: string }>('/api/auth/resend', { method: 'POST', json: { email } });
+  if (r.requestId && r.deviceSecret) pendingLogin.set({ requestId: r.requestId, deviceSecret: r.deviceSecret, email, purpose: 'signup' });
+  return r;
+}
+
+export const setNewPassword = (password: string) => api<{ ok: boolean }>('/api/me/password', { method: 'PUT', json: { password } });
 
 /** Sieht dieses Profil die Funktion? (Ohne Profil wie bisher.) */
 export const meHas = (me: Me | null, f: Feature) => profileHas(me?.settings.profile, f);
@@ -337,8 +395,8 @@ export async function fetchFileUrl(id: string): Promise<string> {
 function queueOffline(text: string, clientId: string, createdAt: string) {
   const tz = state.me?.timeZone ?? 'Europe/Vienna';
   const today = todayIn(tz);
-  const intent = interpret(text, today);
-  let reply = '📴 Du bist offline – ich hab die Nachricht gespeichert und schicke sie, sobald du wieder Netz hast.';
+  const intent = interpret(text, today, '12:00', { locale: state.me?.settings.locale ?? 'en' });
+  let reply = translate(state.me?.settings.locale ?? 'en', 'chat.offlineSaved');
   let localItem: Item | null = null;
   if (intent?.type === 'create' && intent.entry.due) {
     const e = intent.entry;

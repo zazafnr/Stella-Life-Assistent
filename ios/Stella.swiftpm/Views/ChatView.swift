@@ -24,7 +24,11 @@ struct ChatView: View {
         ZStack(alignment: .top) {
             Theme.bg.ignoresSafeArea()
             // der ganze Chat liegt unter einem Himmel mit ziehenden Wolken (bei „Bewegung reduzieren“ stehen sie still)
-            Sky(height: UIScreen.main.bounds.height)
+            if let w = WeatherService.shared.current, WeatherService.shared.animMode != "off" {
+                WeatherBackground(weather: w, mode: WeatherService.shared.animMode)
+            } else {
+                Sky(height: UIScreen.main.bounds.height)
+            }
             VStack(spacing: 0) {
                 header
                 messagesList
@@ -93,12 +97,12 @@ struct ChatView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Stella")
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(Theme.text)
+                    .foregroundStyle(WeatherService.shared.isDarkScene ? Color(hex: WeatherPalette.darkHeadText) : Theme.text)
                 HStack(spacing: 5) {
                     Circle().fill(store.online ? Theme.blue : Theme.faint).frame(width: 6, height: 6)
                     Text(status)
                         .font(.system(size: 13))
-                        .foregroundStyle(store.online ? Theme.blue : Theme.muted)
+                        .foregroundStyle(WeatherService.shared.isDarkScene ? Color(hex: WeatherPalette.darkHeadText) : (store.online ? Theme.blue : Theme.muted))
                         .lineLimit(1)
                 }
             }
@@ -438,8 +442,14 @@ struct Bubble: View {
                 if !message.text.isEmpty {
                     VStack(alignment: .trailing, spacing: 4) {
                         ForEach(message.attachments.filter { $0.kind == "audio" }) { a in
-                            VoiceBubbleButton(id: a.id, onUser: message.isUser)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            if message.isUser && message.failedAudioId == nil {
+                                // sieht aus wie eine getippte Nachricht, darüber eine dezente Zeile (Paket 9)
+                                VoiceLine(attachment: a, text: message.text)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            } else {
+                                VoiceBubbleButton(id: a.id, onUser: message.isUser)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
                         }
                         Text(Self.markdown(message.text))
                             .font(.system(size: 16))
@@ -453,8 +463,13 @@ struct Bubble: View {
                         }
                         if let id = message.actionId { ActionCardView(id: id) }
                         if let card = message.card, card.type == "places" { PlacesCardView(card: card) }
+                        if let card = message.card, card.type == "news_ask" { NewsAskCardView() }
+                        if let card = message.card, card.type == "restaurants" { RestaurantsCardView(card: card) }
+                        if let card = message.card, card.type == "availability" { AvailabilityCardView(card: card) }
+                        if let card = message.card, card.type == "location_ask" { LocationAskCardView() }
                         if let card = message.card, card.type == "spending" { SpendingCardView(card: card) }
                         HStack(spacing: 4) {
+                            if message.via == "telegram" { Image(systemName: "paperplane.fill").accessibilityLabel("Telegram") }
                             Text(time)
                             if message.pending == true { Image(systemName: "clock") }
                         }
@@ -625,6 +640,66 @@ struct ActionCardView: View {
     }
 }
 
+/** Dezente Zeile über dem Text einer Sprachnachricht: Mikrofon, „Per Sprachnachricht · 0:12“, kleiner Play-Knopf. Langes Drücken zeigt die Original-Abschrift. */
+struct VoiceLine: View {
+    var attachment: Attachment
+    var text: String
+    @State private var playback = VoicePlayback()
+    @State private var showRaw = false
+
+    private var hasRaw: Bool {
+        guard let raw = attachment.transcriptRaw else { return false }
+        return raw.trimmingCharacters(in: .whitespacesAndNewlines) != text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var title: String {
+        guard let d = attachment.duration, d > 0 else { return L("voice.viaShort") }
+        return L("voice.via", ["duration": "\(d / 60):\(String(format: "%02d", d % 60))"])
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "mic.fill").font(.system(size: 11))
+                Text(title).font(.system(size: 12))
+                Button {
+                    Task { await playback.toggle(id: attachment.id) }
+                } label: {
+                    ZStack {
+                        Circle().fill(Color.white.opacity(0.25)).frame(width: 22, height: 22)
+                        if playback.loading {
+                            ProgressView().controlSize(.mini).tint(.white)
+                        } else {
+                            Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 9))
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(playback.isPlaying ? L("voice.pause") : L("voice.play"))
+                if hasRaw {
+                    Button(showRaw ? L("voice.hideRaw") : L("voice.showRaw")) { withAnimation { showRaw.toggle() } }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 12))
+                        .underline()
+                }
+            }
+            .foregroundStyle(.white.opacity(0.8))
+            .onLongPressGesture(minimumDuration: 0.5) {
+                if hasRaw { withAnimation { showRaw.toggle() } }
+            }
+            if showRaw, let raw = attachment.transcriptRaw {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L("voice.rawLabel")).font(.system(size: 11)).opacity(0.8)
+                    Text(raw).font(.system(size: 13).italic())
+                }
+                .foregroundStyle(.white)
+                .padding(8)
+                .background(Color.white.opacity(0.16), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+        }
+    }
+}
+
 /** Play-Knopf mit Wellen für eine Sprachnachricht */
 struct VoiceBubbleButton: View {
     var id: String
@@ -652,12 +727,12 @@ struct VoiceBubbleButton: View {
                     }
                 }
                 .foregroundStyle((onUser ? Color.white : Theme.blue).opacity(0.6))
-                Text(playback.failed ? "nicht verfügbar" : "Sprachnachricht")
+                Text(playback.failed ? L("voice.unavailable") : L("voice.label"))
                     .font(.system(size: 13))
                     .foregroundStyle(onUser ? .white.opacity(0.85) : Theme.muted)
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(playback.isPlaying ? "Pausieren" : "Sprachnachricht abspielen")
+        .accessibilityLabel(playback.isPlaying ? L("voice.pause") : L("voice.play"))
     }
 }

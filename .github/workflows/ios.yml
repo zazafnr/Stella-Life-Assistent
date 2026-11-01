@@ -39,6 +39,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Sprachkataloge der App aktuell? (scripts/gen-i18n.ts)
+        run: npx --yes tsx scripts/gen-i18n.ts --check
+
+      - name: Begründungstexte aktuell? (scripts/gen-infoplist.ts)
+        run: npx --yes tsx scripts/gen-infoplist.ts --check
+
+      - name: Wetter-Palette der App aktuell? (scripts/gen-weather-swift.ts)
+        run: npx --yes tsx scripts/gen-weather-swift.ts --check
+
+      - name: Himmel des Ladebildschirms aktuell? (scripts/gen-boot-weather.ts)
+        run: npx --yes tsx scripts/gen-boot-weather.ts --check
+
       - name: Xcode ${{ matrix.xcode }} wählen
         run: |
           XC=$(ls -d /Applications/Xcode_${{ matrix.xcode }}*.app | sort -V | tail -1)
@@ -190,3 +202,36 @@ jobs:
             commit -qm "iOS-Vorschau für ${GITHUB_SHA::7} (${GITHUB_REF_NAME})"
           git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ios-preview
           echo "Vorschau aktualisiert: ${GITHUB_SHA::7}"
+
+  # Zweite Variante: Xcode-Projekt mit den Bildschirmzeit-Erweiterungen (XcodeGen, ios/project.yml). Ohne Signatur, nur als Kontrolle,
+  # dass es baut, und für die Unit-Tests der Schwellen. Die swiftpm-Variante oben bleibt die für Swift Playgrounds und Appetize.
+  xcodeproj:
+    runs-on: macos-15
+    timeout-minutes: 40
+    name: Xcode-Projekt (Bildschirmzeit)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: XcodeGen installieren und Projekt erzeugen
+        run: |
+          brew install xcodegen
+          xcodegen generate --spec ios/project.yml --project ios
+
+      - name: Xcode wählen
+        run: |
+          XC=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+
+      - name: Unit-Tests (Schwellen, Textauswahl)
+        run: |
+          set -o pipefail
+          xcodebuild test -project ios/Stella.xcodeproj -scheme StellaTests \
+            -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGNING_ALLOWED=NO 2>&1 | tail -30
+
+      - name: App mit Erweiterungen kompilieren (ohne Signatur)
+        run: |
+          set -o pipefail
+          xcodebuild build -project ios/Stella.xcodeproj -scheme Stella \
+            -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO 2>&1 | tee build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log

@@ -11,6 +11,10 @@ struct LoginView: View {
     @State private var code = ""
     /** gesetzt, solange ein Code aus der Bestätigungs-Mail erwartet wird */
     @State private var verifying: String?
+    /** gesetzt, wenn der Code zu einem Anmelde-Link gehört: "login" oder "reset" */
+    @State private var linkPurpose: String?
+    @State private var showNewPassword = false
+    @State private var newPassword = ""
     @State private var info: String?
     @State private var wait = 0
     @State private var registration = "invite"
@@ -37,7 +41,7 @@ struct LoginView: View {
                     Text("Stella")
                         .font(Theme.display(44))
                         .foregroundStyle(Theme.text)
-                    Text("Let Stella handle your life.")
+                    Text(L("auth.tagline"))
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(Theme.muted)
                         .padding(.bottom, 18)
@@ -83,6 +87,17 @@ struct LoginView: View {
                         .foregroundStyle(Theme.faint)
                         .padding(.top, 8)
 
+                    Menu {
+                        ForEach(I18n.supported, id: \.self) { l in
+                            Button(I18n.names[l] ?? l) { I18n.shared.set(l) }
+                        }
+                    } label: {
+                        Label(I18n.names[I18n.shared.locale] ?? I18n.shared.locale, systemImage: "globe")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Theme.muted)
+                    }
+                    .padding(.top, 4)
+
                     Text("by EVOLSIOR")
                         .font(.system(size: 11, weight: .medium))
                         .tracking(3.5)
@@ -93,6 +108,14 @@ struct LoginView: View {
                 .padding(.bottom, 40)
             }
             .scrollDismissesKeyboard(.interactively)
+        }
+        .alert(L("auth.newPasswordTitle"), isPresented: $showNewPassword) {
+            SecureField(L("auth.newPassword"), text: $newPassword)
+            Button(L("auth.savePassword")) {
+                let pw = newPassword
+                newPassword = ""
+                Task { try? await store.setPassword(pw) }
+            }
         }
         .alert("Server-Adresse", isPresented: $showServer) {
             TextField("stella.example.at", text: $server)
@@ -128,21 +151,21 @@ struct LoginView: View {
 
     @ViewBuilder private var credentialFields: some View {
         if register {
-            field("Dein Name", text: $name, field: .name)
+            field(L("auth.name"), text: $name, field: .name)
                 .textContentType(.givenName)
         }
-        field("E-Mail", text: $email, field: .email)
+        field(L("auth.email"), text: $email, field: .email)
             .textContentType(.emailAddress)
             .keyboardType(.emailAddress)
             .textInputAutocapitalization(.never)
-        SecureField("Passwort", text: $password)
+        SecureField(L("auth.password"), text: $password)
             .textContentType(register ? .newPassword : .password)
             .focused($focus, equals: .password)
             .submitLabel(needsInvite ? .next : .go)
             .onSubmit { if needsInvite { focus = .invite } else { Task { await submit() } } }
             .modifier(InputStyle())
         if needsInvite {
-            TextField("Einladungscode (ABCD-EFGH)", text: $invite)
+            TextField("\(L("auth.inviteCode")) (ABCD-EFGH)", text: $invite)
                 .focused($focus, equals: .invite)
                 .textInputAutocapitalization(.characters)
                 .autocorrectionDisabled()
@@ -153,7 +176,7 @@ struct LoginView: View {
     }
 
     @ViewBuilder private func verifyFields(_ address: String) -> some View {
-        Text("Wir haben dir einen 6-stelligen Code an \(address) geschickt. Er gilt 15 Minuten.")
+        Text(L("auth.codeSent", ["email": address]))
             .font(.system(size: 14))
             .foregroundStyle(Theme.muted)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -174,31 +197,39 @@ struct LoginView: View {
 
     @ViewBuilder private var secondaryButtons: some View {
         if let verifying {
-            Button(wait > 0 ? "Neuen Code senden (\(wait) s)" : "Neuen Code senden") { Task { await again(verifying) } }
+            Button(wait > 0 ? L("auth.newCodeIn", ["seconds": wait]) : L("auth.newCode")) { Task { await again(verifying) } }
                 .font(.system(size: 15, weight: .semibold))
                 .disabled(wait > 0)
                 .padding(.top, 4)
-            Button("Zurück zur Anmeldung") {
-                withAnimation { self.verifying = nil; error = nil; info = nil; code = "" }
+            Button(L("auth.backToLogin")) {
+                withAnimation { self.verifying = nil; self.linkPurpose = nil; error = nil; info = nil; code = "" }
             }
             .font(.system(size: 14))
             .foregroundStyle(Theme.muted)
         } else if canRegister {
-            Button(register ? "Schon ein Konto? Anmelden" : "Noch kein Konto?") {
+            if !register {
+                Button(L("auth.forgotPassword")) { Task { await requestLink(reset: true) } }
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.muted)
+                Button(L("auth.emailLink")) { Task { await requestLink(reset: false) } }
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.muted)
+            }
+            Button(register ? L("auth.haveAccountLogin") : L("auth.noAccount")) {
                 withAnimation(.spring) { register.toggle(); error = nil }
             }
             .font(.system(size: 15, weight: .semibold))
             .padding(.top, 4)
         } else {
-            Text("Neue Konten sind gerade nicht möglich.")
+            Text(L("auth.registrationClosed"))
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.muted)
         }
     }
 
     private var primaryTitle: String {
-        if verifying != nil { return "Bestätigen" }
-        return register ? "Konto erstellen" : "Anmelden"
+        if verifying != nil { return L("auth.confirm") }
+        return register ? L("auth.createAccount") : L("auth.login")
     }
 
     private var canSubmit: Bool {
@@ -227,7 +258,10 @@ struct LoginView: View {
         info = nil
         defer { busy = false }
         do {
-            if let address = verifying {
+            if let address = verifying, let purpose = linkPurpose {
+                let result = try await store.verifyLinkCode(email: address, code: code)
+                if purpose == "reset" || result == "reset" { showNewPassword = true }
+            } else if let address = verifying {
                 try await store.verify(email: address, code: code)
             } else if let address = try await store.authenticate(register: register, name: name, email: email.trimmingCharacters(in: .whitespaces),
                                                                   password: password, invite: invite) {
@@ -235,6 +269,22 @@ struct LoginView: View {
             }
         } catch let e as APIError where e.needsVerification {
             startVerifying(e.email ?? email, note: "Dein Konto ist noch nicht bestätigt. Gib den Code aus der Mail ein – oder fordere einen neuen an.")
+        } catch {
+            withAnimation { self.error = error.localizedDescription }
+        }
+    }
+
+    /// „Passwort vergessen?“ / „Mit E-Mail-Link anmelden“
+    private func requestLink(reset: Bool) async {
+        let address = email.trimmingCharacters(in: .whitespaces)
+        guard address.contains("@") else { error = L("auth.email"); return }
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            try await store.requestLink(email: address, reset: reset)
+            linkPurpose = reset ? "reset" : "login"
+            startVerifying(address, note: L("auth.linkSentGeneric"))
         } catch {
             withAnimation { self.error = error.localizedDescription }
         }
@@ -253,8 +303,8 @@ struct LoginView: View {
     private func again(_ address: String) async {
         error = nil
         do {
-            try await store.resendCode(email: address)
-            info = "Neuer Code ist unterwegs."
+            if let purpose = linkPurpose { try await store.requestLink(email: address, reset: purpose == "reset") } else { try await store.resendCode(email: address) }
+            info = L("auth.newCodeSent")
             wait = 60
         } catch let e as APIError {
             error = e.message

@@ -288,7 +288,7 @@ test('Briefing: sonntags der Wochenrückblick, sonst nichts', () => {
   assert.ok(lines.some((l) => /^Laufen gehen: \d× von 3×/.test(l)));
   assert.ok(lines.some((l) => /^Radeln: .* km von 20 km/.test(l)));
   assert.deepEqual(goals.goalBriefingLines(user(), '2026-10-30'), [], 'Freitag: kein Rückblick');
-  assert.ok(buildBriefing(user()).sections.every((s) => s.id !== 'goals') || todayIn(user().timeZone) === goals.weekStart(today()) , 'im normalen Briefing nur sonntags');
+  assert.ok(buildBriefing(user()).sections.every((s) => s.id !== 'goals') || new Date(`${today()}T12:00:00Z`).getUTCDay() === 0, 'im normalen Briefing nur sonntags');
 });
 
 test('Ziele-Routen: anlegen, Fortschritt, bearbeiten, pausieren, löschen – fremde nicht', async () => {

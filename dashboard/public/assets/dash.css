@@ -121,3 +121,11 @@ footer.pf { display: flex; justify-content: space-between; gap: 12px; flex-wrap:
 .bad-text { color: var(--bad); }
 
 .app-tab { text-decoration: none; }
+
+/* E-Mail-Vorschau */
+.mail-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; margin-top: 18px; align-items: start; }
+.mail-grid figure { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.mail-grid figcaption { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; opacity: .65; }
+.mail-grid iframe { width: 100%; border: 1px solid rgba(127, 127, 127, .3); border-radius: 14px; background: #fff; height: 780px; }
+#mails .range { flex-wrap: wrap; margin-top: 10px; }
+@media (max-width: 900px) { .mail-grid { grid-template-columns: 1fr; } }

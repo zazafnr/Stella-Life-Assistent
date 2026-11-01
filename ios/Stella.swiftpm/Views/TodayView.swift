@@ -61,12 +61,27 @@ struct TodayView: View {
 
     // MARK: Teile
 
+    /// Kleine Wetteranzeige; die Szenen mit Animation kommen in Paket 8
+    private static func weatherSymbol(_ w: WeatherState) -> String {
+        switch w.type {
+        case "clear", "partly": return w.day ? "sun.max.fill" : "moon.stars.fill"
+        default: return "cloud.fill"
+        }
+    }
+
     private var header: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(Date().formatted(.dateTime.locale(Locale(identifier: "de_AT")).weekday(.wide).day().month(.wide)))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.muted)
+                HStack(spacing: 10) {
+                    Text(Date().formatted(.dateTime.locale(Locale(identifier: "de_AT")).weekday(.wide).day().month(.wide)))
+                    if let w = WeatherService.shared.current {
+                        Label("\(w.temp)°", systemImage: Self.weatherSymbol(w))
+                            .labelStyle(.titleAndIcon)
+                            .accessibilityLabel(L("weather.chip", ["type": L("weather.type.\(w.type)"), "temp": w.temp]))
+                    }
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.muted)
                 Text("\(greeting), \(store.me?.firstName ?? "du")!")
                     .font(Theme.display(32))
                     .foregroundStyle(Theme.text)
@@ -420,8 +435,9 @@ struct BriefingCardView: View {
     @Environment(Store.self) private var store
     @State private var briefing: Briefing?
     @State private var gone: Set<String> = []
+    @State private var reading: ReadingURL?
 
-    private let icons = ["school": "🏫", "due": "📌", "plan": "🗓️", "tomorrow": "🌙", "done": "✅", "inbox": "✉️", "goals": "🎯"]
+    private let icons = ["news": "📰", "school": "🏫", "due": "📌", "plan": "🗓️", "tomorrow": "🌙", "done": "✅", "inbox": "✉️", "goals": "🎯"]
 
     var body: some View {
         let morning = Calendar.current.component(.hour, from: Date()) < 12
@@ -437,8 +453,22 @@ struct BriefingCardView: View {
                                 Text(icons[s.id] ?? "•").font(.system(size: 18)).frame(width: 26)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(s.title).font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.text)
-                                    ForEach(Array(s.lines.enumerated()), id: \.offset) { _, line in
-                                        Text(line).font(.system(size: 14)).foregroundStyle(Theme.muted)
+                                    if s.id == "news", let news = briefing?.news, !news.isEmpty {
+                                        // Antippen öffnet den Artikel (im Safari-Fenster der App)
+                                        ForEach(news) { n in
+                                            Button { reading = URL(string: n.url).map(ReadingURL.init) } label: {
+                                                VStack(alignment: .leading, spacing: 1) {
+                                                    Text(n.sentence).font(.system(size: 14)).foregroundStyle(Theme.text).multilineTextAlignment(.leading)
+                                                    Text(n.source).font(.system(size: 12)).foregroundStyle(Theme.muted)
+                                                }
+                                            }
+                                            .buttonStyle(.plain)
+                                            .accessibilityHint(L("news.card.open"))
+                                        }
+                                    } else {
+                                        ForEach(Array(s.lines.enumerated()), id: \.offset) { _, line in
+                                            Text(line).font(.system(size: 14)).foregroundStyle(Theme.muted)
+                                        }
                                     }
                                 }
                             }
@@ -458,6 +488,7 @@ struct BriefingCardView: View {
             }
         }
         .task(id: store.lastSync) { await load() }
+        .sheet(item: $reading) { item in SafariView(url: item.url).ignoresSafeArea() }
     }
 
     private func load() async {

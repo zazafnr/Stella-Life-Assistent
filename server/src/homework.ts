@@ -7,9 +7,12 @@ import { addAttachment, addMessage, addReminder, enqueueJob, getItem, getUser, t
 import { renderHandwriting } from './handwriting.ts';
 import { complete, type ContentPart } from './llm.ts';
 import { changeItem } from './planner.ts';
-import { pushToUser } from './push.ts';
+import { notify } from './channels/deliver.ts';
 import { filePath, saveFile } from './files.ts';
 import { usesFreeNotes } from './notes.ts';
+import { voiceOf } from './locale.ts';
+import { consumeQuota } from './billing.ts';
+import { resolveTier } from './router.ts';
 
 export const SOLUTION_CAPTION = 'Lösung';
 
@@ -52,7 +55,7 @@ function header(item: Item): string {
   return parts.length ? `__${parts.join(' ')}__` : `__${item.title}__`;
 }
 
-async function askModel(item: Item, images: Attachment[]): Promise<Solution | null> {
+async function askModel(item: Item, images: Attachment[], userId?: string, tier: 'light' | 'heavy' = 'heavy'): Promise<Solution | null> {
   const parts: ContentPart[] = [{
     type: 'text',
     text: `Fach: ${item.subject ?? 'unbekannt'}
@@ -81,7 +84,7 @@ Ist die Aufgabe nicht auf dem Bild: "found": false. Geht sie sichtbar auf der n�
   const { message } = await complete([
     { role: 'system', content: 'Du bist ein ausgezeichneter Schüler an einer österreichischen Schule. Du löst Hausübungen fehlerfrei.' },
     { role: 'user', content: parts },
-  ], undefined, { vision: true, json: true, timeoutMs: 120_000, heavy: true });
+  ], undefined, { vision: true, json: true, timeoutMs: 120_000, tier, effort: 'medium', userId });
   return parseJson(message.content ?? '');
 }
 
@@ -99,7 +102,10 @@ export async function solveHomework(userId: string, itemId: string, attempt = 0)
   const images = pageImages(item);
   if (!images.length) throw new Error('Kein Bild der Aufgabe vorhanden.');
 
-  const solution = await askModel(item, images);
+  // Hausübungen lösen ist eine Profi-Aufgabe (Sonnet) – auch im Free-Abo, solange das Kontingent reicht; sonst macht Haiku weiter
+  const { tier } = resolveTier(user, 'heavy', { homework: true });
+  if (tier === 'heavy') consumeQuota(user, 'pro_task');
+  const solution = await askModel(item, images, userId, tier);
   if (!solution?.found) {
     if (solution?.needsNextPage && item.page && attempt === 0 && images.length < 2) {
       enqueueJob(userId, 'book_page', { itemId, pageDelta: 1, thenSolveAttempt: 1 });
@@ -118,9 +124,9 @@ export async function solveHomework(userId: string, itemId: string, attempt = 0)
   changeItem(user, itemId, { status: 'done', notes: solution.heftText });
   scheduleDoneNotice(user, item);
 
-  const msg = voice(getUser(userId)?.settings.tone).solved(`${item.title}${item.detail ? ` (${item.detail})` : ''}`, usesFreeNotes(userId));
+  const msg = voiceOf(getUser(userId) ?? { settings: {} }).solved(`${item.title}${item.detail ? ` (${item.detail})` : ''}`, usesFreeNotes(userId));
   addMessage(userId, 'assistant', msg, { attachments: [attachment] });
-  await pushToUser(userId, { title: 'Stella', body: msg.replace(/\*\*/g, ''), tag: itemId });
+  await notify(userId, { title: 'Stella', body: msg.replace(/\*\*/g, ''), text: msg, tag: itemId });
 }
 
 /** Statt "Morgen fällig" am Vorabend nur kurz: erledigt. */
@@ -129,5 +135,5 @@ function scheduleDoneNotice(user: User, item: Item) {
   const day = addDays(item.due, -1);
   const at = zonedToUtc(day, user.settings.eveningTime ?? DEFAULT_PREFS.eveningTime, user.timeZone);
   if (at.getTime() <= Date.now()) return;
-  addReminder(user.id, item.id, at, voice(user.settings.tone).solvedReminder(item.title, formatDateDe(item.due)), false, true);
+  addReminder(user.id, item.id, at, voiceOf(user).solvedReminder(item.title, formatDateDe(item.due)), false, true);
 }

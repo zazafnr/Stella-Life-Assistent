@@ -17,7 +17,10 @@ import { buildLagebild, freeSlots, isoWeekday, toHhmm, toMin, type DayContext, t
 import { addMessage, db, getItem, getUser, type User } from './db.ts';
 import { isDelivered, markDelivered } from './hints.ts';
 import { complete, llmAvailable } from './llm.ts';
-import { pushToUser } from './push.ts';
+import { notify } from './channels/deliver.ts';
+import { voiceOf } from './locale.ts';
+import { consumeQuota } from './billing.ts';
+import { resolveTier } from './router.ts';
 
 const MINUTES = { exam: 45, homework: 30, assignment: 60, goal: 30 } as const;
 /** Pause zwischen zwei Dingen */
@@ -291,6 +294,13 @@ export function buildWeekPlan(user: User, opts: PlanOptions = {}, lb: Lagebild =
   };
 }
 
+/** Stoff in Lerneinheiten teilen ist eine Profi-Aufgabe (Sonnet) – mit Kontingent, sonst Haiku */
+function weekTier(user: User): 'light' | 'heavy' {
+  const { tier } = resolveTier(user, 'heavy');
+  if (tier === 'heavy') consumeQuota(user, 'pro_task');
+  return tier;
+}
+
 /** Wie buildWeekPlan, aber langer Stoff wird von der KI in sinnvolle Lerneinheiten geteilt */
 export async function planWeek(user: User, opts: PlanOptions = {}): Promise<WeekPlan> {
   const draft = buildWeekPlan(user, opts);
@@ -304,7 +314,7 @@ export async function planWeek(user: User, opts: PlanOptions = {}): Promise<Week
       const { message } = await complete([
         { role: 'system', content: 'Du teilst Prüfungsstoff in Lerneinheiten auf. Antworte nur mit JSON: {"units": ["…", "…"]} – genau so viele Einträge wie verlangt, je höchstens 8 Wörter, in sinnvoller Lernreihenfolge.' },
         { role: 'user', content: `Test: ${exam.title}\nStoff: ${exam.material.slice(0, 1500)}\nAnzahl Lerneinheiten: ${n}` },
-      ], undefined, { json: true, timeoutMs: 45_000, background: true });
+      ], undefined, { json: true, timeoutMs: 45_000, background: true, tier: weekTier(user), userId: user.id });
       const units = (JSON.parse(message.content ?? '{}') as { units?: unknown }).units;
       if (Array.isArray(units) && units.length >= n) focuses[parentId] = units.slice(0, n).map((u) => String(u).slice(0, 80));
     } catch { /* ohne KI bleibt die einfache Aufteilung */ }
@@ -347,7 +357,7 @@ export function cleanBlocks(userId: string, raw: unknown): PlanBlock[] {
 
 /** Plan vorschlagen (Karte mit Ja/Nein) – im Chat auf Bitte, sonntags von selbst */
 export function offerWeekPlan(user: User, plan: WeekPlan, opts: { intro: string; source: 'chat' | 'auto'; say?: (text: string, actionId: string) => void }) {
-  const v = voice(user.settings.tone);
+  const v = voiceOf(user);
   const text = `${opts.intro}\n\n${weekPlanText(plan, todayIn(user.timeZone))}\n\n${v.weekPlanQuestion()}`;
   return { text, result: perform(user, 'week_plan.apply', { blocks: plan.blocks }, { source: opts.source, confirm: true, question: text, say: opts.say }) };
 }
@@ -363,11 +373,11 @@ export async function maybeOfferWeek(userId: string): Promise<void> {
   if (isDelivered(userId, key)) return;
   const plan = await planWeek(user, { from: addDays(today, 1) });
   if (!plan.blocks.length) { markDelivered(userId, key); return; }
-  const v = voice(user.settings.tone);
+  const v = voiceOf(user);
   const { result } = offerWeekPlan(user, plan, { intro: v.weekPlanOffer(), source: 'auto' });
   markDelivered(userId, key, result.status === 'refused' ? undefined : result.actionId);
   if (result.status !== 'refused') {
-    await pushToUser(userId, { title: 'Stella', body: `${v.weekPlanOffer()} ${plan.blocks.length} Blöcke – schau kurz drüber.`, tag: key });
+    await notify(userId, { title: 'Stella', body: `${v.weekPlanOffer()} ${plan.blocks.length} Blöcke – schau kurz drüber.`, tag: key });
   }
 }
 
@@ -387,7 +397,7 @@ export function replanMissed(userId: string): number {
     AND parent_id IS NOT NULL AND due < ? AND due >= ?`).all(userId, lb.today, addDays(lb.today, -3)) as { id: string }[];
   const states = dayStates(lb, lb.today, addDays(lb.today, 14));
   const preferred = preferredStart(user, lb.memories);
-  const v = voice(user.settings.tone);
+  const v = voiceOf(user);
   let moved = 0;
   for (const { id } of missed) {
     const key = `missed_study:${id}`;

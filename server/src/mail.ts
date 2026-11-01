@@ -22,6 +22,7 @@ import { whoIs } from './profile.ts';
 import { levelFor, perform } from './actions.ts';
 import { formatDateDe, todayIn, voice } from '@stella/shared';
 import { pushToUser } from './push.ts';
+import { voiceOf } from './locale.ts';
 
 export type MailProvider = 'gmail' | 'icloud' | 'other';
 
@@ -186,7 +187,7 @@ ${JSON.stringify(batch.map((m) => ({ id: m.uid, from: m.from, subject: m.subject
 
 Format: {"mails": [{"id": 123, "category": "important", "summary": "…", "confidence": 0.9, "reason": "…", "deadline": null, "needsReply": false}]}`,
     },
-  ], undefined, { json: true, timeoutMs: 90_000, background: true, provider: 'groq', task: 'classify', userId });
+  ], undefined, { json: true, timeoutMs: 90_000, background: true, provider: 'groq', task: 'classify', userId, private: true });
   const text = message.content ?? '';
   const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)) as { mails?: Record<string, unknown>[] };
   for (const r of parsed.mails ?? []) {
@@ -316,7 +317,7 @@ async function checkAccount(userId: string, account: MailAccount) {
 /** Frist aus einer Mail als Eintrag anbieten – läuft über die Rechte für den Planer */
 export function offerDeadline(user: User, eventId: string, from: string, d: Deadline) {
   const when = `${formatDateDe(d.date)}${d.time ? ` um ${d.time}` : ''}`;
-  const v = voice(user.settings.tone);
+  const v = voiceOf(user);
   const r = perform(user, 'item.create', {
     kind: d.time ? 'event' : 'todo', title: d.what, due: d.date, time: d.time, detail: `aus der Mail von ${from}`, source: 'mail',
   }, { source: 'auto', quiet: true, question: v.mailDeadlineAsk(from, d.what, when) });
@@ -425,7 +426,7 @@ export async function draftReply(user: User, eventId: string, instruction = '', 
         `${memories ? `Was du über ${user.name} weißt:\n${memories}\n\n` : ''}` +
         `${instruction ? `Was ${user.name} antworten möchte: ${instruction}` : 'Schreib eine passende, kurze Antwort.'}`,
     },
-  ], undefined, { timeoutMs: 90_000 });
+  ], undefined, { timeoutMs: 90_000, private: true, userId: user.id });
   const body = (message.content ?? '').trim().replace(/^betreff:.*\n+/iu, '');
   if (!body) throw new Error('Kein Entwurf bekommen – bitte nochmal versuchen');
   const subject = /^re:/iu.test(String(ev.text)) ? String(ev.text) : `Re: ${ev.text ?? ''}`;

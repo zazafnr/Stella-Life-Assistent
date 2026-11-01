@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import path from 'node:path';
-import { todayIn, type UserProfile, type ActionGroup, type Attachment, type ChatMessage, type Item, type ItemKind, type ItemStatus, type PermissionLevel, type Tone } from '@stella/shared';
+import { todayIn, type Locale, type UserProfile, type ActionGroup, type Attachment, type ChatMessage, type Item, type ItemKind, type ItemStatus, type PermissionLevel, type Tone } from '@stella/shared';
 import { config } from './config.ts';
 
 export const db = new Database(path.join(config.dataDir, 'stella.db'));
@@ -415,6 +415,146 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX inbound_mail_sender ON inbound_mail(sender, at);
   `,
+  `
+  -- v3 Paket 1: KI-Kosten je Tag, Nutzer und Modell (Mikro-Dollar: 1 000 000 = 1 $).
+  -- llm_usage zählt weiter nur Anfragen je Anbieter (Tageslimit von OpenRouter), diese Tabelle die Tokens und Kosten.
+  CREATE TABLE llm_cost (
+    day TEXT NOT NULL,
+    user_id TEXT NOT NULL DEFAULT '',
+    model TEXT NOT NULL,
+    requests INTEGER NOT NULL DEFAULT 0,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_micro_usd INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, user_id, model)
+  );
+  CREATE INDEX llm_cost_user ON llm_cost(user_id, day);
+  `,
+  `
+  -- v3 Paket 2: Sprache und Land. Alle bestehenden Konten sind deutsch und aus Österreich; neue starten mit Englisch.
+  UPDATE users SET settings = json_set(settings, '$.locale', 'de') WHERE json_extract(settings, '$.locale') IS NULL;
+  UPDATE users SET settings = json_set(settings, '$.country', 'AT') WHERE json_extract(settings, '$.country') IS NULL;
+  `,
+  `
+  -- v3 Paket 5a: Anmelden und Bestätigen über einen Link in der Mail (Token und Code nur als Hash)
+  CREATE TABLE login_requests (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    purpose TEXT NOT NULL,            -- signup | login | reset | address
+    token_hash TEXT NOT NULL UNIQUE,
+    code_hash TEXT NOT NULL,
+    device_hash TEXT NOT NULL,        -- Hash des Gerätegeheimnisses des wartenden Geräts
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT,                     -- Link bzw. Code wurde bestätigt
+    claimed_at TEXT,                  -- das wartende Gerät hat die Sitzung abgeholt
+    attempts INTEGER NOT NULL DEFAULT 0,
+    ip TEXT,
+    user_agent TEXT
+  );
+  CREATE INDEX login_requests_user ON login_requests(user_id, created_at);
+  `,
+  `
+  -- v3 Paket 5b: Abos, Verbrauchszähler, Stripe-Ereignisse (Idempotenz)
+  CREATE TABLE subscriptions (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    plan TEXT NOT NULL,                -- free | plus | pro | max
+    status TEXT NOT NULL,              -- active | trialing | past_due | canceled | unpaid | incomplete
+    provider TEXT NOT NULL,            -- stripe | gift
+    provider_customer TEXT,
+    provider_sub TEXT,
+    current_period_end TEXT,           -- bei Geschenken: Ablaufdatum (leer = unbegrenzt)
+    cancel_at TEXT,
+    updated_at TEXT NOT NULL
+  );
+  CREATE TABLE usage_counters (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    period TEXT NOT NULL,              -- Tag (YYYY-MM-DD) bzw. Monat (YYYY-MM) in der Zeitzone der Nutzerin
+    kind TEXT NOT NULL,                -- ai_message (Tag) | pro_task (Monat)
+    count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, period, kind)
+  );
+  CREATE TABLE stripe_events (id TEXT PRIMARY KEY, type TEXT NOT NULL, at TEXT NOT NULL);
+  -- bestehende Nutzer: Max als Geschenk ohne Ablauf
+  INSERT INTO subscriptions (user_id, plan, status, provider, updated_at) SELECT id, 'max', 'active', 'gift', datetime('now') FROM users;
+  `,
+  // Paket 10: Kanäle (Telegram, später WhatsApp)
+  `
+  CREATE TABLE channel_links (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    channel TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, channel),
+    UNIQUE (channel, external_id)
+  );
+  -- Einmal-Token zum Verknüpfen (nur der Hash wird gespeichert)
+  CREATE TABLE channel_tokens (
+    hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    channel TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+  );
+  ALTER TABLE messages ADD COLUMN via TEXT;
+  `,
+  // Paket 11: Nachrichten (nur Titel, Teaser und Link; nach 3 Tagen gelöscht)
+  `
+  CREATE TABLE news_items (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL,
+    url TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    teaser TEXT NOT NULL DEFAULT '',
+    published_at TEXT NOT NULL,
+    topics TEXT NOT NULL DEFAULT '[]',
+    cluster_id TEXT NOT NULL,
+    fetched_at TEXT NOT NULL
+  );
+  CREATE INDEX news_items_published ON news_items(published_at);
+  CREATE INDEX news_items_cluster ON news_items(cluster_id);
+  CREATE TABLE news_feeds (
+    source_id TEXT PRIMARY KEY,
+    feed_url TEXT NOT NULL,
+    etag TEXT,
+    last_modified TEXT,
+    status TEXT,
+    error TEXT,
+    fetched_at TEXT
+  );
+  CREATE TABLE news_digest (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    date TEXT NOT NULL,
+    json TEXT NOT NULL,
+    PRIMARY KEY (user_id, date)
+  );
+  `,
+  // Paket 13: Bildschirmzeit-Ziele (iOS). Der Server kennt nur Name, Limit und erreichte Schwellen – nie App-Daten.
+  `
+  CREATE TABLE screentime_goals (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    limit_minutes INTEGER NOT NULL,
+    shield INTEGER NOT NULL DEFAULT 0,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX screentime_goals_user ON screentime_goals(user_id);
+  CREATE TABLE screentime_events (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    goal_id TEXT NOT NULL REFERENCES screentime_goals(id) ON DELETE CASCADE,
+    day TEXT NOT NULL,
+    minutes INTEGER NOT NULL,
+    percent INTEGER NOT NULL,
+    at TEXT NOT NULL,
+    UNIQUE (goal_id, day, minutes)
+  );
+  CREATE INDEX screentime_events_user_day ON screentime_events(user_id, day);
+  `,
 ];
 
 function migrate() {
@@ -466,6 +606,18 @@ export interface UserSettings {
   permissions?: Partial<Record<ActionGroup, PermissionLevel>>;
   /** Lebenssituation und Funktionen aus der Einführung */
   profile?: UserProfile;
+  /** Sprache der Oberfläche, der Texte und Mails (Standard: Englisch) */
+  locale?: Locale;
+  /** Land (ISO-3166) für Schulbegriffe, News und Wetter-Rückfall */
+  country?: string;
+  /** Standort: in der Einführung beantwortet ('later' = später noch einmal fragen) */
+  locationPermission?: 'granted' | 'denied' | 'later';
+  /** Zuletzt bekannter Ort, auf etwa 1 km gerundet – für Wetter, Briefing und News. Der genaue Standort wird nie gespeichert. */
+  lastPlace?: { lat: number; lon: number; at: string };
+  /** Wer benachrichtigt werden will, wenn etwas Neues da ist (z. B. FreeNotes) */
+  notify?: { freenotes?: boolean };
+  /** Wohin Stella von sich aus schreibt (Briefing, Erinnerungen, Hinweise): push und/oder telegram. Standard: push. */
+  notifyVia?: ('push' | 'telegram')[];
   /** 'pending': die Einführung wird beim nächsten Öffnen gezeigt; 'done': erledigt oder übersprungen */
   onboarding?: 'pending' | 'done';
 }
@@ -613,7 +765,7 @@ export function itemsChangedSince(userId: string, since: string): Item[] {
 // ---------- Chats (Konversationen) und Nachrichten ----------
 
 /** In welchem Chat gerade geantwortet wird – gilt für alles, was während einer Chat-Anfrage passiert (auch tief in Hilfsfunktionen). */
-export const chatContext = new AsyncLocalStorage<{ userId: string; conversationId: string; detailed?: boolean }>();
+export const chatContext = new AsyncLocalStorage<{ userId: string; conversationId: string; detailed?: boolean; via?: ChatMessage['via'] }>();
 
 type ConversationRow = { id: string; user_id: string; title: string | null; day: string; created_at: string; updated_at: string };
 
@@ -662,12 +814,13 @@ export function backfillConversations() {
 }
 backfillConversations();
 
-type MsgRow = { id: string; client_id: string | null; role: string; text: string; attachments: string; created_at: string; action_id?: string | null; card?: string | null };
+type MsgRow = { id: string; client_id: string | null; role: string; text: string; attachments: string; created_at: string; action_id?: string | null; card?: string | null; via?: string | null };
 const toMessage = (r: MsgRow): ChatMessage => ({
   id: r.id, clientId: r.client_id, role: r.role as ChatMessage['role'], text: r.text,
   attachments: JSON.parse(r.attachments), createdAt: r.created_at,
   ...(r.action_id ? { actionId: r.action_id } : {}),
   ...(r.card ? { card: JSON.parse(r.card) as ChatMessage['card'] } : {}),
+  ...(r.via === 'telegram' ? { via: 'telegram' as const } : {}),
 });
 
 export function findMessageByClientId(userId: string, clientId: string): ChatMessage | null {
@@ -680,13 +833,14 @@ export function findMessageByClientId(userId: string, clientId: string): ChatMes
  * sonst im neuesten Chat von heute – so auch alles, was Stella von sich aus schickt (Briefing, Hinweise, Erinnerungen).
  */
 export function addMessage(userId: string, role: ChatMessage['role'], text: string,
-  opts: { clientId?: string | null; attachments?: Attachment[]; createdAt?: string; actionId?: string; conversationId?: string; card?: ChatMessage['card'] } = {}): ChatMessage {
+  opts: { clientId?: string | null; attachments?: Attachment[]; createdAt?: string; actionId?: string; conversationId?: string; card?: ChatMessage['card']; via?: ChatMessage['via'] } = {}): ChatMessage {
   const id = newId();
   const ctx = chatContext.getStore();
   const conversationId = opts.conversationId ?? (ctx?.userId === userId ? ctx.conversationId : todayConversation(userId)!);
   const createdAt = opts.createdAt ?? now();
-  db.prepare('INSERT INTO messages (id, user_id, client_id, role, text, attachments, created_at, action_id, conversation_id, card) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(id, userId, opts.clientId ?? null, role, text, JSON.stringify(opts.attachments ?? []), createdAt, opts.actionId ?? null, conversationId, opts.card ? JSON.stringify(opts.card) : null);
+  const via = opts.via ?? (ctx?.userId === userId ? ctx.via : undefined) ?? null;
+  db.prepare('INSERT INTO messages (id, user_id, client_id, role, text, attachments, created_at, action_id, conversation_id, card, via) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, userId, opts.clientId ?? null, role, text, JSON.stringify(opts.attachments ?? []), createdAt, opts.actionId ?? null, conversationId, opts.card ? JSON.stringify(opts.card) : null, via);
   db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ? AND updated_at < ?').run(createdAt, conversationId, createdAt);
   return toMessage(db.prepare('SELECT * FROM messages WHERE id = ?').get(id) as MsgRow);
 }

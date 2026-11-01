@@ -1,6 +1,37 @@
 # Stella: Entscheidungen, Grenzen, Fahrplan
 
-## 1. KI-Modell: OpenRouter, automatisch das beste kostenlose
+## 0. KI seit v3: Claude mit Kosten-Router
+
+Seit v3 (Paket 1) läuft fast alles über **Claude Haiku 5.5** (`light`), schwere Aufgaben über **Claude Sonnet 5.5**
+(`heavy`, nur mit Kontingent). Code: `server/src/claude.ts` (Umwandlung ins Anthropic-Format, Prompt-Caching,
+Wiederholung), `server/src/router.ts` (`pickTier`, `resolveTier`, Kontingent-Stub für Paket 5),
+`server/src/costs.ts` (Kosten je Anfrage/Nutzer/Modell in Mikro-Dollar, Tabelle `llm_cost`).
+
+- **Ausweichkette:** Claude 429/5xx → eine Wiederholung → bei `heavy` Haiku statt Sonnet → OpenRouter nur,
+  wenn der Owner „Notfall-Modelle“ eingeschaltet hat. **Mail-Inhalte gehen nie an Gratis-Anbieter** (`private: true`).
+- **Haiku ruft `escalate`**, wenn eine Aufgabe zu schwer ist; dann läuft der Zug einmal mit Sonnet.
+- **Prompt-Caching:** Werkzeuge und fester Teil des System-Prompts tragen `cache_control`; Datum, Uhrzeit, Lagebild
+  und Gedächtnis kommen als zweiter Systemblock danach.
+- **Preise** stehen in `config.pricing` (pro Mio. Tokens), Modellnamen in `config.anthropic.models`; beides per Env änderbar.
+- **Schlüssel:** `ANTHROPIC_API_KEY` oder Einstellungen → Server → Anthropic (verschlüsselt, mit „Testen“).
+- Ohne Claude-Schlüssel gilt weiter der OpenRouter-Weg unten.
+
+## 0b. Sprachen seit v3 (Paket 2)
+
+Acht Sprachen (`shared/src/i18n/locales.ts`: en, de, es, fr, it, pt-BR, tr, pl), Englisch ist Standard. Texte stehen in
+**einer** Quelle: `shared/src/i18n/catalog/<locale>.json` (flache Schlüssel, Platzhalter `{name}`, Mehrzahl `key#one/#other`).
+
+- **Web:** `useT()` aus `web/src/i18n.ts`. **iOS:** `L("schlüssel")`; `scripts/gen-i18n.ts` erzeugt daraus `Core/I18nCatalogs.swift`
+  (die CI prüft mit `--check`, dass sie aktuell ist). **Server:** `tr(user, key)`, `voiceOf(user)`, `dayFor(user, ymd)` aus `server/src/locale.ts`.
+- `voice(tone, locale)` bleibt als typisierter Code (Funktionen mit Varianten): `voice.de.ts` und `voice.en.ts` sind vollständig,
+  die übrigen Sprachen überschreiben in `voice.more.ts` nur, was sie haben (Rest: Englisch).
+- Einstellungen `user.settings.locale` und `country`; bestehende Konten sind per Migration `de`/`AT`, neue starten mit der
+  Browser-/Gerätesprache (sonst Englisch). `STELLA_DEFAULT_LOCALE` gilt für Konten ohne Eintrag.
+- Der System-Prompt der KI ist englisch und enthält die Regel „Always reply in {Sprache}“; Whisper bekommt die Sprache als Hinweis.
+- **Kurznotizen ohne KI:** Deutsch (`parser.ts`) und Englisch (`parser.en.ts`). Für alle anderen Sprachen geht die Nachricht an Haiku.
+- Noch nicht umgestellt: die Dateien in `OPEN` in `shared/src/i18n/jsx.test.ts` (Web) und die meisten iOS-Views.
+
+## 1. KI-Modell: OpenRouter, automatisch das beste kostenlose (Notfall bzw. ohne Claude-Schlüssel)
 
 **Stimmt das mit den 10 $?** Ja. Laut den offiziellen [OpenRouter-Limits](https://openrouter.ai/docs/api-reference/limits) gilt:
 - Mit weniger als 10 $ jemals gekauften Credits: **50 Anfragen pro Tag** an `:free`-Modelle.
@@ -170,6 +201,62 @@ und plant die nächste Erinnerung (`advanceRecurring`); pausiert sind sie ohne E
 > **Stella v2** (Registrierung für alle Lebenslagen, Groq, Chats nach Tagen, Sprache, Listen, Ziele,
 > Ausgaben, „Was Stella vorhat“) steht Paket für Paket in [`docs/plan/stella-v2.md`](plan/stella-v2.md).
 > Ausgeliefert wird mit `scripts/deploy-vps.sh`.
+>
+> **Stella v3** (Claude-Modelle mit Kosten-Router, acht Sprachen, neue E-Mails, Anmelde-Link, Abos mit Limits,
+> Wetter-Animationen, Telegram, News, Alltagsaufgaben, Bildschirmzeit) steht Paket für Paket in
+> [`docs/plan/stella-v3.md`](plan/stella-v3.md). **Finanzen** sind dort vorerst ausgeblendet
+> (`STELLA_FEATURE_FINANCE=true` schaltet sie wieder ein; Code, Tabellen und Tests bleiben).
+
+### Kanäle: Telegram heute, WhatsApp später (v3, Paket 10)
+
+- `server/src/channels/channel.ts` beschreibt einen Kanal (`send`), `deliver.ts` entscheidet mit `notify()`, wohin Stella von sich aus schreibt
+  (`settings.notifyVia`: `push` und/oder `telegram`). Briefing, Hinweise, Erinnerungen, Ziele, Hausübungen, WebUntis und Wochenplan gehen darüber.
+  Ist Telegram gewählt, aber nicht verknüpft oder fehlgeschlagen, kommt die Nachricht trotzdem als Push an. Die Mail-Pipeline (`inbound.ts`) bleibt, wie sie ist.
+- **Telegram:** Bot-Token unter Einstellungen → Server (verschlüsselt, Bereich `__system__`). Beim Speichern setzt der Server den Webhook
+  `/api/channels/telegram/webhook` mit zufälligem `secret_token`; der Header `X-Telegram-Bot-Api-Secret-Token` wird bei jeder Anfrage geprüft (sonst 401).
+- Verknüpfen: Einmal-Token (10 Minuten, nur der Hash liegt in `channel_tokens`) → `https://t.me/<Bot>?start=<token>` → `/start <token>` legt `channel_links` an.
+  `/stop` oder „Trennen“ in der App entfernt sie.
+- Eingehend: Text → `handleChat`, Sprachnachricht (OGG) → `handleAudio` (inkl. Aufräumen aus Paket 9), Foto → Anhang → `handleChat`. Die Nachrichten
+  stehen in derselben Tages-Konversation wie in der App, markiert mit `via = 'telegram'` (in der App ein kleines Symbol). Limits der Abos gelten gleich.
+  Telegram-Wiederholungen werden über die `update_id` erkannt, Aktualisierungen je Chat nacheinander verarbeitet.
+- Ausgehend: Markdown → Telegram-HTML (alles wird escaped), Aktionskarten als Inline-Knöpfe (Ja / Nein / Rückgängig → `approve` / `reject` / `undo`),
+  höchstens eine Nachricht pro Sekunde und Chat. Unbekannte Chats bekommen höchstens drei Erklärungen pro Stunde.
+
+**WhatsApp (nur vorbereitet, `channels/whatsapp.ts`):**
+- Meta erlaubt allgemeine KI-Assistenten in der EU nur vorläufig (seit 2026, 12 Monate) und gegen eine Gebühr pro Nachricht.
+- Proaktive Nachrichten brauchen von Meta freigegebene Vorlagen (etwa 2–5 Cent pro Stück).
+- Nötig wären die Meta-Unternehmensverifizierung und eine eigene Nummer.
+- Wenn es kommt, dann nur ab Pro.
+
+### Alltagsaufgaben (v3, Paket 12)
+
+- Stella **kann nicht selbst buchen, kaufen oder bezahlen** und sagt das offen (Prompt und Karte). Sie findet, vergleicht und bereitet vor.
+- `server/src/errands/`: `restaurants.ts` (Overpass, gleicher Zwischenspeicher und gleiche Bremse wie `places.ts`; Entfernung, „zur Wunschzeit offen“), `booking.ts`
+  (erkennt TheFork, OpenTable, Quandoo, resmio, Bookatable, Tablein und Google „Reservieren“ auf der Webseite des Lokals; Abruf mit Schutz vor internen Adressen),
+  `place.ts` (zuletzt bekannter gerundeter Ort, sonst Nachfrage mit der Standort-Karte), `routes.ts` („In den Planer“ legt einen Termin über die Rechte-Stufen an, mit „Rückgängig“).
+- Agent-Werkzeuge `find_restaurants`, `booking_options`, `report_availability` plus die Server-Werkzeuge `web_search` und `web_fetch` von Claude (je höchstens 3 Nutzungen)
+  gibt es nur in der Profi-Stufe (Sonnet), nur bei einer Alltagsaufgabe (`ERRAND_RE` im Router) und nur ab Plus (`webTasks`). Free bekommt einen Hinweis, ohne dass ein Modell läuft.
+- Karten `restaurants`, `availability` und `location_ask` erscheinen in Web, iOS und (als Text mit Knöpfen) in Telegram. „Lagernd“ oder „bestellbar“ nur mit Quelle, sonst „unklar“.
+- Händler-Adapter (`server/src/stores/`) sind bewusst nicht gebaut: erst, wenn die Websuche bei einer großen Kette nachweislich versagt.
+
+### News im Briefing (v3, Paket 11)
+
+- `server/src/news/`: `sources.ts` (Katalog), `feed.ts` (RSS/Atom/RDF lesen, Themen, Feed-Suche), `cluster.ts` (Gruppen), `store.ts` (Abruf alle 30 Minuten, ETag, Löschen nach 3 Tagen),
+  `digest.ts` (Auswahl und Kurzfassung durch Haiku), `ask.ts` (Frage am ersten Tag), `routes.ts` (Einstellungen, Lieblingszeitung).
+- Gespeichert werden nur Titel, Teaser und Link (`news_items`). Eigene Feed-Adressen der Nutzer werden gegen interne Adressen geschützt (`net.ts`, SSRF).
+- Quellen, Prüfung der Feeds und Nutzungsbedingungen: `docs/news/quellen.md`.
+
+### Abos und Limits (v3, Paket 5)
+
+- Abos: Free, Plus (8 €), Pro (15 €), Max (35 €) – Definition und Startwerte in `shared/src/plans.ts`, Überschreibungen
+  (Einstellungen → Server → „Abos und Limits“) liegen verschlüsselt im System-Bereich und gelten sofort.
+- Zähler: `usage_counters` pro Nutzer und Tag bzw. Monat in der Zeitzone der Person. KI-Nachrichten und Profi-Aufgaben
+  werden in `assistant.ts` vor dem Modellaufruf geprüft; Hausaufgaben laufen auch im Free-Abo weiter (`homework_only`).
+- Bezahlung: Stripe Checkout mit `price_data` direkt im Aufruf (keine Produkte vorab anlegen), Stripe Tax für die Steuer.
+  Der Webhook `/api/billing/webhook` prüft die Signatur, ist idempotent (`stripe_events`) und liegt bewusst außerhalb des
+  Anmelde-Plugins. Ohne Stripe-Schlüssel bleibt alles andere nutzbar; „Upgrade“ zeigt dann einen freundlichen Hinweis.
+- Geschenkte Abos (`provider = 'gift'`, optional mit Ablauf) setzt das Admin-Dashboard oder Einstellungen → Server.
+- Fehlende Nutzer-Aufgaben (Stripe-Konto, Webhook-URL, Schlüssel) stehen im Bericht zum Plan.
 
 **Phase 1: dieser Stand** ✅
 Chat, Kurznotizen (auch offline), Planer, Erinnerungen, Lernpläne, Push, Kalender-Abo, Gesundheit und SMS über Kurzbefehle, digi4school (Kalibrierung offen), automatische KI-Modellwahl.
@@ -190,3 +277,14 @@ Morning Briefing, natürliche Sprache, intelligente Inbox, Plan my week (siehe A
 - Gesundheit: Wasser, Schlaf, Bildschirmzeit. Sanfter Schubs bei zu wenig Bewegung.
 - Geburtstage, Abos und Fristen, Einkaufsliste.
 - Native iOS-App (Expo) mit Widgets, Siri, HealthKit, Share-Sheet.
+
+## 0c. E-Mails seit v3 (Paket 4)
+
+Alle Mails, die Stella verschickt, kommen aus **Vorlagen** (`server/src/email/`): `layout.ts` (Tabellen-Layout, 600 px, Inline-CSS,
+Outlook-Knopf per VML, helle und dunkle Variante, Vorschautext, immer eine Textversion), `templates.ts` (verify-signup,
+verify-address, login-link, welcome, stella-reply, unknown-sender, subscription), `markdown.ts` (Stellas Antworten als sicheres HTML),
+`undo.ts` und `pages.ts` (signierter „Rückgängig“-Link, 7 Tage; GET zeigt nur eine Bestätigungsseite, erst der Knopf macht es rückgängig).
+Texte stehen im Katalog (`email.*`, acht Sprachen). Bilder: `scripts/mail-art.ts` erzeugt PNGs unter `web/public/mail/`
+(öffentlich `https://stella.evolsior.com/mail/…`, SVG zeigt Gmail nicht). `sendTemplateMail()` in `mailer.ts` verschickt HTML + Text.
+Vorschau: `GET /api/admin/mail-preview/:template?locale=` (Owner) und die Seite „Emails“ im Firmen-Dashboard.
+Der Fuß nutzt `STELLA_COMPANY_ADDRESS` (Firmenadresse), `STELLA_IMPRINT_URL`, `STELLA_PRIVACY_URL`.

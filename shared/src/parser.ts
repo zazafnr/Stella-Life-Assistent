@@ -56,33 +56,35 @@ export type Intent =
   | { type: 'errand'; text: string; place: PlaceRef | null; when: 'after_work' | 'after_school' | 'evening' };
 
 import { placeFor, type PlaceRef } from './places.ts';
+import { interpretEn } from './parser.en.ts';
+import type { Locale } from './i18n/locales.ts';
 
 // Muss mit 'u'-Flag benutzt werden: \b kennt kein ü/ä/ö.
 const B = '(?<![\\p{L}\\p{N}])';
 const E = '(?![\\p{L}\\p{N}])';
 
 export const SUBJECTS: [string, string[]][] = [
-  ['Mathe', ['mathe', 'mathematik', 'ma']],
-  ['Deutsch', ['deutsch', 'de', 'dt']],
+  ['Mathe', ['mathe', 'mathematik', 'ma', 'math', 'maths', 'mathematics']],
+  ['Deutsch', ['deutsch', 'de', 'dt', 'german']],
   ['Englisch', ['englisch', 'english', 'engl', 'en']],
-  ['Latein', ['latein', 'lat', 'la']],
-  ['Französisch', ['französisch', 'franzoesisch', 'franz', 'frz']],
-  ['Spanisch', ['spanisch', 'spa', 'span']],
-  ['Italienisch', ['italienisch', 'ita', 'ital']],
-  ['Griechisch', ['griechisch', 'gr']],
-  ['Physik', ['physik', 'ph']],
-  ['Chemie', ['chemie', 'ch']],
-  ['Biologie', ['biologie', 'bio', 'bu']],
-  ['Geschichte', ['geschichte', 'gsk', 'gs', 'ge']],
-  ['Geografie', ['geografie', 'geographie', 'geo', 'gwk', 'gw']],
-  ['Informatik', ['informatik', 'info', 'inf']],
-  ['Musik', ['musik', 'mu', 'me']],
-  ['Kunst', ['kunst', 'be', 'bildnerische']],
+  ['Latein', ['latein', 'lat', 'la', 'latin']],
+  ['Französisch', ['französisch', 'franzoesisch', 'franz', 'frz', 'french']],
+  ['Spanisch', ['spanisch', 'spa', 'span', 'spanish']],
+  ['Italienisch', ['italienisch', 'ita', 'ital', 'italian']],
+  ['Griechisch', ['griechisch', 'gr', 'greek']],
+  ['Physik', ['physik', 'ph', 'physics']],
+  ['Chemie', ['chemie', 'ch', 'chemistry']],
+  ['Biologie', ['biologie', 'bio', 'bu', 'biology']],
+  ['Geschichte', ['geschichte', 'gsk', 'gs', 'ge', 'history']],
+  ['Geografie', ['geografie', 'geographie', 'geo', 'gwk', 'gw', 'geography']],
+  ['Informatik', ['informatik', 'info', 'inf', 'computing', 'cs']],
+  ['Musik', ['musik', 'mu', 'me', 'music']],
+  ['Kunst', ['kunst', 'be', 'bildnerische', 'art']],
   ['Religion', ['religion', 'reli', 'rk', 'rel']],
-  ['Ethik', ['ethik', 'eth']],
-  ['Psychologie & Philosophie', ['psychologie', 'philosophie', 'psy', 'philo', 'pup', 'pp']],
-  ['Sport', ['sport', 'bsp', 'turnen']],
-  ['Wirtschaft', ['wirtschaft', 'bwl', 'rw', 'rechnungswesen']],
+  ['Ethik', ['ethik', 'eth', 'ethics']],
+  ['Psychologie & Philosophie', ['psychologie', 'philosophie', 'psy', 'philo', 'pup', 'pp', 'psychology', 'philosophy']],
+  ['Sport', ['sport', 'bsp', 'turnen', 'pe', 'gym']],
+  ['Wirtschaft', ['wirtschaft', 'bwl', 'rw', 'rechnungswesen', 'economics', 'business']],
 ];
 
 /** Kürzel aus WebUntis o. Ä. (oft nur ein Buchstabe) → Fachname wie im Planer */
@@ -438,7 +440,14 @@ function listIntent(text: string): Intent | null {
   return null;
 }
 
-export function interpret(input: string, today: Ymd, now = '12:00'): Intent | null {
+/**
+ * Deutsch und Englisch verstehen die Kurznotizen ohne KI. Für alle anderen Sprachen gibt es keinen Schnellweg:
+ * die Nachricht geht an die KI (Haiku – billig und schon im Kostenplan eingerechnet).
+ */
+export function interpret(input: string, today: Ymd, now = '12:00', opts: { locale?: Locale } = {}): Intent | null {
+  const locale = opts.locale ?? 'de';
+  if (locale === 'en') return interpretEn(input, today, now);
+  if (locale !== 'de') return null;
   const text = input.trim();
   if (!text) return null;
 

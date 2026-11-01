@@ -1,5 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { TONE_INFO, TONES, type Tone } from '@stella/shared';
+import { ANIM_MODES, COUNTRIES, countryName, LOCALES, LOCALE_NAMES, TONE_INFO, TONES, type AnimMode, type Tone } from '@stella/shared';
+import { setAnimMode, useAnimMode } from '../weather.ts';
+import { TelegramSheet } from './settings/Telegram.tsx';
+import { NewsSettings } from './settings/News.tsx';
+import { useLocale, useT } from '../i18n.ts';
 import { api, logout, logoutLocal, meHas, meIsSchool, refreshMe, useStore, type Me } from '../store.ts';
 import { enablePush, isIos, isStandalone, pushPermission } from '../push.ts';
 import { Copy, Section, useAction } from './settings/ui.tsx';
@@ -8,6 +12,7 @@ import { Mail } from './settings/Mail.tsx';
 import { Untis } from './settings/Untis.tsx';
 import { Handwriting } from './settings/Handwriting.tsx';
 import { Server } from './settings/Server.tsx';
+import { PlanSheet } from './settings/Plan.tsx';
 import { Addresses } from './settings/Addresses.tsx';
 import { FinanceSetup } from './settings/Finance.tsx';
 import { ActionLog, MemoryView, Permissions } from './settings/Assistant.tsx';
@@ -15,11 +20,19 @@ import { Icon, type IconName } from '../ui/Icon.tsx';
 import { Sheet, Sky, StarMark, Switch, showToast } from '../ui/Decor.tsx';
 import { VERSION } from '../version.ts';
 
-type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'finance' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server' | 'addresses' | 'delete';
+type SheetId = 'plan' | 'telegram' | 'news' | 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'finance' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server' | 'addresses' | 'delete';
 
-interface AiStatusData { configured: boolean; chain: string[]; visionChain: string[]; coolingDown: string[]; usedToday: number; dailyLimit: number }
+interface CostSummary { totalMicroUsd: number; requests: number }
+interface AiStatusData {
+  configured: boolean; chain: string[]; visionChain: string[]; coolingDown: string[]; usedToday: number; dailyLimit: number;
+  claude?: { configured: boolean; light: string; heavy: string; allowFreeFallback: boolean };
+  cost?: { today: CostSummary; month: CostSummary; eurPerUsd: number };
+}
+const eur = (micro: number, rate: number) => `${((micro / 1e6) * rate).toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 
-export function Settings({ back, openOnboarding, openPlan }: { back: () => void; openOnboarding: (startAt: 'welcome' | 'situation') => void; openPlan: () => void }) {
+export function Settings({ back, openOnboarding, openPlan }: { back: () => void; openOnboarding: (startAt: 'language' | 'situation') => void; openPlan: () => void }) {
+  const t = useT();
+  const locale = useLocale();
   const me = useStore((s) => s.me);
   const online = useStore((s) => s.online);
   const waiting = useStore((s) => Object.values(s.actions).filter((a) => a.status === 'proposed').length);
@@ -39,22 +52,30 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
 
   const rows: { id: SheetId; icon: IconName; tile: string; title: string; sub: string; status: [string, 'ok' | 'todo' | 'warn'] }[] = [
     {
-      id: 'books', icon: 'book', tile: 'pink', title: 'Schulbücher',
-      sub: bookCount ? me.settings.books!.map((b) => b.subject).join(', ') : 'scook, digi4school',
-      status: booksConnected && bookCount ? ['Verbunden', 'ok'] : booksConnected ? ['Fach fehlt', 'warn'] : ['Einrichten', 'todo'],
+      id: 'books', icon: 'book', tile: 'pink', title: t('settings.books'),
+      sub: bookCount ? me.settings.books!.map((b) => b.subject).join(', ') : t('settings.booksSub'),
+      status: booksConnected && bookCount ? [t('settings.connected'), 'ok'] : booksConnected ? [t('settings.subjectMissing'), 'warn'] : [t('settings.setUp'), 'todo'],
     },
-    { id: 'untis', icon: 'school', tile: 'blue', title: 'WebUntis', sub: 'Stundenplan, Entfall, Tests', status: i.webuntis ? ['Verbunden', 'ok'] : ['Einrichten', 'todo'] },
+    { id: 'untis', icon: 'school', tile: 'blue', title: 'WebUntis', sub: t('settings.untisSub'), status: i.webuntis ? [t('settings.connected'), 'ok'] : [t('settings.setUp'), 'todo'] },
     {
-      id: 'mail', icon: 'mail', tile: 'teal', title: 'E-Mail', sub: i.mailAccounts ? `${i.mailAccounts} ${i.mailAccounts === 1 ? 'Postfach' : 'Postfächer'}` : 'Gmail, iCloud',
-      status: i.mailAccounts ? ['Verbunden', 'ok'] : ['Einrichten', 'todo'],
+      id: 'mail', icon: 'mail', tile: 'teal', title: t('settings.email'), sub: i.mailAccounts ? t('settings.mailboxes', { count: i.mailAccounts }) : t('settings.mailSub'),
+      status: i.mailAccounts ? [t('settings.connected'), 'ok'] : [t('settings.setUp'), 'todo'],
     },
-    { id: 'notes', icon: 'pen', tile: 'blue', title: 'FreeNotes & Handschrift', sub: 'HÜs in deine Hefte schreiben', status: i.freeNotes ? ['Verbunden', 'ok'] : ['Einrichten', 'todo'] },
-    { id: 'health', icon: 'heart', tile: 'pink', title: 'Health, SMS & Kalender', sub: 'Kurzbefehle und Kalender-Abo', status: ['Anleitung', 'todo'] },
-    { id: 'finance', icon: 'wallet', tile: 'green', title: 'Ausgaben', sub: 'Apple Pay → Stella', status: ['Anleitung', 'todo'] },
+    { id: 'notes', icon: 'pen', tile: 'blue', title: t('settings.notesTitle'), sub: t('settings.notesSub'), status: i.freeNotes ? [t('settings.connected'), 'ok'] : [t('settings.setUp'), 'todo'] },
+    { id: 'health', icon: 'heart', tile: 'pink', title: t('settings.healthTitle'), sub: t('settings.healthSub'), status: [t('settings.guide'), 'todo'] },
+    { id: 'finance', icon: 'wallet', tile: 'green', title: t('nav.finance'), sub: t('settings.financeSub'), status: [t('settings.guide'), 'todo'] },
     {
-      id: 'notify', icon: 'bell', tile: 'green', title: 'Mitteilungen', sub: 'Erinnerungen auf diesem Gerät',
-      status: perm === 'granted' ? ['An', 'ok'] : perm === 'denied' ? ['Blockiert', 'warn'] : ['Einschalten', 'todo'],
+      id: 'notify', icon: 'bell', tile: 'green', title: t('settings.notify'), sub: t('settings.notifySub'),
+      status: perm === 'granted' ? [t('settings.on'), 'ok'] : perm === 'denied' ? [t('settings.blocked'), 'warn'] : [t('settings.turnOn'), 'todo'],
     },
+    {
+      id: 'news' as const, icon: 'sparkle' as IconName, tile: 'pink', title: t('settings.news.title'), sub: t('settings.news.sub'),
+      status: (me.settings.news?.enabled ? [t('settings.on'), 'ok'] : [t('settings.turnOn'), 'todo']) as [string, 'ok' | 'todo' | 'warn'],
+    },
+    ...(me.flags?.telegram ? [{
+      id: 'telegram' as const, icon: 'send' as IconName, tile: 'blue', title: t('settings.telegram.title'), sub: t('settings.telegram.sub'),
+      status: (me.settings.notifyVia?.includes('telegram') ? [t('settings.connected'), 'ok'] : [t('settings.setUp'), 'todo']) as [string, 'ok' | 'todo' | 'warn'],
+    }] : []),
   ];
 
   const school = meIsSchool(me);
@@ -66,7 +87,7 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
     return true;
   });
 
-  async function patch(json: Record<string, unknown>, ok = 'Gespeichert') {
+  async function patch(json: Record<string, unknown>, ok = t('settings.saved')) {
     try {
       await api('/api/settings', { method: 'PATCH', json });
       await refreshMe();
@@ -82,8 +103,8 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
       <div className="page-inner stagger">
         <header className="page-head">
           <div className="row" style={{ gap: 4 }}>
-            <button type="button" className="icon-btn" aria-label="Zurück" onClick={back}><Icon name="back" size={18} /></button>
-            <h1 className="display" style={{ fontSize: 28 }}>Einstellungen</h1>
+            <button type="button" className="icon-btn" aria-label={t('settings.back')} onClick={back}><Icon name="back" size={18} /></button>
+            <h1 className="display" style={{ fontSize: 28 }}>{t('settings.title')}</h1>
           </div>
         </header>
 
@@ -91,13 +112,23 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
           <span className="avatar-star" style={{ width: 52, height: 52 }}><StarMark size={24} /></span>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontWeight: 600 }}>{me.name}</span>
-            <span className="small" style={{ color: online ? 'var(--green)' : 'var(--pink-text)' }}>{online ? 'Mit deinem Stella-Server verbunden' : 'Gerade offline'}</span>
+            <span className="small" style={{ color: online ? 'var(--green)' : 'var(--pink-text)' }}>{online ? t('settings.serverOnline') : t('settings.offline')}</span>
           </div>
         </section>
 
-        <TonePicker value={me.settings.tone ?? 'nett'} onChange={(tone) => void patch({ tone }, `${TONE_INFO[tone].emoji} Stella ist jetzt ${TONE_INFO[tone].label.toLowerCase()}`)} />
+        <TonePicker value={me.settings.tone ?? 'nett'} onChange={(tone) => void patch({ tone }, `${TONE_INFO[tone].emoji} ${t('settings.toneNow', { tone: t(`tone.${tone}`).toLowerCase() })}`)} />
 
-        <Group title="Verbindungen">
+        <LanguagePicker />
+
+        <Group title={t('plan.title')}>
+          <button type="button" className="list-row" onClick={() => setSheet('plan')}>
+            <span className="icon-tile pink" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="star" size={18} /></span>
+            <span className="grow"><span className="list-title">{t('plan.current')}</span></span>
+            <Icon name="chevron" size={16} />
+          </button>
+        </Group>
+
+        <Group title={t('settings.groupConnections')}>
           {visibleRows.map((r) => (
             <button key={r.id} type="button" className="list-row" onClick={() => setSheet(r.id)}>
               <span className={`icon-tile ${r.tile}`} style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name={r.icon} size={18} /></span>
@@ -108,70 +139,70 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
           ))}
         </Group>
 
-        <Group title="Du & Stella">
+        <Group title={t('settings.groupYou')}>
           <button type="button" className="list-row" onClick={() => openOnboarding('situation')}>
             <span className="icon-tile pink" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="star" size={18} /></span>
-            <span className="grow"><span className="list-title">Profil</span><span className="list-sub">{profileSummary(me)}</span></span>
+            <span className="grow"><span className="list-title">{t('settings.profile')}</span><span className="list-sub">{profileSummary(me, t)}</span></span>
             <Icon name="chevron" size={16} />
           </button>
           <button type="button" className="list-row" onClick={() => setSheet('addresses')}>
             <span className="icon-tile green" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="mail" size={18} /></span>
-            <span className="grow"><span className="list-title">Mail an Stella</span><span className="list-sub">stella@evolsior.com – von deinen Adressen aus schreiben</span></span>
+            <span className="grow"><span className="list-title">{t('settings.mailToStella')}</span><span className="list-sub">{t('settings.mailToStellaSub')}</span></span>
             <Icon name="chevron" size={16} />
           </button>
-          <button type="button" className="list-row" onClick={() => openOnboarding('welcome')}>
+          <button type="button" className="list-row" onClick={() => openOnboarding('language')}>
             <span className="icon-tile blue" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="sparkle" size={18} /></span>
-            <span className="grow"><span className="list-title">Einführung wiederholen</span><span className="list-sub">Stella neu auf dich einstellen</span></span>
+            <span className="grow"><span className="list-title">{t('settings.redoIntro')}</span><span className="list-sub">{t('settings.redoIntroSub')}</span></span>
             <Icon name="chevron" size={16} />
           </button>
         </Group>
 
-        <Group title="Stella als Assistentin">
+        <Group title={t('settings.groupAssistant')}>
           <button type="button" className="list-row" onClick={openPlan}>
             <span className="icon-tile green" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="calendar" size={18} /></span>
-            <span className="grow"><span className="list-title">Was Stella vorhat</span><span className="list-sub">Erinnerungen, Daueraufträge, Automatiken – ändern oder abstellen</span></span>
+            <span className="grow"><span className="list-title">{t('settings.plan')}</span><span className="list-sub">{t('settings.planSub')}</span></span>
             <Icon name="chevron" size={16} />
           </button>
           <button type="button" className="list-row" onClick={() => setSheet('perms')}>
             <span className="icon-tile blue" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="shield" size={18} /></span>
-            <span className="grow"><span className="list-title">Was Stella selbst darf</span><span className="list-sub">HÜs lösen, Planer ändern, Werbung löschen …</span></span>
+            <span className="grow"><span className="list-title">{t('settings.perms')}</span><span className="list-sub">{t('settings.permsSub')}</span></span>
             <Icon name="chevron" size={16} />
           </button>
           <button type="button" className="list-row" onClick={() => setSheet('memory')}>
             <span className="icon-tile pink" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="memory" size={18} /></span>
-            <span className="grow"><span className="list-title">Was Stella über dich weiß</span><span className="list-sub">ansehen, ändern, löschen</span></span>
+            <span className="grow"><span className="list-title">{t('settings.memory')}</span><span className="list-sub">{t('settings.memorySub')}</span></span>
             <Icon name="chevron" size={16} />
           </button>
           <button type="button" className="list-row" onClick={() => setSheet('log')}>
             <span className="icon-tile green" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="history" size={18} /></span>
-            <span className="grow"><span className="list-title">Was Stella getan hat</span><span className="list-sub">mit „Rückgängig“</span></span>
-            {waiting > 0 && <span className="status warn">{waiting} {waiting === 1 ? 'Frage' : 'Fragen'}</span>}
+            <span className="grow"><span className="list-title">{t('settings.log')}</span><span className="list-sub">{t('settings.logSub')}</span></span>
+            {waiting > 0 && <span className="status warn">{t('settings.questions', { count: waiting })}</span>}
             <Icon name="chevron" size={16} />
           </button>
         </Group>
 
-        <Group title="Zeiten & Ziele">
-          <BriefingRow value={me.settings.briefing ?? 'auto'} onSave={(v) => void patch({ briefing: v }, v === 'off' ? 'Briefing aus' : 'Gespeichert')} />
+        <Group title={t('settings.groupTimes')}>
+          <BriefingRow value={me.settings.briefing ?? 'auto'} onSave={(v) => void patch({ briefing: v }, v === 'off' ? t('settings.briefingOff') : t('settings.saved'))} />
           <label className="list-row">
-            <span className="grow"><span className="list-title">Wochenplan am Sonntag</span>
-              <span className="list-sub">Sonntagabend schlägt Stella einen Plan für die neue Woche vor</span></span>
-            <Switch label="Wochenplan am Sonntag" checked={me.settings.weekPlan !== 'off'}
-              onChange={(on) => void patch({ weekPlan: on ? 'sunday' : 'off' }, on ? 'Kommt Sonntagabend' : 'Kein Wochenplan mehr am Sonntag')} />
+            <span className="grow"><span className="list-title">{t('settings.weekPlan')}</span>
+              <span className="list-sub">{t('settings.weekPlanSub')}</span></span>
+            <Switch label={t('settings.weekPlan')} checked={me.settings.weekPlan !== 'off'}
+              onChange={(on) => void patch({ weekPlan: on ? 'sunday' : 'off' }, on ? t('settings.weekPlanOn') : t('settings.weekPlanOff'))} />
           </label>
-          <TimeRow label="Erinnerung am Vorabend" value={me.settings.eveningTime ?? '19:00'} onSave={(v) => void patch({ eveningTime: v })} />
-          <TimeRow label="Lernzeit" value={me.settings.studyTime ?? '16:30'} onSave={(v) => void patch({ studyTime: v })} />
+          <TimeRow label={t('settings.eveningReminder')} value={me.settings.eveningTime ?? '19:00'} onSave={(v) => void patch({ eveningTime: v })} />
+          <TimeRow label={t('settings.studyTime')} value={me.settings.studyTime ?? '16:30'} onSave={(v) => void patch({ studyTime: v })} />
           <label className="list-row">
-            <span className="grow"><span className="list-title">Schritte-Ziel</span></span>
+            <span className="grow"><span className="list-title">{t('settings.stepGoal')}</span></span>
             <input type="number" min={1000} step={500} defaultValue={me.settings.stepGoal ?? 8000} style={{ width: 110, textAlign: 'right' }}
               onBlur={(e) => { const n = Number(e.target.value); if (n && n !== me.settings.stepGoal) void patch({ stepGoal: n }); }} />
           </label>
         </Group>
 
         {me.role === 'owner' && (
-          <Group title="Server">
+          <Group title={t('settings.groupServer')}>
             <button type="button" className="list-row" onClick={() => setSheet('server')}>
               <span className="icon-tile blue" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="shield" size={18} /></span>
-              <span className="grow"><span className="list-title">Schlüssel & Absender</span><span className="list-sub">Groq, OpenRouter, E-Mail-Versand</span></span>
+              <span className="grow"><span className="list-title">{t('settings.keysTitle')}</span><span className="list-sub">{t('settings.keysSub')}</span></span>
               <Icon name="chevron" size={16} />
             </button>
           </Group>
@@ -180,8 +211,8 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
         {ai?.configured && (
           <button type="button" className="card interactive" onClick={() => setSheet('ai')} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div className="row" style={{ justifyContent: 'space-between' }}>
-              <span style={{ fontWeight: 600 }}>KI heute</span>
-              <span className="small muted" style={{ fontVariantNumeric: 'tabular-nums' }}><strong style={{ color: 'var(--text)' }}>{ai.usedToday}</strong> / {ai.dailyLimit} Anfragen</span>
+              <span style={{ fontWeight: 600 }}>{t('settings.aiToday')}</span>
+              <span className="small muted" style={{ fontVariantNumeric: 'tabular-nums' }}><strong style={{ color: 'var(--text)' }}>{ai.usedToday}</strong> / {ai.dailyLimit} {t('settings.aiRequests')}</span>
             </div>
             <div className="progress"><div style={{ width: `${Math.min(100, (ai.usedToday / ai.dailyLimit) * 100)}%` }} /></div>
             {ai.dailyLimit <= 50 && <span className="small muted">Einmal 10 $ bei OpenRouter aufladen → 1.000 pro Tag</span>}
@@ -189,50 +220,96 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
         )}
 
         <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontWeight: 600 }}>Über Stella</span>
-          <span className="small muted">Version {VERSION}</span>
+          <span style={{ fontWeight: 600 }}>{t('settings.about')}</span>
+          <span className="small muted">{t('settings.version', { version: VERSION })}</span>
           <span className="small">Stella by EVOLSIOR – <em>Built to become</em></span>
-          <span className="small muted">EVOLSIOR steckt in zwei Wörtern: <em>Evolic</em> (sich weiterentwickeln) und <em>Excelsior</em> (immer höher hinaus).</span>
+          <span className="small muted" dangerouslySetInnerHTML={{ __html: t('settings.etymology') }} />
         </section>
 
         <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
-          <button type="button" className="btn secondary" onClick={() => void logout()}><Icon name="logout" size={18} />Abmelden</button>
-          <button type="button" className="link danger" onClick={() => setSheet('delete')}>Konto löschen</button>
+          <button type="button" className="btn secondary" onClick={() => void logout()}><Icon name="logout" size={18} />{t('settings.logout')}</button>
+          <button type="button" className="link danger" onClick={() => setSheet('delete')}>{t('settings.deleteAccount')}</button>
         </div>
       </div>
 
-      {sheet === 'books' && <Sheet title="Schulbücher" onClose={() => setSheet(null)}><Books me={me} /></Sheet>}
+      {sheet === 'plan' && <Sheet title={t('plan.title')} onClose={() => setSheet(null)}><PlanSheet /></Sheet>}
+      {sheet === 'news' && <Sheet title={t('settings.news.title')} onClose={() => setSheet(null)}><NewsSettings /></Sheet>}
+      {sheet === 'telegram' && <Sheet title={t('settings.telegram.title')} onClose={() => setSheet(null)}><TelegramSheet /></Sheet>}
+      {sheet === 'books' && <Sheet title={t('settings.books')} onClose={() => setSheet(null)}><Books me={me} /></Sheet>}
       {sheet === 'untis' && <Sheet title="WebUntis" onClose={() => setSheet(null)}><Untis me={me} /></Sheet>}
-      {sheet === 'mail' && <Sheet title="E-Mail" onClose={() => setSheet(null)}><Mail me={me} /></Sheet>}
-      {sheet === 'notes' && <Sheet title="FreeNotes & Handschrift" onClose={() => setSheet(null)}><Handwriting me={me} /></Sheet>}
-      {sheet === 'health' && <Sheet title="Health, SMS & Kalender" onClose={() => setSheet(null)}><Shortcuts me={me} /></Sheet>}
-      {sheet === 'finance' && <Sheet title="Ausgaben" onClose={() => setSheet(null)}><FinanceSetup me={me} /></Sheet>}
-      {sheet === 'notify' && <Sheet title="Mitteilungen" onClose={() => setSheet(null)}><Notifications onChange={() => setPerm(pushPermission())} /></Sheet>}
-      {sheet === 'ai' && ai && <Sheet title="KI" onClose={() => setSheet(null)}><AiDetails ai={ai} /></Sheet>}
-      {sheet === 'perms' && <Sheet title="Was Stella selbst darf" onClose={() => setSheet(null)}><Permissions /></Sheet>}
-      {sheet === 'memory' && <Sheet title="Was Stella über dich weiß" onClose={() => setSheet(null)}><MemoryView /></Sheet>}
-      {sheet === 'addresses' && <Sheet title="Mail an Stella" onClose={() => setSheet(null)}><Addresses me={me} /></Sheet>}
-      {sheet === 'server' && <Sheet title="Server" onClose={() => setSheet(null)}><Server /></Sheet>}
-      {sheet === 'delete' && <Sheet title="Konto löschen" onClose={() => setSheet(null)}><DeleteAccount onDeleted={() => { setSheet(null); logoutLocal(); }} /></Sheet>}
-      {sheet === 'log' && <Sheet title="Was Stella getan hat" onClose={() => setSheet(null)}><ActionLog /></Sheet>}
+      {sheet === 'mail' && <Sheet title={t('settings.email')} onClose={() => setSheet(null)}><Mail me={me} /></Sheet>}
+      {sheet === 'notes' && <Sheet title={t('settings.notesTitle')} onClose={() => setSheet(null)}><Handwriting me={me} /></Sheet>}
+      {sheet === 'health' && <Sheet title={t('settings.healthTitle')} onClose={() => setSheet(null)}><Shortcuts me={me} /></Sheet>}
+      {sheet === 'finance' && <Sheet title={t('nav.finance')} onClose={() => setSheet(null)}><FinanceSetup me={me} /></Sheet>}
+      {sheet === 'notify' && <Sheet title={t('settings.notify')} onClose={() => setSheet(null)}><Notifications onChange={() => setPerm(pushPermission())} /></Sheet>}
+      {sheet === 'ai' && ai && <Sheet title={t('settings.ai')} onClose={() => setSheet(null)}><AiDetails ai={ai} owner={me.role === 'owner'} /></Sheet>}
+      {sheet === 'perms' && <Sheet title={t('settings.perms')} onClose={() => setSheet(null)}><Permissions /></Sheet>}
+      {sheet === 'memory' && <Sheet title={t('settings.memory')} onClose={() => setSheet(null)}><MemoryView /></Sheet>}
+      {sheet === 'addresses' && <Sheet title={t('settings.mailToStella')} onClose={() => setSheet(null)}><Addresses me={me} /></Sheet>}
+      {sheet === 'server' && <Sheet title={t('settings.groupServer')} onClose={() => setSheet(null)}><Server /></Sheet>}
+      {sheet === 'delete' && <Sheet title={t('settings.deleteAccount')} onClose={() => setSheet(null)}><DeleteAccount onDeleted={() => { setSheet(null); logoutLocal(); }} /></Sheet>}
+      {sheet === 'log' && <Sheet title={t('settings.log')} onClose={() => setSheet(null)}><ActionLog /></Sheet>}
     </div>
   );
 }
 
-function TonePicker({ value, onChange }: { value: Tone; onChange: (t: Tone) => void }) {
+/** Sprache und Land: gelten für die App, Stellas Antworten, Mails und Mitteilungen */
+function LanguagePicker() {
+  const t = useT();
+  const me = useStore((s) => s.me);
+  const locale = useLocale();
+  const country = me?.settings.country ?? '';
+  const animMode = useAnimMode();
+  async function save(patchBody: Record<string, string>) {
+    try {
+      await api('/api/settings', { method: 'PATCH', json: patchBody });
+      await refreshMe();
+      showToast(t('settings.languageSaved'));
+    } catch (err) { showToast((err as Error).message, true); }
+  }
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <h2 className="eyebrow" style={{ margin: '4px 4px 0' }}>Wie Stella schreibt</h2>
-      <div className="tone-grid" role="radiogroup" aria-label="Wie Stella schreibt">
-        {TONES.map((t) => (
-          <button key={t} type="button" role="radio" aria-checked={value === t} className={value === t ? 'tone active' : 'tone'}
-            onClick={() => value !== t && onChange(t)}>
-            <span className="tone-emoji" aria-hidden="true">{TONE_INFO[t].emoji}</span>
-            <span className="tone-label">{TONE_INFO[t].label}</span>
+      <h2 className="eyebrow" style={{ margin: '4px 4px 0' }}>{t('settings.languageTitle')}</h2>
+      <div className="list">
+        <label className="list-row">
+          <span className="grow"><span className="list-title">{t('settings.language')}</span><span className="list-sub">{t('settings.languageSub')}</span></span>
+          <select value={locale} aria-label={t('settings.language')} onChange={(e) => void save({ locale: e.target.value })}>
+            {LOCALES.map((l) => <option key={l} value={l}>{LOCALE_NAMES[l]}</option>)}
+          </select>
+        </label>
+        <label className="list-row">
+          <span className="grow"><span className="list-title">{t('settings.country')}</span></span>
+          <select value={country} aria-label={t('settings.country')} onChange={(e) => void save({ country: e.target.value })}>
+            {!country && <option value="">–</option>}
+            {COUNTRIES.map((c) => <option key={c} value={c}>{countryName(c, locale)}</option>)}
+          </select>
+        </label>
+        <label className="list-row">
+          <span className="grow"><span className="list-title">{t('settings.weatherAnim')}</span><span className="list-sub">{t('settings.weatherAnimSub')}</span></span>
+          <select value={animMode} aria-label={t('settings.weatherAnim')} onChange={(e) => setAnimMode(e.target.value as AnimMode)}>
+            {ANIM_MODES.map((m) => <option key={m} value={m}>{t(`settings.weatherAnim.${m}`)}</option>)}
+          </select>
+        </label>
+      </div>
+    </section>
+  );
+}
+
+function TonePicker({ value, onChange }: { value: Tone; onChange: (t: Tone) => void }) {
+  const t = useT();
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <h2 className="eyebrow" style={{ margin: '4px 4px 0' }}>{t('settings.toneTitle')}</h2>
+      <div className="tone-grid" role="radiogroup" aria-label={t('settings.toneTitle')}>
+        {TONES.map((tone) => (
+          <button key={tone} type="button" role="radio" aria-checked={value === tone} className={value === tone ? 'tone active' : 'tone'}
+            onClick={() => value !== tone && onChange(tone)}>
+            <span className="tone-emoji" aria-hidden="true">{TONE_INFO[tone].emoji}</span>
+            <span className="tone-label">{t(`tone.${tone}`)}</span>
           </button>
         ))}
       </div>
-      <p className="tone-example" key={value}>„{TONE_INFO[value].example}“</p>
+      <p className="tone-example" key={value}>„{t(`tone.${value}.example`)}“</p>
     </section>
   );
 }
@@ -324,10 +401,18 @@ function Shortcuts({ me }: { me: Me }) {
   );
 }
 
-function AiDetails({ ai }: { ai: AiStatusData }) {
+function AiDetails({ ai, owner }: { ai: AiStatusData; owner: boolean }) {
   return (
     <>
-      <Section title="Verbrauch heute">
+      {ai.claude?.configured && (
+        <Section title="Claude">
+          <p className="small">Alltag: <code>{ai.claude.light}</code><br />Schwere Aufgaben: <code>{ai.claude.heavy}</code></p>
+          {ai.cost && owner && (
+            <p className="small">Kosten heute <strong>{eur(ai.cost.today.totalMicroUsd, ai.cost.eurPerUsd)}</strong> ({ai.cost.today.requests} Anfragen) · diesen Monat <strong>{eur(ai.cost.month.totalMicroUsd, ai.cost.eurPerUsd)}</strong></p>
+          )}
+        </Section>
+      )}
+      <Section title="Verbrauch heute (Gratis-Modelle)">
         <p><strong>{ai.usedToday}</strong> von {ai.dailyLimit} Anfragen. Mails sortieren nutzt höchstens die Hälfte, damit für dich immer etwas übrig bleibt.</p>
       </Section>
       <Section title="Modelle (automatisch gewählt)">
@@ -340,12 +425,11 @@ function AiDetails({ ai }: { ai: AiStatusData }) {
   );
 }
 
-const SITUATION_LABEL: Record<string, string> = { school: 'Schule', university: 'Studium', work: 'Job', apprenticeship: 'Lehre', other: 'Alltag' };
-function profileSummary(me: Me) {
+function profileSummary(me: Me, t: (k: string) => string) {
   const p = me.settings.profile;
-  if (!p) return 'noch nicht eingerichtet';
+  if (!p) return t('settings.notSetUp');
   const w = p.workHours;
-  return `${SITUATION_LABEL[p.situation] ?? p.situation}${w ? ` · ${w.start}–${w.end}` : ''}`;
+  return `${t(`onboarding.situation.${p.situation}.label`)}${w ? ` · ${w.start}–${w.end}` : ''}`;
 }
 
 /** Konto samt allen Daten löschen – mit Passwort als Bestätigung. */
