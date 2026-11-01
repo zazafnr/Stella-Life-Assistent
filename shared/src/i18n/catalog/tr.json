@@ -650,5 +650,22 @@
  "screentime.shield": "Sınırda bu uygulamaları engelle",
  "screentime.authorize": "Ekran süresi erişimine izin ver",
  "screentime.report": "Bu hafta",
- "screentime.privacy": "Uygulama listesi cihazında kalır. Stella yalnızca adı, sınırı ve bir eşiğe ne zaman ulaşıldığını öğrenir."
+ "screentime.privacy": "Uygulama listesi cihazında kalır. Stella yalnızca adı, sınırı ve bir eşiğe ne zaman ulaşıldığını öğrenir.",
+ "shell.search": "Ara veya git …",
+ "shell.collapse": "Kenar çubuğunu daralt",
+ "shell.expand": "Kenar çubuğunu genişlet",
+ "shell.more": "Daha fazla",
+ "palette.placeholder": "Sayfa veya eylem bul …",
+ "palette.empty": "Sonuç bulunamadı",
+ "palette.pages": "Sayfalar",
+ "palette.actions": "Eylemler",
+ "palette.select": "Seç",
+ "palette.open": "Aç",
+ "palette.close": "Kapat",
+ "palette.newChat": "Stella ile yeni sohbet",
+ "login.art.1": "Görevler, randevular ve ödevler tek yerde",
+ "login.art.2": "Stella e-postalarını okur ve seni zamanında uyarır",
+ "login.art.3": "Ona yaz ya da konuş, bilgisayarda ve telefonda",
+ "planner.viewWeek": "Hafta",
+ "planner.viewDay": "Gün"
 }

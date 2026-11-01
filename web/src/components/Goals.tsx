@@ -276,10 +276,12 @@ export function Goals() {
             <button type="button" className="btn" onClick={() => setAdding(true)}>Erstes Ziel anlegen</button>
           </section>
         )}
-        {active.map((g) => <GoalCard key={g.id} goal={g} tz={tz} onChange={upsert} onRemoved={(id) => setGoals((gs) => (gs ?? []).filter((x) => x.id !== id))} />)}
-        <ScreenTimeCard />
+        <div className="goal-grid">
+          {active.map((g) => <GoalCard key={g.id} goal={g} tz={tz} onChange={upsert} onRemoved={(id) => setGoals((gs) => (gs ?? []).filter((x) => x.id !== id))} />)}
+          <ScreenTimeCard />
+        </div>
         {rest.length > 0 && <span className="eyebrow">Pausiert und erreicht</span>}
-        {rest.map((g) => <GoalCard key={g.id} goal={g} tz={tz} onChange={upsert} onRemoved={(id) => setGoals((gs) => (gs ?? []).filter((x) => x.id !== id))} />)}
+        {rest.length > 0 && <div className="goal-grid">{rest.map((g) => <GoalCard key={g.id} goal={g} tz={tz} onChange={upsert} onRemoved={(id) => setGoals((gs) => (gs ?? []).filter((x) => x.id !== id))} />)}</div>}
       </div>
       {adding && <GoalForm onSaved={upsert} onClose={() => setAdding(false)} />}
     </div>

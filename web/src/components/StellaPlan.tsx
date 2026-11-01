@@ -3,7 +3,7 @@ import type { StellaPlanControl, StellaPlanEntry } from '@stella/shared';
 import { api, decideAction, sync } from '../store.ts';
 import type { Tab } from '../App.tsx';
 import { Icon } from '../ui/Icon.tsx';
-import { Sky, Switch, showToast } from '../ui/Decor.tsx';
+import { Switch, showToast } from '../ui/Decor.tsx';
 
 interface PlanResponse { entries: StellaPlanEntry[]; soon: StellaPlanEntry[] }
 
@@ -101,14 +101,7 @@ export function StellaPlan({ back, go }: { back: () => void; go: (tab: Tab) => v
 
   return (
     <div className="page">
-      <Sky />
-      <div className="page-inner stagger">
-        <header className="page-head">
-          <div className="row" style={{ gap: 4 }}>
-            <button type="button" className="icon-btn" aria-label="Zurück" onClick={back}><Icon name="back" size={18} /></button>
-            <h1 className="display">Was Stella vorhat</h1>
-          </div>
-        </header>
+      <div className="page-inner narrow">
         <p className="muted" style={{ margin: 0 }}>Alles, was Stella von selbst tut. Jeder Punkt lässt sich ändern oder abstellen – und mit „Rückgängig“ wieder zurückholen.</p>
 
         {!data && <p className="muted">⏳ Einen Moment …</p>}

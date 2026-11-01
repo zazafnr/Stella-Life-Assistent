@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { addDays, todayIn, type HealthDay } from '@stella/shared';
 import { api, useStore } from '../store.ts';
 import { Icon } from '../ui/Icon.tsx';
-import { Ring, Sky, showToast } from '../ui/Decor.tsx';
+import { Ring, showToast } from '../ui/Decor.tsx';
 
 export function Health({ back }: { back: () => void }) {
   const me = useStore((s) => s.me);
@@ -25,15 +25,7 @@ export function Health({ back }: { back: () => void }) {
 
   return (
     <div className="page">
-      <Sky />
-      <div className="page-inner stagger">
-        <header className="page-head">
-          <div className="row" style={{ gap: 4 }}>
-            <button type="button" className="icon-btn" aria-label="Zurück" onClick={back}><Icon name="back" size={18} /></button>
-            <h1 className="display">Gesundheit</h1>
-          </div>
-        </header>
-
+      <div className="page-inner narrow">
         <section className="card row" style={{ gap: 18 }}>
           <Ring size={96} value={todaySteps / goal} color="#34C77B" label={<span style={{ fontSize: 20 }}>{Math.round((todaySteps / goal) * 100)}%</span>} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

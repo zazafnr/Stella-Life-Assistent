@@ -650,5 +650,22 @@
  "screentime.shield": "Blocca queste app al limite",
  "screentime.authorize": "Consenti l’accesso al tempo di utilizzo",
  "screentime.report": "Questa settimana",
- "screentime.privacy": "L’elenco delle app resta sul tuo dispositivo. Stella conosce solo nome, limite e quando è stata raggiunta una soglia."
+ "screentime.privacy": "L’elenco delle app resta sul tuo dispositivo. Stella conosce solo nome, limite e quando è stata raggiunta una soglia.",
+ "shell.search": "Cerca o vai a …",
+ "shell.collapse": "Comprimi barra laterale",
+ "shell.expand": "Espandi barra laterale",
+ "shell.more": "Altro",
+ "palette.placeholder": "Trova una pagina o un'azione …",
+ "palette.empty": "Nessun risultato",
+ "palette.pages": "Pagine",
+ "palette.actions": "Azioni",
+ "palette.select": "Seleziona",
+ "palette.open": "Apri",
+ "palette.close": "Chiudi",
+ "palette.newChat": "Nuova chat con Stella",
+ "login.art.1": "Compiti, appuntamenti e impegni in un unico posto",
+ "login.art.2": "Stella legge le tue mail e ti avvisa in tempo",
+ "login.art.3": "Scrivile o parlale, dal computer e dal telefono",
+ "planner.viewWeek": "Settimana",
+ "planner.viewDay": "Giorno"
 }

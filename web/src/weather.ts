@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from 'react';
 import { isAnimMode, isWeatherType, startWeather, type AnimMode, type WeatherState, type WeatherType } from '@stella/shared';
 import { api, getState } from './store.ts';
+import { isDesktopApp } from './platform.ts';
 
 const CACHE_KEY = 'stella.weather';
 const FORCE_KEY = 'stella.forceWeather';
@@ -36,13 +37,14 @@ export const forcedWeather = () => forced;
 export function useWeather(): WeatherState | null {
   const real = useSyncExternalStore(subscribe, () => current);
   const f = useSyncExternalStore(subscribe, () => forced);
+  if (!isDesktopApp) return null; // im Browser gibt es kein Wetter, nur in der PC-App
   return f ? { type: f.type, day: f.day, temp: real?.temp ?? 15, wind: real?.wind ?? 1, at: Date.now() } : real;
 }
 
 let started = false;
 /** Einmal pro App-Start, sobald jemand angemeldet ist */
 export function startWeatherOnce() {
-  if (started) return;
+  if (started || !isDesktopApp) return;
   started = true;
   const granted = () => getState().me?.settings.locationPermission === 'granted';
   startWeather({

@@ -7,7 +7,7 @@ import { AudioPlayer, VoiceLine, AuthImage, Lightbox, Rich } from './Rich.tsx';
 import { ItemStatus } from './Today.tsx';
 import { ActionCard } from './ActionCard.tsx';
 import { Icon } from '../ui/Icon.tsx';
-import { CloudSky, Sheet, StarMark, showToast } from '../ui/Decor.tsx';
+import { Sheet, StarMark, showToast } from '../ui/Decor.tsx';
 import { NewsAskCard } from './NewsAsk.tsx';
 import { AvailabilityCardView, LocationAskCard, RestaurantsCardView } from './ErrandCards.tsx';
 import { WeatherBackground, useSceneMode } from '../weather/WeatherBackground.tsx';
@@ -152,8 +152,8 @@ export function Chat() {
   return (
     <div style={{ display: 'flex', flex: 1, minHeight: 0, minWidth: 0 }}>
       <aside className="chat-history" aria-label={t('chat.chats')}><ChatHistory onNew={() => void startNew()} /></aside>
-      <div className="chat" data-scene={scene}>
-        {showWeather ? <WeatherBackground /> : <CloudSky />}
+      <div className={showWeather ? 'chat has-weather' : 'chat'} data-scene={scene}>
+        {showWeather && <WeatherBackground />}
         <header className="chat-head">
           <span className="avatar-star"><StarMark size={19} /></span>
           <div style={{ display: 'flex', flexDirection: 'column' }}>

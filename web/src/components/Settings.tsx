@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ANIM_MODES, COUNTRIES, countryName, LOCALES, LOCALE_NAMES, TONE_INFO, TONES, type AnimMode, type Tone } from '@stella/shared';
 import { setAnimMode, useAnimMode } from '../weather.ts';
+import { isDesktopApp } from '../platform.ts';
 import { TelegramSheet } from './settings/Telegram.tsx';
 import { NewsSettings } from './settings/News.tsx';
 import { useLocale, useT } from '../i18n.ts';
@@ -17,7 +18,7 @@ import { Addresses } from './settings/Addresses.tsx';
 import { FinanceSetup } from './settings/Finance.tsx';
 import { ActionLog, MemoryView, Permissions } from './settings/Assistant.tsx';
 import { Icon, type IconName } from '../ui/Icon.tsx';
-import { Sheet, Sky, StarMark, Switch, showToast } from '../ui/Decor.tsx';
+import { Sheet, StarMark, Switch, showToast } from '../ui/Decor.tsx';
 import { VERSION } from '../version.ts';
 
 type SheetId = 'plan' | 'telegram' | 'news' | 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'finance' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server' | 'addresses' | 'delete';
@@ -45,7 +46,7 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
     api<AiStatusData>('/api/ai/status').then(setAi).catch(() => {});
   }, []);
 
-  if (!me) return <div className="page"><Sky clouds={false} /></div>;
+  if (!me) return <div className="page" />;
   const i = me.integrations;
   const booksConnected = Object.values(i.books ?? {}).some((b) => b.connected);
   const bookCount = me.settings.books?.length ?? 0;
@@ -99,22 +100,17 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
 
   return (
     <div className="page">
-      <Sky clouds={false} />
-      <div className="page-inner stagger">
-        <header className="page-head">
-          <div className="row" style={{ gap: 4 }}>
-            <button type="button" className="icon-btn" aria-label={t('settings.back')} onClick={back}><Icon name="back" size={18} /></button>
-            <h1 className="display" style={{ fontSize: 28 }}>{t('settings.title')}</h1>
-          </div>
-        </header>
-
+      <div className="page-inner">
         <section className="card row">
           <span className="avatar-star" style={{ width: 52, height: 52 }}><StarMark size={24} /></span>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontWeight: 600 }}>{me.name}</span>
             <span className="small" style={{ color: online ? 'var(--green)' : 'var(--pink-text)' }}>{online ? t('settings.serverOnline') : t('settings.offline')}</span>
           </div>
+          <button type="button" className="btn secondary small" onClick={() => void logout()}><Icon name="logout" size={15} />{t('settings.logout')}</button>
         </section>
+
+        <div className="settings-cols">
 
         <TonePicker value={me.settings.tone ?? 'nett'} onChange={(tone) => void patch({ tone }, `${TONE_INFO[tone].emoji} ${t('settings.toneNow', { tone: t(`tone.${tone}`).toLowerCase() })}`)} />
 
@@ -227,8 +223,8 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
         </section>
 
         <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
-          <button type="button" className="btn secondary" onClick={() => void logout()}><Icon name="logout" size={18} />{t('settings.logout')}</button>
           <button type="button" className="link danger" onClick={() => setSheet('delete')}>{t('settings.deleteAccount')}</button>
+        </div>
         </div>
       </div>
 
@@ -284,12 +280,12 @@ function LanguagePicker() {
             {COUNTRIES.map((c) => <option key={c} value={c}>{countryName(c, locale)}</option>)}
           </select>
         </label>
-        <label className="list-row">
+        {isDesktopApp && <label className="list-row">
           <span className="grow"><span className="list-title">{t('settings.weatherAnim')}</span><span className="list-sub">{t('settings.weatherAnimSub')}</span></span>
           <select value={animMode} aria-label={t('settings.weatherAnim')} onChange={(e) => setAnimMode(e.target.value as AnimMode)}>
             {ANIM_MODES.map((m) => <option key={m} value={m}>{t(`settings.weatherAnim.${m}`)}</option>)}
           </select>
-        </label>
+        </label>}
       </div>
     </section>
   );

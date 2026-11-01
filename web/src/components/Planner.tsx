@@ -3,7 +3,8 @@ import { addDays, formatDateDe, todayIn, weekdayOf, type Item } from '@stella/sh
 import { api, deleteItem, meIsLearner, meIsSchool, patchItem, useStore } from '../store.ts';
 import { AuthImage, Lightbox } from './Rich.tsx';
 import { Icon } from '../ui/Icon.tsx';
-import { Confetti, Sky, showToast } from '../ui/Decor.tsx';
+import { useLocale, useT } from '../i18n.ts';
+import { Confetti, Sheet, showToast } from '../ui/Decor.tsx';
 import { WeekPlanSheet } from './WeekPlanSheet.tsx';
 
 interface Lesson { date: string; start: string; end: string; subject: string | null; code: string | null; status: string; info: string | null }
@@ -28,7 +29,15 @@ const KIND_LABEL: Record<string, string> = {
   homework: 'Hausübung', exam: 'Test / Schularbeit', assignment: 'Abgabe', event: 'Termin', todo: 'To-do', study: 'Lerneinheit',
 };
 
+const VIEW_KEY = 'stella.plannerView';
+type View = 'week' | 'day';
+const readView = (): View => { try { return localStorage.getItem(VIEW_KEY) === 'day' ? 'day' : 'week'; } catch { return 'week'; } };
+
 export function Planner() {
+  const t = useT();
+  const locale = useLocale();
+  const [view, setViewState] = useState<View>(readView);
+  const setView = (v: View) => { setViewState(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* ohne Speicher geht es auch */ } };
   const itemsById = useStore((s) => s.items);
   const busy = useStore((s) => s.busyItems);
   const me = useStore((s) => s.me);
@@ -113,21 +122,79 @@ export function Planner() {
 
   const kw = isoWeek(monday);
   const closePlanning = useCallback(() => setPlanning(false), []);
+  const openItem = open ? itemsById[open] : undefined;
+  const weekItems = (d: string) => all.filter((i) => i.due === d && matches(filter, i)).sort((a, b) => (a.time ?? '99').localeCompare(b.time ?? '99'));
+  const monthName = (ymd: string) => new Date(`${ymd}T12:00:00Z`).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
 
   return (
     <div className="page">
-      <Sky clouds={false} />
       <div className="page-inner">
-        <header className="page-head rise">
-          <h1 className="display">Planer</h1>
-          <div className="row" style={{ gap: 4 }}>
-            <button type="button" className="icon-btn" aria-label="Vorige Woche" onClick={() => setDay(addDays(day, -7))}><Icon name="back" size={18} /></button>
-            <button type="button" className="btn secondary" style={{ minHeight: 40 }} onClick={() => setDay(today)}>KW {kw}</button>
-            <button type="button" className="icon-btn" aria-label="Nächste Woche" onClick={() => setDay(addDays(day, 7))}><Icon name="chevron" size={18} /></button>
+        <header className="page-head">
+          <div>
+            <h1 className="display">KW {kw}</h1>
+            <p className="page-sub">{monthName(monday)} – {monthName(addDays(monday, 6))}</p>
+          </div>
+          <div className="toolbar">
+            <div className="segmented" role="tablist" aria-label={t('planner.viewWeek')}>
+              <button type="button" role="tab" aria-selected={view === 'week'} className={view === 'week' ? 'active' : ''} onClick={() => setView('week')}><Icon name="grid" size={14} /> {t('planner.viewWeek')}</button>
+              <button type="button" role="tab" aria-selected={view === 'day'} className={view === 'day' ? 'active' : ''} onClick={() => setView('day')}><Icon name="list" size={14} /> {t('planner.viewDay')}</button>
+            </div>
+            <div className="row" style={{ gap: 4 }}>
+              <button type="button" className="icon-btn" aria-label="Vorige Woche" onClick={() => setDay(addDays(day, -7))}><Icon name="back" size={18} /></button>
+              <button type="button" className="btn secondary small" onClick={() => setDay(today)}>{t('nav.today')}</button>
+              <button type="button" className="icon-btn" aria-label="Nächste Woche" onClick={() => setDay(addDays(day, 7))}><Icon name="chevron" size={18} /></button>
+            </div>
+            <button type="button" className="btn" onClick={() => setPlanning(true)}><Icon name="sparkle" size={15} />Woche planen</button>
           </div>
         </header>
 
-        <div className="week rise" role="tablist" aria-label="Woche">
+        <div className="toolbar">
+          <div className="segmented" role="tablist" aria-label="Filter">
+            {filtersFor(meIsSchool(me), meIsLearner(me)).map(([f, label]) => (
+              <button key={f} type="button" role="tab" aria-selected={filter === f} className={filter === f ? 'active' : ''} onClick={() => setFilter(f)}>{label}</button>
+            ))}
+          </div>
+        </div>
+
+        {overdue.length > 0 && (
+          <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span className="eyebrow" style={{ color: 'var(--pink-text)' }}>Überfällig</span>
+            <div className="overdue-grid">{overdue.map(itemCard)}</div>
+          </section>
+        )}
+
+        {view === 'week' ? (
+          <div className="board" data-testid="week-board">
+            {week.map((d) => {
+              const its = weekItems(d);
+              const ls = filter === 'all' ? lessons.filter((l) => l.date === d) : [];
+              return (
+                <section key={d} className={d === today ? 'board-day today' : 'board-day'} aria-label={formatDateDe(d, today)}>
+                  <div className="board-head"><span className="wd">{WD[weekdayOf(d)]}</span><span className="n">{Number(d.slice(8))}</span></div>
+                  <div className="board-list">
+                    {ls.map((l, idx) => <div key={`l${idx}`} className={l.status === 'cancelled' ? 'b-lesson off' : 'b-lesson'}><span className="b-time">{l.start}</span>{l.subject ?? l.code}</div>)}
+                    {its.map((i) => {
+                      const done = i.status === 'done';
+                      return (
+                        <div key={i.id} className={`b-item ${i.kind}${done ? ' done' : ''}`}>
+                          <button type="button" className={done ? 'check on' : 'check'} aria-label={done ? 'Als offen markieren' : 'Erledigt'} onClick={() => void toggle(i)} disabled={i.id.startsWith('local-')}>
+                            {done && <Icon name="check" size={12} stroke={3.4} />}
+                            {justDone === i.id && <Confetti />}
+                          </button>
+                          <button type="button" className="b-title" style={{ border: 0, background: 'none', padding: 0, textAlign: 'left', font: 'inherit' }} onClick={() => setOpen(i.id)}>{i.title}</button>
+                          {i.time && <span className="b-time">{i.time}</span>}
+                        </div>
+                      );
+                    })}
+                    {!its.length && !ls.length && <span className="board-empty">–</span>}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        ) : (
+        <>
+        <div className="week rise" role="tablist" aria-label="Woche" style={{ display: 'grid' }}>
           {week.map((d) => (
             <button key={d} type="button" role="tab" aria-selected={d === day} className={`${d === day ? 'active' : ''}${d === today ? ' today' : ''}`} onClick={() => setDay(d)}>
               <span style={{ fontSize: 11, fontWeight: 600 }}>{WD[weekdayOf(d)]}</span>
@@ -137,30 +204,7 @@ export function Planner() {
           ))}
         </div>
 
-        <button type="button" className="plan-cta rise" onClick={() => setPlanning(true)}>
-          <span className="icon-tile pink"><Icon name="sparkle" size={20} /></span>
-          <span className="plan-text">
-            <strong>Woche planen</strong>
-            <span className="small muted">Stella verteilt Lernen und HÜs auf deine freien Zeiten</span>
-          </span>
-          <Icon name="chevron" size={18} />
-        </button>
-
-        <div className="segmented rise" role="tablist" aria-label="Filter">
-          {filtersFor(meIsSchool(me), meIsLearner(me)).map(([f, label]) => (
-            <button key={f} type="button" role="tab" aria-selected={filter === f} className={filter === f ? 'active' : ''} onClick={() => setFilter(f)}>{label}</button>
-          ))}
-        </div>
-
-        {overdue.length > 0 && (
-          <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span className="eyebrow" style={{ color: 'var(--pink-text)' }}>Überfällig</span>
-            <div className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{overdue.map(itemCard)}</div>
-          </section>
-        )}
-
         <span className="eyebrow">{formatDateDe(day, today)}{formatDateDe(day, today) !== formatDateDe(day) ? ` · ${formatDateDe(day)}` : ''}</span>
-
         {rows.length === 0 ? (
           <div className="empty">
             <span className="icon-tile blue"><Icon name="cloud" size={26} /></span>
@@ -196,8 +240,26 @@ export function Planner() {
             })}
           </div>
         )}
+        </>
+        )}
       </div>
       {lightbox && <Lightbox url={lightbox} onClose={() => setLightbox(null)} />}
+      {openItem && (
+        <Sheet title={openItem.title} onClose={() => setOpen(null)}>
+          <div className="t-extra" style={{ gap: 12 }}>
+            <span className="small muted">{KIND_LABEL[openItem.kind]}{openItem.due ? ` · ${formatDateDe(openItem.due)}` : ''}{openItem.time ? ` · ${openItem.time}` : ''}</span>
+            {openItem.detail && <span>{openItem.detail}</span>}
+            {openItem.material && <span className="small"><strong>Stoff:</strong> {openItem.material}</span>}
+            {openItem.notes && !openItem.notes.startsWith('__') && <span className="small">{openItem.notes}</span>}
+            {openItem.attachments.map((a) => <AuthImage key={a.id} id={a.id} alt={a.caption} onOpen={setLightbox} />)}
+            <div className="row" style={{ gap: 8 }}>
+              <button type="button" className="btn small" onClick={() => void toggle(openItem)}>{openItem.status === 'done' ? 'Als offen markieren' : 'Erledigt'}</button>
+              <button type="button" className="btn small secondary" style={{ color: 'var(--pink-text)' }}
+                onClick={() => { const id = openItem.id; setOpen(null); deleteItem(id).catch((err: Error) => showToast(err.message, true)); }}>Löschen</button>
+            </div>
+          </div>
+        </Sheet>
+      )}
       {planning && <WeekPlanSheet today={today} onClose={closePlanning} />}
     </div>
   );
