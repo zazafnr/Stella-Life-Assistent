@@ -1,0 +1,27 @@
+{
+  "commit": "edb099aa30a06085fcfdba99372b86a8c8b3d2b8",
+  "branch": "claude/site-stella-showcase",
+  "message": "CI: Xcode-Projekt-Job nimmt ein vorhandenes iPhone-Ger\u00e4t statt festem Namen",
+  "run": "https://github.com/zazafnr/Stella-Life-Assistent/actions/runs/41319408682",
+  "device": "iPhone 16 Pro",
+  "createdAt": "2026-11-01T15:14:11+00:00",
+  "screens": [
+    "today",
+    "chat",
+    "planner",
+    "inbox",
+    "weekplan",
+    "settings",
+    "goals",
+    "plan",
+    "subscription",
+    "news",
+    "memory",
+    "perms",
+    "lists",
+    "history",
+    "chat-rain",
+    "chat-night"
+  ],
+  "appetize": "https://appetize.io/app/7hedphqd45epodlt5k6olpxife"
+}
