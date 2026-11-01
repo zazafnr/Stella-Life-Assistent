@@ -7,27 +7,68 @@ import { voiceEn } from '../voice.en.ts';
 
 const placeholders = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!).sort().join(',');
 
-test('jeder Schlüssel aus en.json existiert in jedem geladenen Katalog – mit denselben Platzhaltern', () => {
-  const en = CATALOGS.en!;
+const baseKey = (k: string) => k.split('#')[0]!;
+
+test('alle acht Kataloge sind vollständig: jeder Schlüssel aus en.json, gleiche Platzhalter, keine Fremdschlüssel', () => {
+  const en = CATALOGS.en;
   for (const locale of LOCALES) {
     const cat = CATALOGS[locale];
-    if (!cat) continue;
     for (const [key, text] of Object.entries(en)) {
       assert.ok(key in cat, `${locale}.json fehlt: ${key}`);
       assert.equal(placeholders(cat[key]!), placeholders(text), `${locale}: Platzhalter von ${key} weichen ab`);
+      assert.ok(cat[key]!.trim().length > 0 || /\.text$|: $/.test(en[key]!) || en[key]!.trim().length === 0, `${locale}.${key} ist leer`);
     }
-    for (const key of Object.keys(cat)) assert.ok(key in en, `${locale}.json hat einen Schlüssel, den en.json nicht kennt: ${key}`);
+    // weitere Mehrzahlformen (pl: #few, #many) sind erlaubt, sonst nichts, was Englisch nicht kennt
+    for (const key of Object.keys(cat)) {
+      assert.ok(key in en || `${baseKey(key)}#other` in en, `${locale}.json hat einen Schlüssel, den en.json nicht kennt: ${key}`);
+      if (!(key in en)) assert.equal(placeholders(cat[key]!), placeholders(en[`${baseKey(key)}#other`]!), `${locale}: Platzhalter von ${key}`);
+    }
   }
-  assert.ok(CATALOGS.en && CATALOGS.de, 'Englisch und Deutsch sind vollständig da');
+});
+
+test('polnische Mehrzahl hat alle vier Formen für jede Zählung', () => {
+  for (const base of Object.keys(CATALOGS.en).filter((k) => k.endsWith('#other')).map(baseKey)) {
+    for (const form of ['one', 'few', 'many', 'other']) assert.ok(`${base}#${form}` in CATALOGS.pl, `pl fehlt ${base}#${form}`);
+  }
+  assert.equal(t('pl', 'chat.messageCount', { count: 1 }), '1 wiadomość');
+  assert.equal(t('pl', 'chat.messageCount', { count: 3 }), '3 wiadomości');
+  assert.equal(t('pl', 'chat.messageCount', { count: 5 }), '5 wiadomości');
+  assert.equal(t('pl', 'briefing.lessons', { count: 2 }), '2 lekcje');
+  assert.equal(t('pl', 'briefing.lessons', { count: 12 }), '12 lekcji');
+});
+
+// Enge Stellen in der Oberfläche: Tabs und Ton-Namen. Übertragen heißt kürzer formulieren, nicht Schrift verkleinern.
+const SHORT = (k: string) => /^nav\.(today|chat|planner|goals|inbox|health|finance|settings)$/.test(k) || /^tone\.(nett|frech|cool)$/.test(k);
+
+test('kurze Texte (Tabs und Ton-Namen) sind höchstens 1,6 × so lang wie das Englische – mindestens 12 Zeichen Luft', () => {
+  const en = CATALOGS.en;
+  for (const locale of LOCALES) {
+    for (const key of Object.keys(en).filter(SHORT)) {
+      const limit = Math.max(12, Math.ceil(en[key]!.length * 1.6));
+      assert.ok(CATALOGS[locale][key]!.length <= limit, `${locale}.${key} ist zu lang: "${CATALOGS[locale][key]}" (${CATALOGS[locale][key]!.length} > ${limit})`);
+    }
+  }
+});
+
+test('Slogan und Markenkern: Leitspruch bleibt englisch, der Stella-Slogan ist in jeder Sprache übertragen', () => {
+  const slogans: Record<string, string> = {
+    en: 'Let Stella handle your life.', de: 'Stella kümmert sich um den Rest.', es: 'Deja que Stella se encargue.', fr: "Laisse Stella s'en occuper.",
+    it: 'Lascia fare a Stella.', 'pt-BR': 'Deixa com a Stella.', tr: 'Gerisini Stella halleder.', pl: 'Zostaw to Stelli.',
+  };
+  for (const locale of LOCALES) {
+    assert.equal(CATALOGS[locale]['auth.tagline'], slogans[locale]);
+    assert.match(CATALOGS[locale]['email.code.body']!, /Stella by EVOLSIOR – Built to become/, `${locale}: Markenkern bleibt englisch`);
+  }
 });
 
 test('t(): Platzhalter, Mehrzahl, Rückfall auf Englisch und dann auf den Schlüssel', () => {
   assert.equal(t('en', 'today.greeting.named', { greeting: t('en', 'today.greeting.morning'), name: 'Mia' }), 'Good morning, Mia!');
   assert.equal(t('de', 'today.greeting.named', { greeting: t('de', 'today.greeting.morning'), name: 'Mia' }), 'Guten Morgen, Mia!');
-  assert.equal(t('en', 'items', { count: 1 }), '1 entry');
-  assert.equal(t('en', 'items', { count: 3 }), '3 entries');
-  assert.equal(t('de', 'items', { count: 1 }), '1 Eintrag');
-  assert.equal(translator('es')('common.save'), 'Save', 'Spanisch (noch ohne Katalog) fällt auf Englisch zurück');
+  assert.equal(t('en', 'chat.messageCount', { count: 1 }), '1 message');
+  assert.equal(t('en', 'chat.messageCount', { count: 3 }), '3 messages');
+  assert.equal(t('de', 'chat.messageCount', { count: 1 }), '1 Nachricht');
+  assert.equal(translator('es')('common.save'), 'Guardar');
+  assert.equal(translator('tr')('settings.version', { version: '1.0' }), 'Sürüm 1.0');
   missingKeys.clear();
   assert.equal(t('en', 'gibt.es.nicht'), 'gibt.es.nicht');
   assert.ok(missingKeys.has('en:gibt.es.nicht'), 'fehlende Schlüssel werden gemerkt');
@@ -76,8 +117,31 @@ test('voice(): Englisch und Deutsch haben dieselben Texte in allen drei Tönen',
   }
   assert.match(voice('cool', 'en').briefingGreeting('Mia', 'Friday'), /Morning, Mia/);
   assert.match(voice('nett', 'de').briefingGreeting('Mia', 'Freitag'), /Guten Morgen, Mia/);
-  // Sprachen ohne eigene Texte (Paket 3) fallen auf Englisch zurück
-  assert.equal(voice('nett', 'tr').listEmpty(), voice('nett', 'en').listEmpty());
+});
+
+test('voice() in allen acht Sprachen und drei Tönen: kurz, mit allen Angaben, ohne Platzhalter-Reste', () => {
+  const probes: Record<string, unknown[]> = {
+    homeworkTomorrow: ['MATHE-A'], examTomorrow: ['MATHE-B'], dueTomorrow: ['MATHE-C'], reminderNow: ['MATHE-D'],
+    remindSet: ['MORGEN-E', 'ZAHNARZT-E'], noted: ['MATHE-F'], moved: ['MATHE-G', 'FREITAG-G'], deleted: ['MATHE-H'], listAdded: ['MILCH-I', 1],
+    done: ['MATHE-J', 2], briefingGreeting: ['MIA-K', 'WOCHENTAG-K'], welcome: ['MIA-L'],
+  };
+  for (const locale of LOCALES) {
+    for (const tone of TONES) {
+      const v = voice(tone, locale) as unknown as Record<string, (...a: unknown[]) => string | boolean>;
+      for (const [name, args] of Object.entries(probes)) {
+        const out = String(v[name]!(...args));
+        assert.ok(out.length <= 450 && out.split('\n').length <= 6, `${locale}/${tone}/${name} ist zu lang`);
+        for (const a of args.filter((x) => typeof x === 'string')) assert.ok(out.includes(a as string), `${locale}/${tone}/${name} lässt "${a}" weg`);
+        assert.ok(!/undefined|\[object|\$\{/.test(out), `${locale}/${tone}/${name}: ${out}`);
+      }
+      for (const busy of [true, false]) assert.ok(String(v.briefingClosing!(busy)).length > 3);
+    }
+  }
+  // die Töne unterscheiden sich in jeder Sprache
+  for (const locale of LOCALES) {
+    const set = new Set(TONES.map((tone) => voice(tone, locale).remindSet('X-WANN', 'X-WAS')));
+    assert.equal(set.size, 3, `${locale}: drei verschiedene Töne`);
+  }
 });
 
 test('Standardsprache ist Englisch', async () => {

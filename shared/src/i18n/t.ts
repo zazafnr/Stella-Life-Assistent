@@ -4,11 +4,17 @@
 import { DEFAULT_LOCALE, type Locale } from './locales.ts';
 import en from './catalog/en.json' with { type: 'json' };
 import de from './catalog/de.json' with { type: 'json' };
+import es from './catalog/es.json' with { type: 'json' };
+import fr from './catalog/fr.json' with { type: 'json' };
+import it from './catalog/it.json' with { type: 'json' };
+import ptBR from './catalog/pt-BR.json' with { type: 'json' };
+import tr from './catalog/tr.json' with { type: 'json' };
+import pl from './catalog/pl.json' with { type: 'json' };
 
 export type Catalog = Record<string, string>;
 
-/** Alle geladenen Kataloge. Weitere Sprachen (Paket 3) kommen hier dazu. */
-export const CATALOGS: Partial<Record<Locale, Catalog>> = { en, de };
+/** Alle Kataloge. */
+export const CATALOGS: Record<Locale, Catalog> = { en, de, es, fr, it, 'pt-BR': ptBR, tr, pl };
 
 /** Für Tests: ein Schlüssel, der fehlt, wird hier gesammelt */
 export const missingKeys = new Set<string>();
@@ -17,7 +23,7 @@ const fmt = (text: string, vars?: Record<string, string | number>) =>
   vars ? text.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m)) : text;
 
 function lookup(locale: Locale, key: string): string | undefined {
-  return CATALOGS[locale]?.[key];
+  return CATALOGS[locale][key];
 }
 
 export function t(locale: Locale, key: string, vars?: Record<string, string | number>): string {
