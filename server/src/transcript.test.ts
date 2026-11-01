@@ -57,8 +57,8 @@ test('Aufräumen: sauberer Text im Chat, Rohtext und Dauer hängen an der Aufnah
   const used = billing.usedCount(user(), 'ai_message');
   const res = await handleAudio(user(), { audio: recording, mime: 'audio/mp4', durationSec: 12.4, clientId: 'c1' });
   assert.equal(res.transcript, 'Ich muss morgen um 15 Uhr zum Zahnarzt.');
-  assert.equal(res.userMessage.text, 'Ich muss morgen um 15 Uhr zum Zahnarzt.');
-  const att = res.userMessage.attachments.find((a: Att) => a.kind === 'audio') as Att;
+  assert.equal(res.userMessage!.text, 'Ich muss morgen um 15 Uhr zum Zahnarzt.');
+  const att = res.userMessage!.attachments.find((a: Att) => a.kind === 'audio') as Att;
   assert.equal(att.transcriptRaw, raw);
   assert.equal(att.transcript, 'Ich muss morgen um 15 Uhr zum Zahnarzt.');
   assert.equal(att.duration, 12);
@@ -100,7 +100,7 @@ test('Ausfall der Bereinigung: der Rohtext gilt, kein Fehler für die Person', a
   cleanReply = 'down';
   const res = await handleAudio(user(), { audio: recording, mime: 'audio/mp4', clientId: 'c2' });
   assert.equal(res.transcript, raw);
-  const att = res.userMessage.attachments.find((a: Att) => a.kind === 'audio') as Att;
+  const att = res.userMessage!.attachments.find((a: Att) => a.kind === 'audio') as Att;
   assert.equal(att.transcriptRaw, raw);
   assert.equal(att.transcript, undefined, 'nichts Bereinigtes gespeichert');
 });
