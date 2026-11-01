@@ -111,3 +111,15 @@ test('Sonnenauf- und -untergang aus Open-Meteo (Ortszeit + Versatz) werden echte
   assert.equal(w.sunrise, Date.UTC(2026, 10, 1, 5, 58));
   assert.equal(w.sunset, Date.UTC(2026, 10, 1, 15, 58));
 });
+
+test('iOS: Palette und Szene stimmen mit shared überein', async () => {
+  const { execFileSync } = await import('node:child_process');
+  execFileSync('npx', ['tsx', 'scripts/gen-weather-swift.ts', '--check'], { cwd: new URL('../../', import.meta.url), stdio: 'pipe' });
+  const swift = readFileSync(new URL('../../ios/Stella.swiftpm/Design/Weather/WeatherScene.swift', import.meta.url), 'utf8');
+  // Hüllkurve des Blitzes und Dunkel-Regel sind in Swift nachgebaut – die Schlüsselzahlen müssen gleich sein
+  for (const needle of ['ramp(t, 0, 25)', 'ramp(t, 90, 160)', '0.4 * ramp(t, 185, 205)', 'ramp(t, 230, 270)', '0.35 * (1 - ramp(t, 160, 600))', '947182440.0', '45.0 * 60']) {
+    assert.ok(swift.includes(needle), `Swift: ${needle}`);
+  }
+  assert.ok(swift.includes('!day || type == "thunder" || type == "heavy_rain"'));
+  assert.equal(Date.UTC(2000, 0, 6, 18, 14) / 1000, 947182440);
+});

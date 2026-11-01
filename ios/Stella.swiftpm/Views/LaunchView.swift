@@ -4,16 +4,21 @@ import SwiftUI
 struct LaunchView: View {
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Theme.skyTop, Theme.skyMid, .white], startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-            Cloud(width: 110).position(x: 70, y: 110)
-            Cloud(width: 140).position(x: UIScreen.main.bounds.width - 60, y: 190)
+            if let w = WeatherService.shared.current, WeatherService.shared.animMode != "off" {
+                // gespeichertes Wetter sofort; die Dauer bleibt die echte Ladezeit
+                WeatherBackground(weather: w, mode: WeatherService.shared.animMode)
+            } else {
+                LinearGradient(colors: [Theme.skyTop, Theme.skyMid, .white], startPoint: .top, endPoint: .bottom)
+                    .ignoresSafeArea()
+                Cloud(width: 110).position(x: 70, y: 110)
+                Cloud(width: 140).position(x: UIScreen.main.bounds.width - 60, y: 190)
+            }
             VStack(spacing: 6) {
                 HoppingStar(size: 56)
                     .padding(.bottom, 10)
                 Text("Stella")
                     .font(Theme.display(34))
-                    .foregroundStyle(Theme.text)
+                    .foregroundStyle(WeatherService.shared.isDarkScene ? Color(hex: WeatherPalette.darkHeadText) : Theme.text)
                 Text("by EVOLSIOR")
                     .font(.system(size: 11, weight: .medium))
                     .tracking(3.5)

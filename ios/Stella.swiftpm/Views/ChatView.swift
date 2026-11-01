@@ -24,7 +24,11 @@ struct ChatView: View {
         ZStack(alignment: .top) {
             Theme.bg.ignoresSafeArea()
             // der ganze Chat liegt unter einem Himmel mit ziehenden Wolken (bei „Bewegung reduzieren“ stehen sie still)
-            Sky(height: UIScreen.main.bounds.height)
+            if let w = WeatherService.shared.current, WeatherService.shared.animMode != "off" {
+                WeatherBackground(weather: w, mode: WeatherService.shared.animMode)
+            } else {
+                Sky(height: UIScreen.main.bounds.height)
+            }
             VStack(spacing: 0) {
                 header
                 messagesList
@@ -93,12 +97,12 @@ struct ChatView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Stella")
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(Theme.text)
+                    .foregroundStyle(WeatherService.shared.isDarkScene ? Color(hex: WeatherPalette.darkHeadText) : Theme.text)
                 HStack(spacing: 5) {
                     Circle().fill(store.online ? Theme.blue : Theme.faint).frame(width: 6, height: 6)
                     Text(status)
                         .font(.system(size: 13))
-                        .foregroundStyle(store.online ? Theme.blue : Theme.muted)
+                        .foregroundStyle(WeatherService.shared.isDarkScene ? Color(hex: WeatherPalette.darkHeadText) : (store.online ? Theme.blue : Theme.muted))
                         .lineLimit(1)
                 }
             }

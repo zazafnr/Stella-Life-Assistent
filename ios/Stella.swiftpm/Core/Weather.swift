@@ -13,6 +13,9 @@ struct WeatherState: Codable, Equatable {
     var wind: Int
     /// Zeitpunkt der Messung (Sekunden seit 1970)
     var at: Double
+    /// Sonnenaufgang und -untergang heute (Sekunden seit 1970), für die Dämmerung
+    var sunrise: Double? = nil
+    var sunset: Double? = nil
 
     /// Älter als 3 Stunden: nur noch Startbild
     var isStale: Bool { Date().timeIntervalSince1970 - at > 3 * 3600 }
@@ -43,7 +46,19 @@ struct WeatherState: Codable, Equatable {
               let code = (c["weather_code"] as? NSNumber)?.intValue, let temp = (c["temperature_2m"] as? NSNumber)?.doubleValue else { return nil }
         let isDay = (c["is_day"] as? NSNumber)?.intValue ?? 1
         let wind = (c["wind_speed_10m"] as? NSNumber)?.doubleValue ?? 0
-        return WeatherState(type: type(forWMO: code), day: isDay != 0, temp: Int(temp.rounded()), wind: windLevel(wind), at: Date().timeIntervalSince1970)
+        // „2026-11-01T06:58“ ist Ortszeit; mit dem Versatz der Antwort wird daraus ein echter Zeitpunkt
+        let offset = (root["utc_offset_seconds"] as? NSNumber)?.doubleValue ?? 0
+        let daily = root["daily"] as? [String: Any]
+        func moment(_ key: String) -> Double? {
+            guard let s = (daily?[key] as? [String])?.first else { return nil }
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.timeZone = TimeZone(identifier: "UTC")
+            f.dateFormat = "yyyy-MM-dd'T'HH:mm"
+            return f.date(from: s).map { $0.timeIntervalSince1970 - offset }
+        }
+        return WeatherState(type: type(forWMO: code), day: isDay != 0, temp: Int(temp.rounded()), wind: windLevel(wind), at: Date().timeIntervalSince1970,
+                            sunrise: moment("sunrise"), sunset: moment("sunset"))
     }
 }
 
@@ -107,6 +122,21 @@ final class WeatherService {
         didSet {
             if let forced { UserDefaults.standard.set(forced, forKey: Self.forceKey) } else { UserDefaults.standard.removeObject(forKey: Self.forceKey) }
         }
+    }
+
+    /// Wetter-Animationen: "on", "calm" oder "off" (Einstellungen → Darstellung)
+    static let animKey = "weatherAnim"
+    var animMode: String {
+        get { _ = animRevision; return UserDefaults.standard.string(forKey: Self.animKey) ?? "on" }
+        set { UserDefaults.standard.set(newValue, forKey: Self.animKey); animRevision += 1 }
+    }
+    /// Zählt Änderungen von animMode, damit Views sich neu zeichnen
+    private(set) var animRevision = 0
+
+    /// Dunkle Szene (Nacht, Gewitter, Starkregen): Kopfzeile bekommt helle Schrift
+    var isDarkScene: Bool {
+        guard animMode != "off", let w = current else { return false }
+        return WeatherRules.isDark(type: w.type, day: w.day)
     }
 
     /// Das Wetter, das die Oberfläche zeigt

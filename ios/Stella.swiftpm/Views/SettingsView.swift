@@ -47,6 +47,11 @@ struct SettingsView: View {
                             set: { l in I18n.shared.set(l); Task { await save(["locale": .string(l)]) } })) {
                             ForEach(I18n.supported, id: \.self) { l in Text(I18n.names[l] ?? l).tag(l) }
                         }
+                        Picker(L("settings.weatherAnim"), selection: Binding(
+                            get: { WeatherService.shared.animMode },
+                            set: { WeatherService.shared.animMode = $0 })) {
+                            ForEach(["on", "calm", "off"], id: \.self) { m in Text(L("settings.weatherAnim.\(m)")).tag(m) }
+                        }
                     } header: {
                         Text(L("settings.languageTitle"))
                     } footer: {

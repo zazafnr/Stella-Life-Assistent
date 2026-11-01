@@ -1,6 +1,6 @@
 # Wetter-Animationen: Abnahme (Paket 8)
 
-Stand: Web fertig und mit Playwright geprüft; die iOS-Fassung (`Design/Weather/`) ist gebaut, aber noch nicht im Simulator gesehen (siehe unten).
+Stand: Web fertig und mit Playwright geprüft. Die iOS-Fassung (`ios/Stella.swiftpm/Design/Weather/`) ist geschrieben, aber in dieser Umgebung **weder kompiliert noch im Simulator gesehen** (es gibt hier kein Swift). Der Xcode-Build in GitHub Actions zeigt, ob sie baut; Farben und Zahlen kommen aus `WeatherPalette.swift` (erzeugt, im CI geprüft).
 
 ## Bilder
 
