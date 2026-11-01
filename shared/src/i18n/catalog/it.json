@@ -508,5 +508,10 @@
  "weather.type.heavy_rain": "pioggia intensa",
  "weather.type.thunder": "temporale",
  "weather.type.snow": "neve",
- "weather.type.sleet": "nevischio"
+ "weather.type.sleet": "nevischio",
+ "settings.weatherAnim": "Animazioni meteo",
+ "settings.weatherAnimSub": "Il cielo dietro la chat",
+ "settings.weatherAnim.on": "Attive",
+ "settings.weatherAnim.calm": "Tranquille",
+ "settings.weatherAnim.off": "Disattivate"
 }

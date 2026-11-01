@@ -508,5 +508,10 @@
  "weather.type.heavy_rain": "sağanak",
  "weather.type.thunder": "gök gürültülü fırtına",
  "weather.type.snow": "kar",
- "weather.type.sleet": "karla karışık yağmur"
+ "weather.type.sleet": "karla karışık yağmur",
+ "settings.weatherAnim": "Hava animasyonları",
+ "settings.weatherAnimSub": "Sohbetin arkasındaki gökyüzü",
+ "settings.weatherAnim.on": "Açık",
+ "settings.weatherAnim.calm": "Sakin",
+ "settings.weatherAnim.off": "Kapalı"
 }

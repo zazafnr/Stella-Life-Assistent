@@ -530,5 +530,10 @@
  "weather.type.heavy_rain": "ulewa",
  "weather.type.thunder": "burza",
  "weather.type.snow": "śnieg",
- "weather.type.sleet": "deszcz ze śniegiem"
+ "weather.type.sleet": "deszcz ze śniegiem",
+ "settings.weatherAnim": "Animacje pogody",
+ "settings.weatherAnimSub": "Niebo za czatem",
+ "settings.weatherAnim.on": "Włączone",
+ "settings.weatherAnim.calm": "Spokojne",
+ "settings.weatherAnim.off": "Wyłączone"
 }

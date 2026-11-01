@@ -508,5 +508,10 @@
  "weather.type.heavy_rain": "chuva forte",
  "weather.type.thunder": "tempestade",
  "weather.type.snow": "neve",
- "weather.type.sleet": "chuva com neve"
+ "weather.type.sleet": "chuva com neve",
+ "settings.weatherAnim": "Animações do clima",
+ "settings.weatherAnimSub": "O céu atrás do chat",
+ "settings.weatherAnim.on": "Ativadas",
+ "settings.weatherAnim.calm": "Calmas",
+ "settings.weatherAnim.off": "Desativadas"
 }

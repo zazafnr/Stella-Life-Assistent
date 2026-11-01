@@ -8,6 +8,8 @@ import { ItemStatus } from './Today.tsx';
 import { ActionCard } from './ActionCard.tsx';
 import { Icon } from '../ui/Icon.tsx';
 import { CloudSky, Sheet, StarMark, showToast } from '../ui/Decor.tsx';
+import { WeatherBackground, useSceneMode } from '../weather/WeatherBackground.tsx';
+import { useAnimMode, useWeather } from '../weather.ts';
 import { ListsSheet } from './Lists.tsx';
 import { PlacesCard } from './PlacesCard.tsx';
 import { SpendingCard } from './Finance.tsx';
@@ -140,12 +142,16 @@ export function Chat() {
     try { await newConversation(); setHistory(false); inputRef.current?.focus(); } catch (err) { showToast((err as Error).message, true); }
   }
 
+  const weather = useWeather();
+  const animMode = useAnimMode();
+  const scene = useSceneMode();
+  const showWeather = !!weather && animMode !== 'off';
   let lastDay = '';
   return (
     <div style={{ display: 'flex', flex: 1, minHeight: 0, minWidth: 0 }}>
       <aside className="chat-history" aria-label={t('chat.chats')}><ChatHistory onNew={() => void startNew()} /></aside>
-      <div className="chat">
-        <CloudSky />
+      <div className="chat" data-scene={scene}>
+        {showWeather ? <WeatherBackground /> : <CloudSky />}
         <header className="chat-head">
           <span className="avatar-star"><StarMark size={19} /></span>
           <div style={{ display: 'flex', flexDirection: 'column' }}>

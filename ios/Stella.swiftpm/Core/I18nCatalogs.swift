@@ -514,7 +514,12 @@ enum I18nCatalogs {
  "weather.type.heavy_rain": "Starkregen",
  "weather.type.thunder": "Gewitter",
  "weather.type.snow": "Schnee",
- "weather.type.sleet": "Schneeregen"
+ "weather.type.sleet": "Schneeregen",
+ "settings.weatherAnim": "Wetter-Animationen",
+ "settings.weatherAnimSub": "Der Himmel hinter dem Chat",
+ "settings.weatherAnim.on": "An",
+ "settings.weatherAnim.calm": "Ruhig",
+ "settings.weatherAnim.off": "Aus"
 }
 """#,
         "en": #"""
@@ -1028,7 +1033,12 @@ enum I18nCatalogs {
  "weather.type.heavy_rain": "heavy rain",
  "weather.type.thunder": "thunderstorm",
  "weather.type.snow": "snow",
- "weather.type.sleet": "sleet"
+ "weather.type.sleet": "sleet",
+ "settings.weatherAnim": "Weather animations",
+ "settings.weatherAnimSub": "Sky behind the chat",
+ "settings.weatherAnim.on": "On",
+ "settings.weatherAnim.calm": "Calm",
+ "settings.weatherAnim.off": "Off"
 }
 """#,
         "es": #"""
@@ -1542,7 +1552,12 @@ enum I18nCatalogs {
  "weather.type.heavy_rain": "lluvia fuerte",
  "weather.type.thunder": "tormenta",
  "weather.type.snow": "nieve",
- "weather.type.sleet": "aguanieve"
+ "weather.type.sleet": "aguanieve",
+ "settings.weatherAnim": "Animaciones del tiempo",
+ "settings.weatherAnimSub": "El cielo detrás del chat",
+ "settings.weatherAnim.on": "Activadas",
+ "settings.weatherAnim.calm": "Tranquilas",
+ "settings.weatherAnim.off": "Desactivadas"
 }
 """#,
         "fr": #"""
@@ -2056,7 +2071,12 @@ enum I18nCatalogs {
  "weather.type.heavy_rain": "forte pluie",
  "weather.type.thunder": "orage",
  "weather.type.snow": "neige",
- "weather.type.sleet": "neige fondue"
+ "weather.type.sleet": "neige fondue",
+ "settings.weatherAnim": "Animations météo",
+ "settings.weatherAnimSub": "Le ciel derrière le chat",
+ "settings.weatherAnim.on": "Activées",
+ "settings.weatherAnim.calm": "Calmes",
+ "settings.weatherAnim.off": "Désactivées"
 }
 """#,
         "it": #"""
@@ -2570,7 +2590,12 @@ enum I18nCatalogs {
  "weather.type.heavy_rain": "pioggia intensa",
  "weather.type.thunder": "temporale",
  "weather.type.snow": "neve",
- "weather.type.sleet": "nevischio"
+ "weather.type.sleet": "nevischio",
+ "settings.weatherAnim": "Animazioni meteo",
+ "settings.weatherAnimSub": "Il cielo dietro la chat",
+ "settings.weatherAnim.on": "Attive",
+ "settings.weatherAnim.calm": "Tranquille",
+ "settings.weatherAnim.off": "Disattivate"
 }
 """#,
         "pl": #"""
@@ -3106,7 +3131,12 @@ enum I18nCatalogs {
  "weather.type.heavy_rain": "ulewa",
  "weather.type.thunder": "burza",
  "weather.type.snow": "śnieg",
- "weather.type.sleet": "deszcz ze śniegiem"
+ "weather.type.sleet": "deszcz ze śniegiem",
+ "settings.weatherAnim": "Animacje pogody",
+ "settings.weatherAnimSub": "Niebo za czatem",
+ "settings.weatherAnim.on": "Włączone",
+ "settings.weatherAnim.calm": "Spokojne",
+ "settings.weatherAnim.off": "Wyłączone"
 }
 """#,
         "pt-BR": #"""
@@ -3620,7 +3650,12 @@ enum I18nCatalogs {
  "weather.type.heavy_rain": "chuva forte",
  "weather.type.thunder": "tempestade",
  "weather.type.snow": "neve",
- "weather.type.sleet": "chuva com neve"
+ "weather.type.sleet": "chuva com neve",
+ "settings.weatherAnim": "Animações do clima",
+ "settings.weatherAnimSub": "O céu atrás do chat",
+ "settings.weatherAnim.on": "Ativadas",
+ "settings.weatherAnim.calm": "Calmas",
+ "settings.weatherAnim.off": "Desativadas"
 }
 """#,
         "tr": #"""
@@ -4134,7 +4169,12 @@ enum I18nCatalogs {
  "weather.type.heavy_rain": "sağanak",
  "weather.type.thunder": "gök gürültülü fırtına",
  "weather.type.snow": "kar",
- "weather.type.sleet": "karla karışık yağmur"
+ "weather.type.sleet": "karla karışık yağmur",
+ "settings.weatherAnim": "Hava animasyonları",
+ "settings.weatherAnimSub": "Sohbetin arkasındaki gökyüzü",
+ "settings.weatherAnim.on": "Açık",
+ "settings.weatherAnim.calm": "Sakin",
+ "settings.weatherAnim.off": "Kapalı"
 }
 """#,
     ]

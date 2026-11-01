@@ -18,6 +18,9 @@ export interface WeatherState {
   place?: { lat: number; lon: number };
   /** Zeitpunkt der Messung (ms seit 1970) */
   at: number;
+  /** Sonnenaufgang und -untergang heute (ms seit 1970), für Dämmerung in den Szenen */
+  sunrise?: number;
+  sunset?: number;
 }
 
 /** Älter als 3 Stunden: nur noch Startbild, wird gleich ersetzt */
@@ -64,13 +67,22 @@ export function openMeteoUrl(lat: number, lon: number, opts: { base?: string; ho
   return `${opts.base ?? OPEN_METEO}/v1/forecast?${q}`;
 }
 
+interface OpenMeteoDaily { sunrise?: string[]; sunset?: string[] }
 interface OpenMeteoCurrent { weather_code?: number; temperature_2m?: number; is_day?: number; wind_speed_10m?: number; time?: string }
 
 /** Antwort von Open-Meteo → Szene; null, wenn die Antwort nicht passt */
 export function parseOpenMeteo(json: unknown, place?: { lat: number; lon: number }, now = Date.now()): WeatherState | null {
-  const c = (json as { current?: OpenMeteoCurrent } | null)?.current;
+  const root = json as { current?: OpenMeteoCurrent; daily?: OpenMeteoDaily; utc_offset_seconds?: number } | null;
+  const c = root?.current;
   if (!c || typeof c.weather_code !== 'number' || typeof c.temperature_2m !== 'number') return null;
+  // „2026-11-01T06:58“ ist Ortszeit (timezone=auto); mit dem Versatz der Antwort wird daraus ein echter Zeitpunkt
+  const local = (s?: string) => {
+    const ms = s ? Date.parse(`${s}:00Z`) : NaN;
+    return Number.isFinite(ms) ? ms - (root?.utc_offset_seconds ?? 0) * 1000 : undefined;
+  };
+  const sunrise = local(root?.daily?.sunrise?.[0]), sunset = local(root?.daily?.sunset?.[0]);
   return {
+    ...(sunrise !== undefined ? { sunrise } : {}), ...(sunset !== undefined ? { sunset } : {}),
     type: wmoToType(c.weather_code), day: c.is_day !== 0, temp: Math.round(c.temperature_2m),
     wind: windLevel(typeof c.wind_speed_10m === 'number' ? c.wind_speed_10m : 0), ...(place ? { place: roundPlace(place.lat, place.lon) } : {}), at: now,
   };
@@ -131,7 +143,7 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
   });
 }
 
-const same = (a: WeatherState | null, b: WeatherState) => !!a && a.type === b.type && a.day === b.day && a.temp === b.temp && a.wind === b.wind;
+const same = (a: WeatherState | null, b: WeatherState) => !!a && a.type === b.type && a.day === b.day && a.temp === b.temp && a.wind === b.wind && a.sunrise === b.sunrise && a.sunset === b.sunset;
 
 /**
  * 1. zuletzt gespeichertes Wetter sofort zeigen (`onChange` noch vor dem ersten await),

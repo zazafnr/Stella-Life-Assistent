@@ -508,5 +508,10 @@
  "weather.type.heavy_rain": "forte pluie",
  "weather.type.thunder": "orage",
  "weather.type.snow": "neige",
- "weather.type.sleet": "neige fondue"
+ "weather.type.sleet": "neige fondue",
+ "settings.weatherAnim": "Animations météo",
+ "settings.weatherAnimSub": "Le ciel derrière le chat",
+ "settings.weatherAnim.on": "Activées",
+ "settings.weatherAnim.calm": "Calmes",
+ "settings.weatherAnim.off": "Désactivées"
 }

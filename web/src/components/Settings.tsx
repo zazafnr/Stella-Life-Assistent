@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { COUNTRIES, countryName, LOCALES, LOCALE_NAMES, TONE_INFO, TONES, type Tone } from '@stella/shared';
+import { ANIM_MODES, COUNTRIES, countryName, LOCALES, LOCALE_NAMES, TONE_INFO, TONES, type AnimMode, type Tone } from '@stella/shared';
+import { setAnimMode, useAnimMode } from '../weather.ts';
 import { useLocale, useT } from '../i18n.ts';
 import { api, logout, logoutLocal, meHas, meIsSchool, refreshMe, useStore, type Me } from '../store.ts';
 import { enablePush, isIos, isStandalone, pushPermission } from '../push.ts';
@@ -246,6 +247,7 @@ function LanguagePicker() {
   const me = useStore((s) => s.me);
   const locale = useLocale();
   const country = me?.settings.country ?? '';
+  const animMode = useAnimMode();
   async function save(patchBody: Record<string, string>) {
     try {
       await api('/api/settings', { method: 'PATCH', json: patchBody });
@@ -268,6 +270,12 @@ function LanguagePicker() {
           <select value={country} aria-label={t('settings.country')} onChange={(e) => void save({ country: e.target.value })}>
             {!country && <option value="">–</option>}
             {COUNTRIES.map((c) => <option key={c} value={c}>{countryName(c, locale)}</option>)}
+          </select>
+        </label>
+        <label className="list-row">
+          <span className="grow"><span className="list-title">{t('settings.weatherAnim')}</span><span className="list-sub">{t('settings.weatherAnimSub')}</span></span>
+          <select value={animMode} aria-label={t('settings.weatherAnim')} onChange={(e) => setAnimMode(e.target.value as AnimMode)}>
+            {ANIM_MODES.map((m) => <option key={m} value={m}>{t(`settings.weatherAnim.${m}`)}</option>)}
           </select>
         </label>
       </div>

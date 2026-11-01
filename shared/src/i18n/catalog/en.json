@@ -508,5 +508,10 @@
  "weather.type.heavy_rain": "heavy rain",
  "weather.type.thunder": "thunderstorm",
  "weather.type.snow": "snow",
- "weather.type.sleet": "sleet"
+ "weather.type.sleet": "sleet",
+ "settings.weatherAnim": "Weather animations",
+ "settings.weatherAnimSub": "Sky behind the chat",
+ "settings.weatherAnim.on": "On",
+ "settings.weatherAnim.calm": "Calm",
+ "settings.weatherAnim.off": "Off"
 }
