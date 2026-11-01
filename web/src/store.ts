@@ -5,8 +5,8 @@
 
 import { useSyncExternalStore } from 'react';
 import {
-  formatDateDe, interpret, profileHas, profileIsLearner, profileIsSchool, todayIn, type ActionEntry, type ActionGroup, type ChatMessage, type ChatResponse, type Conversation, type Item, type PermissionLevel,
-  type SyncResponse, type Tone, type Feature, type UserProfile,
+  formatDateDe, interpret, t as translate, profileHas, profileIsLearner, profileIsSchool, todayIn, type ActionEntry, type ActionGroup, type ChatMessage, type ChatResponse, type Conversation, type Item, type PermissionLevel,
+  type Locale, type SyncResponse, type Tone, type Feature, type UserProfile,
 } from '@stella/shared';
 
 export type BookProvider = 'digi4school' | 'scook';
@@ -26,6 +26,9 @@ export interface Me {
     weekPlan?: 'sunday' | 'off';
     profile?: UserProfile;
     onboarding?: 'pending' | 'done';
+    /** Sprache und Land (Paket 2) */
+    locale?: Locale;
+    country?: string;
   };
   integrations: {
     books: Record<BookProvider, { connected: boolean; cookies: boolean; email: string | null }>;
@@ -339,8 +342,8 @@ export async function fetchFileUrl(id: string): Promise<string> {
 function queueOffline(text: string, clientId: string, createdAt: string) {
   const tz = state.me?.timeZone ?? 'Europe/Vienna';
   const today = todayIn(tz);
-  const intent = interpret(text, today);
-  let reply = '📴 Du bist offline – ich hab die Nachricht gespeichert und schicke sie, sobald du wieder Netz hast.';
+  const intent = interpret(text, today, '12:00', { locale: state.me?.settings.locale ?? 'en' });
+  let reply = translate(state.me?.settings.locale ?? 'en', 'chat.offlineSaved');
   let localItem: Item | null = null;
   if (intent?.type === 'create' && intent.entry.due) {
     const e = intent.entry;

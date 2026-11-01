@@ -82,10 +82,10 @@ final class Store {
     /** Gibt die E-Mail-Adresse zurück, wenn erst ein Code aus der Bestätigungs-Mail eingegeben werden muss */
     @discardableResult
     func authenticate(register: Bool, name: String, email: String, password: String, invite: String = "") async throws -> String? {
-        struct Body: Encodable { var name: String; var email: String; var password: String; var device: String; var timeZone: String; var invite: String }
+        struct Body: Encodable { var name: String; var email: String; var password: String; var device: String; var timeZone: String; var invite: String; var locale: String }
         let body = Body(name: name, email: email, password: password,
                         device: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone",
-                        timeZone: TimeZone.current.identifier, invite: invite)
+                        timeZone: TimeZone.current.identifier, invite: invite, locale: I18n.shared.locale)
         let res: SignupResponse = try await api.send("POST", register ? "/api/auth/register" : "/api/auth/login", body: body)
         if res.needsVerification == true { return res.email ?? email }
         guard let token = res.token, let user = res.user else { throw APIError(message: "Antwort vom Server nicht verstanden", status: -1) }

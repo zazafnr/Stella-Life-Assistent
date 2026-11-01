@@ -42,6 +42,18 @@ struct SettingsView: View {
                     }
 
                     Section {
+                        Picker(L("settings.language"), selection: Binding(
+                            get: { I18n.shared.locale },
+                            set: { l in I18n.shared.set(l); Task { await save(["locale": .string(l)]) } })) {
+                            ForEach(I18n.supported, id: \.self) { l in Text(I18n.names[l] ?? l).tag(l) }
+                        }
+                    } header: {
+                        Text(L("settings.languageTitle"))
+                    } footer: {
+                        Text(L("settings.languageSub"))
+                    }
+
+                    Section {
                         Button { store.onboardingRequest = .situation } label: {
                             row("Profil", symbol: "person.crop.circle", tint: Theme.pink, detail: Self.profileSummary(me))
                         }

@@ -22,6 +22,7 @@ import { whoIs } from './profile.ts';
 import { levelFor, perform } from './actions.ts';
 import { formatDateDe, todayIn, voice } from '@stella/shared';
 import { pushToUser } from './push.ts';
+import { voiceOf } from './locale.ts';
 
 export type MailProvider = 'gmail' | 'icloud' | 'other';
 
@@ -316,7 +317,7 @@ async function checkAccount(userId: string, account: MailAccount) {
 /** Frist aus einer Mail als Eintrag anbieten – läuft über die Rechte für den Planer */
 export function offerDeadline(user: User, eventId: string, from: string, d: Deadline) {
   const when = `${formatDateDe(d.date)}${d.time ? ` um ${d.time}` : ''}`;
-  const v = voice(user.settings.tone);
+  const v = voiceOf(user);
   const r = perform(user, 'item.create', {
     kind: d.time ? 'event' : 'todo', title: d.what, due: d.date, time: d.time, detail: `aus der Mail von ${from}`, source: 'mail',
   }, { source: 'auto', quiet: true, question: v.mailDeadlineAsk(from, d.what, when) });

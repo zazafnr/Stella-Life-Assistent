@@ -77,7 +77,7 @@ test('Einladung → Code per Mail → bestätigen → Sitzung; Einladung ist dan
   assert.equal(reg.statusCode, 200, reg.body);
   assert.deepEqual(reg.json(), { needsVerification: true, email: 'mia@example.com' });
   assert.equal(sent.at(-1)!.to, 'mia@example.com');
-  assert.match(sent.at(-1)!.subject, /^Dein Stella-Code: \d{6}$/);
+  assert.match(sent.at(-1)!.subject, /^Your Stella code: \d{6}$/, 'neue Konten starten mit Englisch');
 
   // vor der Bestätigung kein Login
   assert.throws(() => login('mia@example.com', 'supergeheim'), (err: unknown) =>

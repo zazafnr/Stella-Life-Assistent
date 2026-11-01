@@ -4,7 +4,8 @@
 
 import { readFileSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
-import type { Attachment, ChatResponse } from '@stella/shared';
+import { isoLanguage, type Attachment, type ChatResponse } from '@stella/shared';
+import { userLocale } from './locale.ts';
 import { handleChat } from './assistant.ts';
 import { HttpError } from './auth.ts';
 import { db, notifyOnce, type User } from './db.ts';
@@ -62,7 +63,7 @@ export async function handleAudio(user: User, input: AudioInput): Promise<ChatRe
 
   let transcript: string;
   try {
-    transcript = await transcribe(data!, mime, { userId: user.id });
+    transcript = await transcribe(data!, mime, { userId: user.id, language: isoLanguage(userLocale(user)) });
   } catch (err) {
     if (err instanceof LlmUnavailable) throw new AudioFailed(err.message, audioId);
     throw err;

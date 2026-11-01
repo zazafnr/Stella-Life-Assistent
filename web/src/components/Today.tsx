@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { addDays, diffDays, formatDateDe, todayIn, type FinanceMonth, type GoalProgress, type Item } from '@stella/shared';
 import { api, meHas, useStore } from '../store.ts';
+import { useLocale, useT } from '../i18n.ts';
 import type { Tab } from '../App.tsx';
 import { Icon, type IconName } from '../ui/Icon.tsx';
 import { Confetti, Ring, Sky, StarMark } from '../ui/Decor.tsx';
@@ -18,9 +19,9 @@ const KIND_ICON: Record<string, [IconName, string]> = {
   todo: ['check', 'blue'], study: ['sparkle', 'blue'], reminder: ['bell', 'pink'],
 };
 
-function greeting() {
+function greetingKey() {
   const h = new Date().getHours();
-  return h < 11 ? 'Guten Morgen' : h < 18 ? 'Hallo' : 'Guten Abend';
+  return h < 11 ? 'today.greeting.morning' : h < 18 ? 'today.greeting.afternoon' : 'today.greeting.evening';
 }
 
 export function solvedInNotebook(i: Item) {
@@ -28,20 +29,23 @@ export function solvedInNotebook(i: Item) {
 }
 
 export function ItemStatus({ item, busy }: { item: Item; busy: boolean }) {
+  const t = useT();
   if (item.status === 'done' && solvedInNotebook(item)) {
     return (
       <span className="pill green" style={{ position: 'relative' }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path className="check-draw" d="M5 12.5l4.5 4.5L19 7.5" /></svg>
-        Im Heft<Confetti delay={0.7} />
+        {t('today.status.inNotebook')}<Confetti delay={0.7} />
       </span>
     );
   }
-  if (item.status === 'done') return <span className="pill green"><Icon name="check" size={14} stroke={3} />Erledigt</span>;
-  if (busy) return <span className="pill blue">Stella löst …</span>;
-  return <span className="pill gray">offen</span>;
+  if (item.status === 'done') return <span className="pill green"><Icon name="check" size={14} stroke={3} />{t('today.status.done')}</span>;
+  if (busy) return <span className="pill blue">{t('today.status.solving')}</span>;
+  return <span className="pill gray">{t('today.status.open')}</span>;
 }
 
 export function Today({ go }: { go: (t: Tab) => void }) {
+  const t = useT();
+  const locale = useLocale();
   const me = useStore((s) => s.me);
   const itemsById = useStore((s) => s.items);
   const busy = useStore((s) => s.busyItems);
@@ -90,7 +94,7 @@ export function Today({ go }: { go: (t: Tab) => void }) {
       study: all.filter((i) => i.kind === 'study' && i.status === 'open' && i.due === today)[0],
     };
   }, [itemsById, today, tomorrow]);
-  const dueLabel = due.length && due.every((i) => i.due === tomorrow) ? 'Morgen fällig' : 'Als Nächstes';
+  const dueLabel = due.length && due.every((i) => i.due === tomorrow) ? t('today.dueTomorrow') : t('today.upNext');
 
   const since = Date.now() - 86_400_000;
   const recent = inbox.filter((e) => Date.parse(e.createdAt) > since);
@@ -101,7 +105,7 @@ export function Today({ go }: { go: (t: Tab) => void }) {
   const goal = me?.settings.stepGoal || 8000;
   const homeworkSubjects = new Set(due.filter((i) => i.due === tomorrow).map((i) => i.subject));
   const firstName = (me?.name ?? '').split(' ')[0];
-  const dateLabel = new Date().toLocaleDateString('de-AT', { weekday: 'long', day: 'numeric', month: 'long' });
+  const dateLabel = new Date().toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
     <div className="page">
@@ -111,9 +115,9 @@ export function Today({ go }: { go: (t: Tab) => void }) {
         <header className="page-head">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span className="small muted" style={{ fontWeight: 600 }}>{dateLabel}</span>
-            <h1 className="display">{greeting()}{firstName ? `, ${firstName}` : ''}!</h1>
+            <h1 className="display">{firstName ? t('today.greeting.named', { greeting: t(greetingKey()), name: firstName }) : t('today.greeting.plain', { greeting: t(greetingKey()) })}</h1>
           </div>
-          <button type="button" className="icon-btn" aria-label="Einstellungen" onClick={() => go('settings')} style={{ color: 'var(--pink)' }}>
+          <button type="button" className="icon-btn" aria-label={t('nav.settings')} onClick={() => go('settings')} style={{ color: 'var(--pink)' }}>
             <StarMark size={20} />
           </button>
         </header>
@@ -125,8 +129,8 @@ export function Today({ go }: { go: (t: Tab) => void }) {
             <span className="row" style={{ gap: 12 }}>
               <span className="icon-tile blue" style={{ width: 40, height: 40, borderRadius: 13 }}><Icon name="plus" size={20} /></span>
               <span style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                <span style={{ fontWeight: 600 }}>Einkaufsliste</span>
-                <span className="small muted">{shopCount === null ? 'antippen zum Öffnen' : shopCount === 0 ? 'nichts zu besorgen' : `${shopCount} ${shopCount === 1 ? 'Eintrag' : 'Einträge'} offen`}</span>
+                <span style={{ fontWeight: 600 }}>{t('today.shopping')}</span>
+                <span className="small muted">{shopCount === null ? t('today.shopping.tap') : shopCount === 0 ? t('today.shopping.none') : t('today.shopping.open', { count: shopCount })}</span>
               </span>
             </span>
             <Icon name="chevron" size={16} />
@@ -137,12 +141,12 @@ export function Today({ go }: { go: (t: Tab) => void }) {
         <section className="card" aria-label={dueLabel}>
           <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
             <span className="eyebrow">{dueLabel}</span>
-            <button type="button" className="link small" onClick={() => go('planner')}>Planer</button>
+            <button type="button" className="link small" onClick={() => go('planner')}>{t('today.planner')}</button>
           </div>
           {due.length === 0 && (
             <div className="row">
               <span className="icon-tile green"><Icon name="check" size={20} stroke={2.6} /></span>
-              <span>Nichts offen – genieß den Tag!</span>
+              <span>{t('today.allClear')}</span>
             </div>
           )}
           {due.map((i) => {
@@ -169,27 +173,27 @@ export function Today({ go }: { go: (t: Tab) => void }) {
               <>
                 <Ring value={1 - Math.min(diffDays(today, exam.due!), 21) / 21} color="#FF7EB3" label={diffDays(today, exam.due!)} />
                 <span style={{ fontWeight: 600 }}>{exam.title}</span>
-                <span className="small muted">{study ? `Heute: ${study.detail ?? 'Lernen'}` : `in ${diffDays(today, exam.due!)} Tagen`}</span>
+                <span className="small muted">{study ? t('today.studyToday', { what: study.detail ?? t('today.studyDefault') }) : t('today.inDays', { count: diffDays(today, exam.due!) })}</span>
               </>
             ) : (
               <>
                 <span className="icon-tile pink" style={{ width: 64, height: 64, borderRadius: 20 }}><Icon name="exam" size={26} /></span>
-                <span style={{ fontWeight: 600 }}>Keine Tests</span>
-                <span className="small muted">Schreib z. B. „Mathe SA 12.11.“</span>
+                <span style={{ fontWeight: 600 }}>{t('today.noTests')}</span>
+                <span className="small muted">{t('today.noTestsHint')}</span>
               </>
             )}
           </button>
           <button type="button" className="card interactive" onClick={() => go('health')} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <Ring value={(steps ?? 0) / goal} color="#34C77B" label={<span style={{ fontSize: 12, color: 'var(--green)' }}>{steps === null ? '–' : `${Math.round(((steps ?? 0) / goal) * 100)} %`}</span>} />
-            <span style={{ fontWeight: 600 }}>{steps === null ? 'Schritte' : `${steps.toLocaleString('de-AT')} Schritte`}</span>
+            <span style={{ fontWeight: 600 }}>{steps === null ? t('today.steps') : t('today.stepsCount', { count: steps.toLocaleString(locale) })}</span>
             <span className="small muted">Ziel {goal.toLocaleString('de-AT')}</span>
           </button>
         </div>
 
         {lessons && lessons.length > 0 && (
-          <section aria-label="Morgen in der Schule" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <section aria-label={t('today.tomorrowAtSchool')} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div className="row" style={{ justifyContent: 'space-between' }}>
-              <h2>Morgen in der Schule</h2>
+              <h2>{t('today.tomorrowAtSchool')}</h2>
               <span className="small muted">{formatDateDe(tomorrow)}</span>
             </div>
             <div className="lesson-strip">
@@ -198,7 +202,7 @@ export function Today({ go }: { go: (t: Tab) => void }) {
                 const hw = !off && homeworkSubjects.has(l.subject);
                 return (
                   <div key={idx} className={`lesson-chip${off ? ' off' : hw ? ' hw' : ''}`}>
-                    <span className="t">{l.start}{off ? ' · entfällt' : hw ? ' · HÜ' : ''}</span>
+                    <span className="t">{l.start}{off ? t('today.lessonCancelled') : hw ? t('today.lessonHomework') : ''}</span>
                     <span className="s">{l.subject ?? l.code}</span>
                   </div>
                 );
@@ -213,8 +217,8 @@ export function Today({ go }: { go: (t: Tab) => void }) {
           <button type="button" className="card interactive row" onClick={() => go('finance')}>
             <span className="icon-tile green"><Icon name="wallet" size={20} /></span>
             <span style={{ flex: 1 }}>
-              <strong style={{ fontWeight: 600, display: 'block' }}>Ausgaben diesen Monat</strong>
-              <span className="small muted">{spent.count ? `${euro(spent.cents, spent.currency)} · ${spent.count} ${spent.count === 1 ? 'Zahlung' : 'Zahlungen'}` : 'noch keine Zahlungen – Einrichtung unter Einstellungen'}</span>
+              <strong style={{ fontWeight: 600, display: 'block' }}>{t('today.spendingMonth')}</strong>
+              <span className="small muted">{spent.count ? t('today.spendingCount', { amount: euro(spent.cents, spent.currency), count: spent.count }) : t('today.spendingNone')}</span>
             </span>
             <Icon name="chevron" size={16} />
           </button>
@@ -222,7 +226,7 @@ export function Today({ go }: { go: (t: Tab) => void }) {
 
         {goalList.length > 0 && (
           <button type="button" className="card interactive" onClick={() => go('goals')} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <span className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0 }}>Deine Ziele</h2><Icon name="chevron" size={16} /></span>
+            <span className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0 }}>{t('today.yourGoals')}</h2><Icon name="chevron" size={16} /></span>
             {goalList.slice(0, 3).map((g) => (
               <span key={g.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <span className="row" style={{ justifyContent: 'space-between', fontSize: 14 }}>
@@ -238,8 +242,8 @@ export function Today({ go }: { go: (t: Tab) => void }) {
         <button type="button" className="card interactive row" onClick={() => go('inbox')}>
           <span className={important ? 'pulse' : ''} aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: important ? 'var(--pink)' : 'var(--blue-light)' }} />
           <span style={{ flex: 1, fontSize: 14 }}>
-            <strong style={{ fontWeight: 600 }}>{important} wichtige {important === 1 ? 'Nachricht' : 'Nachrichten'}</strong>
-            <span className="muted"> · {social} Social · {trashed} Werbung gelöscht</span>
+            <strong style={{ fontWeight: 600 }}>{t('today.importantMessages', { count: important })}</strong>
+            <span className="muted">{t('today.inboxMeta', { social, trashed })}</span>
           </span>
           <Icon name="chevron" size={16} />
         </button>
@@ -247,8 +251,8 @@ export function Today({ go }: { go: (t: Tab) => void }) {
         <button type="button" className="card interactive row" onClick={() => go('chat')}>
           <span className="icon-tile blue"><Icon name="chat" size={20} /></span>
           <span style={{ flex: 1 }}>
-            <strong style={{ fontWeight: 600, display: 'block' }}>Stella etwas sagen</strong>
-            <span className="small muted">„Latein HÜ S. 20 Nr. 3 Freitag“ oder einfach fragen</span>
+            <strong style={{ fontWeight: 600, display: 'block' }}>{t('today.tellStella')}</strong>
+            <span className="small muted">{t('today.tellStellaHint')}</span>
           </span>
           <Icon name="chevron" size={16} />
         </button>

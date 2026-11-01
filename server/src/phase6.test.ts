@@ -29,7 +29,7 @@ process.env.OPENROUTER_API_KEY = 'test';
 process.env.OPENROUTER_BASE_URL = `http://127.0.0.1:${(mock.address() as AddressInfo).port}`;
 
 const { register } = await import('./auth.ts');
-const { db, getUser, newId } = await import('./db.ts');
+const { db, getUser, newId, updateUserSettings } = await import('./db.ts');
 const { handleChat } = await import('./assistant.ts');
 const { applyProfile } = await import('./profile.ts');
 const { quickActions } = await import('./quick.ts');
@@ -38,6 +38,7 @@ const { STYLE_RULES } = await import('@stella/shared');
 const school = register('Lukas', 'lukas@example.com', 'supergeheim', 'Europe/Vienna').user;
 const job = register('Mia', 'mia@example.com', 'supergeheim', 'Europe/Vienna').user;
 applyProfile(getUser(job.id)!, { situation: 'work', features: ['planner', 'mails', 'shopping', 'goals', 'finance'], workHours: { days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' } });
+updateUserSettings(school.id, { country: 'AT', locale: 'de' });
 applyProfile(getUser(school.id)!, { situation: 'school', features: ['planner', 'homework', 'mails'] });
 
 const ids = (u: { id: string }, hour: number) => quickActions(getUser(u.id)!, hour).actions.map((a) => a.id);
@@ -72,13 +73,15 @@ test('Antwortstil: der System-Prompt enthält die Regeln – und passt zum Profi
   const [jobPrompt, schoolPrompt] = prompts;
   for (const p of [jobPrompt!, schoolPrompt!]) {
     assert.ok(p.includes(STYLE_RULES), 'Stilregeln stehen im Prompt');
-    assert.match(p, /höchstens etwa 6 Zeilen/);
-    assert.match(p, /Aufzählungen/);
-    assert.match(p, /keine Überschriften/i);
+    assert.match(p, /at most about 6 lines/);
+    assert.match(p, /bullet lists/);
+    assert.match(p, /No headings/i);
+    assert.match(p, /Always reply in German/, 'Sprache der Antwort steht als Regel im Prompt');
   }
-  assert.match(jobPrompt!, /Mia arbeitet \(09:00–17:00\)/);
-  assert.ok(!/zur Schule/.test(jobPrompt!) && !/solve_homework/.test(jobPrompt!), 'im Job keine Schule');
-  assert.match(schoolPrompt!, /Lukas geht in Österreich zur Schule/);
+  assert.match(jobPrompt!, /Mia works \(09:00–17:00\)/);
+  assert.ok(!/goes to school/.test(jobPrompt!) && !/solve_homework/.test(jobPrompt!), 'im Job keine Schule');
+  assert.match(schoolPrompt!, /Lukas goes to school in Austria/);
+  assert.match(schoolPrompt!, /homework = "Hausübung"/, 'Schulwort je Land');
   assert.match(schoolPrompt!, /solve_homework/);
 });
 

@@ -39,6 +39,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Sprachkataloge der App aktuell? (scripts/gen-i18n.ts)
+        run: npx --yes tsx scripts/gen-i18n.ts --check
+
       - name: Xcode ${{ matrix.xcode }} wählen
         run: |
           XC=$(ls -d /Applications/Xcode_${{ matrix.xcode }}*.app | sort -V | tail -1)

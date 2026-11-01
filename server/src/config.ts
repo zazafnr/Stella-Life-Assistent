@@ -13,6 +13,8 @@ export const config = {
   secret: env.STELLA_SECRET ?? '',
   /** Nach dem ersten Konto weitere Registrierungen erlauben? */
   allowRegistration: env.STELLA_ALLOW_REGISTRATION === 'true',
+  /** Sprache für Konten ohne eigene Einstellung (Standard Englisch; Tests setzen Deutsch) */
+  defaultLocale: env.STELLA_DEFAULT_LOCALE ?? 'en',
   defaultTimeZone: env.STELLA_TIMEZONE ?? 'Europe/Vienna',
   openrouter: {
     apiKey: env.OPENROUTER_API_KEY ?? '',

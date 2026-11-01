@@ -12,10 +12,12 @@ import type { FastifyInstance } from 'fastify';
 import { addMessage, db, getUser, newId, now, updateUserSettings, type User } from './db.ts';
 import { config } from './config.ts';
 import { createSession, hashPassword, HttpError, register as registerFirst, userCount, verifyPassword } from './auth.ts';
-import { voice } from '@stella/shared';
+import { isCountry, isLocale, matchLocale, type Locale } from '@stella/shared';
+import { tr } from './locale.ts';
 import { mailerConfigured, sendSystemMail } from './mailer.ts';
 import { filePath } from './files.ts';
 import { skipProfile, cleanProfile, applyProfile } from './profile.ts';
+import { voiceOf } from './locale.ts';
 
 export type RegistrationMode = 'closed' | 'invite' | 'open';
 
@@ -74,18 +76,20 @@ function issueCode(user: User) {
 }
 
 async function mailCode(user: User, code: string) {
-  await sendSystemMail(user.email, `Dein Stella-Code: ${code}`,
-    `Hallo ${user.name},\n\ndein Bestätigungs-Code für Stella lautet:\n\n    ${code}\n\nEr gilt ${CODE_MINUTES} Minuten. Falls du dich nicht bei Stella angemeldet hast, kannst du diese Mail einfach ignorieren.\n\nStella by EVOLSIOR – Built to become`, 'noreply', { purpose: 'verification', userId: user.id });
+  await sendSystemMail(user.email, tr(user, 'email.code.subject', { code }),
+    tr(user, 'email.code.body', { name: user.name, code, minutes: CODE_MINUTES }), 'noreply', { purpose: 'verification', userId: user.id });
 }
 
-export async function startSignup(b: { name: string; email: string; password: string; timeZone: string; device?: string; invite?: string }) {
+export async function startSignup(b: { name: string; email: string; password: string; timeZone: string; device?: string; invite?: string; locale?: Locale; country?: string }) {
+  const base = { locale: b.locale ?? matchLocale(undefined), ...(isCountry(b.country) ? { country: b.country } : {}) };
   const email = b.email.trim().toLowerCase();
   // das erste Konto ist der Owner: ohne Einladung, ohne Code
   if (userCount() === 0) {
     const { token, user } = registerFirst(b.name || 'Du', email, b.password, b.timeZone, b.device);
-    updateUserSettings(user.id, { onboarding: 'pending' });
-    addMessage(user.id, 'assistant', voice(user.settings.tone).welcome(user.name));
-    return { token, user: getUser(user.id)!, needsVerification: false as const };
+    updateUserSettings(user.id, { onboarding: 'pending', ...base });
+    const created = getUser(user.id)!;
+    addMessage(user.id, 'assistant', voiceOf(created).welcome(created.name));
+    return { token, user: created, needsVerification: false as const };
   }
   const mode = registrationMode();
   if (mode === 'closed') throw new HttpError(403, 'Registrierung ist geschlossen.');
@@ -101,7 +105,7 @@ export async function startSignup(b: { name: string; email: string; password: st
 
   const id = newId();
   db.prepare('INSERT INTO users (id, name, email, password_hash, time_zone, ingest_token, created_at, role, verified, settings) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)')
-    .run(id, b.name.trim().slice(0, 80) || 'Du', email, hashPassword(b.password), b.timeZone || config.defaultTimeZone, randomBytes(24).toString('base64url'), now(), 'user', JSON.stringify({ onboarding: 'pending' }));
+    .run(id, b.name.trim().slice(0, 80) || 'Du', email, hashPassword(b.password), b.timeZone || config.defaultTimeZone, randomBytes(24).toString('base64url'), now(), 'user', JSON.stringify({ onboarding: 'pending', ...base }));
   if (invite) db.prepare('UPDATE invites SET used_by = ? WHERE code = ?').run(id, invite);
   const user = getUser(id)!;
   try {
@@ -135,7 +139,7 @@ export function verifyEmail(emailRaw: string, code: string, device?: string) {
   db.prepare('UPDATE users SET verified = 1 WHERE id = ?').run(row.id);
   db.prepare('DELETE FROM email_codes WHERE user_id = ?').run(row.id);
   const user = getUser(row.id)!;
-  addMessage(user.id, 'assistant', voice(user.settings.tone).welcome(user.name));
+  addMessage(user.id, 'assistant', voiceOf(user).welcome(user.name));
   return { token: createSession(user.id, device), user };
 }
 
@@ -181,7 +185,9 @@ export function deleteAccount(user: User, password: string) {
 export function registerSignupRoutes(app: FastifyInstance, publicUser: (u: User) => unknown) {
   app.post('/api/auth/register', async (req) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
-    const res = await startSignup({ name: str(b.name, 80), email: str(b.email), password: typeof b.password === 'string' ? b.password.slice(0, 200) : '', timeZone: str(b.timeZone, 60), device: str(b.device, 80), invite: str(b.invite, 40) });
+    // Sprache: ausdrücklich gewählt, sonst aus dem Browser (Accept-Language), sonst Englisch
+    const locale = isLocale(b.locale) ? b.locale : matchLocale(req.headers['accept-language']);
+    const res = await startSignup({ name: str(b.name, 80), email: str(b.email), password: typeof b.password === 'string' ? b.password.slice(0, 200) : '', timeZone: str(b.timeZone, 60), device: str(b.device, 80), invite: str(b.invite, 40), locale, country: str(b.country, 10) });
     return res.needsVerification ? res : { token: res.token, user: publicUser(res.user) };
   });
   app.post('/api/auth/verify', async (req) => {

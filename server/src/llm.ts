@@ -279,14 +279,15 @@ const AUDIO_EXT: Record<string, string> = {
   'audio/webm': 'webm', 'video/webm': 'webm', 'audio/ogg': 'ogg', 'audio/wav': 'wav', 'audio/x-wav': 'wav',
 };
 
-export async function transcribe(audio: Buffer, mime: string, opts: { userId?: string } = {}): Promise<string> {
+export async function transcribe(audio: Buffer, mime: string, opts: { userId?: string; language?: string } = {}): Promise<string> {
   const key = serverKey('groq');
   if (!key) throw new LlmUnavailable('Spracherkennung ist noch nicht eingerichtet (Groq-Schlüssel fehlt).');
   const type = mime.split(';')[0]!.trim().toLowerCase();
   const form = new FormData();
   form.append('file', new Blob([new Uint8Array(audio)], { type }), `sprache.${AUDIO_EXT[type] ?? 'm4a'}`);
   form.append('model', config.groq.models.transcribe);
-  form.append('language', 'de');
+  // Sprache als Hinweis (ISO-639-1): hilft Whisper bei kurzen Aufnahmen; ohne Angabe erkennt es sie selbst
+  if (opts.language) form.append('language', opts.language);
   form.append('response_format', 'json');
   form.append('temperature', '0');
   countRequest('groq', opts.userId);

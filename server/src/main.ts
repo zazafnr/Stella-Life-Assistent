@@ -2,7 +2,8 @@ import { createReadStream, existsSync } from 'node:fs';
 import path from 'node:path';
 import Fastify, { type FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
-import { addDays, isTone, todayIn, voice, type Item } from '@stella/shared';
+import { addDays, isCountry, isLocale, isTone, todayIn, voice, type Item } from '@stella/shared';
+import { userLocale } from './locale.ts';
 import { config } from './config.ts';
 import {
   deleteSecret, hasSecret, HttpError, login, logout, register, requireUser, setSecret, userByIngestToken, userCount,
@@ -260,6 +261,14 @@ app.register(async (api) => {
       if (v !== 'auto' && v !== 'off' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) throw new HttpError(400, 'Briefing: "auto", "off" oder HH:MM');
       patch.briefing = v;
     }
+    if (b.locale !== undefined) {
+      if (!isLocale(b.locale)) throw new HttpError(400, 'Unknown language.');
+      patch.locale = b.locale;
+    }
+    if (b.country !== undefined) {
+      if (!isCountry(b.country)) throw new HttpError(400, 'Unknown country.');
+      patch.country = b.country;
+    }
     if (b.weekPlan !== undefined) {
       if (b.weekPlan !== 'sunday' && b.weekPlan !== 'off') throw new HttpError(400, 'Wochenplan: "sunday" oder "off"');
       patch.weekPlan = b.weekPlan;
@@ -281,7 +290,7 @@ app.register(async (api) => {
     const user = getUser(req.user.id)!;
     // Erinnerungen tragen Uhrzeit und Ton in sich → neu erzeugen
     if (patch.eveningTime || patch.studyTime || (patch.tone && patch.tone !== req.user.settings.tone)) rescheduleAll(user);
-    if (patch.tone && patch.tone !== req.user.settings.tone) addMessage(user.id, 'assistant', voice(patch.tone).toneChanged());
+    if (patch.tone && patch.tone !== req.user.settings.tone) addMessage(user.id, 'assistant', voice(patch.tone, patch.locale ?? userLocale(req.user)).toneChanged());
     return publicUser(user);
   });
 

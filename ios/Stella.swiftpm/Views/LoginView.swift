@@ -37,7 +37,7 @@ struct LoginView: View {
                     Text("Stella")
                         .font(Theme.display(44))
                         .foregroundStyle(Theme.text)
-                    Text("Let Stella handle your life.")
+                    Text(L("auth.tagline"))
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(Theme.muted)
                         .padding(.bottom, 18)
@@ -82,6 +82,17 @@ struct LoginView: View {
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.faint)
                         .padding(.top, 8)
+
+                    Menu {
+                        ForEach(I18n.supported, id: \.self) { l in
+                            Button(I18n.names[l] ?? l) { I18n.shared.set(l) }
+                        }
+                    } label: {
+                        Label(I18n.names[I18n.shared.locale] ?? I18n.shared.locale, systemImage: "globe")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Theme.muted)
+                    }
+                    .padding(.top, 4)
 
                     Text("by EVOLSIOR")
                         .font(.system(size: 11, weight: .medium))
@@ -128,21 +139,21 @@ struct LoginView: View {
 
     @ViewBuilder private var credentialFields: some View {
         if register {
-            field("Dein Name", text: $name, field: .name)
+            field(L("auth.name"), text: $name, field: .name)
                 .textContentType(.givenName)
         }
-        field("E-Mail", text: $email, field: .email)
+        field(L("auth.email"), text: $email, field: .email)
             .textContentType(.emailAddress)
             .keyboardType(.emailAddress)
             .textInputAutocapitalization(.never)
-        SecureField("Passwort", text: $password)
+        SecureField(L("auth.password"), text: $password)
             .textContentType(register ? .newPassword : .password)
             .focused($focus, equals: .password)
             .submitLabel(needsInvite ? .next : .go)
             .onSubmit { if needsInvite { focus = .invite } else { Task { await submit() } } }
             .modifier(InputStyle())
         if needsInvite {
-            TextField("Einladungscode (ABCD-EFGH)", text: $invite)
+            TextField("\(L("auth.inviteCode")) (ABCD-EFGH)", text: $invite)
                 .focused($focus, equals: .invite)
                 .textInputAutocapitalization(.characters)
                 .autocorrectionDisabled()
@@ -153,7 +164,7 @@ struct LoginView: View {
     }
 
     @ViewBuilder private func verifyFields(_ address: String) -> some View {
-        Text("Wir haben dir einen 6-stelligen Code an \(address) geschickt. Er gilt 15 Minuten.")
+        Text(L("auth.codeSent", ["email": address]))
             .font(.system(size: 14))
             .foregroundStyle(Theme.muted)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -174,31 +185,31 @@ struct LoginView: View {
 
     @ViewBuilder private var secondaryButtons: some View {
         if let verifying {
-            Button(wait > 0 ? "Neuen Code senden (\(wait) s)" : "Neuen Code senden") { Task { await again(verifying) } }
+            Button(wait > 0 ? L("auth.newCodeIn", ["seconds": wait]) : L("auth.newCode")) { Task { await again(verifying) } }
                 .font(.system(size: 15, weight: .semibold))
                 .disabled(wait > 0)
                 .padding(.top, 4)
-            Button("Zurück zur Anmeldung") {
+            Button(L("auth.backToLogin")) {
                 withAnimation { self.verifying = nil; error = nil; info = nil; code = "" }
             }
             .font(.system(size: 14))
             .foregroundStyle(Theme.muted)
         } else if canRegister {
-            Button(register ? "Schon ein Konto? Anmelden" : "Noch kein Konto?") {
+            Button(register ? L("auth.haveAccountLogin") : L("auth.noAccount")) {
                 withAnimation(.spring) { register.toggle(); error = nil }
             }
             .font(.system(size: 15, weight: .semibold))
             .padding(.top, 4)
         } else {
-            Text("Neue Konten sind gerade nicht möglich.")
+            Text(L("auth.registrationClosed"))
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.muted)
         }
     }
 
     private var primaryTitle: String {
-        if verifying != nil { return "Bestätigen" }
-        return register ? "Konto erstellen" : "Anmelden"
+        if verifying != nil { return L("auth.confirm") }
+        return register ? L("auth.createAccount") : L("auth.login")
     }
 
     private var canSubmit: Bool {

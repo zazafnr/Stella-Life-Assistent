@@ -1,7 +1,7 @@
 // Stellas "Gehirn": erst schnelle Regeln (offline-fähig, kostenlos), dann die KI mit Werkzeugen.
 
 import {
-  addDays, formatDateDe, interpret, placeKind, nextSchoolDay, parseEntry, splitTopics, STYLE_RULES, timeIn, todayIn, toneInstruction, voice, WEEKDAYS_DE, weekdayOf,
+  addDays, formatDateDe, interpret, placeKind, nextSchoolDay, parseEntry, splitTopics, STYLE_RULES, timeIn, todayIn, toneInstruction, languageRule, LANGUAGE_NAMES_EN, voice, WEEKDAYS_DE, WEEKDAYS_EN, weekdayOf,
   type Attachment, type ChatMessage, type ChatResponse, type Intent, type Item, type ItemKind, type ItemQuery, type MemoryCategory, type ParsedEntry,
 } from '@stella/shared';
 import {
@@ -22,11 +22,13 @@ import { afterWorkTime, describeUser, hasFeature, isSchool } from './profile.ts'
 import { matchOpenItems, openItems } from './lists.ts';
 import { activeGoals, amountText, describeCadence, extractGoal, extractLog, GOAL_RE, looksLikeGoal, matchGoal, parseLogQuick, progress, weekTarget, type NewGoal } from './goals.ts';
 import { resolvePlace } from './places.ts';
-import { describeRecurrence, nextOccurrence } from '@stella/shared';
+import { describeRecurrence, describeRecurrenceEn, nextOccurrence } from '@stella/shared';
 import { euro, spendingCard, spendingFacts, spendingPeriod, SPEND_RE } from './finance.ts';
 import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type Tier, type ToolDef } from './llm.ts';
 import { pickTier, resolveTier } from './router.ts';
+import { dayFor, tr, userLocale, userTerms } from './locale.ts';
 import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
+import { voiceOf } from './locale.ts';
 
 interface Turn {
   user: User;
@@ -48,7 +50,10 @@ const sayAction = (t: Turn) => (text: string, actionId: string) => { t.replies.p
 /** Satzende ohne doppelten Punkt nach "Freitag, 30.10." */
 const dot = (s: string) => (s.endsWith('.') ? s : `${s}.`);
 const touched = (t: Turn, ...items: (Item | null)[]) => items.forEach((i) => i && t.changed.set(i.id, i));
-const v = (t: Turn) => voice(t.user.settings.tone);
+const v = (t: Turn) => voiceOf(t.user);
+/** Text aus dem Sprachkatalog in der Sprache der Nutzerin; `day` formatiert ein Datum */
+const T = (t: Turn, key: string, vars?: Record<string, string | number>) => tr(t.user, key, { homework: userTerms(t.user).homework, ...vars });
+const day = (t: Turn, ymd: string, rel = true) => dayFor(t.user, ymd, rel ? t.today : undefined);
 
 /** `conversationId`: in welchem Chat geschrieben wird (alter Chat fortsetzen); ohne Angabe der neueste von heute. */
 export async function handleChat(user: User, text: string, clientId: string | null, imageIds: string[] = [], conversationId: string | null = null,
@@ -67,11 +72,11 @@ async function handleChatIn(user: User, text: string, clientId: string | null, i
   const userMessage = addMessage(user.id, 'user', text, { clientId, attachments: [...images, ...extra] });
 
   const t: Turn = { user, conversationId: convId, today: todayIn(user.timeZone), replies: [], changed: new Map(), images };
-  const intent = interpret(text, t.today, timeIn(user.timeZone));
+  const intent = interpret(text, t.today, timeIn(user.timeZone), { locale: userLocale(user) });
   const pending = getPending(user.id);
 
   let handled = false;
-  if (/^\s*(bitte\s+)?(mach\s+(das|es)\s+)?r(ü|ue)ckg(ä|ae)ngig\b|^\s*undo\b/iu.test(text)) handled = undoLast(t);
+  if (/^\s*(bitte\s+)?(mach\s+(das|es)\s+)?r(ü|ue)ckg(ä|ae)ngig\b|^\s*(please\s+)?undo(\s+(that|it))?\b/iu.test(text)) handled = undoLast(t);
   if (!handled && BRIEFING_RE.test(text)) { say(t, briefingText(t.user)); handled = true; }
   if (!handled && FORGOT_RE.test(text)) handled = await answerForgot(t);
   if (!handled && INBOX_RE.test(text)) handled = answerInbox(t);
@@ -107,11 +112,11 @@ async function handleChatIn(user: User, text: string, clientId: string | null, i
   return { messages: t.replies, items: [...t.changed.values()], userMessage };
 }
 
-const BRIEFING_RE = /^\s*(\W*)(morning[- ]?)?briefing\b|^\s*(tages)?(überblick|ueberblick)\b|^\s*was (steht|ist) heute (an|los)\b/iu;
-const INBOX_RE = /^\s*(\W*)(was (ist|gibt'?s) neu(es)? (in|bei) (der |meiner |meinen |deiner )?(mail|mails|post|inbox)|(gibt'?s |hab ich )?neue (mail|mails|post)|mail-?übersicht|hab ich post)\b/iu;
+const BRIEFING_RE = /^\s*(\W*)(morning[- ]?)?briefing\b|^\s*(tages)?(überblick|ueberblick)\b|^\s*was (steht|ist) heute (an|los)\b|^\s*what'?s (up|on) today\b/iu;
+const INBOX_RE = /^\s*(\W*)(was (ist|gibt'?s) neu(es)? (in|bei) (der |meiner |meinen |deiner )?(mail|mails|post|inbox)|(gibt'?s |hab ich )?neue (mail|mails|post)|mail-?übersicht|hab ich post|what'?s new in (my )?(e-?mail|mail|inbox)|(do i have |any )new (e-?mails?|mail)s?)\b/iu;
 const GOAL_START_RE = GOAL_RE;
 const GOAL_EXPLICIT_RE = /^\s*(mein\s+ziel|ziel\s*[:,])/iu;
-const FORGOT_RE = /hab(e)? ich (was|etwas|irgendwas) vergessen|was (hab|habe) ich vergessen/iu;
+const FORGOT_RE = /hab(e)? ich (was|etwas|irgendwas) vergessen|was (hab|habe) ich vergessen|did i forget (anything|something)|what did i forget/iu;
 
 const WEEK_RE = /\bplan(e|st)?\s+(mir\s+)?(meine|die|diese|nächste|naechste)\s+(\w+\s+)?woche\b|\bwochenplan|\bwoche\s+(planen|durchplanen)|\bplan my week\b/iu;
 
@@ -119,7 +124,7 @@ const WEEK_RE = /\bplan(e|st)?\s+(mir\s+)?(meine|die|diese|nächste|naechste)\s+
 async function answerWeek(t: Turn, text: string): Promise<boolean> {
   const next = /nächste|naechste/iu.test(text);
   const plan = await planWeek(t.user, next ? { from: addDays(t.today, 8 - isoWeekday(t.today)) } : {});
-  const v = voice(t.user.settings.tone);
+  const v = voiceOf(t.user);
   if (!plan.blocks.length) {
     say(t, plan.notes.length ? `${v.weekPlanEmpty()}\n\n${plan.notes.map((n) => `⚠️ ${n}`).join('\n')}` : v.weekPlanEmpty());
     return true;
@@ -131,7 +136,7 @@ async function answerWeek(t: Turn, text: string): Promise<boolean> {
 
 /** „Was ist neu in der Mail?“ – die wichtigen Mails der letzten Tage in wenigen Zeilen */
 function answerInbox(t: Turn): boolean {
-  const v = voice(t.user.settings.tone);
+  const v = voiceOf(t.user);
   const mails = buildLagebild(t.user, 3).importantInbox;
   if (!mails.length) { say(t, v.inboxNone()); return true; }
   const lines = mails.slice(0, 4).map((m) => `- **${m.sender ?? 'Jemand'}**: ${m.summary || '(ohne Text)'}${m.needsReply ? ' _(Antwort nötig)_' : ''}`).join('\n');
@@ -142,13 +147,13 @@ function answerInbox(t: Turn): boolean {
 /** „Was hab ich vergessen?“ – alle aktuellen Hinweise, mit Vorschlägen als Karten */
 async function answerForgot(t: Turn): Promise<boolean> {
   const hints = findHints(t.user);
-  if (!hints.length) { say(t, voice(t.user.settings.tone).nothingForgotten()); return true; }
+  if (!hints.length) { say(t, voiceOf(t.user).nothingForgotten()); return true; }
   say(t, hints.length === 1 ? 'Eine Sache ist mir aufgefallen:' : `${hints.length} Sachen sind mir aufgefallen:`);
   for (const h of hints) {
     if (h.action && !h.actionId) {
       const r = perform(t.user, h.action.type, h.action.params as never, { source: 'auto', question: h.text, quiet: true, say: sayAction(t) });
       if (r.status === 'done') {
-        t.replies.push(addMessage(t.user.id, 'assistant', voice(t.user.settings.tone).hintDone(getAction(t.user.id, r.actionId)?.summary ?? h.action.label), { actionId: r.actionId }));
+        t.replies.push(addMessage(t.user.id, 'assistant', voiceOf(t.user).hintDone(getAction(t.user.id, r.actionId)?.summary ?? h.action.label), { actionId: r.actionId }));
       }
       else if (r.status === 'refused') say(t, h.text);
       markHintDelivered(t.user.id, h.key, r.status === 'refused' ? undefined : r.actionId);
@@ -166,10 +171,10 @@ const autopilot = (u: User) => ['auto', 'notify'].includes(levelFor(u, 'homework
 
 function undoLast(t: Turn): boolean {
   const last = lastUndoable(t.user.id);
-  if (!last) { say(t, 'Ich finde gerade nichts, was ich rückgängig machen könnte. 🤔'); return true; }
+  if (!last) { say(t, T(t, 'srv.undo.nothing')); return true; }
   const { changed } = undo(t.user.id, last.id);
   touched(t, ...changed);
-  say(t, `↩️ Rückgängig: ${last.summary}.`);
+  say(t, T(t, 'srv.undo.done', { summary: last.summary }));
   return true;
 }
 
@@ -192,13 +197,13 @@ function attachPhotoToRecentHomework(t: Turn): boolean {
     AND created_at > ? ORDER BY created_at DESC LIMIT 1`).get(t.user.id, new Date(Date.now() - 30 * 60_000).toISOString()) as { id: string } | undefined;
   const item = recent && getItem(t.user.id, recent.id);
   if (!item) {
-    say(t, '📸 Zu welcher HÜ gehört das Foto? Schick es nochmal mit z. B. „Mathe HÜ AB Nr. 3 Freitag“.');
+    say(t, T(t, 'srv.photo.which'));
     return true;
   }
   attachPhotos(t, item);
   say(t, autopilot(t.user)
-    ? `📸 Hab das Foto zu **${item.title}** gelegt – ich lös das und schreib's dir ins Heft. ✍️`
-    : `📸 Hab das Foto zu **${item.title}** gelegt.`);
+    ? T(t, 'srv.photo.attachedSolve', { title: item.title })
+    : T(t, 'srv.photo.attached', { title: item.title }));
   requestSolve(t, item);
   return true;
 }
@@ -217,13 +222,13 @@ async function onCreate(t: Turn, e: ParsedEntry) {
   touched(t, item);
   // ins Protokoll, damit „Rückgängig“ und „nein, Donnerstag“ funktionieren
   const actionId = record(t.user, 'item.create', { kind: item.kind, title: item.title, due: item.due, time: item.time }, { id: item.id }, { id: item.id });
-  const when = `${formatDateDe(item.due!, t.today)}${item.time ? ` um ${item.time}` : ''}`;
+  const when = `${day(t, item.due!)}${item.time ? ` ${T(t, 'srv.atTime', { time: item.time })}` : ''}`;
   const evening = t.user.settings.eveningTime ?? '19:00';
 
   if (item.kind === 'homework') {
     const remindDay = addDays(item.due!, -1);
-    const parts = [dot(v(t).noted(`**${item.title}**${item.detail ? ` – ${item.detail}` : ''}, fällig ${when}`))];
-    if (remindDay >= t.today) parts.push(v(t).remindAt(formatDateDe(remindDay, t.today), evening));
+    const parts = [dot(v(t).noted(`**${item.title}**${item.detail ? ` – ${item.detail}` : ''}, ${T(t, 'srv.dueWhen', { when })}`))];
+    if (remindDay >= t.today) parts.push(v(t).remindAt(day(t, remindDay), evening));
     const book = bookFor(t.user, item.subject);
     if (t.images.length) {
       attachPhotos(t, item);
@@ -234,8 +239,8 @@ async function onCreate(t: Turn, e: ParsedEntry) {
     if (e.dueAssumed) {
       const fromTimetable = item.due !== nextSchoolDay(t.today);
       parts.push(fromTimetable
-        ? `_(Kein Datum dabei – ich hab die nächste ${item.subject}-Stunde laut WebUntis genommen.)_`
-        : `_(Kein Datum erkannt – ich hab den nächsten Schultag genommen. Schreib z. B. „${item.subject ?? ''} HÜ bis Freitag“, wenn's anders ist.)_`);
+        ? T(t, 'srv.noDate.timetable', { subject: item.subject ?? '' })
+        : T(t, 'srv.noDate.nextDay', { subject: item.subject ?? '' }));
     }
     sayA(t, parts.join(' '), actionId);
     if (t.images.length) requestSolve(t, item);
@@ -243,7 +248,7 @@ async function onCreate(t: Turn, e: ParsedEntry) {
   }
 
   if (item.kind === 'exam') {
-    sayA(t, v(t).examNoted(item.title, dot(formatDateDe(item.due!))), actionId);
+    sayA(t, v(t).examNoted(item.title, dot(day(t, item.due!, false))), actionId);
     if (item.material) {
       await makePlan(t, item.id, item.material);
     } else {
@@ -274,8 +279,8 @@ function findItem(t: Turn, q: ItemQuery): Item | null {
   return best?.item ?? null;
 }
 
-const queryLabel = (q: ItemQuery) => [q.subject, q.kind && { homework: 'HÜ', exam: 'Test', assignment: 'Abgabe', event: 'Termin', todo: 'To-do', study: 'Lernen', reminder: 'Erinnerung' }[q.kind], ...q.words].filter(Boolean).join(' ');
-const whenLabel = (t: Turn, due: string | null, time: string | null) => [due ? formatDateDe(due, t.today) : null, time ? `um ${time}` : null].filter(Boolean).join(' ');
+const queryLabel = (t: Turn, q: ItemQuery) => [q.subject, q.kind && T(t, `kind.${q.kind}`), ...q.words].filter(Boolean).join(' ');
+const whenLabel = (t: Turn, due: string | null, time: string | null) => [due ? day(t, due) : null, time ? T(t, 'srv.atTime', { time }) : null].filter(Boolean).join(' ');
 
 function changeTo(t: Turn, item: Item, due: string | null, time: string | null) {
   const r = perform(t.user, 'item.update', { id: item.id, patch: { ...(due ? { due } : {}), ...(time ? { time } : {}) } }, { source: 'chat', quiet: true, say: sayAction(t) });
@@ -290,12 +295,12 @@ async function onMove(t: Turn, intent: Extract<Intent, { type: 'move' }>, text: 
   // "Latein HÜ auf Freitag" ohne vorhandene HÜ ist eher eine neue HÜ
   const entry = parseEntry(text.replace(/\bauf\b/iu, 'bis'), t.today);
   if (entry) { await onCreate(t, entry); return; }
-  say(t, v(t).notFound(queryLabel(intent.query)));
+  say(t, v(t).notFound(queryLabel(t, intent.query)));
 }
 
 function onDelete(t: Turn, q: ItemQuery) {
   const item = findItem(t, q);
-  if (!item) { say(t, v(t).notFound(queryLabel(q))); return; }
+  if (!item) { say(t, v(t).notFound(queryLabel(t, q))); return; }
   const r = perform(t.user, 'item.delete', { id: item.id }, { source: 'chat', quiet: true, say: sayAction(t) });
   touched(t, ...r.changed);
   if (r.status === 'refused') say(t, `🙅 ${r.reason}`);
@@ -319,7 +324,7 @@ function onRecurring(t: Turn, intent: Extract<Intent, { type: 'recurring' }>) {
     { source: 'chat', quiet: true, say: sayAction(t) });
   touched(t, ...r.changed);
   if (r.status === 'refused') say(t, `🙅 ${r.reason}`);
-  else if (r.status === 'done') sayA(t, v(t).recurringSet(`${describeRecurrence(intent.recurrence)} um ${time}`, intent.text), r.actionId);
+  else if (r.status === 'done') sayA(t, v(t).recurringSet(`${userLocale(t.user) === 'de' ? describeRecurrence(intent.recurrence) : describeRecurrenceEn(intent.recurrence)} ${T(t, 'srv.atTime', { time })}`, intent.text), r.actionId);
 }
 
 // ---------- Einkaufsliste und Erledigungen ----------
@@ -465,12 +470,13 @@ function onDone(t: Turn, subject: string | null, kind: ItemKind | null) {
 
 export function agendaText(user: User, today: string, days: number): string {
   const items = listItems(user.id, { from: today, to: addDays(today, days) });
-  if (!items.length) return voice(user.settings.tone).nothingAhead(days);
+  if (!items.length) return voiceOf(user).nothingAhead(days);
+  const NODATE = 'no-date';
   const byDay = new Map<string, Item[]>();
-  for (const i of items) byDay.set(i.due ?? 'ohne Datum', [...(byDay.get(i.due ?? 'ohne Datum') ?? []), i]);
+  for (const i of items) byDay.set(i.due ?? NODATE, [...(byDay.get(i.due ?? NODATE) ?? []), i]);
   const icon: Record<string, string> = { homework: '📚', exam: '📝', assignment: '📌', event: '📅', todo: '☑️', study: '🧠' };
-  return [...byDay].map(([day, list]) =>
-    `**${day === 'ohne Datum' ? day : formatDateDe(day, today)}**\n` +
+  return [...byDay].map(([d, list]) =>
+    `**${d === NODATE ? tr(user, 'srv.noDate.label') : dayFor(user, d, today)}**\n` +
     list.map((i) => `${icon[i.kind] ?? '•'} ${i.title}${i.detail ? ` – ${i.detail}` : ''}${i.time ? ` (${i.time})` : ''}`).join('\n'),
   ).join('\n\n');
 }
@@ -489,7 +495,7 @@ async function answerPending(t: Turn, pending: { type: string; itemId: string; c
     clearPending(t.user.id);
     const updated = changeItem(t.user, item.id, { due });
     touched(t, updated);
-    say(t, `👍 ${item.title} am ${formatDateDe(due)} – eingetragen!`);
+    say(t, T(t, 'srv.pending.dateSet', { title: item.title, when: day(t, due, false) }));
     if (item.kind === 'exam' && !item.material) {
       setPending(t.user.id, 'exam_material', item.id);
       say(t, v(t).askMaterial());
@@ -724,7 +730,7 @@ const TOOLS: ToolDef[] = [
 const toolsFor = (user: User): ToolDef[] => TOOLS.filter((x) => x.function.name !== 'spending_summary' || hasFeature(user, 'finance'));
 
 /** Antworten per E-Mail: einfache Aufträge kurz bestätigen, Fragen ausführlich beantworten */
-const STYLE_DETAILED = 'Stil: Die Antwort geht per E-Mail. Einfache Aufträge bestätigst du kurz in ein, zwei Sätzen. Fragen beantwortest du ausführlich und gut gegliedert (kurze Absätze oder Aufzählungen mit „- “), ohne Floskeln.';
+const STYLE_DETAILED = 'Style: the answer goes out by email. Confirm simple tasks briefly in one or two sentences. Answer questions in detail and well structured (short paragraphs or bullet lists with "- "), no filler phrases.';
 
 /**
  * System-Prompt in zwei Teilen: `fixed` bleibt zwischen Anfragen gleich (Prompt-Caching), `dynamic` enthält alles
@@ -732,26 +738,28 @@ const STYLE_DETAILED = 'Stil: Die Antwort geht per E-Mail. Einfache Aufträge be
  */
 export function systemPrompt(user: User, today: string): { fixed: string; dynamic: string } {
   const lb = buildLagebild(user, 8);
+  const locale = userLocale(user);
+  const terms = userTerms(user);
   return {
-    dynamic: `Jetzt: ${WEEKDAYS_DE[weekdayOf(today)]}, ${today}, ${timeIn(user.timeZone)} Uhr (${user.timeZone}).
+    dynamic: `Now: ${WEEKDAYS_EN[weekdayOf(today)]}, ${today}, ${timeIn(user.timeZone)} (${user.timeZone}).
 
-LAGEBILD
+SITUATION (Lagebild)
 ${lagebildPrompt(lb)}`,
-    fixed: `Du bist Stella, der persönliche Assistent von ${user.name}. Motto: "Let Stella handle your life."
-${describeUser(user)} Du nimmst ${user.name} Arbeit ab: Termine, Planung, Nachrichten, Alltag${isSchool(user) ? ', Schule und Lernen' : ''}.
+    fixed: `You are Stella, the personal assistant of ${user.name}. Motto: "Let Stella handle your life."
+${describeUser(user)} You take work off ${user.name}'s plate: appointments, planning, messages, everyday life${isSchool(user) ? ', school and learning' : ''}.
 
-Regeln:
-- Antworte auf Deutsch.
-- ${chatContext.getStore()?.detailed ? STYLE_DETAILED : STYLE_RULES}
-- ${toneInstruction(user.settings.tone)}
-- HANDELN statt erklären: Wenn ${user.name} etwas organisiert, geplant, verschoben, abgesagt oder vorbereitet haben will, tu es mit den Werkzeugen (mehrere Schritte sind ok). Rechne Daten selbst aus (YYYY-MM-DD).
-- Manche Aktionen brauchen die Zustimmung von ${user.name}: Dann bekommt ${user.name} eine Karte mit Ja/Nein – sag nur kurz, dass du gefragt hast.
-- Nutze das Lagebild und die Uhrzeit im zweiten Systemteil (freie Zeiten, Tests, Lernstand) für Vorschläge. Plane nichts in belegte Zeiten.
-- Erfinde keine Termine oder Fakten. Frag nach, wenn etwas Wichtiges fehlt.
-- Bei Tests/Schularbeiten: Stoff erfragen, dann create_study_plan.
-${isSchool(user) ? `- Hausübungen erledigst du (solve_homework): Stella löst sie und schreibt sie in Handschrift ins Heft.\n` : ''}
-- GEDÄCHTNIS: Erfährst du etwas Dauerhaftes und Nützliches über ${user.name} (Personen und ihre Rolle, feste Termine/Routinen mit Wochentag und Uhrzeit, Vorlieben, was schwer/leicht fällt, Ziele), speichere es sofort mit remember – ohne nachzufragen und ohne es groß anzukündigen. Nicht speichern: Einmaliges (das ist ein Planer-Eintrag), Banales, Passwörter, Dinge, die schon unten stehen. Ist etwas überholt, ändere oder lösche den alten Eintrag (update_memory/forget). Nutze dein Wissen, ohne es jedes Mal zu erwähnen.
-- Ist eine Aufgabe zu schwer für dich (lange Planung, mehrstufiges Rechnen, viele Quellen), ruf escalate auf; dann übernimmt ein stärkeres Modell. Bei allem Alltäglichen nicht.`,
+Rules:
+- ${languageRule(LANGUAGE_NAMES_EN[locale])}
+${isSchool(user) ? `- School words in ${user.name}'s country: homework = "${terms.homework}", big written exam = "${terms.exam}", short test = "${terms.quiz}". Use these words.\n` : ''}- ${chatContext.getStore()?.detailed ? STYLE_DETAILED : STYLE_RULES}
+- ${toneInstruction(user.settings.tone, locale)}
+- ACT instead of explaining: when ${user.name} wants something organised, planned, moved, cancelled or prepared, do it with the tools (several steps are fine). Work out dates yourself (YYYY-MM-DD).
+- Some actions need ${user.name}'s approval: then ${user.name} gets a card with Yes/No – just say briefly that you asked.
+- Use the situation report (second system block: free time, tests, learning progress) and the current time for suggestions. Never plan into busy times.
+- Never invent appointments or facts. Ask if something important is missing.
+- For tests/exams: ask for the material, then call create_study_plan.
+${isSchool(user) ? `- You do the homework (solve_homework): Stella solves it and writes it into the notebook in handwriting.\n` : ''}- You cannot book, buy or pay for anything. Say so openly, prepare everything and give the next step.
+- MEMORY: when you learn something lasting and useful about ${user.name} (people and their role, fixed appointments/routines with weekday and time, preferences, what is hard/easy, goals), save it right away with remember – without asking and without announcing it. Do not save: one-off things (that is a planner entry), trivia, passwords, things already in the situation report. If something is outdated, change or delete the old entry (update_memory/forget). Use what you know without mentioning it every time.
+- If a task is too hard for you (long multi-step planning, multi-step maths, weighing many sources), call escalate; a stronger model then takes over. Not for everyday things.`,
   };
 }
 

@@ -49,6 +49,21 @@ export function nextOccurrence(rec: Recurrence | string, from: Ymd): Ymd {
 const DAY_NAMES = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
 /** „täglich“, „jeden Montag“, „jeden Montag und Donnerstag“, „werktags“, „jeden Monat am 15.“ */
+const DAY_NAMES_EN = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'}`;
+
+/** „every day“, „every Monday and Thursday“, „on weekdays“ … */
+export function describeRecurrenceEn(rec: Recurrence | string): string {
+  const r = typeof rec === 'string' ? parseRecurrence(rec) : rec;
+  if (!r) return '';
+  if (r.kind === 'daily') return 'every day';
+  if (r.kind === 'monthly') return `on the ${ordinal(r.day)} of every month`;
+  if (r.days.join(',') === '1,2,3,4,5') return 'on weekdays';
+  if (r.days.join(',') === '6,7') return 'on weekends';
+  const names = r.days.map((d) => DAY_NAMES_EN[d]!);
+  return `every ${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]}`;
+}
+
 export function describeRecurrence(rec: Recurrence | string): string {
   const r = typeof rec === 'string' ? parseRecurrence(rec) : rec;
   if (!r) return '';

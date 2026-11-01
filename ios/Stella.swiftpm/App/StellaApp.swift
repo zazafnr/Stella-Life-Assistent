@@ -69,29 +69,32 @@ struct RootView: View {
             try? await Task.sleep(for: .milliseconds(300))
             launchDelayPassed = true
         }
+        // Sprache des Kontos übernehmen (gilt für die ganze App)
+        .onChange(of: store.me?.settings.locale) { _, l in if let l { I18n.shared.set(l) } }
+        .task { if let l = store.me?.settings.locale { I18n.shared.set(l) } }
     }
 
     @ViewBuilder private var content: some View {
         if store.loggedIn {
             TabView(selection: $tab) {
                 TodayView(go: { tab = $0 })
-                    .tabItem { Label("Heute", systemImage: "sparkles") }
+                    .tabItem { Label(L("nav.today"), systemImage: "sparkles") }
                     .tag(Tab.today)
                 ChatView()
-                    .tabItem { Label("Chat", systemImage: "bubble.left.and.bubble.right") }
+                    .tabItem { Label(L("nav.chat"), systemImage: "bubble.left.and.bubble.right") }
                     .tag(Tab.chat)
                 PlannerView()
-                    .tabItem { Label("Planer", systemImage: "calendar") }
+                    .tabItem { Label(L("nav.planner"), systemImage: "calendar") }
                     .tag(Tab.planner)
                     .badge(store.openHomework)
                 if store.me?.has("goals") != false {
                     GoalsView()
-                        .tabItem { Label("Ziele", systemImage: "target") }
+                        .tabItem { Label(L("nav.goals"), systemImage: "target") }
                         .tag(Tab.goals)
                 }
                 if store.me?.has("mails") != false {
                     InboxView()
-                        .tabItem { Label("Inbox", systemImage: "tray") }
+                        .tabItem { Label(L("nav.inbox"), systemImage: "tray") }
                         .tag(Tab.inbox)
                 }
             }

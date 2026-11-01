@@ -3,6 +3,9 @@
 import type { FastifyInstance } from 'fastify';
 import { timeIn } from '@stella/shared';
 import { hasFeature } from './profile.ts';
+import { tr, userTerms } from './locale.ts';
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 import type { User } from './db.ts';
 
 export interface QuickAction {
@@ -17,18 +20,19 @@ export interface QuickAction {
   text?: string;
 }
 
-// „Ausgaben diese Woche“ (needs: 'finance') bleibt in der Liste, hasFeature blendet sie aus, solange der Schalter aus ist.
-const ALL: (QuickAction & { needs?: Parameters<typeof hasFeature>[1] })[] = [
-  { id: 'briefing', icon: 'sun', symbol: 'sun.max.fill', label: 'Briefing', kind: 'send', text: 'Briefing', needs: 'planner' },
-  { id: 'photo', icon: 'camera', symbol: 'camera.fill', label: 'Foto schicken', kind: 'camera', needs: 'homework' },
-  { id: 'homework', icon: 'book', symbol: 'book.fill', label: 'HÜ eintragen', kind: 'text', text: 'Mathe HÜ S. ', needs: 'homework' },
-  { id: 'voice', icon: 'mic', symbol: 'mic.fill', label: 'Sprachnachricht', kind: 'mic' },
-  { id: 'shopping', icon: 'plus', symbol: 'cart.fill', label: 'Einkaufsliste', kind: 'list', needs: 'shopping' },
-  { id: 'week', icon: 'calendar', symbol: 'calendar.badge.clock', label: 'Woche planen', kind: 'send', text: 'Plan meine Woche', needs: 'planner' },
-  { id: 'mail', icon: 'mail', symbol: 'envelope.fill', label: 'Was ist neu in der Mail?', kind: 'send', text: 'Was ist neu in der Mail?', needs: 'mails' },
-  { id: 'goal', icon: 'star', symbol: 'star.fill', label: 'Ziel-Update', kind: 'text', text: 'Ziel-Update: ', needs: 'goals' },
-  { id: 'spending', icon: 'steps', symbol: 'eurosign.circle.fill', label: 'Ausgaben diese Woche', kind: 'send', text: 'Wie viel hab ich diese Woche ausgegeben?', needs: 'finance' },
-  { id: 'forgot', icon: 'sparkle', symbol: 'questionmark.bubble.fill', label: 'Hab ich was vergessen?', kind: 'send', text: 'Hab ich was vergessen?', needs: 'planner' },
+// Labels und Sendetexte stehen im Sprachkatalog (quick.<id>.label / .text). „Ausgaben“ (needs: 'finance') bleibt in der
+// Liste, hasFeature blendet sie aus, solange der Schalter aus ist.
+const ALL: (Omit<QuickAction, 'label' | 'text'> & { needs?: Parameters<typeof hasFeature>[1]; hasText?: boolean })[] = [
+  { id: 'briefing', icon: 'sun', symbol: 'sun.max.fill', kind: 'send', hasText: true, needs: 'planner' },
+  { id: 'photo', icon: 'camera', symbol: 'camera.fill', kind: 'camera', needs: 'homework' },
+  { id: 'homework', icon: 'book', symbol: 'book.fill', kind: 'text', hasText: true, needs: 'homework' },
+  { id: 'voice', icon: 'mic', symbol: 'mic.fill', kind: 'mic' },
+  { id: 'shopping', icon: 'plus', symbol: 'cart.fill', kind: 'list', needs: 'shopping' },
+  { id: 'week', icon: 'calendar', symbol: 'calendar.badge.clock', kind: 'send', hasText: true, needs: 'planner' },
+  { id: 'mail', icon: 'mail', symbol: 'envelope.fill', kind: 'send', hasText: true, needs: 'mails' },
+  { id: 'goal', icon: 'star', symbol: 'star.fill', kind: 'text', hasText: true, needs: 'goals' },
+  { id: 'spending', icon: 'steps', symbol: 'eurosign.circle.fill', kind: 'send', hasText: true, needs: 'finance' },
+  { id: 'forgot', icon: 'sparkle', symbol: 'questionmark.bubble.fill', kind: 'send', hasText: true, needs: 'planner' },
 ];
 
 /**
@@ -36,7 +40,11 @@ const ALL: (QuickAction & { needs?: Parameters<typeof hasFeature>[1] })[] = [
  * `cards` sind die ersten vier – sie erscheinen groß, solange der Chat noch leer ist.
  */
 export function quickActions(user: User, hour: number): { actions: QuickAction[]; cards: QuickAction[] } {
-  const actions = ALL.filter((a) => !a.needs || hasFeature(user, a.needs)).map(({ needs: _n, ...a }) => a);
+  const terms = userTerms(user);
+  const actions: QuickAction[] = ALL.filter((a) => !a.needs || hasFeature(user, a.needs)).map(({ needs: _n, hasText, ...a }) => ({
+    ...a, label: tr(user, `quick.${a.id}.label`),
+    ...(hasText ? { text: tr(user, `quick.${a.id}.text`, { homework: capitalize(terms.homework) }) } : {}),
+  }));
   const front = hour < 11 ? 'briefing' : hour >= 18 ? 'forgot' : null;
   const ordered = front ? [...actions.filter((a) => a.id === front), ...actions.filter((a) => a.id !== front)] : actions;
   // das Briefing gehört in den Morgen, tagsüber und abends nur ans Ende

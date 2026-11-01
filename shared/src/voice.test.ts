@@ -29,7 +29,7 @@ test('Varianten sind stabil und jede Phrase existiert in allen Tönen', () => {
 test('Ton-Prüfung und KI-Stil', () => {
   assert.ok(isTone('cool'));
   assert.ok(!isTone('böse'));
-  assert.match(toneInstruction('frech'), /nie gemein/i);
+  assert.match(toneInstruction('frech'), /never mean/i);
 });
 
 test('feste Texte bleiben kurz: höchstens 6 Zeilen und 450 Zeichen, in jedem Ton', () => {
@@ -47,6 +47,6 @@ test('feste Texte bleiben kurz: höchstens 6 Zeilen und 450 Zeichen, in jedem To
 });
 
 test('Antwortstil steckt in der Stilvorgabe jedes Tons', () => {
-  for (const tone of TONES) assert.match(toneInstruction(tone), /etwa 6 Zeilen.*Aufzählungen.*keine Überschriften/i);
-  assert.match(STYLE_RULES, /hilfsbereiter Kumpel/);
+  for (const tone of TONES) assert.match(toneInstruction(tone), /about 6 lines.*bullet lists.*no headings/i);
+  assert.match(STYLE_RULES, /helpful friend/);
 });

@@ -211,7 +211,7 @@ test('Caching: der feste Teil (Werkzeuge + System) bleibt zwischen zwei Anfragen
   assert.equal(a.body.system[0].text, b.body.system[0].text, 'fester Teil unverändert');
   assert.ok(a.body.system[0].cache_control && a.body.tools.at(-1).cache_control);
   assert.ok(!/\d\d:\d\d/.test(a.body.system[0].text), 'keine Uhrzeit im festen Teil');
-  assert.match(a.body.system[1].text, /Jetzt: .*Uhr/);
+  assert.match(a.body.system[1].text, /Now: .*\d\d:\d\d/);
   // der Mock meldet beim zweiten Mal Cache-Treffer – das landet in der Kostenzählung
   const row = db.prepare('SELECT SUM(cache_read_tokens) AS n FROM llm_cost WHERE user_id = ?').get(user.id) as { n: number };
   assert.ok(row.n > 0, 'cache_read_input_tokens wurde mitgezählt');

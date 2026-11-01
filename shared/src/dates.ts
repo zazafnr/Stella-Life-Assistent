@@ -2,8 +2,12 @@
 // So hängt "Freitag" nie davon ab, in welcher Zeitzone der Server läuft –
 // nur beim Umrechnen in einen echten Zeitpunkt (Erinnerung) kommt die Zeitzone ins Spiel.
 
+import { t } from './i18n/t.ts';
+import type { Locale } from './i18n/locales.ts';
+
 export type Ymd = string;
 
+export const WEEKDAYS_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 export const WEEKDAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 
 function toUtcMs(ymd: Ymd): number {
@@ -97,9 +101,10 @@ export function formatDateDe(ymd: Ymd, today?: Ymd): string {
 const WEEKDAYS_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
 /** „Heute“, „Gestern“ oder „Mi, 4.11.“ – für Chat-Listen */
-export function dayLabel(day: Ymd, today: Ymd): string {
-  if (day === today) return 'Heute';
-  if (day === addDays(today, -1)) return 'Gestern';
+export function dayLabel(day: Ymd, today: Ymd, locale: Locale = 'de'): string {
+  if (day === today) return t(locale, 'nav.today');
+  if (day === addDays(today, -1)) return t(locale, 'chat.yesterday');
   const [, m, d] = day.split('-').map(Number) as [number, number, number];
-  return `${WEEKDAYS_SHORT[weekdayOf(day)] ?? ''}, ${d}.${m}.`;
+  if (locale === 'de') return `${WEEKDAYS_SHORT[weekdayOf(day)] ?? ''}, ${d}.${m}.`;
+  return new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'numeric', timeZone: 'UTC' }).format(new Date(`${day}T12:00:00Z`));
 }

@@ -13,6 +13,7 @@ import {
 } from './db.ts';
 import { addItem, changeItem } from './planner.ts';
 import { pushToUser } from './push.ts';
+import { voiceOf } from './locale.ts';
 
 export interface UntisCredentials {
   server?: string;
@@ -119,7 +120,7 @@ export async function syncUntis(userId: string) {
         kind: 'homework', subject, title: `${subject ?? ''} HÜ`.trim(), detail: h.text?.trim() || null,
         due, source: 'webuntis', externalId,
       });
-      await say(user, voice(user.settings.tone).untisHomework(item.title, item.detail ?? '', `${due.slice(8)}.${due.slice(5, 7)}`), externalId);
+      await say(user, voiceOf(user).untisHomework(item.title, item.detail ?? '', `${due.slice(8)}.${due.slice(5, 7)}`), externalId);
     }
 
     // Tests & Schularbeiten
@@ -145,7 +146,7 @@ export async function syncUntis(userId: string) {
     // Entfall morgen
     const tomorrow = addDays(today, 1);
     for (const l of lessonsFor(userId, tomorrow, tomorrow).filter((l) => l.status === 'cancelled')) {
-      await say(user, voice(user.settings.tone).untisCancelled(l.subject ?? l.code ?? '', l.start), `untis-cancel-${tomorrow}-${l.start}-${l.code}`);
+      await say(user, voiceOf(user).untisCancelled(l.subject ?? l.code ?? '', l.start), `untis-cancel-${tomorrow}-${l.start}-${l.code}`);
     }
   } finally {
     await client.logout().catch(() => {});

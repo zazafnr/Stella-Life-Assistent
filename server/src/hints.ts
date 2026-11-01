@@ -17,6 +17,7 @@ import { pushToUser } from './push.ts';
 import { nextLessonDate } from './untis.ts';
 import { budgetStatus, euro } from './finance.ts';
 import { activeGoals, parseGoalQuick, staleGoals } from './goals.ts';
+import { voiceOf } from './locale.ts';
 
 export interface FoundHint extends Hint {
   action?: { type: ActionType; params: ActionParams[ActionType]; label: string };
@@ -42,7 +43,7 @@ export function findSlot(lb: Lagebild, minutes: number, before: string, preferre
 }
 
 export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): FoundHint[] {
-  const v = voice(user.settings.tone);
+  const v = voiceOf(user);
   const out: FoundHint[] = [];
   const tomorrow = addDays(lb.today, 1);
   const studyTime = user.settings.studyTime ?? '16:30';
@@ -212,7 +213,7 @@ export async function deliverHint(user: User, h: FoundHint, push: boolean): Prom
     const r = perform(user, h.action.type, h.action.params as never, { source: 'auto', question: h.text, quiet: true });
     if (r.status === 'done') {
       actionId = r.actionId;
-      text = voice(user.settings.tone).hintDone((db.prepare('SELECT summary FROM actions WHERE id = ?').get(r.actionId) as { summary: string }).summary);
+      text = voiceOf(user).hintDone((db.prepare('SELECT summary FROM actions WHERE id = ?').get(r.actionId) as { summary: string }).summary);
       addMessage(user.id, 'assistant', text, { actionId });
     } else if (r.status === 'proposed') {
       actionId = r.actionId;

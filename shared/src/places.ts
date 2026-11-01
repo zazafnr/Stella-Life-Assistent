@@ -17,15 +17,15 @@ export interface PlaceKind extends PlaceRef {
 }
 
 export const PLACE_KINDS: PlaceKind[] = [
-  { category: 'florist', label: 'Blumenladen', plural: 'Blumenläden', emoji: '🌸', tag: 'shop=florist', words: ['blume', 'blumen', 'strauss', 'rosen', 'tulpen'] },
-  { category: 'pharmacy', label: 'Apotheke', plural: 'Apotheken', emoji: '💊', tag: 'amenity=pharmacy', words: ['apotheke', 'medikament', 'tabletten', 'hustensaft', 'nasenspray', 'rezept'] },
-  { category: 'supermarket', label: 'Supermarkt', plural: 'Supermärkte', emoji: '🛒', tag: 'shop=supermarket', words: ['supermarkt', 'lebensmittel', 'einkaufen', 'getränke'] },
-  { category: 'bakery', label: 'Bäckerei', plural: 'Bäckereien', emoji: '🥐', tag: 'shop=bakery', words: ['bäcker', 'baecker', 'brot', 'semmel', 'gebäck', 'gebaeck', 'brötchen', 'broetchen', 'kipferl', 'kuchen', 'torte'] },
-  { category: 'chemist', label: 'Drogerie', plural: 'Drogerien', emoji: '🧴', tag: 'shop=chemist', words: ['drogerie', 'shampoo', 'zahnpasta', 'duschgel', 'waschmittel', 'deo', 'zahnbürste', 'zahnbuerste'] },
-  { category: 'post', label: 'Postamt', plural: 'Postämter', emoji: '📮', tag: 'amenity=post_office', words: ['postamt', 'post', 'paket', 'päckchen', 'paeckchen', 'briefmarke'] },
-  { category: 'fuel', label: 'Tankstelle', plural: 'Tankstellen', emoji: '⛽', tag: 'amenity=fuel', words: ['tanken', 'tankstelle', 'benzin', 'diesel'] },
-  { category: 'diy', label: 'Baumarkt', plural: 'Baumärkte', emoji: '🔨', tag: 'shop=doityourself', words: ['baumarkt', 'schrauben', 'dübel', 'duebel', 'werkzeug', 'farbe', 'glühbirne', 'gluehbirne'] },
-  { category: 'electronics', label: 'Elektronikgeschäft', plural: 'Elektronikgeschäfte', emoji: '🔌', tag: 'shop=electronics', words: ['elektronik', 'ladekabel', 'kabel', 'batterien', 'akku', 'handyhülle', 'handyhuelle'] },
+  { category: 'florist', label: 'Blumenladen', plural: 'Blumenläden', emoji: '🌸', tag: 'shop=florist', words: ['blume', 'blumen', 'strauss', 'rosen', 'tulpen', 'flowers', 'flower', 'bouquet', 'florist'] },
+  { category: 'pharmacy', label: 'Apotheke', plural: 'Apotheken', emoji: '💊', tag: 'amenity=pharmacy', words: ['apotheke', 'medikament', 'tabletten', 'hustensaft', 'nasenspray', 'rezept', 'pharmacy', 'medicine', 'pills', 'prescription'] },
+  { category: 'supermarket', label: 'Supermarkt', plural: 'Supermärkte', emoji: '🛒', tag: 'shop=supermarket', words: ['supermarkt', 'lebensmittel', 'einkaufen', 'getränke', 'supermarket', 'groceries', 'grocery'] },
+  { category: 'bakery', label: 'Bäckerei', plural: 'Bäckereien', emoji: '🥐', tag: 'shop=bakery', words: ['bäcker', 'baecker', 'brot', 'semmel', 'gebäck', 'gebaeck', 'brötchen', 'broetchen', 'kipferl', 'kuchen', 'torte', 'bakery', 'bread', 'rolls', 'pastry', 'cake'] },
+  { category: 'chemist', label: 'Drogerie', plural: 'Drogerien', emoji: '🧴', tag: 'shop=chemist', words: ['drogerie', 'shampoo', 'zahnpasta', 'duschgel', 'waschmittel', 'deo', 'zahnbürste', 'zahnbuerste', 'toothpaste', 'toothbrush', 'detergent', 'drugstore'] },
+  { category: 'post', label: 'Postamt', plural: 'Postämter', emoji: '📮', tag: 'amenity=post_office', words: ['postamt', 'post', 'paket', 'päckchen', 'paeckchen', 'briefmarke', 'parcel', 'package', 'stamps', 'postoffice'] },
+  { category: 'fuel', label: 'Tankstelle', plural: 'Tankstellen', emoji: '⛽', tag: 'amenity=fuel', words: ['tanken', 'tankstelle', 'benzin', 'diesel', 'petrol', 'gas', 'fuel'] },
+  { category: 'diy', label: 'Baumarkt', plural: 'Baumärkte', emoji: '🔨', tag: 'shop=doityourself', words: ['baumarkt', 'schrauben', 'dübel', 'duebel', 'werkzeug', 'farbe', 'glühbirne', 'gluehbirne', 'screws', 'tools', 'paint', 'lightbulb', 'bulb', 'hardware'] },
+  { category: 'electronics', label: 'Elektronikgeschäft', plural: 'Elektronikgeschäfte', emoji: '🔌', tag: 'shop=electronics', words: ['elektronik', 'ladekabel', 'kabel', 'batterien', 'akku', 'handyhülle', 'handyhuelle', 'charger', 'cable', 'batteries', 'electronics'] },
   { category: 'tobacco', label: 'Trafik', plural: 'Trafiken', emoji: '📰', tag: 'shop=tobacco', words: ['trafik', 'zeitung', 'tabak', 'lotto'] },
 ];
 

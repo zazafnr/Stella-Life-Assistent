@@ -10,6 +10,7 @@ import { changeItem } from './planner.ts';
 import { pushToUser } from './push.ts';
 import { filePath, saveFile } from './files.ts';
 import { usesFreeNotes } from './notes.ts';
+import { voiceOf } from './locale.ts';
 
 export const SOLUTION_CAPTION = 'Lösung';
 
@@ -118,7 +119,7 @@ export async function solveHomework(userId: string, itemId: string, attempt = 0)
   changeItem(user, itemId, { status: 'done', notes: solution.heftText });
   scheduleDoneNotice(user, item);
 
-  const msg = voice(getUser(userId)?.settings.tone).solved(`${item.title}${item.detail ? ` (${item.detail})` : ''}`, usesFreeNotes(userId));
+  const msg = voiceOf(getUser(userId) ?? { settings: {} }).solved(`${item.title}${item.detail ? ` (${item.detail})` : ''}`, usesFreeNotes(userId));
   addMessage(userId, 'assistant', msg, { attachments: [attachment] });
   await pushToUser(userId, { title: 'Stella', body: msg.replace(/\*\*/g, ''), tag: itemId });
 }
@@ -129,5 +130,5 @@ function scheduleDoneNotice(user: User, item: Item) {
   const day = addDays(item.due, -1);
   const at = zonedToUtc(day, user.settings.eveningTime ?? DEFAULT_PREFS.eveningTime, user.timeZone);
   if (at.getTime() <= Date.now()) return;
-  addReminder(user.id, item.id, at, voice(user.settings.tone).solvedReminder(item.title, formatDateDe(item.due)), false, true);
+  addReminder(user.id, item.id, at, voiceOf(user).solvedReminder(item.title, formatDateDe(item.due)), false, true);
 }

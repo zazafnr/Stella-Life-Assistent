@@ -405,6 +405,9 @@ struct UserSettings: Codable, Hashable {
     var profile: UserProfile?
     /** "pending": die Einführung kommt beim nächsten Öffnen; "done": erledigt oder übersprungen */
     var onboarding: String?
+    /** Sprache der Oberfläche (en, de, es, fr, it, pt-BR, tr, pl) und Land (ISO-3166) */
+    var locale: String?
+    var country: String?
 }
 
 /** Ein Block im Wochenplan-Vorschlag */

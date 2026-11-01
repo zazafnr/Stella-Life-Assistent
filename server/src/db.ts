@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import path from 'node:path';
-import { todayIn, type UserProfile, type ActionGroup, type Attachment, type ChatMessage, type Item, type ItemKind, type ItemStatus, type PermissionLevel, type Tone } from '@stella/shared';
+import { todayIn, type Locale, type UserProfile, type ActionGroup, type Attachment, type ChatMessage, type Item, type ItemKind, type ItemStatus, type PermissionLevel, type Tone } from '@stella/shared';
 import { config } from './config.ts';
 
 export const db = new Database(path.join(config.dataDir, 'stella.db'));
@@ -432,6 +432,11 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX llm_cost_user ON llm_cost(user_id, day);
   `,
+  `
+  -- v3 Paket 2: Sprache und Land. Alle bestehenden Konten sind deutsch und aus Österreich; neue starten mit Englisch.
+  UPDATE users SET settings = json_set(settings, '$.locale', 'de') WHERE json_extract(settings, '$.locale') IS NULL;
+  UPDATE users SET settings = json_set(settings, '$.country', 'AT') WHERE json_extract(settings, '$.country') IS NULL;
+  `,
 ];
 
 function migrate() {
@@ -483,6 +488,10 @@ export interface UserSettings {
   permissions?: Partial<Record<ActionGroup, PermissionLevel>>;
   /** Lebenssituation und Funktionen aus der Einführung */
   profile?: UserProfile;
+  /** Sprache der Oberfläche, der Texte und Mails (Standard: Englisch) */
+  locale?: Locale;
+  /** Land (ISO-3166) für Schulbegriffe, News und Wetter-Rückfall */
+  country?: string;
   /** 'pending': die Einführung wird beim nächsten Öffnen gezeigt; 'done': erledigt oder übersprungen */
   onboarding?: 'pending' | 'done';
 }

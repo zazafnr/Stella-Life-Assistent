@@ -16,6 +16,21 @@ Wiederholung), `server/src/router.ts` (`pickTier`, `resolveTier`, Kontingent-Stu
 - **Schlüssel:** `ANTHROPIC_API_KEY` oder Einstellungen → Server → Anthropic (verschlüsselt, mit „Testen“).
 - Ohne Claude-Schlüssel gilt weiter der OpenRouter-Weg unten.
 
+## 0b. Sprachen seit v3 (Paket 2)
+
+Acht Sprachen (`shared/src/i18n/locales.ts`: en, de, es, fr, it, pt-BR, tr, pl), Englisch ist Standard. Texte stehen in
+**einer** Quelle: `shared/src/i18n/catalog/<locale>.json` (flache Schlüssel, Platzhalter `{name}`, Mehrzahl `key#one/#other`).
+
+- **Web:** `useT()` aus `web/src/i18n.ts`. **iOS:** `L("schlüssel")`; `scripts/gen-i18n.ts` erzeugt daraus `Core/I18nCatalogs.swift`
+  (die CI prüft mit `--check`, dass sie aktuell ist). **Server:** `tr(user, key)`, `voiceOf(user)`, `dayFor(user, ymd)` aus `server/src/locale.ts`.
+- `voice(tone, locale)` bleibt als typisierter Code (Funktionen mit Varianten): `voice.de.ts` und `voice.en.ts` sind vollständig,
+  die übrigen Sprachen überschreiben in `voice.more.ts` nur, was sie haben (Rest: Englisch).
+- Einstellungen `user.settings.locale` und `country`; bestehende Konten sind per Migration `de`/`AT`, neue starten mit der
+  Browser-/Gerätesprache (sonst Englisch). `STELLA_DEFAULT_LOCALE` gilt für Konten ohne Eintrag.
+- Der System-Prompt der KI ist englisch und enthält die Regel „Always reply in {Sprache}“; Whisper bekommt die Sprache als Hinweis.
+- **Kurznotizen ohne KI:** Deutsch (`parser.ts`) und Englisch (`parser.en.ts`). Für alle anderen Sprachen geht die Nachricht an Haiku.
+- Noch nicht umgestellt: die Dateien in `OPEN` in `shared/src/i18n/jsx.test.ts` (Web) und die meisten iOS-Views.
+
 ## 1. KI-Modell: OpenRouter, automatisch das beste kostenlose (Notfall bzw. ohne Claude-Schlüssel)
 
 **Stimmt das mit den 10 $?** Ja. Laut den offiziellen [OpenRouter-Limits](https://openrouter.ai/docs/api-reference/limits) gilt:
