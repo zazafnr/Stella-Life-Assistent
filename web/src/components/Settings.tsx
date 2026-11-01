@@ -9,6 +9,7 @@ import { Mail } from './settings/Mail.tsx';
 import { Untis } from './settings/Untis.tsx';
 import { Handwriting } from './settings/Handwriting.tsx';
 import { Server } from './settings/Server.tsx';
+import { PlanSheet } from './settings/Plan.tsx';
 import { Addresses } from './settings/Addresses.tsx';
 import { FinanceSetup } from './settings/Finance.tsx';
 import { ActionLog, MemoryView, Permissions } from './settings/Assistant.tsx';
@@ -16,7 +17,7 @@ import { Icon, type IconName } from '../ui/Icon.tsx';
 import { Sheet, Sky, StarMark, Switch, showToast } from '../ui/Decor.tsx';
 import { VERSION } from '../version.ts';
 
-type SheetId = 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'finance' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server' | 'addresses' | 'delete';
+type SheetId = 'plan' | 'books' | 'untis' | 'mail' | 'notes' | 'health' | 'finance' | 'notify' | 'ai' | 'perms' | 'memory' | 'log' | 'server' | 'addresses' | 'delete';
 
 interface CostSummary { totalMicroUsd: number; requests: number }
 interface AiStatusData {
@@ -107,6 +108,14 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
         <TonePicker value={me.settings.tone ?? 'nett'} onChange={(tone) => void patch({ tone }, `${TONE_INFO[tone].emoji} ${t('settings.toneNow', { tone: t(`tone.${tone}`).toLowerCase() })}`)} />
 
         <LanguagePicker />
+
+        <Group title={t('plan.title')}>
+          <button type="button" className="list-row" onClick={() => setSheet('plan')}>
+            <span className="icon-tile pink" style={{ width: 36, height: 36, borderRadius: 11 }}><Icon name="star" size={18} /></span>
+            <span className="grow"><span className="list-title">{t('plan.current')}</span></span>
+            <Icon name="chevron" size={16} />
+          </button>
+        </Group>
 
         <Group title={t('settings.groupConnections')}>
           {visibleRows.map((r) => (
@@ -212,6 +221,7 @@ export function Settings({ back, openOnboarding, openPlan }: { back: () => void;
         </div>
       </div>
 
+      {sheet === 'plan' && <Sheet title={t('plan.title')} onClose={() => setSheet(null)}><PlanSheet /></Sheet>}
       {sheet === 'books' && <Sheet title={t('settings.books')} onClose={() => setSheet(null)}><Books me={me} /></Sheet>}
       {sheet === 'untis' && <Sheet title="WebUntis" onClose={() => setSheet(null)}><Untis me={me} /></Sheet>}
       {sheet === 'mail' && <Sheet title={t('settings.email')} onClose={() => setSheet(null)}><Mail me={me} /></Sheet>}

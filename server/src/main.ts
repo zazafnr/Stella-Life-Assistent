@@ -5,6 +5,9 @@ import fastifyStatic from '@fastify/static';
 import { addDays, isCountry, isLocale, isTone, todayIn, voice, type Item } from '@stella/shared';
 import { userLocale } from './locale.ts';
 import { registerUndoRoutes } from './email/undo.ts';
+import { currentPlanId, maxMailboxes, registerBillingRoutes, registerBillingWebhook } from './billing.ts';
+import { tr } from './locale.ts';
+import { registerLoginApi, registerLoginRoutes, registerPasswordRoute, setPublicUser } from './loginlink.ts';
 import { config } from './config.ts';
 import {
   deleteSecret, hasSecret, HttpError, login, logout, register, requireUser, setSecret, userByIngestToken, userCount,
@@ -96,6 +99,10 @@ app.get('/api/status', async () => ({
 registerSignupRoutes(app, publicUser);
 registerInboundRoute(app);
 registerUndoRoutes(app);
+registerBillingWebhook(app);
+registerLoginRoutes(app);
+registerLoginApi(app);
+setPublicUser(publicUser);
 
 // Das Firmen-Dashboard liegt auf eigener Adresse (Cloudflare) und liest nur Admin- und Login-Routen.
 const DASHBOARD_ORIGINS = (process.env.STELLA_DASHBOARD_ORIGINS ?? 'https://dashboard.evolsior.com').split(',').map((s) => s.trim()).filter(Boolean);
@@ -221,6 +228,8 @@ app.register(async (api) => {
   registerPlaceRoutes(api);
   registerQuickRoutes(api);
   registerProfileRoutes(api, publicUser);
+  registerPasswordRoute(api);
+  registerBillingRoutes(api);
   registerAudioRoutes(api);
 
   api.get('/api/me', async (req) => publicUser(req.user));
@@ -505,6 +514,11 @@ app.register(async (api) => {
       user: str(b.user, 200).trim(), pass: str(b.pass, 200).replace(/\s+/g, ''),
     };
     if (!account.host || !account.user || !account.pass) throw new HttpError(400, 'Adresse und App-Passwort nötig');
+    const allowed = maxMailboxes(req.user);
+    if (listAccounts(req.user.id).length >= allowed) {
+      const planName = currentPlanId(req.user);
+      throw new HttpError(402, tr(req.user, 'paywall.mailboxes', { plan: planName.charAt(0).toUpperCase() + planName.slice(1), count: allowed }), { upgrade: true });
+    }
     try { await testAccount(account); } catch (err) { throw new HttpError(400, `Anmeldung fehlgeschlagen: ${(err as Error).message}`); }
     saveAccounts(req.user.id, [...listAccounts(req.user.id), account]);
     void checkAllMail(req.user.id).catch(() => {});

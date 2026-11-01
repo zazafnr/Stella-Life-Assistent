@@ -19,6 +19,8 @@ import { isDelivered, markDelivered } from './hints.ts';
 import { complete, llmAvailable } from './llm.ts';
 import { pushToUser } from './push.ts';
 import { voiceOf } from './locale.ts';
+import { consumeQuota } from './billing.ts';
+import { resolveTier } from './router.ts';
 
 const MINUTES = { exam: 45, homework: 30, assignment: 60, goal: 30 } as const;
 /** Pause zwischen zwei Dingen */
@@ -292,6 +294,13 @@ export function buildWeekPlan(user: User, opts: PlanOptions = {}, lb: Lagebild =
   };
 }
 
+/** Stoff in Lerneinheiten teilen ist eine Profi-Aufgabe (Sonnet) – mit Kontingent, sonst Haiku */
+function weekTier(user: User): 'light' | 'heavy' {
+  const { tier } = resolveTier(user, 'heavy');
+  if (tier === 'heavy') consumeQuota(user, 'pro_task');
+  return tier;
+}
+
 /** Wie buildWeekPlan, aber langer Stoff wird von der KI in sinnvolle Lerneinheiten geteilt */
 export async function planWeek(user: User, opts: PlanOptions = {}): Promise<WeekPlan> {
   const draft = buildWeekPlan(user, opts);
@@ -305,7 +314,7 @@ export async function planWeek(user: User, opts: PlanOptions = {}): Promise<Week
       const { message } = await complete([
         { role: 'system', content: 'Du teilst Prüfungsstoff in Lerneinheiten auf. Antworte nur mit JSON: {"units": ["…", "…"]} – genau so viele Einträge wie verlangt, je höchstens 8 Wörter, in sinnvoller Lernreihenfolge.' },
         { role: 'user', content: `Test: ${exam.title}\nStoff: ${exam.material.slice(0, 1500)}\nAnzahl Lerneinheiten: ${n}` },
-      ], undefined, { json: true, timeoutMs: 45_000, background: true, tier: 'heavy', userId: user.id });
+      ], undefined, { json: true, timeoutMs: 45_000, background: true, tier: weekTier(user), userId: user.id });
       const units = (JSON.parse(message.content ?? '{}') as { units?: unknown }).units;
       if (Array.isArray(units) && units.length >= n) focuses[parentId] = units.slice(0, n).map((u) => String(u).slice(0, 80));
     } catch { /* ohne KI bleibt die einfache Aufteilung */ }

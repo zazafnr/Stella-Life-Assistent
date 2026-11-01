@@ -4,17 +4,19 @@
 import type { Tier } from './llm-types.ts';
 import type { User } from './db.ts';
 
-export type QuotaKind = 'ai_message' | 'pro_task';
+export type { QuotaKind } from './billing.ts';
+import { consumeQuota, quotaFor, type QuotaKind } from './billing.ts';
 
-export interface QuotaResult { ok: boolean; reason?: string }
+export interface QuotaResult { ok: boolean; reason?: 'limit' | 'homework_only'; used?: number; limit?: number }
 
-/** Paket 5 ersetzt den Rumpf: Tageslimit KI-Nachrichten, Monatskontingent Profi-Aufgaben. */
-export function checkQuota(_user: User, _kind: QuotaKind): QuotaResult {
-  return { ok: true };
+/** Kontingent prüfen (Abo-Limits aus billing.ts). `homework`: die Profi-Aufgabe ist das Lösen einer Hausübung. */
+export function checkQuota(user: User, kind: QuotaKind, opts: { homework?: boolean } = {}): QuotaResult {
+  const q = quotaFor(user, kind, opts);
+  return { ok: q.ok, reason: q.reason, used: q.used, limit: q.limit };
 }
 
-/** Verbrauch buchen (Paket 5). */
-export function consume(_user: User, _kind: QuotaKind): void {}
+/** Verbrauch buchen */
+export function consume(user: User, kind: QuotaKind): void { consumeQuota(user, kind); }
 
 export type TaskKind = 'chat' | 'homework' | 'weekplan' | 'research';
 
@@ -46,8 +48,8 @@ export function pickTier(_user: User, input: TierInput): Tier {
  * Gewünschte Stufe mit Kontingent abgleichen. Ist die Profi-Aufgabe nicht mehr drin, macht Haiku weiter
  * (`downgraded`: Stella sagt das in einem Satz). Verbraucht wird erst, wenn Sonnet wirklich lief (`consume`).
  */
-export function resolveTier(user: User, wanted: Tier): { tier: Tier; downgraded: boolean } {
+export function resolveTier(user: User, wanted: Tier, opts: { homework?: boolean } = {}): { tier: Tier; downgraded: boolean; reason?: 'limit' | 'homework_only' } {
   if (wanted === 'light') return { tier: 'light', downgraded: false };
-  const q = checkQuota(user, 'pro_task');
-  return q.ok ? { tier: 'heavy', downgraded: false } : { tier: 'light', downgraded: true };
+  const q = checkQuota(user, 'pro_task', opts);
+  return q.ok ? { tier: 'heavy', downgraded: false } : { tier: 'light', downgraded: true, reason: q.reason };
 }

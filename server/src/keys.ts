@@ -8,11 +8,13 @@ import { deleteSecret, getSecret, HttpError, setSecret } from './auth.ts';
 import { now } from './db.ts';
 
 export const SYSTEM_SCOPE = '__system__';
-export const KEY_NAMES = ['anthropic', 'groq', 'openrouter', 'smtp'] as const;
+export const KEY_NAMES = ['anthropic', 'groq', 'openrouter', 'smtp', 'stripe'] as const;
 export type KeyName = (typeof KEY_NAMES)[number];
 export const isKeyName = (v: unknown): v is KeyName => KEY_NAMES.includes(v as KeyName);
 
 export interface SmtpKey { host: string; port: number; user: string; pass: string; from?: string }
+/** Stripe: geheimer Schlüssel (sk_…) und Signatur-Geheimnis des Webhooks (whsec_…) */
+export interface StripeKey { secretKey: string; webhookSecret: string }
 
 type ApiKeyName = 'anthropic' | 'groq' | 'openrouter';
 
@@ -31,6 +33,13 @@ export function smtpKey(): SmtpKey | null {
   return getSecret<SmtpKey>(SYSTEM_SCOPE, 'smtp');
 }
 
+export function stripeKey(): StripeKey | null {
+  const stored = getSecret<StripeKey>(SYSTEM_SCOPE, 'stripe');
+  const secretKey = process.env.STRIPE_SECRET_KEY || stored?.secretKey || '';
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || stored?.webhookSecret || '';
+  return secretKey ? { secretKey, webhookSecret } : null;
+}
+
 interface Health { ok: boolean; at: string; error?: string }
 const lastRecorded = new Map<string, number>();
 
@@ -47,7 +56,7 @@ export interface KeyStatus { set: boolean; source: 'env' | 'app' | null; lastOk:
 export function keyStatus(): Record<KeyName, KeyStatus> {
   const out = {} as Record<KeyName, KeyStatus>;
   for (const name of KEY_NAMES) {
-    const fromEnv = name !== 'smtp' && !!ENV_KEY[name]();
+    const fromEnv = name !== 'smtp' && name !== 'stripe' && !!ENV_KEY[name]();
     const fromApp = !!getSecret(SYSTEM_SCOPE, name);
     const h = getSecret<Health>(SYSTEM_SCOPE, `status:${name}`);
     out[name] = {
@@ -79,11 +88,20 @@ function cleanSmtp(v: unknown): SmtpKey {
   return { host, port, user, pass, ...(from ? { from } : {}) };
 }
 
+function cleanStripe(v: unknown): StripeKey {
+  const o = (v ?? {}) as Record<string, unknown>;
+  const secretKey = typeof o.secretKey === 'string' ? o.secretKey.trim() : '';
+  const webhookSecret = typeof o.webhookSecret === 'string' ? o.webhookSecret.trim() : '';
+  if (!/^(sk|rk)_(test|live)_[A-Za-z0-9]{8,}$/.test(secretKey)) throw new HttpError(400, 'Das sieht nicht nach einem geheimen Stripe-Schlüssel aus (sk_live_… oder sk_test_…).');
+  if (webhookSecret && !/^whsec_[A-Za-z0-9+/=_-]{8,}$/.test(webhookSecret)) throw new HttpError(400, 'Das Webhook-Geheimnis beginnt mit whsec_.');
+  return { secretKey, webhookSecret };
+}
+
 /** Eintragen oder (mit null/leer) löschen. */
 export function setKey(name: KeyName, value: unknown) {
   const empty = value === null || value === '' || value === undefined;
   if (empty) { deleteSecret(SYSTEM_SCOPE, name); deleteSecret(SYSTEM_SCOPE, `status:${name}`); return; }
-  setSecret(SYSTEM_SCOPE, name, name === 'smtp' ? cleanSmtp(value) : cleanKey(value));
+  setSecret(SYSTEM_SCOPE, name, name === 'smtp' ? cleanSmtp(value) : name === 'stripe' ? cleanStripe(value) : cleanKey(value));
   deleteSecret(SYSTEM_SCOPE, `status:${name}`);
   lastRecorded.delete(name);
 }
@@ -98,8 +116,15 @@ export async function testKey(name: KeyName): Promise<{ ok: boolean; message: st
       const transport = nodemailer.createTransport({ host: smtp.host, port: smtp.port, secure: smtp.port === 465, auth: { user: smtp.user, pass: smtp.pass }, connectionTimeout: 10_000, greetingTimeout: 10_000 });
       await transport.verify();
       result = { ok: true, message: 'Anmeldung beim Mail-Server hat geklappt.' };
+    } else if (name === 'stripe') {
+      const k = stripeKey();
+      if (!k) return { ok: false, message: 'Stripe ist noch nicht eingetragen.' };
+      const res = await fetch(`${config.stripe.baseUrl}/v1/balance`, { signal: AbortSignal.timeout(15_000), headers: { Authorization: `Bearer ${k.secretKey}` } });
+      result = res.ok
+        ? { ok: true, message: `Der Schlüssel funktioniert (${k.secretKey.startsWith('sk_live') || k.secretKey.startsWith('rk_live') ? 'Live' : 'Test'}-Modus)${k.webhookSecret ? '' : ' – das Webhook-Geheimnis fehlt noch.'}` }
+        : { ok: false, message: res.status === 401 ? 'Stripe lehnt den Schlüssel ab.' : `Stripe antwortet mit Fehler ${res.status}.` };
     } else {
-      const key = serverKey(name);
+      const key = serverKey(name as 'anthropic' | 'groq' | 'openrouter');
       if (!key) return { ok: false, message: 'Dafür ist noch kein Schlüssel eingetragen.' };
       const res = name === 'anthropic'
         ? await fetch(`${config.anthropic.baseUrl || 'https://api.anthropic.com'}/v1/models?limit=1`, {

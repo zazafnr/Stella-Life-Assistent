@@ -22,6 +22,22 @@ export const config = {
     /** Hier liegen die Bilder der Mails (web/public/mail wird mit der Web-App ausgeliefert) */
     assetsUrl: env.STELLA_MAIL_ASSETS_URL ?? 'https://stella.evolsior.com/mail',
   },
+  /** Adresse der Anmelde-Links aus den Mails (eigener Name auf demselben Server: login.stella.evolsior.com) */
+  loginUrl: env.STELLA_LOGIN_URL ?? env.STELLA_PUBLIC_URL ?? `http://localhost:${env.PORT ?? 8787}`,
+  /** Cookie-Domain für das wartende Gerät; leer = aus loginUrl ableiten (stella.evolsior.com) */
+  loginCookieDomain: env.STELLA_LOGIN_COOKIE_DOMAIN ?? '',
+  /** Apple-Team-ID für Universal Links (apple-app-site-association); leer = aus */
+  appleTeamId: env.STELLA_APPLE_TEAM_ID ?? '',
+  /** Stripe (Bezahlung der Abos). Schlüssel stehen verschlüsselt in den Server-Einstellungen, nicht hier. */
+  stripe: {
+    baseUrl: env.STRIPE_BASE_URL ?? 'https://api.stripe.com',
+    /** Stripe Tax: Umsatzsteuer je EU-Land (OSS) automatisch */
+    automaticTax: env.STELLA_STRIPE_TAX !== 'false',
+    /** Steuer-Code „Software as a Service“ */
+    taxCode: env.STELLA_STRIPE_TAX_CODE ?? 'txcd_10103001',
+  },
+  /** Abo für Konten ohne eigenes Abo (Standard Free; der Owner bekommt immer Max; Tests setzen max) */
+  defaultPlan: env.STELLA_DEFAULT_PLAN ?? 'free',
   /** Sprache für Konten ohne eigene Einstellung (Standard Englisch; Tests setzen Deutsch) */
   defaultLocale: env.STELLA_DEFAULT_LOCALE ?? 'en',
   defaultTimeZone: env.STELLA_TIMEZONE ?? 'Europe/Vienna',

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { api, ApiError, authenticate, meHas, meIsSchool, refreshMe, resendCode, startBackgroundSync, useStore, verifyEmail } from './store.ts';
+import { useEffect, useMemo, useState } from 'react';
+import { meHas, meIsSchool, refreshMe, startBackgroundSync, useStore } from './store.ts';
 import { Today } from './components/Today.tsx';
 import { Chat } from './components/Chat.tsx';
 import { Planner } from './components/Planner.tsx';
@@ -11,10 +11,10 @@ import { Health } from './components/Health.tsx';
 import { Settings } from './components/Settings.tsx';
 import { Intro, dismissBoot, introShown } from './components/Intro.tsx';
 import { Onboarding } from './components/Onboarding.tsx';
+import { Login } from './components/Login.tsx';
 import { Icon, type IconName } from './ui/Icon.tsx';
 import { Sky, StarMark, showToast } from './ui/Decor.tsx';
-import { rememberLocale, useHtmlLang, useLocale, useT } from './i18n.ts';
-import { LOCALES, LOCALE_NAMES, isLocale } from '@stella/shared';
+import { useHtmlLang, useT } from './i18n.ts';
 
 export type Tab = 'today' | 'chat' | 'planner' | 'goals' | 'inbox' | 'health' | 'finance' | 'plan' | 'settings';
 
@@ -124,110 +124,5 @@ export function App() {
       </nav>
     </div>
     </>
-  );
-}
-
-function Login() {
-  const t = useT();
-  const locale = useLocale();
-  const [mode, setMode] = useState<'login' | 'register' | 'verify'>('login');
-  const [form, setForm] = useState({ name: '', email: '', password: '', invite: '', code: '' });
-  const [registration, setRegistration] = useState<'closed' | 'invite' | 'open'>('invite');
-  const [hasUsers, setHasUsers] = useState(true);
-  const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [wait, setWait] = useState(0);
-
-  useEffect(() => {
-    api<{ hasUsers: boolean; registration?: 'closed' | 'invite' | 'open' }>('/api/status')
-      .then((s) => { setHasUsers(s.hasUsers); setRegistration(s.registration ?? 'invite'); if (!s.hasUsers) setMode('register'); })
-      .catch(() => setError(t('auth.serverDown')));
-  }, []);
-  useEffect(() => {
-    if (wait <= 0) return;
-    const t = setTimeout(() => setWait(wait - 1), 1000);
-    return () => clearTimeout(t);
-  }, [wait]);
-
-  const toVerify = (email: string, note: string) => { setForm((f) => ({ ...f, email, code: '' })); setMode('verify'); setInfo(note); setWait(60); };
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError('');
-    setInfo('');
-    try {
-      if (mode === 'verify') {
-        await verifyEmail(form.email, form.code);
-      } else {
-        const res = await authenticate(mode, { ...form, locale });
-        if (res?.needsVerification) toVerify(res.email, t('auth.codeSent', { email: res.email }));
-      }
-    } catch (err) {
-      if (err instanceof ApiError && err.data.needsVerification) toVerify(String(err.data.email ?? form.email), t('auth.notConfirmed'));
-      else setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function again() {
-    setError('');
-    try { await resendCode(form.email); setInfo(t('auth.newCodeSent')); setWait(60); } catch (err) {
-      setError((err as Error).message);
-      if (err instanceof ApiError && typeof err.data.retryIn === 'number') setWait(err.data.retryIn);
-    }
-  }
-
-  const field = (key: keyof typeof form) => ({
-    value: form[key], onChange: (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value }),
-  });
-  const canRegister = !hasUsers || registration !== 'closed';
-
-  return (
-    <div className="login">
-      <Sky />
-      <form className="login-card rise" onSubmit={submit}>
-        <div className="login-star"><StarMark size={34} /></div>
-        <h1 className="display">Stella</h1>
-        <p className="tagline">{t('auth.tagline')}</p>
-        {mode === 'verify' ? (
-          <>
-            {info && <p className="muted small" style={{ margin: 0 }}>{info}</p>}
-            <label className="field" style={{ textAlign: 'left' }}>{t('auth.codeFromMail')}
-              <input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,7}" maxLength={7} required autoFocus placeholder="123456" {...field('code')} style={{ letterSpacing: '.3em', fontSize: 22, textAlign: 'center' }} />
-            </label>
-          </>
-        ) : (
-          <>
-            {mode === 'register' && <label className="field" style={{ textAlign: 'left' }}>{t('auth.name')}<input autoComplete="given-name" required {...field('name')} /></label>}
-            <label className="field" style={{ textAlign: 'left' }}>{t('auth.email')}<input type={mode === 'login' ? 'text' : 'email'} inputMode="email" autoCapitalize="none" autoComplete="email" required {...field('email')} /></label>
-            <label className="field" style={{ textAlign: 'left' }}>{t('auth.password')}<input type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={mode === 'login' ? 1 : 8} required {...field('password')} /></label>
-            {mode === 'register' && hasUsers && registration === 'invite' && (
-              <label className="field" style={{ textAlign: 'left' }}>{t('auth.inviteCode')}<input autoCapitalize="characters" autoComplete="off" required placeholder="ABCD-EFGH" {...field('invite')} /></label>
-            )}
-          </>
-        )}
-        {error && <p className="error-text" style={{ margin: 0 }}>{error}</p>}
-        {mode !== 'verify' && info && <p className="muted small" style={{ margin: 0 }}>{info}</p>}
-        <button type="submit" className="btn block" disabled={busy}>{mode === 'login' ? t('auth.login') : mode === 'register' ? t('auth.createAccount') : t('auth.confirm')}</button>
-        {mode === 'verify' ? (
-          <>
-            <button type="button" className="link" disabled={wait > 0} onClick={() => void again()}>{wait > 0 ? t('auth.newCodeIn', { seconds: wait }) : t('auth.newCode')}</button>
-            <button type="button" className="link" onClick={() => { setMode('login'); setError(''); setInfo(''); }}>{t('auth.backToLogin')}</button>
-          </>
-        ) : canRegister ? (
-          <button type="button" className="link" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setInfo(''); }}>
-            {mode === 'login' ? t('auth.noAccount') : t('auth.haveAccountLogin')}
-          </button>
-        ) : <p className="muted small" style={{ margin: 0 }}>{t('auth.registrationClosed')}</p>}
-        <label className="field small" style={{ textAlign: 'center' }}><span className="sr-only">{t('auth.language')}</span>
-          <select value={locale} aria-label={t('auth.language')} onChange={(e) => { if (isLocale(e.target.value)) rememberLocale(e.target.value); }}>
-            {LOCALES.map((l) => <option key={l} value={l}>{LOCALE_NAMES[l]}</option>)}
-          </select></label>
-        <p className="by-evolsior">by EVOLSIOR</p>
-      </form>
-    </div>
   );
 }

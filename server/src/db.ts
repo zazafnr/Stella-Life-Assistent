@@ -437,6 +437,49 @@ const MIGRATIONS: string[] = [
   UPDATE users SET settings = json_set(settings, '$.locale', 'de') WHERE json_extract(settings, '$.locale') IS NULL;
   UPDATE users SET settings = json_set(settings, '$.country', 'AT') WHERE json_extract(settings, '$.country') IS NULL;
   `,
+  `
+  -- v3 Paket 5a: Anmelden und Bestätigen über einen Link in der Mail (Token und Code nur als Hash)
+  CREATE TABLE login_requests (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    purpose TEXT NOT NULL,            -- signup | login | reset | address
+    token_hash TEXT NOT NULL UNIQUE,
+    code_hash TEXT NOT NULL,
+    device_hash TEXT NOT NULL,        -- Hash des Gerätegeheimnisses des wartenden Geräts
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT,                     -- Link bzw. Code wurde bestätigt
+    claimed_at TEXT,                  -- das wartende Gerät hat die Sitzung abgeholt
+    attempts INTEGER NOT NULL DEFAULT 0,
+    ip TEXT,
+    user_agent TEXT
+  );
+  CREATE INDEX login_requests_user ON login_requests(user_id, created_at);
+  `,
+  `
+  -- v3 Paket 5b: Abos, Verbrauchszähler, Stripe-Ereignisse (Idempotenz)
+  CREATE TABLE subscriptions (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    plan TEXT NOT NULL,                -- free | plus | pro | max
+    status TEXT NOT NULL,              -- active | trialing | past_due | canceled | unpaid | incomplete
+    provider TEXT NOT NULL,            -- stripe | gift
+    provider_customer TEXT,
+    provider_sub TEXT,
+    current_period_end TEXT,           -- bei Geschenken: Ablaufdatum (leer = unbegrenzt)
+    cancel_at TEXT,
+    updated_at TEXT NOT NULL
+  );
+  CREATE TABLE usage_counters (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    period TEXT NOT NULL,              -- Tag (YYYY-MM-DD) bzw. Monat (YYYY-MM) in der Zeitzone der Nutzerin
+    kind TEXT NOT NULL,                -- ai_message (Tag) | pro_task (Monat)
+    count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, period, kind)
+  );
+  CREATE TABLE stripe_events (id TEXT PRIMARY KEY, type TEXT NOT NULL, at TEXT NOT NULL);
+  -- bestehende Nutzer: Max als Geschenk ohne Ablauf
+  INSERT INTO subscriptions (user_id, plan, status, provider, updated_at) SELECT id, 'max', 'active', 'gift', datetime('now') FROM users;
+  `,
 ];
 
 function migrate() {

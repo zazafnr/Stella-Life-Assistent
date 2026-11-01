@@ -13,8 +13,8 @@ import { addMessage, db, getUser, newId, now, updateUserSettings, type User } fr
 import { config } from './config.ts';
 import { createSession, hashPassword, HttpError, register as registerFirst, userCount, verifyPassword } from './auth.ts';
 import { isCountry, isLocale, matchLocale, type Locale } from '@stella/shared';
-import { userLocale } from './locale.ts';
-import { mailerConfigured, sendTemplateMail } from './mailer.ts';
+import { checkResend, claimByCode, createLoginRequest, pendingCookie, sendLinkMail } from './loginlink.ts';
+import { mailerConfigured } from './mailer.ts';
 import { filePath } from './files.ts';
 import { skipProfile, cleanProfile, applyProfile } from './profile.ts';
 import { voiceOf } from './locale.ts';
@@ -66,23 +66,12 @@ function claimInvite(code: string): string {
 }
 
 // ---------- Registrieren und bestätigen ----------
+// Die Bestätigung läuft über einen Link in der Mail (loginlink.ts). Der 6-stellige Code bleibt für „anderes Gerät“ und ältere Apps.
 
-function issueCode(user: User) {
-  const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
-  db.prepare(`INSERT INTO email_codes (user_id, code_hash, expires_at, attempts, sent_at) VALUES (?, ?, ?, 0, ?)
-    ON CONFLICT(user_id) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at, attempts = 0, sent_at = excluded.sent_at`)
-    .run(user.id, hashCode(user.id, code), new Date(Date.now() + CODE_MINUTES * 60_000).toISOString(), now());
-  return code;
-}
-
-async function mailCode(user: User, code: string) {
-  await sendTemplateMail(user.email, userLocale(user), 'verify-signup', { name: user.name, code, minutes: CODE_MINUTES }, 'noreply', { purpose: 'verification', userId: user.id });
-}
-
-export async function startSignup(b: { name: string; email: string; password: string; timeZone: string; device?: string; invite?: string; locale?: Locale; country?: string }) {
+export async function startSignup(b: { name: string; email: string; password: string; timeZone: string; device?: string; invite?: string; locale?: Locale; country?: string; ip?: string; userAgent?: string; deviceSecret?: string }) {
   const base = { locale: b.locale ?? matchLocale(undefined), ...(isCountry(b.country) ? { country: b.country } : {}) };
   const email = b.email.trim().toLowerCase();
-  // das erste Konto ist der Owner: ohne Einladung, ohne Code
+  // das erste Konto ist der Owner: ohne Einladung, ohne Bestätigung
   if (userCount() === 0) {
     const { token, user } = registerFirst(b.name || 'Du', email, b.password, b.timeZone, b.device);
     updateUserSettings(user.id, { onboarding: 'pending', ...base });
@@ -97,7 +86,7 @@ export async function startSignup(b: { name: string; email: string; password: st
   if (b.password.length < 8) throw new HttpError(400, 'Passwort muss mindestens 8 Zeichen haben.');
   if (!mailerConfigured()) throw new HttpError(503, 'Dieser Server kann gerade keine Bestätigungs-Mails verschicken. Bitte melde dich beim Betreiber.');
 
-  // eine nicht bestätigte Anmeldung mit derselben Adresse wird ersetzt (z. B. Tippfehler im Passwort, Code nie angekommen)
+  // eine nicht bestätigte Anmeldung mit derselben Adresse wird ersetzt (z. B. Tippfehler im Passwort, Mail nie angekommen)
   const old = db.prepare('SELECT id, verified FROM users WHERE email = ?').get(email) as { id: string; verified: number } | undefined;
   if (old?.verified) throw new HttpError(409, 'Diese E-Mail ist schon registriert.');
   if (old) db.prepare('DELETE FROM users WHERE id = ?').run(old.id); // Einladung wird dabei wieder frei (ON DELETE SET NULL)
@@ -108,54 +97,37 @@ export async function startSignup(b: { name: string; email: string; password: st
   if (invite) db.prepare('UPDATE invites SET used_by = ? WHERE code = ?').run(id, invite);
   const user = getUser(id)!;
   try {
-    await mailCode(user, issueCode(user));
+    const req = createLoginRequest(user, 'signup', { ip: b.ip, userAgent: b.userAgent, deviceSecret: b.deviceSecret });
+    await sendLinkMail(user, 'signup', req);
+    return { needsVerification: true as const, email, requestId: req.requestId, deviceSecret: req.deviceSecret };
   } catch (err) {
     db.prepare('DELETE FROM users WHERE id = ?').run(id);
     throw new HttpError(502, `Ich konnte die Bestätigungs-Mail nicht senden (${(err as Error).message}).`);
   }
-  return { needsVerification: true as const, email };
 }
 
+/** Code aus dem Link (anderes Gerät) oder – ältere Apps – E-Mail + Code. Schaltet das Konto frei und meldet an. */
 export function verifyEmail(emailRaw: string, code: string, device?: string) {
-  const email = emailRaw.trim().toLowerCase();
-  const row = db.prepare('SELECT id, name FROM users WHERE email = ? AND verified = 0').get(email) as { id: string; name: string } | undefined;
-  if (!row) throw new HttpError(400, 'Zu dieser Adresse wartet keine Anmeldung auf einen Code.');
-  const c = db.prepare('SELECT code_hash AS hash, expires_at AS expiresAt, attempts FROM email_codes WHERE user_id = ?').get(row.id) as
-    { hash: string; expiresAt: string; attempts: number } | undefined;
-  if (!c) throw new HttpError(400, 'Es ist kein Code offen – fordere einen neuen an.', { needsNewCode: true });
-  if (c.expiresAt < now()) throw new HttpError(400, 'Der Code ist abgelaufen – fordere einen neuen an.', { needsNewCode: true });
-  const given = Buffer.from(hashCode(row.id, code.replace(/\D/g, '')));
-  const real = Buffer.from(c.hash);
-  if (given.length !== real.length || !timingSafeEqual(given, real)) {
-    const attempts = c.attempts + 1;
-    if (attempts >= MAX_ATTEMPTS) {
-      db.prepare('DELETE FROM email_codes WHERE user_id = ?').run(row.id);
-      throw new HttpError(429, 'Zu viele falsche Eingaben – fordere einen neuen Code an.', { needsNewCode: true });
-    }
-    db.prepare('UPDATE email_codes SET attempts = ? WHERE user_id = ?').run(attempts, row.id);
-    throw new HttpError(400, `Der Code stimmt nicht. Noch ${MAX_ATTEMPTS - attempts} ${MAX_ATTEMPTS - attempts === 1 ? 'Versuch' : 'Versuche'}.`);
-  }
-  db.prepare('UPDATE users SET verified = 1 WHERE id = ?').run(row.id);
-  db.prepare('DELETE FROM email_codes WHERE user_id = ?').run(row.id);
-  const user = getUser(row.id)!;
-  addMessage(user.id, 'assistant', voiceOf(user).welcome(user.name));
-  return { token: createSession(user.id, device), user };
-}
-
-export async function resendCode(emailRaw: string) {
   const email = emailRaw.trim().toLowerCase();
   const row = db.prepare('SELECT id FROM users WHERE email = ? AND verified = 0').get(email) as { id: string } | undefined;
   if (!row) throw new HttpError(400, 'Zu dieser Adresse wartet keine Anmeldung auf einen Code.');
-  const last = db.prepare('SELECT sent_at AS sentAt FROM email_codes WHERE user_id = ?').get(row.id) as { sentAt: string } | undefined;
-  const wait = last ? Math.ceil((Date.parse(last.sentAt) + RESEND_SECONDS * 1000 - Date.now()) / 1000) : 0;
-  if (wait > 0) throw new HttpError(429, `Bitte warte noch ${wait} Sekunden, bevor du einen neuen Code anforderst.`, { retryIn: wait });
+  const done = claimByCode({ email, code, device });
+  return { token: done.token, user: done.user };
+}
+
+export async function resendCode(emailRaw: string, meta: { ip?: string; userAgent?: string } = {}) {
+  const email = emailRaw.trim().toLowerCase();
+  const row = db.prepare('SELECT id FROM users WHERE email = ? AND verified = 0').get(email) as { id: string } | undefined;
+  if (!row) throw new HttpError(400, 'Zu dieser Adresse wartet keine Anmeldung auf einen Code.');
+  checkResend(row.id, 'signup');
   const user = getUser(row.id)!;
   try {
-    await mailCode(user, issueCode(user));
+    const req = createLoginRequest(user, 'signup', meta);
+    await sendLinkMail(user, 'signup', req);
+    return { ok: true, requestId: req.requestId, deviceSecret: req.deviceSecret };
   } catch (err) {
     throw new HttpError(502, `Ich konnte die Bestätigungs-Mail nicht senden (${(err as Error).message}).`);
   }
-  return { ok: true };
 }
 
 // ---------- Konto löschen ----------
@@ -182,19 +154,27 @@ export function deleteAccount(user: User, password: string) {
 // ---------- Routen ----------
 
 export function registerSignupRoutes(app: FastifyInstance, publicUser: (u: User) => unknown) {
-  app.post('/api/auth/register', async (req) => {
+  app.post('/api/auth/register', async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     // Sprache: ausdrücklich gewählt, sonst aus dem Browser (Accept-Language), sonst Englisch
     const locale = isLocale(b.locale) ? b.locale : matchLocale(req.headers['accept-language']);
-    const res = await startSignup({ name: str(b.name, 80), email: str(b.email), password: typeof b.password === 'string' ? b.password.slice(0, 200) : '', timeZone: str(b.timeZone, 60), device: str(b.device, 80), invite: str(b.invite, 40), locale, country: str(b.country, 10) });
-    return res.needsVerification ? res : { token: res.token, user: publicUser(res.user) };
+    const res = await startSignup({ name: str(b.name, 80), email: str(b.email), password: typeof b.password === 'string' ? b.password.slice(0, 200) : '', timeZone: str(b.timeZone, 60), device: str(b.device, 80), invite: str(b.invite, 40), locale, country: str(b.country, 10),
+      ip: req.ip, userAgent: String(req.headers['user-agent'] ?? ''), deviceSecret: str(b.deviceSecret, 80) });
+    if (!res.needsVerification) return { token: res.token, user: publicUser(res.user) };
+    // Das Cookie hilft dem Link auf login.stella.evolsior.com, dieses Gerät wiederzuerkennen
+    reply.header('Set-Cookie', pendingCookie(res.deviceSecret));
+    return res;
   });
   app.post('/api/auth/verify', async (req) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const { token, user } = verifyEmail(str(b.email), str(b.code, 20), str(b.device, 80));
     return { token, user: publicUser(user) };
   });
-  app.post('/api/auth/resend', async (req) => resendCode(str(((req.body ?? {}) as Record<string, unknown>).email)));
+  app.post('/api/auth/resend', async (req, reply) => {
+    const res = await resendCode(str(((req.body ?? {}) as Record<string, unknown>).email), { ip: req.ip, userAgent: String(req.headers['user-agent'] ?? '') });
+    reply.header('Set-Cookie', pendingCookie(res.deviceSecret));
+    return res;
+  });
 }
 
 /** Mit Login: Profil aus der Einführung, Konto löschen */

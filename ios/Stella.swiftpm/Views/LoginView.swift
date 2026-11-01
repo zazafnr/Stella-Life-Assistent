@@ -11,6 +11,10 @@ struct LoginView: View {
     @State private var code = ""
     /** gesetzt, solange ein Code aus der Bestätigungs-Mail erwartet wird */
     @State private var verifying: String?
+    /** gesetzt, wenn der Code zu einem Anmelde-Link gehört: "login" oder "reset" */
+    @State private var linkPurpose: String?
+    @State private var showNewPassword = false
+    @State private var newPassword = ""
     @State private var info: String?
     @State private var wait = 0
     @State private var registration = "invite"
@@ -105,6 +109,14 @@ struct LoginView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
+        .alert(L("auth.newPasswordTitle"), isPresented: $showNewPassword) {
+            SecureField(L("auth.newPassword"), text: $newPassword)
+            Button(L("auth.savePassword")) {
+                let pw = newPassword
+                newPassword = ""
+                Task { try? await store.setPassword(pw) }
+            }
+        }
         .alert("Server-Adresse", isPresented: $showServer) {
             TextField("stella.example.at", text: $server)
                 .textInputAutocapitalization(.never)
@@ -190,11 +202,19 @@ struct LoginView: View {
                 .disabled(wait > 0)
                 .padding(.top, 4)
             Button(L("auth.backToLogin")) {
-                withAnimation { self.verifying = nil; error = nil; info = nil; code = "" }
+                withAnimation { self.verifying = nil; self.linkPurpose = nil; error = nil; info = nil; code = "" }
             }
             .font(.system(size: 14))
             .foregroundStyle(Theme.muted)
         } else if canRegister {
+            if !register {
+                Button(L("auth.forgotPassword")) { Task { await requestLink(reset: true) } }
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.muted)
+                Button(L("auth.emailLink")) { Task { await requestLink(reset: false) } }
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.muted)
+            }
             Button(register ? L("auth.haveAccountLogin") : L("auth.noAccount")) {
                 withAnimation(.spring) { register.toggle(); error = nil }
             }
@@ -238,7 +258,10 @@ struct LoginView: View {
         info = nil
         defer { busy = false }
         do {
-            if let address = verifying {
+            if let address = verifying, let purpose = linkPurpose {
+                let result = try await store.verifyLinkCode(email: address, code: code)
+                if purpose == "reset" || result == "reset" { showNewPassword = true }
+            } else if let address = verifying {
                 try await store.verify(email: address, code: code)
             } else if let address = try await store.authenticate(register: register, name: name, email: email.trimmingCharacters(in: .whitespaces),
                                                                   password: password, invite: invite) {
@@ -246,6 +269,22 @@ struct LoginView: View {
             }
         } catch let e as APIError where e.needsVerification {
             startVerifying(e.email ?? email, note: "Dein Konto ist noch nicht bestätigt. Gib den Code aus der Mail ein – oder fordere einen neuen an.")
+        } catch {
+            withAnimation { self.error = error.localizedDescription }
+        }
+    }
+
+    /// „Passwort vergessen?“ / „Mit E-Mail-Link anmelden“
+    private func requestLink(reset: Bool) async {
+        let address = email.trimmingCharacters(in: .whitespaces)
+        guard address.contains("@") else { error = L("auth.email"); return }
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            try await store.requestLink(email: address, reset: reset)
+            linkPurpose = reset ? "reset" : "login"
+            startVerifying(address, note: L("auth.linkSentGeneric"))
         } catch {
             withAnimation { self.error = error.localizedDescription }
         }
@@ -264,8 +303,8 @@ struct LoginView: View {
     private func again(_ address: String) async {
         error = nil
         do {
-            try await store.resendCode(email: address)
-            info = "Neuer Code ist unterwegs."
+            if let purpose = linkPurpose { try await store.requestLink(email: address, reset: purpose == "reset") } else { try await store.resendCode(email: address) }
+            info = L("auth.newCodeSent")
             wait = 60
         } catch let e as APIError {
             error = e.message

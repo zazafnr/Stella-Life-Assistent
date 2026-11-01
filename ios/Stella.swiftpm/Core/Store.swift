@@ -100,6 +100,27 @@ final class Store {
         await beginSession(token: res.token, user: res.user)
     }
 
+    /// „Mit E-Mail-Link anmelden“ bzw. „Passwort vergessen“: Link per Mail anfordern (Antwort ist immer gleich)
+    func requestLink(email: String, reset: Bool) async throws {
+        struct Body: Encodable { var email: String; var purpose: String; var locale: String }
+        _ = try await api.send("POST", "/api/auth/link/request", body: Body(email: email, purpose: reset ? "reset" : "login", locale: I18n.shared.locale), as: OK.self)
+    }
+
+    /// Code vom Link, der auf einem anderen Gerät bzw. im Browser geöffnet wurde. Gibt den Zweck zurück ("login", "reset", "signup").
+    func verifyLinkCode(email: String, code: String) async throws -> String {
+        struct Body: Encodable { var email: String; var code: String; var device: String }
+        struct Res: Decodable { var token: String; var user: Me; var purpose: String? }
+        let res: Res = try await api.send("POST", "/api/auth/link/code",
+            body: Body(email: email, code: code, device: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"))
+        await beginSession(token: res.token, user: res.user)
+        return res.purpose ?? "login"
+    }
+
+    func setPassword(_ password: String) async throws {
+        struct Body: Encodable { var password: String }
+        _ = try await api.send("PUT", "/api/me/password", body: Body(password: password), as: OK.self)
+    }
+
     func resendCode(email: String) async throws {
         struct Body: Encodable { var email: String }
         _ = try await api.send("POST", "/api/auth/resend", body: Body(email: email), as: OK.self)

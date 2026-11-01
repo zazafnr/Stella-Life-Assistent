@@ -5,7 +5,7 @@
 #
 #   sudo STELLA_DOMAIN=stella.example.at ./deploy/install-vps.sh
 #
-# Optional: STELLA_PORT (Standard 8795), OPENROUTER_API_KEY (nur beim ersten Mal nötig),
+# Optional: STELLA_PORT (Standard 8795), OPENROUTER_API_KEY (nur beim ersten Mal nötig), STELLA_LOGIN_HOST (Standard login.<domain>),
 # STELLA_ALIASES (weitere Adressen, durch Leerzeichen getrennt, die auf dieselbe App zeigen).
 set -euo pipefail
 
@@ -58,6 +58,9 @@ fi
 # Diese Werte gehören zur Installation und werden immer gesetzt
 set_env() { grep -q "^$1=" "$ENV_FILE" && sed -i "s|^$1=.*|$1=$2|" "$ENV_FILE" || echo "$1=$2" >> "$ENV_FILE"; }
 set_env STELLA_PUBLIC_URL "https://$DOMAIN"
+# Anmelde-Links aus den Mails liegen auf eigenem Namen (login.<domain>), DNS: A-Record auf diese IP
+LOGIN_HOST=${STELLA_LOGIN_HOST:-login.$DOMAIN}
+set_env STELLA_LOGIN_URL "https://$LOGIN_HOST"
 set_env PORT "$PORT"
 set_env HOST 127.0.0.1
 set_env STELLA_DATA_DIR "$DATA"
@@ -102,6 +105,18 @@ BLOCK="# stella-begin
 $NAMES {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:$PORT
+}
+
+# Anmelde-Links: nur die Link-Seite und die Apple-Datei sind unter diesem Namen erreichbar
+$LOGIN_HOST {
+	encode zstd gzip
+	@link path /v/* /.well-known/apple-app-site-association
+	handle @link {
+		reverse_proxy 127.0.0.1:$PORT
+	}
+	handle {
+		respond \"Not found\" 404
+	}
 }
 # stella-end"
 cp "$CADDYFILE" "$CADDYFILE.vor-stella"

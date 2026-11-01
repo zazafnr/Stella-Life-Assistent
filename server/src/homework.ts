@@ -11,6 +11,8 @@ import { pushToUser } from './push.ts';
 import { filePath, saveFile } from './files.ts';
 import { usesFreeNotes } from './notes.ts';
 import { voiceOf } from './locale.ts';
+import { consumeQuota } from './billing.ts';
+import { resolveTier } from './router.ts';
 
 export const SOLUTION_CAPTION = 'Lösung';
 
@@ -53,7 +55,7 @@ function header(item: Item): string {
   return parts.length ? `__${parts.join(' ')}__` : `__${item.title}__`;
 }
 
-async function askModel(item: Item, images: Attachment[], userId?: string): Promise<Solution | null> {
+async function askModel(item: Item, images: Attachment[], userId?: string, tier: 'light' | 'heavy' = 'heavy'): Promise<Solution | null> {
   const parts: ContentPart[] = [{
     type: 'text',
     text: `Fach: ${item.subject ?? 'unbekannt'}
@@ -82,7 +84,7 @@ Ist die Aufgabe nicht auf dem Bild: "found": false. Geht sie sichtbar auf der n�
   const { message } = await complete([
     { role: 'system', content: 'Du bist ein ausgezeichneter Schüler an einer österreichischen Schule. Du löst Hausübungen fehlerfrei.' },
     { role: 'user', content: parts },
-  ], undefined, { vision: true, json: true, timeoutMs: 120_000, tier: 'heavy', effort: 'medium', userId });
+  ], undefined, { vision: true, json: true, timeoutMs: 120_000, tier, effort: 'medium', userId });
   return parseJson(message.content ?? '');
 }
 
@@ -100,7 +102,10 @@ export async function solveHomework(userId: string, itemId: string, attempt = 0)
   const images = pageImages(item);
   if (!images.length) throw new Error('Kein Bild der Aufgabe vorhanden.');
 
-  const solution = await askModel(item, images, userId);
+  // Hausübungen lösen ist eine Profi-Aufgabe (Sonnet) – auch im Free-Abo, solange das Kontingent reicht; sonst macht Haiku weiter
+  const { tier } = resolveTier(user, 'heavy', { homework: true });
+  if (tier === 'heavy') consumeQuota(user, 'pro_task');
+  const solution = await askModel(item, images, userId, tier);
   if (!solution?.found) {
     if (solution?.needsNextPage && item.page && attempt === 0 && images.length < 2) {
       enqueueJob(userId, 'book_page', { itemId, pageDelta: 1, thenSolveAttempt: 1 });

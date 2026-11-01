@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../store.ts';
 import { Section, useAction } from './ui.tsx';
 
-type Name = 'anthropic' | 'groq' | 'openrouter' | 'smtp';
+type Name = 'anthropic' | 'groq' | 'openrouter' | 'smtp' | 'stripe';
 interface KeyStatus { set: boolean; source: 'env' | 'app' | null; lastOk: string | null; lastError: string | null }
 type Keys = Record<Name, KeyStatus>;
 
@@ -10,6 +10,7 @@ const TITLES: Record<Name, { title: string; hint: string; field: string }> = {
   anthropic: { title: 'Anthropic-API-Key (Claude)', hint: 'Claude Haiku erledigt fast alles, Claude Sonnet nur schwere Aufgaben. Key aus console.anthropic.com; dort bitte ein Ausgabenlimit setzen.', field: 'sk-ant-…' },
   groq: { title: 'Groq-API-Key', hint: 'Mails einordnen, Chat-Titel und Sprachnachrichten. Kostenlos erhältlich auf console.groq.com.', field: 'gsk_…' },
   openrouter: { title: 'OpenRouter-API-Key', hint: 'Für Chat und Planer. Ohne Eintrag hier gilt der Schlüssel aus der Server-Umgebung.', field: 'sk-or-…' },
+  stripe: { title: 'Stripe (Bezahlung der Abos)', hint: 'Geheimer Schlüssel (sk_…) und Webhook-Geheimnis (whsec_…). Webhook-URL in Stripe: https://stella.evolsior.com/api/billing/webhook – Ereignisse: checkout.session.completed, customer.subscription.updated, customer.subscription.deleted.', field: '' },
   smtp: { title: 'E-Mail-Absender (SMTP)', hint: 'Von hier gehen die Bestätigungs-Codes bei der Registrierung raus. Der Absender (z. B. Stella <noreply@evolsior.com>) bestimmt die Domain: Antworten gehen an support@ dieser Domain, Mails, die Stella dir schreibt, kommen von stella@.', field: '' },
 };
 
@@ -29,6 +30,8 @@ export function Server() {
       {(['anthropic', 'groq', 'openrouter'] as const).map((n) => <KeyCard key={n} name={n} status={keys[n]} onChange={setKeys} />)}
       <FallbackCard />
       <SmtpCard status={keys.smtp} onChange={setKeys} />
+      <StripeCard status={keys.stripe} onChange={setKeys} />
+      <PlansAdmin />
       <InboundCard />
       <Invites />
     </>
@@ -130,6 +133,80 @@ function SmtpCard({ status, onChange }: { status: KeyStatus; onChange: (k: Keys)
       </form>
       {view}
     </Section>
+  );
+}
+
+function StripeCard({ status, onChange }: { status: KeyStatus; onChange: (k: Keys) => void }) {
+  const [run, view] = useAction();
+  const [f, setF] = useState({ secretKey: '', webhookSecret: '' });
+  const t = TITLES.stripe;
+  const put = (value: unknown, ok: string) => run(async () => {
+    const r = await api<{ keys: Keys }>('/api/admin/keys', { method: 'PUT', json: { name: 'stripe', value } });
+    onChange(r.keys);
+    setF({ secretKey: '', webhookSecret: '' });
+  }, ok);
+  const test = () => run(async () => {
+    const r = await api<{ ok: boolean; message: string; keys: Keys }>('/api/admin/keys/stripe/test', { method: 'POST' });
+    onChange(r.keys);
+    if (!r.ok) throw new Error(r.message);
+  }, 'Der Schlüssel funktioniert.');
+  return (
+    <Section title={t.title}>
+      <p className="muted small">{t.hint}</p>
+      <StatusLine s={status} />
+      <form className="form-grid two" onSubmit={(e) => { e.preventDefault(); void put(f, 'Gespeichert.'); }}>
+        <label style={{ gridColumn: '1 / -1' }}>Geheimer Schlüssel<input type="password" autoComplete="off" placeholder="sk_live_…" value={f.secretKey} onChange={(e) => setF({ ...f, secretKey: e.target.value })} required /></label>
+        <label style={{ gridColumn: '1 / -1' }}>Webhook-Geheimnis<input type="password" autoComplete="off" placeholder="whsec_…" value={f.webhookSecret} onChange={(e) => setF({ ...f, webhookSecret: e.target.value })} /></label>
+        <div className="button-row" style={{ gridColumn: '1 / -1' }}>
+          <button type="submit" className="btn">Speichern</button>
+          <button type="button" className="btn secondary" disabled={!status.set} onClick={() => void test()}>Testen</button>
+          {status.source === 'app' && <button type="button" className="link danger" onClick={() => void put(null, 'Gelöscht.')}>Entfernen</button>}
+        </div>
+      </form>
+      {view}
+    </Section>
+  );
+}
+
+interface PlanRow { id: string; priceCents: number; limits: { aiMessagesPerDay: number; proTasksPerMonth: number; mailboxes: number } }
+
+/** Limits der Abos ändern (ohne Deploy) und Abos schenken */
+function PlansAdmin() {
+  const [plans, setPlans] = useState<PlanRow[] | null>(null);
+  const [run, view] = useAction();
+  const [gift, setGift] = useState({ email: '', plan: 'plus', days: '30' });
+  useEffect(() => { api<{ effective: PlanRow[] }>('/api/admin/plans').then((r) => setPlans(r.effective)).catch(() => {}); }, []);
+  if (!plans) return null;
+  const set = (id: string, key: 'aiMessagesPerDay' | 'proTasksPerMonth' | 'mailboxes', v: string) =>
+    setPlans(plans.map((p) => (p.id === id ? { ...p, limits: { ...p.limits, [key]: Number(v) || 0 } } : p)));
+  return (
+    <>
+      <Section title="Abos und Limits">
+        <p className="muted small">Gilt sofort, ohne Neustart. Startwerte stehen in shared/src/plans.ts; hier eingetragene Zahlen überschreiben sie.</p>
+        {plans.map((p) => (
+          <div key={p.id} className="form-grid two">
+            <strong style={{ gridColumn: '1 / -1' }}>{p.id}</strong>
+            <label>KI-Nachrichten/Tag<input inputMode="numeric" value={p.limits.aiMessagesPerDay} onChange={(e) => set(p.id, 'aiMessagesPerDay', e.target.value)} /></label>
+            <label>Profi-Aufgaben/Monat<input inputMode="numeric" value={p.limits.proTasksPerMonth} onChange={(e) => set(p.id, 'proTasksPerMonth', e.target.value)} /></label>
+            <label>Postfächer (999 = unbegrenzt)<input inputMode="numeric" value={p.limits.mailboxes} onChange={(e) => set(p.id, 'mailboxes', e.target.value)} /></label>
+          </div>
+        ))}
+        <button type="button" className="btn" onClick={() => void run(async () => {
+          const body = Object.fromEntries(plans.map((p) => [p.id, p.limits]));
+          await api('/api/admin/plans', { method: 'PUT', json: body });
+        }, 'Gespeichert.')}>Limits speichern</button>
+      </Section>
+      <Section title="Abo schenken">
+        <p className="muted small">Für Tester und Freunde: ohne Bezahlung, mit Ablaufdatum (leer = unbegrenzt).</p>
+        <form className="form-grid two" onSubmit={(e) => { e.preventDefault(); void run(async () => { await api('/api/admin/billing/gift', { method: 'POST', json: { email: gift.email, plan: gift.plan, days: gift.days || null } }); }, 'Abo geschenkt.'); }}>
+          <label style={{ gridColumn: '1 / -1' }}>E-Mail des Kontos<input type="email" value={gift.email} onChange={(e) => setGift({ ...gift, email: e.target.value })} required /></label>
+          <label>Abo<select value={gift.plan} onChange={(e) => setGift({ ...gift, plan: e.target.value })}>{['free', 'plus', 'pro', 'max'].map((x) => <option key={x}>{x}</option>)}</select></label>
+          <label>Tage<input inputMode="numeric" value={gift.days} onChange={(e) => setGift({ ...gift, days: e.target.value })} /></label>
+          <button type="submit" className="btn" style={{ gridColumn: '1 / -1' }}>Schenken</button>
+        </form>
+        {view}
+      </Section>
+    </>
   );
 }
 

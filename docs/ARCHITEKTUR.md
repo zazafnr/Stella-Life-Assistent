@@ -207,6 +207,18 @@ und plant die nächste Erinnerung (`advanceRecurring`); pausiert sind sie ohne E
 > [`docs/plan/stella-v3.md`](plan/stella-v3.md). **Finanzen** sind dort vorerst ausgeblendet
 > (`STELLA_FEATURE_FINANCE=true` schaltet sie wieder ein; Code, Tabellen und Tests bleiben).
 
+### Abos und Limits (v3, Paket 5)
+
+- Abos: Free, Plus (8 €), Pro (15 €), Max (35 €) – Definition und Startwerte in `shared/src/plans.ts`, Überschreibungen
+  (Einstellungen → Server → „Abos und Limits“) liegen verschlüsselt im System-Bereich und gelten sofort.
+- Zähler: `usage_counters` pro Nutzer und Tag bzw. Monat in der Zeitzone der Person. KI-Nachrichten und Profi-Aufgaben
+  werden in `assistant.ts` vor dem Modellaufruf geprüft; Hausaufgaben laufen auch im Free-Abo weiter (`homework_only`).
+- Bezahlung: Stripe Checkout mit `price_data` direkt im Aufruf (keine Produkte vorab anlegen), Stripe Tax für die Steuer.
+  Der Webhook `/api/billing/webhook` prüft die Signatur, ist idempotent (`stripe_events`) und liegt bewusst außerhalb des
+  Anmelde-Plugins. Ohne Stripe-Schlüssel bleibt alles andere nutzbar; „Upgrade“ zeigt dann einen freundlichen Hinweis.
+- Geschenkte Abos (`provider = 'gift'`, optional mit Ablauf) setzt das Admin-Dashboard oder Einstellungen → Server.
+- Fehlende Nutzer-Aufgaben (Stripe-Konto, Webhook-URL, Schlüssel) stehen im Bericht zum Plan.
+
 **Phase 1: dieser Stand** ✅
 Chat, Kurznotizen (auch offline), Planer, Erinnerungen, Lernpläne, Push, Kalender-Abo, Gesundheit und SMS über Kurzbefehle, digi4school (Kalibrierung offen), automatische KI-Modellwahl.
 

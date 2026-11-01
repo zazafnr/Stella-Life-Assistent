@@ -16,6 +16,7 @@ const { setKey } = await import('./keys.ts');
 const { setMailTransportFactory } = await import('./mailer.ts');
 const { createInvite, registerProfileRoutes, registerSignupRoutes } = await import('./signup.ts');
 const { cleanProfile, hasFeature, afterWorkTime } = await import('./profile.ts');
+const { codeForToken } = await import('./loginlink.ts');
 const { addItem } = await import('./planner.ts');
 const { buildWeekPlan } = await import('./weekplan.ts');
 const { findHints } = await import('./hints.ts');
@@ -38,7 +39,8 @@ await app.register(async (api) => { api.addHook('preHandler', requireUser); regi
 await app.ready();
 
 const post = (url: string, payload: unknown, token?: string) => app.inject({ method: 'POST', url, payload: payload as object, headers: token ? { authorization: `Bearer ${token}` } : {} });
-const lastCode = () => /\n\s{4}(\d{6})\n/.exec(sent.at(-1)!.text)![1]!;
+// Die Mail enthält nur den Link; der Code gehört fest zum Token und steht auf der Link-Seite (anderes Gerät)
+const lastCode = () => codeForToken(/\/v\/([\w-]+)/.exec(sent.at(-1)!.text)![1]!);
 const signup = (email: string, invite?: string, extra: object = {}) =>
   post('/api/auth/register', { name: 'Mia', email, password: 'supergeheim', timeZone: 'Europe/Vienna', invite, ...extra });
 
@@ -75,7 +77,9 @@ test('Einladung → Code per Mail → bestätigen → Sitzung; Einladung ist dan
   const { code } = createInvite(ownerId);
   const reg = await signup('mia@example.com', code);
   assert.equal(reg.statusCode, 200, reg.body);
-  assert.deepEqual(reg.json(), { needsVerification: true, email: 'mia@example.com' });
+  assert.equal(reg.json().needsVerification, true);
+  assert.equal(reg.json().email, 'mia@example.com');
+  assert.ok(reg.json().requestId && reg.json().deviceSecret, 'das wartende Gerät bekommt Anfrage-Id und Gerätegeheimnis');
   assert.equal(sent.at(-1)!.to, 'mia@example.com');
   assert.equal(sent.at(-1)!.subject, 'Confirm your Stella sign-up', 'neue Konten starten mit Englisch');
   assert.match((sent.at(-1) as unknown as { html: string }).html, /<html lang="en"/);
@@ -117,17 +121,17 @@ test('Code-Ablauf: falsch, 5 Fehlversuche sperren, abgelaufen, erneut senden ers
   const tooSoon = await post('/api/auth/resend', { email: 'tim@example.com' });
   assert.equal(tooSoon.statusCode, 429);
   assert.ok(tooSoon.json().retryIn > 0);
-  db.prepare("UPDATE email_codes SET sent_at = ? WHERE user_id = (SELECT id FROM users WHERE email = 'tim@example.com')").run(new Date(Date.now() - 61_000).toISOString());
+  db.prepare("UPDATE login_requests SET created_at = ? WHERE user_id = (SELECT id FROM users WHERE email = 'tim@example.com')").run(new Date(Date.now() - 61_000).toISOString());
   assert.equal((await post('/api/auth/resend', { email: 'tim@example.com' })).statusCode, 200);
 
   // abgelaufen
-  db.prepare("UPDATE email_codes SET expires_at = ? WHERE user_id = (SELECT id FROM users WHERE email = 'tim@example.com')").run(new Date(Date.now() - 1000).toISOString());
+  db.prepare("UPDATE login_requests SET expires_at = ? WHERE user_id = (SELECT id FROM users WHERE email = 'tim@example.com')").run(new Date(Date.now() - 1000).toISOString());
   const expired = await post('/api/auth/verify', { email: 'tim@example.com', code: lastCode() });
   assert.equal(expired.statusCode, 400);
   assert.match(expired.json().error, /abgelaufen/);
 
   // frischer Code klappt
-  db.prepare("UPDATE email_codes SET sent_at = ? WHERE user_id = (SELECT id FROM users WHERE email = 'tim@example.com')").run(new Date(Date.now() - 61_000).toISOString());
+  db.prepare("UPDATE login_requests SET created_at = ? WHERE user_id = (SELECT id FROM users WHERE email = 'tim@example.com')").run(new Date(Date.now() - 61_000).toISOString());
   await post('/api/auth/resend', { email: 'tim@example.com' });
   assert.equal((await post('/api/auth/verify', { email: 'tim@example.com', code: lastCode() })).statusCode, 200);
 });

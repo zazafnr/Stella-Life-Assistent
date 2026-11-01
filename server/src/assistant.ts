@@ -26,6 +26,8 @@ import { describeRecurrence, describeRecurrenceEn, nextOccurrence } from '@stell
 import { euro, spendingCard, spendingFacts, spendingPeriod, SPEND_RE } from './finance.ts';
 import { complete, LlmUnavailable, llmAvailable, type LlmMessage, type Tier, type ToolDef } from './llm.ts';
 import { pickTier, resolveTier } from './router.ts';
+import { consumeQuota, nextPlan, paywallHintDue, planFor, quotaFor } from './billing.ts';
+import type { PlanId } from '@stella/shared';
 import { dayFor, tr, userLocale, userTerms } from './locale.ts';
 import { addItem, addParsedEntry, bookFor, changeItem, createStudyPlan } from './planner.ts';
 import { voiceOf } from './locale.ts';
@@ -858,29 +860,55 @@ async function runTool(t: Turn, name: string, args: Record<string, any>): Promis
   }
 }
 
+/** Tageslimit erreicht: freundlich im Ton der Nutzerin; Kurznotizen gehen weiter, der Upgrade-Hinweis höchstens einmal am Tag */
+function limitReachedText(t: Turn, limit: number, planId: PlanId): string {
+  const tone = t.user.settings.tone ?? 'nett';
+  let text = tr(t.user, `paywall.limit.${tone}`, { limit });
+  const next = nextPlan(planId);
+  if (next && paywallHintDue(t.user)) {
+    const p = planFor(next);
+    text += `\n\n${tr(t.user, 'paywall.hint', { plan: next.charAt(0).toUpperCase() + next.slice(1), limit: p.limits.aiMessagesPerDay })}`;
+  }
+  return text;
+}
+
 async function runAgent(t: Turn, wanted?: Tier, escalated = false) {
+  // Eine KI-Nachricht zählt einmal pro Nutzernachricht (die Wiederholung mit Sonnet zählt nicht extra)
+  if (!escalated) {
+    const q = quotaFor(t.user, 'ai_message');
+    if (!q.ok) { say(t, limitReachedText(t, q.limit, q.plan)); return; }
+    consumeQuota(t.user, 'ai_message');
+  }
   const history = conversationMessages(t.user.id, t.conversationId, 16);
   const lastUser = [...history].reverse().find((m) => m.role === 'user')?.text;
   // Der Chat-Agent startet als Haiku; Sonnet nur auf ausdrücklichen Wunsch ("gründlich") oder wenn Haiku `escalate` ruft
-  const { tier, downgraded } = resolveTier(t.user, wanted ?? pickTier(t.user, { text: lastUser, kind: 'chat' }));
+  const asked = wanted ?? pickTier(t.user, { text: lastUser, kind: 'chat' });
+  const { tier, downgraded, reason } = resolveTier(t.user, asked);
+  // Profi-Aufgabe verbraucht (einmal je Zug). Ist sie leer, macht Haiku weiter – und Stella sagt das in einem Satz.
+  if (tier === 'heavy') consumeQuota(t.user, 'pro_task');
+  const downgradeNote = downgraded && asked === 'heavy' ? tr(t.user, reason === 'homework_only' ? 'paywall.proFree' : `paywall.pro.${t.user.settings.tone ?? 'nett'}`) : '';
   const sys = systemPrompt(t.user, t.today);
   const messages: LlmMessage[] = [
     { role: 'system', content: sys.fixed, dynamic: sys.dynamic },
     ...history.map((m) => ({ role: m.role, content: m.text }) as LlmMessage),
   ];
   const tools = toolsFor(t.user).filter((x) => x.function.name !== 'escalate' || (tier === 'light' && !escalated));
+  let escalateNote = '';
   try {
     for (let step = 0; step < 6; step++) {
       const { message } = await complete(messages, tools, { tier, effort: 'medium', userId: t.user.id, heavy: tier === 'heavy' });
       messages.push({ role: 'assistant', content: message.content ?? '', tool_calls: message.tool_calls, raw: message.raw });
       if (!message.tool_calls?.length) {
-        say(t, message.content?.trim() || '🤔');
+        say(t, `${message.content?.trim() || '🤔'}${downgradeNote || escalateNote ? `\n\n_${downgradeNote || escalateNote}_` : ''}`);
         return;
       }
       const wantsMore = message.tool_calls.find((c) => c.function.name === 'escalate');
       if (wantsMore) {
         // Haiku sagt: zu schwer. Der Zug wird einmal mit Sonnet wiederholt – wenn Kontingent da ist.
         if (resolveTier(t.user, 'heavy').tier === 'heavy') return runAgent(t, 'heavy', true);
+        // keine Profi-Aufgabe mehr: Haiku macht weiter und sagt es am Ende in einem Satz
+        const e = resolveTier(t.user, 'heavy');
+        if (!escalateNote) escalateNote = tr(t.user, e.reason === 'homework_only' ? 'paywall.proFree' : `paywall.pro.${t.user.settings.tone ?? 'nett'}`);
         messages.push(...message.tool_calls.map((c) => ({ role: 'tool' as const, tool_call_id: c.id,
           content: JSON.stringify(c === wantsMore ? { ok: false, info: 'Kein Profi-Kontingent mehr. Mach es so gut du kannst und sag das in einem Satz.' } : { error: 'übersprungen' }) })));
         continue;

@@ -5,7 +5,9 @@ import { HttpError, requireOwner } from './auth.ts';
 import { rotateInboundSecret, inboundSecretSet } from './inbound.ts';
 import { isKeyName, keyStatus, serverAiSettings, setKey, setServerAiSettings, testKey } from './keys.ts';
 import { createInvite, deleteInvite, listInvites, registrationMode } from './signup.ts';
-import { isLocale, LOCALES, DEFAULT_LOCALE } from '@stella/shared';
+import { isLocale, isPlanId, LOCALES, DEFAULT_LOCALE, PLAN_IDS, PLANS } from '@stella/shared';
+import { billingOverview, giftPlan, planFor, planOverrides, setPlanOverrides, subscriptionOf } from './billing.ts';
+import { db } from './db.ts';
 import { renderTemplate, SAMPLE, TEMPLATE_NAMES, type TemplateName } from './email/templates.ts';
 
 export function registerAdminRoutes(api: FastifyInstance) {
@@ -33,6 +35,26 @@ export function registerAdminRoutes(api: FastifyInstance) {
     if (req.query.format === 'json') return mail;
     return reply.type('text/html; charset=utf-8').send(mail.html);
   });
+
+  // Abos: schenken, Limits ändern (ohne Deploy), Zahlen für das Dashboard
+  api.post('/api/admin/billing/gift', { preHandler: requireOwner }, async (req) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const email = typeof b.email === 'string' ? b.email.trim().toLowerCase() : '';
+    const row = db.prepare('SELECT id FROM users WHERE email = ? OR id = ?').get(email, String(b.userId ?? '')) as { id: string } | undefined;
+    if (!row) throw new HttpError(404, 'Konto nicht gefunden.');
+    if (!isPlanId(b.plan)) throw new HttpError(400, 'Unbekanntes Abo.');
+    const days = b.days === null || b.days === undefined || b.days === '' ? null : Number(b.days);
+    if (days !== null && (!Number.isFinite(days) || days < 1 || days > 3650)) throw new HttpError(400, 'Tage: 1 bis 3650 oder leer für unbegrenzt.');
+    giftPlan(row.id, b.plan, days);
+    return { ok: true, subscription: subscriptionOf(row.id) };
+  });
+  api.get('/api/admin/plans', { preHandler: requireOwner }, async () => ({ defaults: PLANS, overrides: planOverrides(), effective: PLAN_IDS.map((id) => planFor(id)) }));
+  api.put('/api/admin/plans', { preHandler: requireOwner }, async (req) => {
+    const overrides = setPlanOverrides(req.body);
+    return { overrides, effective: PLAN_IDS.map((id) => planFor(id)) };
+  });
+  api.get<{ Querystring: { days?: string } }>('/api/admin/billing-overview', { preHandler: requireOwner }, async (req) =>
+    billingOverview(Math.min(Math.max(Number(req.query.days) || 30, 1), 365)));
 
   // KI-Einstellungen des Servers: Notfall-Ausweichen auf Gratis-Modelle ein/aus
   api.get('/api/admin/ai', { preHandler: requireOwner }, async () => serverAiSettings());
