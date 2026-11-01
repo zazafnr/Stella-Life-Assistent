@@ -19,6 +19,11 @@ on:
         description: "Klick-Vorschau (Screenshots) erstellen, auch wenn Appetize klappt"
         type: boolean
         default: false
+      lang:
+        description: "Sprache der Screenshots und der Beispieldaten (en landet auf dem Branch ios-preview-en)"
+        type: choice
+        options: [de, en]
+        default: de
 
 permissions:
   contents: write
@@ -134,6 +139,7 @@ jobs:
         env:
           STELLA_DATA_DIR: ${{ runner.temp }}/demo
           STELLA_SECRET: preview-secret-not-for-production
+          DEMO_LANG: ${{ inputs.lang == 'en' && 'en' || '' }}
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
         run: |
           npm ci --no-audit --no-fund
@@ -162,10 +168,11 @@ jobs:
           xcrun simctl install "$UDID" "$APP"
           BUNDLE=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$APP/Info.plist")
           TOKEN=$(cat "$RUNNER_TEMP/token")
-          shoot() { # name tab [open]
+          if [ "${{ inputs.lang }}" = "en" ]; then LANGS='(en-US)'; LOC=en_US; else LANGS='(de-AT)'; LOC=de_AT; fi
+          shoot() { # name tab [open] [weather]
             xcrun simctl terminate "$UDID" "$BUNDLE" 2>/dev/null || true
-            xcrun simctl launch "$UDID" "$BUNDLE" -AppleLanguages "(de-AT)" -AppleLocale de_AT \
-              -server http://localhost:8790 -demoToken "$TOKEN" -tab "$2" ${3:+-open "$3"} >/dev/null
+            xcrun simctl launch "$UDID" "$BUNDLE" -AppleLanguages "$LANGS" -AppleLocale "$LOC" \
+              -server http://localhost:8790 -demoToken "$TOKEN" -tab "$2" ${3:+-open "$3"} ${4:+-forceWeather "$4"} >/dev/null
             sleep 7
             xcrun simctl io "$UDID" screenshot --type=png "$OUT/$1.png" >/dev/null
             sips -s format jpeg -s formatOptions 82 -Z 1400 "$OUT/$1.png" --out "$OUT/$1.jpg" >/dev/null && rm "$OUT/$1.png"
@@ -176,6 +183,16 @@ jobs:
           shoot inbox inbox
           shoot weekplan planner weekplan
           shoot settings today settings
+          shoot goals goals
+          shoot plan today plan
+          shoot subscription today subscription
+          shoot news today news
+          shoot memory today memory
+          shoot perms today perms
+          shoot lists today lists
+          shoot history chat history
+          shoot chat-rain chat "" rain
+          shoot chat-night chat "" clear:night
           DEVICE=$(xcrun simctl list devices | grep "$UDID" | sed -E 's/^ *([^(]+) \(.*/\1/' | xargs)
           python3 - "$OUT" "$DEVICE" <<'PY'
           import json, os, sys, datetime, subprocess
@@ -185,7 +202,7 @@ jobs:
               "commit": os.environ["GITHUB_SHA"], "branch": os.environ["GITHUB_REF_NAME"], "message": message,
               "run": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
               "device": device, "createdAt": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
-              "screens": ["today", "chat", "planner", "inbox", "weekplan", "settings"],
+              "screens": ["today", "chat", "planner", "inbox", "weekplan", "settings", "goals", "plan", "subscription", "news", "memory", "perms", "lists", "history", "chat-rain", "chat-night"],
               "appetize": open(f"{os.environ['RUNNER_TEMP']}/appetize-url").read().strip() if os.path.exists(f"{os.environ['RUNNER_TEMP']}/appetize-url") else None,
           }, open(f"{out}/meta.json", "w"), indent=2)
           PY
@@ -196,11 +213,12 @@ jobs:
         continue-on-error: true
         working-directory: ${{ runner.temp }}/preview
         run: |
-          git init -q -b ios-preview
+          BRANCH=ios-preview; [ "${{ inputs.lang }}" = "en" ] && BRANCH=ios-preview-en
+          git init -q -b "$BRANCH"
           git add -A
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit -qm "iOS-Vorschau für ${GITHUB_SHA::7} (${GITHUB_REF_NAME})"
-          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ios-preview
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "$BRANCH"
           echo "Vorschau aktualisiert: ${GITHUB_SHA::7}"
 
   # Zweite Variante: Xcode-Projekt mit den Bildschirmzeit-Erweiterungen (XcodeGen, ios/project.yml). Ohne Signatur, nur als Kontrolle,

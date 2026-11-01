@@ -11,6 +11,7 @@ struct TodayView: View {
     @State private var showHealth = false
     @State private var showFinance = Demo.opens("finance")
     @State private var showPlan = Demo.opens("plan")
+    @State private var showDemoScreen = Demo.opensExtra
     @State private var openItem: Item?
 
     private var today: String { Day.today }
@@ -55,6 +56,7 @@ struct TodayView: View {
             .sheet(isPresented: $showFinance) { FinanceSheet() }
             .sheet(isPresented: $showPlan) { NavigationStack { StellaPlanView(go: { go($0) }) } }
             .sheet(item: $openItem) { ItemDetail(item: $0) }
+            .sheet(isPresented: $showDemoScreen) { DemoScreenSheet() }
             .task { await reload() }
         }
     }

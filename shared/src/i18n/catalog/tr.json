@@ -667,5 +667,7 @@
  "login.art.2": "Stella e-postalarını okur ve seni zamanında uyarır",
  "login.art.3": "Ona yaz ya da konuş, bilgisayarda ve telefonda",
  "planner.viewWeek": "Hafta",
- "planner.viewDay": "Gün"
+ "planner.viewDay": "Gün",
+ "planner.studyTitle": "Çalış: {title}",
+ "planner.doTitle": "Yap: {title}"
 }

@@ -667,5 +667,7 @@
  "login.art.2": "A Stella lê seus e-mails e lembra você a tempo",
  "login.art.3": "Escreva ou fale com ela, no computador e no celular",
  "planner.viewWeek": "Semana",
- "planner.viewDay": "Dia"
+ "planner.viewDay": "Dia",
+ "planner.studyTitle": "Estudar: {title}",
+ "planner.doTitle": "Fazer: {title}"
 }

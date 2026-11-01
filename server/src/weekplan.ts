@@ -18,7 +18,7 @@ import { addMessage, db, getItem, getUser, type User } from './db.ts';
 import { isDelivered, markDelivered } from './hints.ts';
 import { complete, llmAvailable } from './llm.ts';
 import { notify } from './channels/deliver.ts';
-import { voiceOf } from './locale.ts';
+import { tr, voiceOf } from './locale.ts';
 import { consumeQuota } from './billing.ts';
 import { resolveTier } from './router.ts';
 
@@ -161,7 +161,7 @@ export function buildWeekPlan(user: User, opts: PlanOptions = {}, lb: Lagebild =
             placedDays.push(s);
             blocks.push({
               key: '', date: s.day.date, start: at, end: toHhmm(toMin(at) + MINUTES.exam),
-              title: `Lernen: ${exam.title}`, focus: null, subject: exam.subject, parentId: exam.id, why: 'exam',
+              title: tr(user, 'planner.studyTitle', { title: exam.title }), focus: null, subject: exam.subject, parentId: exam.id, why: 'exam',
             });
             break;
           }
@@ -211,7 +211,7 @@ export function buildWeekPlan(user: User, opts: PlanOptions = {}, lb: Lagebild =
             take(s, at, MINUTES.homework);
             blocks.push({
               key: `${item.id}:0`, date: s.day.date, start: at, end: toHhmm(toMin(at) + MINUTES.homework),
-              title: `Erledigen: ${item.title}`, focus: item.detail, subject: item.subject, parentId: item.id, why: 'homework',
+              title: tr(user, 'planner.doTitle', { title: item.title }), focus: item.detail, subject: item.subject, parentId: item.id, why: 'homework',
             });
             return;
           }
