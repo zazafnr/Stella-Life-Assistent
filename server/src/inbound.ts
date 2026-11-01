@@ -14,7 +14,11 @@ import { HttpError, getSecret, setSecret } from './auth.ts';
 import { db, getUser, newId, now, type User } from './db.ts';
 import { SYSTEM_SCOPE } from './keys.ts';
 import { logMail } from './maillog.ts';
-import { mailerConfigured, sendSystemMail } from './mailer.ts';
+import { mailerConfigured, sendTemplateMail } from './mailer.ts';
+import { matchLocale, type Locale } from '@stella/shared';
+import { tr, userLocale } from './locale.ts';
+import { undoToken, undoUrl } from './email/undo.ts';
+import { getAction } from './actions.ts';
 import { googleConfigured, googleLinkUrl, type OAuthClient } from './oauth.ts';
 
 const CODE_MINUTES = 15;
@@ -67,9 +71,7 @@ export async function addAddress(user: User, raw: unknown): Promise<LinkedAddres
     ON CONFLICT(id) DO UPDATE SET code_hash = excluded.code_hash, code_expires = excluded.code_expires, attempts = 0, sent_at = excluded.sent_at`)
     .run(id, user.id, email, hashCode(id, code), new Date(Date.now() + CODE_MINUTES * 60_000).toISOString(), now(), now());
   try {
-    await sendSystemMail(email, `Dein Stella-Code: ${code}`,
-      `Hallo ${user.name},\n\num diese Adresse mit deinem Stella-Konto zu verknüpfen, gib diesen Code ein:\n\n    ${code}\n\nEr gilt ${CODE_MINUTES} Minuten. Danach kannst du Stella von dieser Adresse aus schreiben: stella@evolsior.com.\nFalls du das nicht warst, ignoriere diese Mail.\n\nStella by EVOLSIOR – Built to become`,
-      'noreply', { purpose: 'address_verification', userId: user.id });
+    await sendTemplateMail(email, userLocale(user), 'verify-address', { name: user.name, email, code, minutes: CODE_MINUTES }, 'noreply', { purpose: 'address_verification', userId: user.id });
   } catch (err) {
     db.prepare('DELETE FROM user_emails WHERE id = ? AND verified = 0').run(id);
     throw new HttpError(502, `Die Mail mit dem Code ließ sich nicht verschicken: ${(err as Error).message}`);
@@ -169,18 +171,9 @@ export function cleanMailText(text: string): string {
 
 const isQuestion = (t: string) => t.length > 20 && (/\?/.test(t) || /^(wie|was|warum|wieso|weshalb|wann|wo|wer|welche[rsmn]?|kannst du|könntest du|erkläre?|erzähl|how|what|why|when|where|who|can you)\b/i.test(t.trim()));
 
-/** Markdown aus der App-Antwort → einfacher Text */
-const plain = (s: string) => s.replace(/\*\*/g, '').replace(/__/g, '').replace(/^#+\s*/gm, '').trim();
-
-const NOTICE = (publicUrl: string) => `Hallo!
-
-Ich bin Stella, eine persönliche Assistentin. Ich kenne diese Adresse noch nicht und kann deshalb nicht antworten.
-
-So geht's: Lege ein Konto an unter ${publicUrl} und verknüpfe diese Adresse dort unter Einstellungen → Meine E-Mail-Adressen. Danach beantworte ich deine Mails.
-
-Hi! I'm Stella, a personal assistant. I don't know this address yet, so I can't reply. Create an account at ${publicUrl} and link this address under Settings → My email addresses. After that I'll answer your emails.
-
-Stella by EVOLSIOR`;
+/** Sprache für Mails an Unbekannte: grob aus der Länderendung der Adresse (.at/.de → Deutsch …), sonst Englisch */
+const TLD_LOCALE: Record<string, Locale> = { at: 'de', de: 'de', ch: 'de', li: 'de', es: 'es', mx: 'es', ar: 'es', fr: 'fr', it: 'it', br: 'pt-BR', pt: 'pt-BR', tr: 'tr', pl: 'pl' };
+const noticeLocale = (sender: string): Locale => TLD_LOCALE[sender.split('.').pop() ?? ''] ?? matchLocale(undefined);
 
 export async function processInbound(p: InboundPayload): Promise<{ outcome: InboundOutcome }> {
   const sender = clean(/<([^>]+)>/.exec(String(p.from ?? ''))?.[1] ?? p.from);
@@ -203,7 +196,7 @@ export async function processInbound(p: InboundPayload): Promise<{ outcome: Inbo
   if ((db.prepare('SELECT COUNT(*) AS n FROM inbound_mail WHERE sender = ? AND at > ?').get(sender, lastHour) as { n: number }).n > MAX_PER_SENDER_HOUR) return finish('rate_limited');
 
   const subject = String(p.subject ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
-  const replySubject = /^(re|aw|antwort):/i.test(subject) ? subject : `Re: ${subject || 'Deine Nachricht an Stella'}`;
+  const replySubject = /^(re|aw|antwort):/i.test(subject) ? subject : `Re: ${subject || 'Stella'}`;
   const refs = [...String(p.references ?? '').split(/\s+/).filter(Boolean), ...(messageId.startsWith('generated:') ? [] : [messageId])].slice(-10);
   const threading = messageId.startsWith('generated:') ? {} : { inReplyTo: messageId, references: refs };
 
@@ -214,7 +207,7 @@ export async function processInbound(p: InboundPayload): Promise<{ outcome: Inbo
       const already = db.prepare("SELECT 1 FROM inbound_mail WHERE sender = ? AND outcome = 'unknown_sender' AND at > ? AND message_id != ?").get(sender, dayAgo, messageId);
       const today = (db.prepare("SELECT COUNT(*) AS n FROM inbound_mail WHERE outcome = 'unknown_sender' AND at > ?").get(dayAgo) as { n: number }).n;
       if (already || today >= MAX_NOTICES_PER_DAY || !mailerConfigured()) return finish('unknown_sender_silent');
-      await sendSystemMail(sender, replySubject, NOTICE(config.publicUrl), 'stella', { purpose: 'unknown_sender_notice', ...threading });
+      await sendTemplateMail(sender, noticeLocale(sender), 'unknown-sender', { appUrl: config.publicUrl }, 'stella', { purpose: 'unknown_sender_notice', subject: replySubject, ...threading });
       return finish('unknown_sender');
     }
     const body = cleanMailText(p.text ?? '');
@@ -222,10 +215,15 @@ export async function processInbound(p: InboundPayload): Promise<{ outcome: Inbo
     const text = body ? (!isReply && subject && body.length < 200 && !/^(hallo|hi|hey)\b/i.test(subject) ? `${subject}\n${body}` : body) : subject;
     if (!text) return finish('ignored_automated');
     const res = await handleChat(user, text, `mail:${messageId}`.slice(0, 200), [], null, { detailed: isQuestion(text) });
-    const answers = res.messages.filter((m) => m.role === 'assistant').map((m) => plain(m.text)).filter(Boolean);
-    const undoable = res.messages.some((m) => m.actionId);
-    const reply = `${answers.join('\n\n') || 'Erledigt.'}${undoable ? '\n\nFalsch verstanden? Antworte einfach mit „rückgängig“.' : ''}\n\n– Stella`;
-    await sendSystemMail(sender, replySubject, reply, 'stella', { purpose: 'stella_reply', userId: user.id, ...threading });
+    const answers = res.messages.filter((m) => m.role === 'assistant').map((m) => m.text.trim()).filter(Boolean);
+    // Karten „Das habe ich getan“ und ein signierter Rückgängig-Link (7 Tage) für alles, was Stella eingetragen hat
+    const actionIds = [...new Set(res.messages.map((m) => m.actionId).filter((x): x is string => !!x))];
+    const done = actionIds.map((id) => getAction(user.id, id)).filter((a) => a && a.canUndo);
+    await sendTemplateMail(sender, userLocale(user), 'stella-reply', {
+      replyText: answers.join('\n\n') || tr(user, 'email.reply.fallback'),
+      actions: done.map((a) => String(a!.summary)),
+      ...(done.length ? { undoUrl: undoUrl(undoToken(user.id, done.map((a) => a!.id))) } : {}),
+    }, 'stella', { purpose: 'stella_reply', userId: user.id, subject: replySubject, ...threading });
     return finish('replied');
   } catch (err) {
     logMail('in', 'error', 'failed', { to: sender, userId: user?.id, detail: (err as Error).message });

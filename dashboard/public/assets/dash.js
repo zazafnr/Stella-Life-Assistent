@@ -78,6 +78,7 @@
     if (!t) { view('login'); return; }
     $('load-err').textContent = '';
     document.body.classList.add('busy');
+    mailUi();
     fetch(API + '/api/admin/overview?days=' + days, { headers: { authorization: 'Bearer ' + t } })
       .then(function (r) {
         if (r.status === 401 || r.status === 403) { signOut('Your session has ended. Please sign in again.'); return null; }
@@ -218,6 +219,49 @@
     var last = pts[pts.length - 1]; c.appendChild(svg('circle', { cx: last[0], cy: last[1], r: 4, fill: 'var(--c1)' }));
     ticks(c, series, L, W - step, H, n);
   }
+
+  // ---------- E-Mail-Vorschau: alle Vorlagen mit Beispieldaten, hell/dunkel, Desktop/Handy ----------
+  var mail = { template: 'verify-signup', locale: 'en', ready: false };
+  function mailUi() {
+    var t = currentToken();
+    if (!t || mail.ready) return;
+    fetch(API + '/api/admin/mail-preview', { headers: { authorization: 'Bearer ' + t } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (list) {
+        if (!list) return;
+        mail.ready = true;
+        var tpl = $('mail-templates'), loc = $('mail-locales');
+        list.templates.forEach(function (name) {
+          var b = el('button', name, null); b.type = 'button'; b.setAttribute('aria-pressed', String(name === mail.template));
+          b.addEventListener('click', function () { mail.template = name; Array.prototype.forEach.call(tpl.children, function (x) { x.setAttribute('aria-pressed', String(x === b)); }); mailShow(); });
+          tpl.appendChild(b);
+        });
+        list.locales.forEach(function (l) {
+          var b = el('button', l, null); b.type = 'button'; b.setAttribute('aria-pressed', String(l === mail.locale));
+          b.addEventListener('click', function () { mail.locale = l; Array.prototype.forEach.call(loc.children, function (x) { x.setAttribute('aria-pressed', String(x === b)); }); mailShow(); });
+          loc.appendChild(b);
+        });
+        mailShow();
+      }).catch(function () { /* nur Owner sehen die Vorschau */ });
+  }
+  function mailShow() {
+    var t = currentToken();
+    fetch(API + '/api/admin/mail-preview/' + mail.template + '?format=json&locale=' + mail.locale, { headers: { authorization: 'Bearer ' + t } })
+      .then(function (r) { return r.json(); })
+      .then(function (m) {
+        var grid = $('mail-grid'); clear(grid);
+        // Dunkel erzwingen: die Vorlage fragt prefers-color-scheme – im Vorschau-Rahmen ersetzen wir die Bedingung
+        var dark = m.html.replace('@media (prefers-color-scheme: dark)', '@media all');
+        var light = m.html.replace('@media (prefers-color-scheme: dark)', '@media not all');
+        [['Desktop · light', light, 640], ['Desktop · dark', dark, 640], ['Phone · light', light, 375], ['Phone · dark', dark, 375]].forEach(function (v) {
+          var fig = el('figure', null, null), cap = el('figcaption', v[0], null), fr = document.createElement('iframe');
+          fr.title = v[0]; fr.setAttribute('sandbox', ''); fr.srcdoc = v[1];
+          if (v[2] === 375) { fr.style.maxWidth = '375px'; }
+          fig.appendChild(cap); fig.appendChild(fr); grid.appendChild(fig);
+        });
+      });
+  }
+  mailUi();
 
   // Beim Neuladen: gespeicherte Sitzung weiterverwenden, sonst Anmeldung
   if (token()) { view('dash'); load(); } else { view('login'); }

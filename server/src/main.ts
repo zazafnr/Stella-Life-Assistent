@@ -4,6 +4,7 @@ import Fastify, { type FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { addDays, isCountry, isLocale, isTone, todayIn, voice, type Item } from '@stella/shared';
 import { userLocale } from './locale.ts';
+import { registerUndoRoutes } from './email/undo.ts';
 import { config } from './config.ts';
 import {
   deleteSecret, hasSecret, HttpError, login, logout, register, requireUser, setSecret, userByIngestToken, userCount,
@@ -46,7 +47,7 @@ import { currentConversation, listConversations, registerConversationRoutes } fr
 import { addMemory, cleanSchedule, deleteMemory, isCategory, listMemories, MEMORY_CATEGORIES, updateMemory } from './memory.ts';
 
 // trustProxy nur für Caddy auf derselben Maschine – sonst ließe sich die Absender-Adresse fälschen
-const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, bodyLimit: 2 * 1024 * 1024, trustProxy: '127.0.0.1' });
+const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, bodyLimit: 2 * 1024 * 1024, trustProxy: '127.0.0.1', maxParamLength: 1000 });
 app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: 5 * 1024 * 1024 }, (_req, body, done) => done(null, body));
 
 app.setErrorHandler((err, _req, reply) => {
@@ -94,6 +95,7 @@ app.get('/api/status', async () => ({
 
 registerSignupRoutes(app, publicUser);
 registerInboundRoute(app);
+registerUndoRoutes(app);
 
 // Das Firmen-Dashboard liegt auf eigener Adresse (Cloudflare) und liest nur Admin- und Login-Routen.
 const DASHBOARD_ORIGINS = (process.env.STELLA_DASHBOARD_ORIGINS ?? 'https://dashboard.evolsior.com').split(',').map((s) => s.trim()).filter(Boolean);

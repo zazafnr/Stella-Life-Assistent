@@ -13,8 +13,8 @@ import { addMessage, db, getUser, newId, now, updateUserSettings, type User } fr
 import { config } from './config.ts';
 import { createSession, hashPassword, HttpError, register as registerFirst, userCount, verifyPassword } from './auth.ts';
 import { isCountry, isLocale, matchLocale, type Locale } from '@stella/shared';
-import { tr } from './locale.ts';
-import { mailerConfigured, sendSystemMail } from './mailer.ts';
+import { userLocale } from './locale.ts';
+import { mailerConfigured, sendTemplateMail } from './mailer.ts';
 import { filePath } from './files.ts';
 import { skipProfile, cleanProfile, applyProfile } from './profile.ts';
 import { voiceOf } from './locale.ts';
@@ -76,8 +76,7 @@ function issueCode(user: User) {
 }
 
 async function mailCode(user: User, code: string) {
-  await sendSystemMail(user.email, tr(user, 'email.code.subject', { code }),
-    tr(user, 'email.code.body', { name: user.name, code, minutes: CODE_MINUTES }), 'noreply', { purpose: 'verification', userId: user.id });
+  await sendTemplateMail(user.email, userLocale(user), 'verify-signup', { name: user.name, code, minutes: CODE_MINUTES }, 'noreply', { purpose: 'verification', userId: user.id });
 }
 
 export async function startSignup(b: { name: string; email: string; password: string; timeZone: string; device?: string; invite?: string; locale?: Locale; country?: string }) {

@@ -35,7 +35,20 @@
 | `settings.permsSub` | Solve homework, change the planner, delete ads … | HÜs lösen, Planer ändern, Werbung löschen … |
 | `quick.forgot.text` | Did I forget anything? | Hab ich was vergessen? |
 | `srv.noDate.nextDay` | _(No date found – I took the next school day. Write e.g. "{subject} homework until Friday" if it's different.)_ | _(Kein Datum erkannt – ich hab den nächsten Schultag genommen. Schreib z. B. „{subject} HÜ bis Freitag“, wenn's anders ist.)_ |
-| `email.code.body` | Hi Mia, ⏎  ⏎ your confirmation code for Stella is: ⏎  ⏎     {code} ⏎  ⏎ It is valid for {minutes} minutes. If you didn't sign up for Stella, you can simply ignore this email. ⏎  ⏎ Stella by EVOLSIOR – Built to become | Hallo Mia, ⏎  ⏎ dein Bestätigungs-Code für Stella lautet: ⏎  ⏎     {code} ⏎  ⏎ Er gilt {minutes} Minuten. Falls du dich nicht bei Stella angemeldet hast, kannst du diese Mail einfach ignorieren. ⏎  ⏎ Stella by EVOLSIOR – Built to become |
+| `email.verifySignup.body` | Confirm your email address to start with Stella. Open the link on the device where you are signing up. | Bestätige deine E-Mail-Adresse, dann kann es mit Stella losgehen. Öffne den Link am besten auf dem Gerät, auf dem du dich anmeldest. |
+| `email.verifySignup.button` | Confirm sign-up | Anmeldung bestätigen |
+| `email.welcome.body` | Your account is confirmed. Here is how to get the most out of Stella in the first minutes. | Dein Konto ist bestätigt. So holst du in den ersten Minuten das Meiste aus Stella heraus. |
+| `email.welcome.title` | Welcome, Mia | Willkommen, Mia |
+| `email.welcome.body` | Your account is confirmed. Here is how to get the most out of Stella in the first minutes. | Dein Konto ist bestätigt. So holst du in den ersten Minuten das Meiste aus Stella heraus. |
+| `email.reply.title` | Stella's reply | Stellas Antwort |
+| `email.unknown.title` | Nice to meet you | Schön, dass du schreibst |
+| `email.unknown.body` | I am Stella, a personal assistant for school, work and everyday life. I do not know this address yet, so I cannot answer your email. | Ich bin Stella, eine persönliche Assistentin für Schule, Job und Alltag. Diese Adresse kenne ich noch nicht und kann deshalb nicht antworten. |
+| `email.subscription.started.title` | Welcome to {plan} | Willkommen bei {plan} |
+| `email.subscription.started.body` | Thank you. Your limits are higher right away. Stripe sends the invoice separately. | Danke dir. Deine Limits sind sofort höher. Die Rechnung schickt Stripe separat. |
+| `email.subscription.changed.title` | You are on {plan} now | Du bist jetzt bei {plan} |
+| `email.subscription.changed.body` | Your plan was changed. The new limits apply from now on. | Dein Abo wurde geändert. Die neuen Limits gelten ab sofort. |
+| `email.subscription.cancelled.title` | Subscription cancelled | Abo gekündigt |
+| `email.subscription.cancelled.body` | You keep {plan} until {until}. After that, Stella continues with the free plan. | Du behältst {plan} bis {until}. Danach läuft Stella mit dem kostenlosen Abo weiter. |
 
 **Briefing-Gruß und Erinnerung in den drei Tönen**
 
@@ -84,7 +97,20 @@
 | `settings.permsSub` | Solve homework, change the planner, delete ads … | Resolver deberes, cambiar la agenda, borrar publicidad… |
 | `quick.forgot.text` | Did I forget anything? | ¿Me estoy olvidando de algo? |
 | `srv.noDate.nextDay` | _(No date found – I took the next school day. Write e.g. "{subject} homework until Friday" if it's different.)_ | _(No he encontrado fecha: he cogido el próximo día de clase. Escribe, por ejemplo, «{subject} deberes hasta el viernes» si es otro.)_ |
-| `email.code.body` | Hi Mia, ⏎  ⏎ your confirmation code for Stella is: ⏎  ⏎     {code} ⏎  ⏎ It is valid for {minutes} minutes. If you didn't sign up for Stella, you can simply ignore this email. ⏎  ⏎ Stella by EVOLSIOR – Built to become | Hola, Mia: ⏎  ⏎ tu código de confirmación de Stella es: ⏎  ⏎     {code} ⏎  ⏎ Vale {minutes} minutos. Si no te has registrado en Stella, puedes ignorar este correo. ⏎  ⏎ Stella by EVOLSIOR – Built to become |
+| `email.verifySignup.body` | Confirm your email address to start with Stella. Open the link on the device where you are signing up. | Confirma tu correo para empezar con Stella. Abre el enlace en el dispositivo en el que te estás registrando. |
+| `email.verifySignup.button` | Confirm sign-up | Confirmar registro |
+| `email.welcome.body` | Your account is confirmed. Here is how to get the most out of Stella in the first minutes. | Tu cuenta está confirmada. Así sacas el máximo de Stella en los primeros minutos. |
+| `email.welcome.title` | Welcome, Mia | Te damos la bienvenida, Mia |
+| `email.welcome.body` | Your account is confirmed. Here is how to get the most out of Stella in the first minutes. | Tu cuenta está confirmada. Así sacas el máximo de Stella en los primeros minutos. |
+| `email.reply.title` | Stella's reply | La respuesta de Stella |
+| `email.unknown.title` | Nice to meet you | Encantada de conocerte |
+| `email.unknown.body` | I am Stella, a personal assistant for school, work and everyday life. I do not know this address yet, so I cannot answer your email. | Soy Stella, una asistente personal para el colegio, el trabajo y el día a día. Todavía no conozco esta dirección, así que no puedo responderte. |
+| `email.subscription.started.title` | Welcome to {plan} | Te damos la bienvenida a {plan} |
+| `email.subscription.started.body` | Thank you. Your limits are higher right away. Stripe sends the invoice separately. | Gracias. Tus límites suben de inmediato. Stripe envía la factura por separado. |
+| `email.subscription.changed.title` | You are on {plan} now | Ahora estás en {plan} |
+| `email.subscription.changed.body` | Your plan was changed. The new limits apply from now on. | Tu plan se ha cambiado. Los nuevos límites valen desde ahora. |
+| `email.subscription.cancelled.title` | Subscription cancelled | Suscripción cancelada |
+| `email.subscription.cancelled.body` | You keep {plan} until {until}. After that, Stella continues with the free plan. | Conservas {plan} hasta el {until}. Después, Stella sigue con el plan gratuito. |
 
 **Briefing-Gruß und Erinnerung in den drei Tönen**
 
@@ -133,7 +159,20 @@
 | `settings.permsSub` | Solve homework, change the planner, delete ads … | Résoudre les devoirs, modifier l'agenda, supprimer les pubs… |
 | `quick.forgot.text` | Did I forget anything? | Est-ce que j'ai oublié quelque chose ? |
 | `srv.noDate.nextDay` | _(No date found – I took the next school day. Write e.g. "{subject} homework until Friday" if it's different.)_ | _(Pas de date trouvée – j'ai pris le prochain jour de classe. Écris par ex. « {subject} devoirs pour vendredi » si c'est différent.)_ |
-| `email.code.body` | Hi Mia, ⏎  ⏎ your confirmation code for Stella is: ⏎  ⏎     {code} ⏎  ⏎ It is valid for {minutes} minutes. If you didn't sign up for Stella, you can simply ignore this email. ⏎  ⏎ Stella by EVOLSIOR – Built to become | Salut Mia, ⏎  ⏎ voici ton code de confirmation pour Stella : ⏎  ⏎     {code} ⏎  ⏎ Il est valable {minutes} minutes. Si tu n'as pas créé de compte sur Stella, ignore simplement ce message. ⏎  ⏎ Stella by EVOLSIOR – Built to become |
+| `email.verifySignup.body` | Confirm your email address to start with Stella. Open the link on the device where you are signing up. | Confirme ton adresse e-mail pour démarrer avec Stella. Ouvre le lien sur l'appareil où tu t'inscris. |
+| `email.verifySignup.button` | Confirm sign-up | Confirmer l'inscription |
+| `email.welcome.body` | Your account is confirmed. Here is how to get the most out of Stella in the first minutes. | Ton compte est confirmé. Voici comment tirer le meilleur de Stella dès les premières minutes. |
+| `email.welcome.title` | Welcome, Mia | Bienvenue, Mia |
+| `email.welcome.body` | Your account is confirmed. Here is how to get the most out of Stella in the first minutes. | Ton compte est confirmé. Voici comment tirer le meilleur de Stella dès les premières minutes. |
+| `email.reply.title` | Stella's reply | La réponse de Stella |
+| `email.unknown.title` | Nice to meet you | Ravie de te rencontrer |
+| `email.unknown.body` | I am Stella, a personal assistant for school, work and everyday life. I do not know this address yet, so I cannot answer your email. | Je suis Stella, une assistante personnelle pour l'école, le travail et le quotidien. Je ne connais pas encore cette adresse, je ne peux donc pas te répondre. |
+| `email.subscription.started.title` | Welcome to {plan} | Bienvenue dans {plan} |
+| `email.subscription.started.body` | Thank you. Your limits are higher right away. Stripe sends the invoice separately. | Merci. Tes limites augmentent tout de suite. Stripe envoie la facture séparément. |
+| `email.subscription.changed.title` | You are on {plan} now | Tu es maintenant sur {plan} |
+| `email.subscription.changed.body` | Your plan was changed. The new limits apply from now on. | Ton abonnement a été modifié. Les nouvelles limites s'appliquent dès maintenant. |
+| `email.subscription.cancelled.title` | Subscription cancelled | Abonnement résilié |
+| `email.subscription.cancelled.body` | You keep {plan} until {until}. After that, Stella continues with the free plan. | Tu gardes {plan} jusqu'au {until}. Ensuite, Stella continue avec l'offre gratuite. |
 
 **Briefing-Gruß und Erinnerung in den drei Tönen**
 
@@ -182,7 +221,20 @@
 | `settings.permsSub` | Solve homework, change the planner, delete ads … | Risolvere i compiti, modificare l'agenda, eliminare la pubblicità… |
 | `quick.forgot.text` | Did I forget anything? | Ho dimenticato qualcosa? |
 | `srv.noDate.nextDay` | _(No date found – I took the next school day. Write e.g. "{subject} homework until Friday" if it's different.)_ | _(Nessuna data trovata: ho preso il prossimo giorno di scuola. Scrivi ad es. «{subject} compiti per venerdì» se è un altro giorno.)_ |
-| `email.code.body` | Hi Mia, ⏎  ⏎ your confirmation code for Stella is: ⏎  ⏎     {code} ⏎  ⏎ It is valid for {minutes} minutes. If you didn't sign up for Stella, you can simply ignore this email. ⏎  ⏎ Stella by EVOLSIOR – Built to become | Ciao Mia, ⏎  ⏎ questo è il tuo codice di conferma per Stella: ⏎  ⏎     {code} ⏎  ⏎ È valido per {minutes} minuti. Se non hai creato tu un account su Stella, ignora pure questa e-mail. ⏎  ⏎ Stella by EVOLSIOR – Built to become |
+| `email.verifySignup.body` | Confirm your email address to start with Stella. Open the link on the device where you are signing up. | Conferma il tuo indirizzo e-mail per iniziare con Stella. Apri il link sul dispositivo con cui ti stai registrando. |
+| `email.verifySignup.button` | Confirm sign-up | Conferma registrazione |
+| `email.welcome.body` | Your account is confirmed. Here is how to get the most out of Stella in the first minutes. | Il tuo account è confermato. Ecco come sfruttare al meglio Stella fin dai primi minuti. |
+| `email.welcome.title` | Welcome, Mia | Benvenuto, Mia |
+| `email.welcome.body` | Your account is confirmed. Here is how to get the most out of Stella in the first minutes. | Il tuo account è confermato. Ecco come sfruttare al meglio Stella fin dai primi minuti. |
+| `email.reply.title` | Stella's reply | La risposta di Stella |
+| `email.unknown.title` | Nice to meet you | Piacere di conoscerti |
+| `email.unknown.body` | I am Stella, a personal assistant for school, work and everyday life. I do not know this address yet, so I cannot answer your email. | Sono Stella, un'assistente personale per scuola, lavoro e vita di tutti i giorni. Non conosco ancora questo indirizzo, quindi non posso risponderti. |
+| `email.subscription.started.title` | Welcome to {plan} | Benvenuto in {plan} |
+| `email.subscription.started.body` | Thank you. Your limits are higher right away. Stripe sends the invoice separately. | Grazie. I tuoi limiti salgono subito. La fattura la invia Stripe a parte. |
+| `email.subscription.changed.title` | You are on {plan} now | Ora sei su {plan} |
+| `email.subscription.changed.body` | Your plan was changed. The new limits apply from now on. | Il tuo abbonamento è stato modificato. I nuovi limiti valgono da subito. |
+| `email.subscription.cancelled.title` | Subscription cancelled | Abbonamento annullato |
+| `email.subscription.cancelled.body` | You keep {plan} until {until}. After that, Stella continues with the free plan. | Mantieni {plan} fino al {until}. Poi Stella continua con il piano gratuito. |
 
 **Briefing-Gruß und Erinnerung in den drei Tönen**
 
@@ -231,7 +283,20 @@
 | `settings.permsSub` | Solve homework, change the planner, delete ads … | Resolver lição, mexer na agenda, apagar propaganda… |
 | `quick.forgot.text` | Did I forget anything? | Será que esqueci alguma coisa? |
 | `srv.noDate.nextDay` | _(No date found – I took the next school day. Write e.g. "{subject} homework until Friday" if it's different.)_ | _(Não achei data: peguei o próximo dia de aula. Escreva, por exemplo, «{subject} lição até sexta» se for outro dia.)_ |
-| `email.code.body` | Hi Mia, ⏎  ⏎ your confirmation code for Stella is: ⏎  ⏎     {code} ⏎  ⏎ It is valid for {minutes} minutes. If you didn't sign up for Stella, you can simply ignore this email. ⏎  ⏎ Stella by EVOLSIOR – Built to become | Oi, Mia! ⏎  ⏎ seu código de confirmação da Stella é: ⏎  ⏎     {code} ⏎  ⏎ Ele vale por {minutes} minutos. Se você não se cadastrou na Stella, é só ignorar este e-mail. ⏎  ⏎ Stella by EVOLSIOR – Built to become |
+| `email.verifySignup.body` | Confirm your email address to start with Stella. Open the link on the device where you are signing up. | Confirme seu e-mail para começar com a Stella. Abra o link no aparelho em que você está se cadastrando. |
+| `email.verifySignup.button` | Confirm sign-up | Confirmar cadastro |
+| `email.welcome.body` | Your account is confirmed. Here is how to get the most out of Stella in the first minutes. | Sua conta está confirmada. Veja como aproveitar a Stella desde os primeiros minutos. |
+| `email.welcome.title` | Welcome, Mia | Boas-vindas, Mia |
+| `email.welcome.body` | Your account is confirmed. Here is how to get the most out of Stella in the first minutes. | Sua conta está confirmada. Veja como aproveitar a Stella desde os primeiros minutos. |
+| `email.reply.title` | Stella's reply | A resposta da Stella |
+| `email.unknown.title` | Nice to meet you | Prazer em conhecer você |
+| `email.unknown.body` | I am Stella, a personal assistant for school, work and everyday life. I do not know this address yet, so I cannot answer your email. | Eu sou a Stella, uma assistente pessoal para escola, trabalho e o dia a dia. Ainda não conheço este endereço, então não posso responder. |
+| `email.subscription.started.title` | Welcome to {plan} | Boas-vindas ao {plan} |
+| `email.subscription.started.body` | Thank you. Your limits are higher right away. Stripe sends the invoice separately. | Obrigada. Seus limites aumentam na hora. A fatura é enviada separadamente pelo Stripe. |
+| `email.subscription.changed.title` | You are on {plan} now | Agora você está no {plan} |
+| `email.subscription.changed.body` | Your plan was changed. The new limits apply from now on. | Seu plano foi alterado. Os novos limites valem a partir de agora. |
+| `email.subscription.cancelled.title` | Subscription cancelled | Assinatura cancelada |
+| `email.subscription.cancelled.body` | You keep {plan} until {until}. After that, Stella continues with the free plan. | Você mantém o {plan} até {until}. Depois, a Stella continua no plano gratuito. |
 
 **Briefing-Gruß und Erinnerung in den drei Tönen**
 
@@ -280,7 +345,20 @@
 | `settings.permsSub` | Solve homework, change the planner, delete ads … | Ödev çöz, planı değiştir, reklamları sil… |
 | `quick.forgot.text` | Did I forget anything? | Bir şey unuttum mu? |
 | `srv.noDate.nextDay` | _(No date found – I took the next school day. Write e.g. "{subject} homework until Friday" if it's different.)_ | _(Tarih bulamadım; bir sonraki okul gününü aldım. Farklıysa örneğin "{subject} ödevi cumaya kadar" yaz.)_ |
-| `email.code.body` | Hi Mia, ⏎  ⏎ your confirmation code for Stella is: ⏎  ⏎     {code} ⏎  ⏎ It is valid for {minutes} minutes. If you didn't sign up for Stella, you can simply ignore this email. ⏎  ⏎ Stella by EVOLSIOR – Built to become | Merhaba Mia, ⏎  ⏎ Stella için doğrulama kodun: ⏎  ⏎     {code} ⏎  ⏎ Kod {minutes} dakika geçerli. Stella'ya kaydolmadıysan bu e-postayı yok sayabilirsin. ⏎  ⏎ Stella by EVOLSIOR – Built to become |
+| `email.verifySignup.body` | Confirm your email address to start with Stella. Open the link on the device where you are signing up. | Stella'yı kullanmaya başlamak için e-posta adresini onayla. Bağlantıyı kayıt olduğun cihazda aç. |
+| `email.verifySignup.button` | Confirm sign-up | Kaydı onayla |
+| `email.welcome.body` | Your account is confirmed. Here is how to get the most out of Stella in the first minutes. | Hesabın onaylandı. İlk dakikalarda Stella'dan en iyi şekilde yararlanmanın yolu: |
+| `email.welcome.title` | Welcome, Mia | Hoş geldin, Mia |
+| `email.welcome.body` | Your account is confirmed. Here is how to get the most out of Stella in the first minutes. | Hesabın onaylandı. İlk dakikalarda Stella'dan en iyi şekilde yararlanmanın yolu: |
+| `email.reply.title` | Stella's reply | Stella'nın yanıtı |
+| `email.unknown.title` | Nice to meet you | Tanıştığımıza memnun oldum |
+| `email.unknown.body` | I am Stella, a personal assistant for school, work and everyday life. I do not know this address yet, so I cannot answer your email. | Ben Stella; okul, iş ve günlük hayat için kişisel bir asistanım. Bu adresi henüz tanımıyorum, bu yüzden yanıt veremiyorum. |
+| `email.subscription.started.title` | Welcome to {plan} | {plan}'a hoş geldin |
+| `email.subscription.started.body` | Thank you. Your limits are higher right away. Stripe sends the invoice separately. | Teşekkürler. Limitlerin hemen artar. Faturayı Stripe ayrıca gönderir. |
+| `email.subscription.changed.title` | You are on {plan} now | Artık {plan} planındasın |
+| `email.subscription.changed.body` | Your plan was changed. The new limits apply from now on. | Aboneliğin değiştirildi. Yeni limitler hemen geçerli. |
+| `email.subscription.cancelled.title` | Subscription cancelled | Abonelik iptal edildi |
+| `email.subscription.cancelled.body` | You keep {plan} until {until}. After that, Stella continues with the free plan. | {plan} planın {until} tarihine kadar sürer. Sonrasında Stella ücretsiz planla devam eder. |
 
 **Briefing-Gruß und Erinnerung in den drei Tönen**
 
@@ -329,7 +407,20 @@
 | `settings.permsSub` | Solve homework, change the planner, delete ads … | Rozwiązywać zadania, zmieniać plan, usuwać reklamy… |
 | `quick.forgot.text` | Did I forget anything? | Czy coś mi umknęło? |
 | `srv.noDate.nextDay` | _(No date found – I took the next school day. Write e.g. "{subject} homework until Friday" if it's different.)_ | _(Nie znalazłam daty – wzięłam następny dzień szkolny. Jeśli ma być inaczej, napisz np. „{subject} zadanie na piątek”.)_ |
-| `email.code.body` | Hi Mia, ⏎  ⏎ your confirmation code for Stella is: ⏎  ⏎     {code} ⏎  ⏎ It is valid for {minutes} minutes. If you didn't sign up for Stella, you can simply ignore this email. ⏎  ⏎ Stella by EVOLSIOR – Built to become | Cześć Mia, ⏎  ⏎ twój kod potwierdzający do Stelli to: ⏎  ⏎     {code} ⏎  ⏎ Jest ważny przez {minutes} minut. Jeśli to nie Ty zakładasz konto w Stelli, po prostu zignoruj tę wiadomość. ⏎  ⏎ Stella by EVOLSIOR – Built to become |
+| `email.verifySignup.body` | Confirm your email address to start with Stella. Open the link on the device where you are signing up. | Potwierdź adres e-mail, a Stella zacznie działać. Otwórz link na urządzeniu, na którym się rejestrujesz. |
+| `email.verifySignup.button` | Confirm sign-up | Potwierdź rejestrację |
+| `email.welcome.body` | Your account is confirmed. Here is how to get the most out of Stella in the first minutes. | Twoje konto jest potwierdzone. Oto jak wycisnąć z Stelli najwięcej od pierwszych minut. |
+| `email.welcome.title` | Welcome, Mia | Witaj, Mia |
+| `email.welcome.body` | Your account is confirmed. Here is how to get the most out of Stella in the first minutes. | Twoje konto jest potwierdzone. Oto jak wycisnąć z Stelli najwięcej od pierwszych minut. |
+| `email.reply.title` | Stella's reply | Odpowiedź Stelli |
+| `email.unknown.title` | Nice to meet you | Miło Cię poznać |
+| `email.unknown.body` | I am Stella, a personal assistant for school, work and everyday life. I do not know this address yet, so I cannot answer your email. | Jestem Stella, osobistą asystentką do szkoły, pracy i codzienności. Nie znam jeszcze tego adresu, więc nie mogę odpowiedzieć. |
+| `email.subscription.started.title` | Welcome to {plan} | Witaj w planie {plan} |
+| `email.subscription.started.body` | Thank you. Your limits are higher right away. Stripe sends the invoice separately. | Dziękuję. Twoje limity rosną od razu. Fakturę wysyła osobno Stripe. |
+| `email.subscription.changed.title` | You are on {plan} now | Jesteś teraz w planie {plan} |
+| `email.subscription.changed.body` | Your plan was changed. The new limits apply from now on. | Twój plan został zmieniony. Nowe limity obowiązują od teraz. |
+| `email.subscription.cancelled.title` | Subscription cancelled | Subskrypcja anulowana |
+| `email.subscription.cancelled.body` | You keep {plan} until {until}. After that, Stella continues with the free plan. | {plan} masz do {until}. Potem Stella działa dalej w planie darmowym. |
 
 **Briefing-Gruß und Erinnerung in den drei Tönen**
 

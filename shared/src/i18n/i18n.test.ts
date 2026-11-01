@@ -57,7 +57,7 @@ test('Slogan und Markenkern: Leitspruch bleibt englisch, der Stella-Slogan ist i
   };
   for (const locale of LOCALES) {
     assert.equal(CATALOGS[locale]['auth.tagline'], slogans[locale]);
-    assert.match(CATALOGS[locale]['email.code.body']!, /Stella by EVOLSIOR – Built to become/, `${locale}: Markenkern bleibt englisch`);
+    assert.equal(CATALOGS[locale]['email.footer.tagline'], 'Stella by EVOLSIOR · Built to become', `${locale}: Markenkern bleibt englisch`);
   }
 });
 

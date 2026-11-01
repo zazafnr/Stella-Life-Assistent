@@ -13,7 +13,7 @@ const KEYS = [
   'onboarding.situation.school.sub', 'onboarding.features.title', 'onboarding.mail.text', 'onboarding.tone.title', 'onboarding.briefing.title',
   'onboarding.done.title', 'onboarding.done.start', 'tone.nett.example', 'tone.frech.example', 'tone.cool.example', 'briefing.nothing',
   'briefing.allCancelled', 'error.generic', 'error.network', 'auth.notConfirmed', 'chat.empty', 'chat.offlineSaved', 'srv.undo.nothing',
-  'today.allClear', 'settings.weekPlanSub', 'settings.planSub', 'settings.permsSub', 'quick.forgot.text', 'srv.noDate.nextDay', 'email.code.body',
+  'today.allClear', 'settings.weekPlanSub', 'settings.planSub', 'settings.permsSub', 'quick.forgot.text', 'srv.noDate.nextDay', 'email.verifySignup.body', 'email.verifySignup.button', 'email.welcome.body',
   // ab Paket 4–13 kommen weitere Schlüssel dazu (Paywall, Mails, Standort, News …): hier einfach ergänzen
   ...Object.keys(CATALOGS.en).filter((k) => /^(paywall|email\.(verify|welcome|login|reply|unknown|subscription)|location|news|screentime)\./.test(k) && /\.(title|text|body|cta|headline)$/.test(k)).slice(0, 12),
 ];

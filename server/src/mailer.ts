@@ -4,6 +4,8 @@
 import nodemailer, { type Transporter } from 'nodemailer';
 import { smtpKey, type SmtpKey } from './keys.ts';
 import { logMail } from './maillog.ts';
+import type { Locale } from '@stella/shared';
+import { renderTemplate, type TemplateData, type TemplateName } from './email/templates.ts';
 
 let factory: (smtp: SmtpKey) => Pick<Transporter, 'sendMail'> = (smtp) => nodemailer.createTransport({
   host: smtp.host, port: smtp.port, secure: smtp.port === 465, auth: { user: smtp.user, pass: smtp.pass },
@@ -46,7 +48,7 @@ export interface MailExtra {
   references?: string[];
 }
 
-export async function sendSystemMail(to: string, subject: string, text: string, kind: MailKind = 'noreply', extra: MailExtra = {}): Promise<void> {
+export async function sendSystemMail(to: string, subject: string, text: string, kind: MailKind = 'noreply', extra: MailExtra & { html?: string } = {}): Promise<void> {
   const smtp = smtpKey();
   const purpose = extra.purpose ?? (kind === 'stella' ? 'stella_reply' : 'system');
   if (!smtp) { logMail('out', purpose, 'failed', { to, userId: extra.userId, detail: 'kein Absender eingerichtet' }); throw new Error('Kein Mail-Absender eingerichtet'); }
@@ -54,6 +56,7 @@ export async function sendSystemMail(to: string, subject: string, text: string, 
   try {
     await factory(smtp).sendMail({
       from: who.from ?? `Stella <${smtp.user}>`, ...(who.replyTo ? { replyTo: who.replyTo } : {}), to, subject, text,
+      ...(extra.html ? { html: extra.html } : {}),
       ...(extra.inReplyTo ? { inReplyTo: extra.inReplyTo, references: extra.references?.length ? extra.references : [extra.inReplyTo] } : {}),
     });
     logMail('out', purpose, 'ok', { to, userId: extra.userId });
@@ -61,4 +64,14 @@ export async function sendSystemMail(to: string, subject: string, text: string, 
     logMail('out', purpose, 'failed', { to, userId: extra.userId, detail: (err as Error).message });
     throw err;
   }
+}
+
+/**
+ * Mail aus einer Vorlage (HTML im Stil der Marke + Textversion) in der Sprache der Empfängerin.
+ * Der Betreff kommt aus der Vorlage, es sei denn `subject` ist gesetzt (z. B. „Re: …“ im selben Verlauf).
+ */
+export async function sendTemplateMail(to: string, locale: Locale, template: TemplateName, data: TemplateData = {}, kind: MailKind = 'noreply',
+  extra: MailExtra & { subject?: string } = {}): Promise<void> {
+  const { subject, html, text } = renderTemplate(template, locale, data);
+  await sendSystemMail(to, extra.subject ?? subject, text, kind, { ...extra, html, purpose: extra.purpose ?? template });
 }

@@ -13,6 +13,15 @@ export const config = {
   secret: env.STELLA_SECRET ?? '',
   /** Nach dem ersten Konto weitere Registrierungen erlauben? */
   allowRegistration: env.STELLA_ALLOW_REGISTRATION === 'true',
+  /** Absender-Angaben im Fuß jeder Mail (Pflicht für geschäftliche Mails in AT/DE) */
+  mail: {
+    /** Firmenadresse im Mail-Fuß – bitte in der Server-Umgebung (STELLA_COMPANY_ADDRESS) eintragen */
+    company: env.STELLA_COMPANY_ADDRESS ?? 'EVOLSIOR',
+    imprintUrl: env.STELLA_IMPRINT_URL ?? 'https://evolsior.com/imprint',
+    privacyUrl: env.STELLA_PRIVACY_URL ?? 'https://evolsior.com/privacy',
+    /** Hier liegen die Bilder der Mails (web/public/mail wird mit der Web-App ausgeliefert) */
+    assetsUrl: env.STELLA_MAIL_ASSETS_URL ?? 'https://stella.evolsior.com/mail',
+  },
   /** Sprache für Konten ohne eigene Einstellung (Standard Englisch; Tests setzen Deutsch) */
   defaultLocale: env.STELLA_DEFAULT_LOCALE ?? 'en',
   defaultTimeZone: env.STELLA_TIMEZONE ?? 'Europe/Vienna',

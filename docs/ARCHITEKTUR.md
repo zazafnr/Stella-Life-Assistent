@@ -226,3 +226,14 @@ Morning Briefing, natürliche Sprache, intelligente Inbox, Plan my week (siehe A
 - Gesundheit: Wasser, Schlaf, Bildschirmzeit. Sanfter Schubs bei zu wenig Bewegung.
 - Geburtstage, Abos und Fristen, Einkaufsliste.
 - Native iOS-App (Expo) mit Widgets, Siri, HealthKit, Share-Sheet.
+
+## 0c. E-Mails seit v3 (Paket 4)
+
+Alle Mails, die Stella verschickt, kommen aus **Vorlagen** (`server/src/email/`): `layout.ts` (Tabellen-Layout, 600 px, Inline-CSS,
+Outlook-Knopf per VML, helle und dunkle Variante, Vorschautext, immer eine Textversion), `templates.ts` (verify-signup,
+verify-address, login-link, welcome, stella-reply, unknown-sender, subscription), `markdown.ts` (Stellas Antworten als sicheres HTML),
+`undo.ts` und `pages.ts` (signierter „Rückgängig“-Link, 7 Tage; GET zeigt nur eine Bestätigungsseite, erst der Knopf macht es rückgängig).
+Texte stehen im Katalog (`email.*`, acht Sprachen). Bilder: `scripts/mail-art.ts` erzeugt PNGs unter `web/public/mail/`
+(öffentlich `https://stella.evolsior.com/mail/…`, SVG zeigt Gmail nicht). `sendTemplateMail()` in `mailer.ts` verschickt HTML + Text.
+Vorschau: `GET /api/admin/mail-preview/:template?locale=` (Owner) und die Seite „Emails“ im Firmen-Dashboard.
+Der Fuß nutzt `STELLA_COMPANY_ADDRESS` (Firmenadresse), `STELLA_IMPRINT_URL`, `STELLA_PRIVACY_URL`.
