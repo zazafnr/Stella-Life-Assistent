@@ -111,6 +111,29 @@
     </div>
   </section>
 
+  <section id="subs" aria-labelledby="subs-h">
+    <div class="head">
+      <div class="gap-12"><p class="label">Stella</p><h2 id="subs-h">Subscriptions</h2></div>
+    </div>
+    <div class="tiles" id="sub-tiles"></div>
+    <div class="grid two">
+      <div class="card">
+        <div><h3>Users per plan</h3><p class="hint" id="sub-hint">Costs per user: Claude, in euros</p></div>
+        <table>
+          <thead><tr><th>Plan</th><th class="n">Users</th><th class="n">Paying</th><th class="n">Avg cost</th><th class="n">95th pct.</th><th class="n">Margin / user</th></tr></thead>
+          <tbody id="sub-plans"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div><h3>Highest costs</h3><p class="hint">Top 10 users by AI cost</p></div>
+        <table>
+          <thead><tr><th>#</th><th>User</th><th>Plan</th><th class="n">Cost</th></tr></thead>
+          <tbody id="sub-top"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
   <section id="mails" aria-labelledby="mails-h">
     <div class="page-head">
       <div class="gap-12"><p class="label">Stella</p><h2 id="mails-h">Emails</h2></div>
