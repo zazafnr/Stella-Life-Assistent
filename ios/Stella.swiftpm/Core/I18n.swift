@@ -15,6 +15,9 @@ final class I18n {
         "pt-BR": "Português (Brasil)", "tr": "Türkçe", "pl": "Polski",
     ]
     private static let key = "stella.locale"
+    /// Zusätzliche Texte einer Edition je Sprache (JSON wie in I18nCatalogs); sie ergänzen den Kern und dürfen ihn überschreiben.
+    /// Die App setzt das einmal beim Start, bevor der erste Text gebraucht wird.
+    static var extraJSON: [String: String] = [:]
 
     private(set) var locale: String
     @ObservationIgnored private var catalogs: [String: [String: String]] = [:]
@@ -47,6 +50,10 @@ final class I18n {
         if let json = I18nCatalogs.json[l], let data = json.data(using: .utf8),
            let dict = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
             parsed = dict
+        }
+        if let extra = Self.extraJSON[l], let data = extra.data(using: .utf8),
+           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
+            parsed.merge(dict) { _, new in new }
         }
         catalogs[l] = parsed
         return parsed
