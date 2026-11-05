@@ -67,6 +67,20 @@ Entscheidungen:
   Anmeldung auf der falschen Oberfläche → `409` mit `code: 'wrong_edition'`, `edition` und `url` (nie eine Sitzung); Anmelde-Links für Konten der anderen App werden nicht verschickt (ohne zu verraten, dass es das Konto gibt).
   `GET /api/me` liefert `edition` und `editionUrl`; `GET /api/edition` beschreibt, was die Plugins an Einstellungen und Einführung beisteuern.
 - **Mails**: Absendername, Betreff, Kopf und Fuß nennen das Produkt der Edition (`Stella` / `Stella for Students`); die Kataloge sagen weiter nur „Stella“, `brandText()` ersetzt es.
+### Zwei Repos, ein Server (Paket 2)
+
+- **Kein Git-Submodul.** `git archive` (in `scripts/deploy-vps.sh`) nimmt Submodule nicht mit, und ein gepinnter Stand hinkt der Arbeit am Plugin hinterher.
+  Stattdessen klont `scripts/fetch-edition.sh` das Repo `Stella-for-Students` nach `editions/students` (ignoriert in `.gitignore`).
+  `STELLA_STUDENTS_REF` wählt Branch, Tag oder Commit (Standard `main`). Das Dockerfile (`--build-arg STUDENTS_REF=…`, `off` = ohne), `deploy/install-vps.sh`
+  (holt es, wenn es fehlt) und `scripts/deploy-vps.sh` (packt es in das Archiv) rufen es auf.
+- **Kern-Spiegel**: Im Students-Repo liegt unter `core/` eine eingecheckte, schreibgeschützte Kopie von `shared/`, `server/`, (`web-core/` ab Paket 4) und iOS `Core/` + `Design/`.
+  `npm run sync:core` (im Students-Repo) erzeugt sie und schreibt `core/CORE_COMMIT`; `--check` schlägt fehl, wenn jemand im Spiegel gearbeitet hat.
+  **Änderungen am Kern passieren nur hier.** Danach: hier committen und pushen, im Students-Repo `npm run sync:core`, committen.
+- **CI**: `.github/workflows/ci.yml` prüft den Kern (Typen, Tests, iOS-Kataloge) und in einem zweiten Job das Zusammenspiel
+  (`STELLA_EDITION_STUDENTS=editions/students/server-plugin npm test` mit dem geholten Plugin).
+- Das Plugin darf `null` liefern („noch nichts beizutragen“): dann gilt das eingebaute Schul-Plugin. So bleibt der Server in den Paketen 2 und 3 mit jedem Stand des Plugins lauffähig.
+- Laufzeit-Abhängigkeiten des Plugins (z. B. `webuntis`, `otplib`, `playwright`) bleiben in `server/package.json` dieses Repos, bis das Plugin sie selbst mitbringt.
+
 - **Grenze**: eine E-Mail-Adresse gehört zu einem Konto (`users.email` ist eindeutig). Wer beide Apps nutzen will, braucht zwei Adressen; der Hinweis „gehört zu Stella for Students“ kommt dann bei Anmeldung und Registrierung.
 
 ## 1. KI-Modell: OpenRouter, automatisch das beste kostenlose (Notfall bzw. ohne Claude-Schlüssel)
