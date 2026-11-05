@@ -25,6 +25,11 @@ trap 'rm -rf "$work"' EXIT
 
 echo "==> Code packen (HEAD, ohne desktop/ und ios/)"
 git archive HEAD -- . ':(exclude)desktop' ':(exclude)ios' > "$work/stella.tar"
+# Edition-Plugin (Stella for Students) dazupacken: git archive nimmt weder Submodule noch ignorierte Ordner mit
+if [[ ${STELLA_EDITION_STUDENTS:-} != off ]]; then
+  STELLA_FETCH_STRIP_GIT=1 scripts/fetch-edition.sh "$work/edition/editions/students"
+  tar -rf "$work/stella.tar" -C "$work/edition" editions
+fi
 sum=$(sha256sum "$work/stella.tar" | cut -d' ' -f1)
 base64 -w0 "$work/stella.tar" > "$work/stella.b64"
 split -b "$CHUNK" -d -a 4 "$work/stella.b64" "$work/part-"

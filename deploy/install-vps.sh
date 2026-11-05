@@ -35,6 +35,13 @@ if [[ "$SRC" != "$APP" ]]; then
   tar -C "$SRC" --exclude=./node_modules --exclude=./data --exclude=./.git --exclude='./*/node_modules' -cf - . | tar -C "$APP" -xf -
 fi
 
+log "Edition-Plugin (Stella for Students)"
+# Kommt der Code per Git-Klon statt per scripts/deploy-vps.sh, fehlt das Plugin noch: holen. STELLA_EDITION_STUDENTS=off schaltet es ab.
+if [[ ${STELLA_EDITION_STUDENTS:-} != off && ! -d $APP/editions/students/server-plugin ]]; then
+  if command -v git >/dev/null; then (cd "$APP" && STELLA_FETCH_STRIP_GIT=1 bash scripts/fetch-edition.sh) || echo "Plugin nicht geholt – es läuft das eingebaute Schul-Plugin."
+  else echo "git fehlt – es läuft das eingebaute Schul-Plugin."; fi
+fi
+
 log "Abhängigkeiten installieren und Web-App bauen"
 cd "$APP"
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci --no-audit --no-fund

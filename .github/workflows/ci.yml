@@ -1,0 +1,44 @@
+name: CI
+
+# Typprüfung und Tests des Kerns (normales Stella). Der zweite Job prüft das Zusammenspiel mit dem Edition-Plugin
+# aus zazafnr/Stella-for-Students (Branch, Tag oder Commit über die Variable STUDENTS_REF, Standard: main).
+on:
+  push:
+    paths-ignore: ['ios/**', 'desktop/**', 'site/**', 'docs/**']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      students_ref:
+        description: 'Stand von Stella-for-Students (Branch, Tag, Commit)'
+        default: main
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci --no-audit --no-fund
+      - run: npx tsc -p shared --noEmit && npx tsc -p server --noEmit && npx tsc -p web --noEmit
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - name: iOS-Sprachkataloge aktuell?
+        run: npx tsx scripts/gen-i18n.ts --check
+
+  students-plugin:
+    # Zusammenspiel: dieselben Tests, aber mit dem echten Plugin aus dem Students-Repo statt des eingebauten
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Edition-Plugin holen
+        run: STELLA_STUDENTS_REF="${{ inputs.students_ref || vars.STUDENTS_REF || 'main' }}" scripts/fetch-edition.sh
+      - run: STELLA_EDITION_STUDENTS=editions/students/server-plugin npm test

@@ -156,7 +156,7 @@ test('ohne Plugin: keine Schul-Routen, keine Schul-Werkzeuge, keine Schul-Sätze
 
 test('mit Plugin: Routen, Werkzeuge, Prompt und Schnellwege wie bisher', async () => {
   resetEditions();
-  const res0 = await loadEditions(undefined);
+  const res0 = await loadEditions('builtin');
   assert.deepEqual(res0, { loaded: ['students'], source: 'builtin' });
 
   const app = await newApp((a) => { a.register(async (api: FastifyInstance) => { api.addHook('preHandler', requireUser); pluginRoutes(api); }); });
