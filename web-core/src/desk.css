@@ -1,15 +1,7 @@
 /* Stella für Web und PC: eigenes Desktop-Layout (Seitenleiste, Kopfleiste, mehrspaltige Seiten, Seitenfenster).
-   Es liegt über styles.css und übernimmt von dort nur die Marke: Farben, Schrift, Stern. Das Handy-Layout bleibt als schmale Notlösung unter 760 px. */
+   Es liegt über core.css; die Marke (Farben, Schrift, Rundung) kommt aus theme.css der App, das nach diesem Stylesheet geladen wird. Das Handy-Layout bleibt als schmale Notlösung unter 760 px. */
 :root {
-  --bg: var(--bg);
-  --surface: #FFFFFF;
-  --surface-2: var(--surface-2);
-  --tint: var(--tint);
-  --border: color-mix(in srgb, var(--text) 9%, transparent);
-  --border-strong: color-mix(in srgb, var(--text) 18%, transparent);
-  --shadow: 0 1px 2px color-mix(in srgb, var(--text) 5%, transparent);
-  --shadow-lg: 0 16px 40px color-mix(in srgb, var(--text) 16%, transparent);
-  --radius: 12px;
+  /* nur Maße des Desktop-Layouts; Farben, Schatten und Rundung kommen aus theme.css der jeweiligen App */
   --r-sm: 8px;
   --side-w: 244px;
   --top-h: 56px;
