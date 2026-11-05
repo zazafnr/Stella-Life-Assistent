@@ -119,7 +119,7 @@ export interface ChatMessage {
 export type PermissionLevel = 'auto' | 'notify' | 'ask' | 'never';
 
 /** Bereiche, für die man Stella Rechte gibt */
-export type ActionGroup = 'planner' | 'delete' | 'homework' | 'mail_sort' | 'mail_send' | 'memory';
+export type ActionGroup = 'planner' | 'delete' | 'homework' | 'mail_sort' | 'mail_send' | 'memory' | 'learning';
 
 export type ActionStatus = 'proposed' | 'done' | 'rejected' | 'undone' | 'failed';
 

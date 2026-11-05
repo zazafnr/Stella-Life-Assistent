@@ -15,7 +15,7 @@ import { dayFor, tr, userLocale, userTerms, voiceOf } from './locale.ts';
 import { pushToUser } from './push.ts';
 import { mailerConfigured, sendTemplateMail } from './mailer.ts';
 import { filePath, saveFile } from './files.ts';
-import { consumeQuota } from './billing.ts';
+import { consumeQuota, quotaFor } from './billing.ts';
 import { resolveTier } from './router.ts';
 import { hasFeature, isSchool } from './profile.ts';
 import { toHhmm, toMin } from './context.ts';
@@ -52,7 +52,7 @@ export const pluginApi = {
   pushToUser, mailerConfigured, sendTemplateMail,
   saveFile, filePath,
   /** Abo-Kontingent und Modellwahl (Profi-Aufgaben) */
-  consumeQuota, resolveTier,
+  consumeQuota, quotaFor, resolveTier,
   hasFeature, isSchool,
   toMin, toHhmm,
   /** Text aus dem Sprachkatalog in der Sprache der Nutzerin */
