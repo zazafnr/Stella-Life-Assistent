@@ -22,7 +22,7 @@ export interface Me {
   /** Adresse der App, zu der das Konto gehört */
   editionUrl?: string;
   /** serverweite Funktions-Schalter (z. B. Finanzen ausgeblendet) */
-  flags?: { finance?: boolean; freenotesUrl?: string | null; telegram?: boolean };
+  flags?: { finance?: boolean; freenotesUrl?: string | null; telegram?: boolean; studentsUrl?: string };
   settings: {
     eveningTime?: string; studyTime?: string; stepGoal?: number;
     books?: BookConfig[]; homeworkAutopilot?: boolean; mailAutoTrash?: boolean; tone?: Tone;

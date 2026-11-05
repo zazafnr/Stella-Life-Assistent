@@ -127,7 +127,7 @@ export function App() {
   return (
     <>
     {introLayer}
-    {showOnboarding && <Onboarding startAt={showOnboarding.startAt} onDone={(after) => { setOnboarding(null); if (after === 'settings') setTab('settings'); }} />}
+    {showOnboarding && <Onboarding situations={['work', 'apprenticeship', 'other']} studentsHint={me?.flags?.studentsUrl} startAt={showOnboarding.startAt} onDone={(after) => { setOnboarding(null); if (after === 'settings') setTab('settings'); }} />}
     {palette && <CommandPalette entries={entries} onClose={() => setPalette(false)} />}
     <div className={collapsed ? 'app collapsed' : 'app'}>
       <nav className="sidebar" aria-label={t('nav.navigation')}>

@@ -8,7 +8,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import type { BriefingSection, Edition, Hint, Item, Locale, ParserExtension } from '@stella/shared';
-import { extendCatalogs, type Catalog } from '@stella/shared';
+import { extendCatalogs, extendEditionCatalogs, type Catalog } from '@stella/shared';
 import { db } from '../db.ts';
 import type { ToolDef } from '../llm-types.ts';
 import type { PendingType, User } from '../db.ts';
@@ -111,6 +111,8 @@ export interface EditionPlugin {
   quickActions?: (user: User) => PluginQuickAction[];
   scheduler?: PluginScheduler;
   catalog?: Partial<Record<Locale, Catalog>>;
+  /** Texte, die in dieser Edition anders lauten als im Kern (gleiche Schlüssel, z. B. Schulwörter statt der neutralen Fassung) */
+  overrides?: Partial<Record<Locale, Catalog>>;
   settings?: (user: User) => PluginSettingsSection[];
   onboarding?: PluginOnboardingStep[];
   /** Zusätzliche VEVENT-Blöcke für das Kalender-Abo (ohne BEGIN/END:VCALENDAR) */
@@ -129,6 +131,7 @@ export function registerEdition(plugin: EditionPlugin): void {
   if (plugins.has(plugin.id)) throw new Error(`Edition-Plugin „${plugin.id}“ ist schon geladen.`);
   runPluginMigrations(plugin);
   if (plugin.catalog) extendCatalogs(plugin.catalog);
+  if (plugin.overrides) extendEditionCatalogs(plugin.edition, plugin.overrides);
   plugins.set(plugin.id, plugin);
 }
 

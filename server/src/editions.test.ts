@@ -19,6 +19,7 @@ const { registerLoginApi } = await import('./loginlink.ts');
 const { loadEditions } = await import('./editions/load.ts');
 const { editions, pluginAutomations, pluginIcal, pluginParser, pluginRoutes, pluginTools, registerEdition, requestEdition, resetEditions } = await import('./editions/registry.ts');
 const { levelFor } = await import('./actions.ts');
+const { tr, welcomeText } = await import('./locale.ts');
 const { toICalendar } = await import('./ical.ts');
 const { buildLagebild } = await import('./context.ts');
 const { systemPrompt } = await import('./assistant.ts');
@@ -172,6 +173,8 @@ test('mit Plugin: Routen, Werkzeuge, Prompt, Schnellwege, Hinweise, Briefing und
     actions: { groups: { homework: { label: 'Demo-Recht', help: 'x', default: 'auto', levels: ['auto', 'ask', 'never'] } }, defs: {} },
     parser: { kinds: [['homework', 'HÜ', ['hü']]], subjects: [['Latein', ['latein']]] },
     ical: () => ['BEGIN:VEVENT', 'UID:demo@stella', 'SUMMARY:Demo', 'END:VEVENT'],
+    overrides: { de: { 'today.noTests': 'Keine Tests' } },
+    catalog: { de: { 'students.welcome.examples': 'Hausübungen gehen auch.' } },
   };
   registerEdition(plugin);
 
@@ -195,6 +198,13 @@ test('mit Plugin: Routen, Werkzeuge, Prompt, Schnellwege, Hinweise, Briefing und
   assert.ok(pluginAutomations(user).some((a) => a.title === 'Demo-Automatik'));
   assert.match(toICalendar([], 'Europe/Vienna', pluginIcal(user)), /UID:demo@stella/);
   assert.equal(levelFor(user, 'homework'), 'auto', 'Rechte-Bereich des Plugins');
+
+  // Texte: neutral im normalen Stella, mit dem Wortschatz der Edition für deren Konten
+  const de = { settings: { locale: 'de' as const } };
+  assert.equal(tr({ ...de, edition: 'life' }, 'today.noTests'), 'Keine Prüfungen');
+  assert.equal(tr({ ...de, edition: 'students' }, 'today.noTests'), 'Keine Tests');
+  assert.match(welcomeText({ ...de, edition: 'students', name: 'Mia' }), /Hausübungen gehen auch\.$/);
+  assert.doesNotMatch(welcomeText({ ...de, edition: 'life', name: 'Mia' }), /Hausübung|Schularbeit|HÜ/);
 
   // Parser: ohne Plugin ist „Latein HÜ S. 45 Nr. 3 Freitag“ keine Hausübung, mit Plugin schon
   const extra = pluginParser();

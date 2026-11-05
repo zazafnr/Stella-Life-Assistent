@@ -17,7 +17,7 @@ import { editionUrl } from './editions/access.ts';
 import { createSession, hashPassword, HttpError } from './auth.ts';
 import { addMessage, db, getUser, newId, now, type User } from './db.ts';
 import { sendTemplateMail, mailerConfigured } from './mailer.ts';
-import { userLocale, voiceOf } from './locale.ts';
+import { userLocale, voiceOf, welcomeText } from './locale.ts';
 import { simplePage } from './email/pages.ts';
 
 export type LinkPurpose = 'signup' | 'login' | 'reset' | 'address';
@@ -149,7 +149,7 @@ function finish(r: Row, device?: string): Claimed {
   if (!user.verified && r.purpose === 'signup') {
     db.prepare('UPDATE users SET verified = 1 WHERE id = ?').run(user.id);
     const verified = getUser(user.id)!;
-    addMessage(verified.id, 'assistant', voiceOf(verified).welcome(verified.name));
+    addMessage(verified.id, 'assistant', welcomeText(verified));
     // Willkommens-Mail mit drei Schritten (nach der Bestätigung)
     if (mailerConfigured()) {
       void sendTemplateMail(verified.email, userLocale(verified), 'welcome', { name: verified.name, appUrl: editionUrl(verified.edition) }, 'noreply', { purpose: 'welcome', userId: verified.id }).catch(() => {});

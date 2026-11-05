@@ -4,7 +4,7 @@ import { DEFAULT_LOCALE, formatDay, isCountry, isLocale, LANGUAGE_NAMES_EN, scho
 import { config } from './config.ts';
 import type { User } from './db.ts';
 
-type HasSettings = Pick<User, 'settings'>;
+type HasSettings = Pick<User, 'settings'> & { edition?: User['edition'] };
 
 export const userLocale = (u: HasSettings): Locale =>
   isLocale(u.settings.locale) ? u.settings.locale : isLocale(config.defaultLocale) ? config.defaultLocale : DEFAULT_LOCALE;
@@ -16,7 +16,15 @@ export const languageName = (u: HasSettings): string => LANGUAGE_NAMES_EN[userLo
 export const voiceOf = (u: HasSettings) => voice(u.settings.tone, userLocale(u));
 
 /** Text aus dem Sprachkatalog in der Sprache dieser Nutzerin */
-export const tr = (u: HasSettings, key: string, vars?: Record<string, string | number>) => t(userLocale(u), key, vars);
+export const tr = (u: HasSettings, key: string, vars?: Record<string, string | number>) => t(userLocale(u), key, vars, u.edition);
+
+/** Begrüßung im ersten Chat: Text der Stimme (Ton, Sprache) plus – in Stella for Students – Beispiele mit Schulwörtern */
+export function welcomeText(u: HasSettings & { name: string }): string {
+  const base = voiceOf(u).welcome(u.name);
+  if (u.edition !== 'students') return base;
+  const extra = tr(u, 'students.welcome.examples');
+  return extra === 'students.welcome.examples' ? base : `${base}\n\n${extra}`;
+}
 
 /** „heute“, „morgen“ oder „Freitag, 13. Nov.“ in der Sprache dieser Nutzerin */
 export const dayFor = (u: HasSettings, ymd: string, today?: string) => formatDay(userLocale(u), ymd, today);

@@ -774,7 +774,17 @@ const TOOLS: ToolDef[] = [
 ];
 
 /** Werkzeuge für diese Nutzerin: ausgeblendete Funktionen (z. B. Finanzen) bekommt die KI gar nicht erst zu sehen. */
-const toolsFor = (user: User, tier: Tier = 'light', errand = false): ToolDef[] => [...TOOLS, ...pluginTools(user).map((x) => x.def)]
+/** Ohne Edition-Plugin kennt das Anlegen-Werkzeug nur erwachsene Arten (Prüfung, Abgabe, Termin …) – Hausübungen und Schularbeiten gibt es nur mit Plugin */
+const adaptEntryTool = (def: ToolDef): ToolDef => {
+  if (def.function.name !== 'create_entry' || pluginParser()?.kinds?.some(([k]) => k === 'homework')) return def;
+  const props = { ...(def.function.parameters.properties as Record<string, Record<string, unknown>>) };
+  props.kind = { type: 'string', enum: KINDS.filter((k) => k !== 'homework'), description: 'exam=exam/test, assignment=deadline/submission, event=appointment, todo=task, study=study session, reminder=reminder at an exact time (time required)' };
+  props.title = { type: 'string', description: 'short, e.g. "Statistics exam" or "Dentist"' };
+  delete props.subject;
+  return { type: 'function', function: { ...def.function, description: 'Creates an entry in the planner (exam, deadline, appointment, to-do). Reminders are planned automatically.', parameters: { ...def.function.parameters, properties: props } } };
+};
+
+const toolsFor = (user: User, tier: Tier = 'light', errand = false): ToolDef[] => [...TOOLS.map(adaptEntryTool), ...pluginTools(user).map((x) => x.def)]
   .filter((x) => x.function.name !== 'spending_summary' || hasFeature(user, 'finance'))
   .filter((x) => !ERRAND_TOOLS.has(x.function.name) || (errand && tier === 'heavy' && planAllows(user, 'webTasks')));
 

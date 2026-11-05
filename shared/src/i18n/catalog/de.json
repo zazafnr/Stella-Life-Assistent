@@ -206,8 +206,8 @@
  "today.studyToday": "Heute: {what}",
  "today.studyDefault": "Lernen",
  "today.inDays": "in {count} Tagen",
- "today.noTests": "Keine Tests",
- "today.noTestsHint": "Schreib z. B. „Mathe SA 12.11.“",
+ "today.noTests": "Keine Prüfungen",
+ "today.noTestsHint": "Schreib z. B. „Prüfung 12.11.“",
  "today.steps": "Schritte",
  "today.stepsCount": "{count} Schritte",
  "today.tomorrowAtSchool": "Morgen in der Schule",
@@ -222,7 +222,7 @@
  "today.importantMessages#other": "{count} wichtige Nachrichten",
  "today.inboxMeta": " · {social} Social · {trashed} Werbung gelöscht",
  "today.tellStella": "Stella etwas sagen",
- "today.tellStellaHint": "„Latein HÜ S. 20 Nr. 3 Freitag“ oder einfach fragen",
+ "today.tellStellaHint": "„Zahnarzt Freitag 15 Uhr“ oder frag einfach",
  "today.greeting.named": "{greeting}, {name}!",
  "today.greeting.plain": "{greeting}!",
  "settings.books": "Schulbücher",
@@ -718,5 +718,7 @@
  "calendar.day.entries#one": "{date}, {count} Eintrag",
  "calendar.day.entries#other": "{date}, {count} Einträge",
  "calendar.free.minutes": "{minutes} frei",
- "calendar.dragHint": "Zum Verschieben ziehen, am unteren Rand die Länge ändern."
+ "calendar.dragHint": "Zum Verschieben ziehen, am unteren Rand die Länge ändern.",
+ "onboarding.studentsHint": "Du gehst zur Schule oder studierst? Dafür gibt es Stella for Students.",
+ "onboarding.studentsHint.link": "Stella for Students öffnen"
 }

@@ -206,8 +206,8 @@
  "today.studyToday": "Dziś: {what}",
  "today.studyDefault": "nauka",
  "today.inDays": "za {count} dni",
- "today.noTests": "Brak sprawdzianów",
- "today.noTestsHint": "Napisz np. „Sprawdzian z matmy 12.11.”",
+ "today.noTests": "Brak egzaminów",
+ "today.noTestsHint": "Napisz np. „Egzamin 12.11.”",
  "today.steps": "Kroki",
  "today.stepsCount": "{count} kroków",
  "today.tomorrowAtSchool": "Jutro w szkole",
@@ -222,7 +222,7 @@
  "today.importantMessages#other": "{count} ważnych wiadomości",
  "today.inboxMeta": " · {social} z mediów społecznościowych · {trashed} reklam usuniętych",
  "today.tellStella": "Napisz coś do Stelli",
- "today.tellStellaHint": "„Zadanie z łaciny s. 20 nr 3 piątek” albo po prostu zapytaj",
+ "today.tellStellaHint": "„Dentysta piątek 15:00” albo po prostu zapytaj",
  "today.greeting.named": "{greeting}, {name}!",
  "today.greeting.plain": "{greeting}!",
  "settings.books": "Podręczniki",
@@ -742,5 +742,7 @@
  "calendar.day.entries#many": "{date}, {count} wpisów",
  "calendar.day.entries#other": "{date}, {count} wpisu",
  "calendar.free.minutes": "{minutes} wolne",
- "calendar.dragHint": "Przeciągnij, aby przenieść; pociągnij dolną krawędź, aby zmienić czas."
+ "calendar.dragHint": "Przeciągnij, aby przenieść; pociągnij dolną krawędź, aby zmienić czas.",
+ "onboarding.studentsHint": "Chodzisz do szkoły lub studiujesz? Do tego jest Stella for Students.",
+ "onboarding.studentsHint.link": "Otwórz Stella for Students"
 }

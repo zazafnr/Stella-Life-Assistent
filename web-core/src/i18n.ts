@@ -36,7 +36,7 @@ export function useLocale(): Locale {
 
 export function useT() {
   const locale = useLocale();
-  return useCallback((key: string, vars?: Record<string, string | number>) => translate(locale, key, vars), [locale]);
+  return useCallback((key: string, vars?: Record<string, string | number>) => translate(locale, key, vars, appConfig().edition), [locale]);
 }
 
 /** `<html lang>` auf die aktuelle Sprache setzen */

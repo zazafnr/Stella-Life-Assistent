@@ -83,7 +83,7 @@ function publicUser(user: User) {
   return {
     id: user.id, name: user.name, email: user.email, timeZone: user.timeZone, settings: visibleSettings(user.settings), role: user.role, edition: user.edition, editionUrl: editionUrl(user.edition),
     /** Serverweite Funktions-Schalter für die Oberflächen (z. B. Einführung ohne „Ausgaben“) */
-    flags: { finance: config.features.finance, freenotesUrl: config.freenotesUrl || null, telegram: telegramConfigured() },
+    flags: { finance: config.features.finance, freenotesUrl: config.freenotesUrl || null, telegram: telegramConfigured(), studentsUrl: config.studentsUrl },
     ingestUrl: `${config.publicUrl}/api/ingest/${user.ingestToken}`,
     integrations: {
       ...pluginIntegrations(user),

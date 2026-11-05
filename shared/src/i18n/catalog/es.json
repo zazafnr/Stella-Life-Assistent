@@ -207,7 +207,7 @@
  "today.studyDefault": "estudiar",
  "today.inDays": "en {count} días",
  "today.noTests": "Sin exámenes",
- "today.noTestsHint": "Escribe, por ejemplo, «Examen de mates 12/11»",
+ "today.noTestsHint": "Escribe p. ej. «Examen 12/11»",
  "today.steps": "Pasos",
  "today.stepsCount": "{count} pasos",
  "today.tomorrowAtSchool": "Mañana en el colegio",
@@ -222,7 +222,7 @@
  "today.importantMessages#other": "{count} mensajes importantes",
  "today.inboxMeta": " · {social} de redes · {trashed} de publicidad borrados",
  "today.tellStella": "Cuéntale algo a Stella",
- "today.tellStellaHint": "«Deberes de latín pág. 20 n.º 3 viernes» o pregunta lo que quieras",
+ "today.tellStellaHint": "«Dentista viernes 15:00» o pregunta sin más",
  "today.greeting.named": "¡{greeting}, {name}!",
  "today.greeting.plain": "¡{greeting}!",
  "settings.books": "Libros de texto",
@@ -718,5 +718,7 @@
  "calendar.day.entries#one": "{date}, {count} entrada",
  "calendar.day.entries#other": "{date}, {count} entradas",
  "calendar.free.minutes": "{minutes} libres",
- "calendar.dragHint": "Arrastra para mover; tira del borde inferior para cambiar la duración."
+ "calendar.dragHint": "Arrastra para mover; tira del borde inferior para cambiar la duración.",
+ "onboarding.studentsHint": "¿Vas al colegio o estudias? Para eso existe Stella for Students.",
+ "onboarding.studentsHint.link": "Abrir Stella for Students"
 }

@@ -62,7 +62,7 @@ function NotebookMockup({ alt }: { alt: string }) {
  * Einführung in ein paar Klicks: Sprache, wer bist du, wobei soll Stella helfen. Jederzeit „Überspringen“.
  * `startAt = 'situation'` öffnet sie als „Profil bearbeiten“ ohne Begrüßung.
  */
-export function Onboarding({ onDone, startAt = 'language', situations }: { onDone: (after?: 'settings') => void; startAt?: StepId; /** welche Lebenssituationen die App anbietet (Standard: alle) */ situations?: Situation[] }) {
+export function Onboarding({ onDone, startAt = 'language', situations, studentsHint }: { onDone: (after?: 'settings') => void; startAt?: StepId; /** welche Lebenssituationen die App anbietet (Standard: alle) */ situations?: Situation[]; /** Adresse von Stella for Students: unter der Auswahl erscheint „Du gehst zur Schule oder studierst?“ mit Link */ studentsHint?: string }) {
   const me = useStore((s) => s.me) as Me;
   const t = useT();
   const locale = useLocale();
@@ -223,6 +223,7 @@ export function Onboarding({ onDone, startAt = 'language', situations }: { onDon
                 </button>
               ))}
             </div>
+            {studentsHint && <p className="muted small" style={{ margin: 0 }}>{t('onboarding.studentsHint')} <a href={studentsHint} className="link">{t('onboarding.studentsHint.link')} →</a></p>}
           </>
         )}
         {step === 'freenotes' && (

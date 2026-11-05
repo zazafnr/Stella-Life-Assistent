@@ -27,30 +27,40 @@ export function extendCatalogs(extra: Partial<Record<Locale, Catalog>>): void {
   }
 }
 
+/**
+ * Überschreibungen einer Edition für Schlüssel des Kerns (z. B. Schulwörter statt der neutralen Texte im normalen Stella).
+ * Sie gelten nur, wenn `t(…, edition)` mit dieser Edition gerufen wird – so antwortet ein Server beiden Apps in deren Vokabular.
+ */
+const OVERRIDES: Partial<Record<string, Partial<Record<Locale, Catalog>>>> = {};
+export function extendEditionCatalogs(edition: string, overrides: Partial<Record<Locale, Catalog>>): void {
+  const target = (OVERRIDES[edition] ??= {});
+  for (const [locale, entries] of Object.entries(overrides) as [Locale, Catalog][]) target[locale] = { ...target[locale], ...entries };
+}
+
 /** Für Tests: ein Schlüssel, der fehlt, wird hier gesammelt */
 export const missingKeys = new Set<string>();
 
 const fmt = (text: string, vars?: Record<string, string | number>) =>
   vars ? text.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m)) : text;
 
-function lookup(locale: Locale, key: string): string | undefined {
-  return CATALOGS[locale][key];
+function lookup(locale: Locale, key: string, edition?: string): string | undefined {
+  return (edition ? OVERRIDES[edition]?.[locale]?.[key] : undefined) ?? CATALOGS[locale][key];
 }
 
-export function t(locale: Locale, key: string, vars?: Record<string, string | number>): string {
+export function t(locale: Locale, key: string, vars?: Record<string, string | number>, edition?: string): string {
   let found: string | undefined;
   if (vars && typeof vars.count === 'number') {
     const rule = new Intl.PluralRules(locale).select(vars.count);
-    found = lookup(locale, `${key}#${rule}`) ?? lookup(locale, `${key}#other`);
-    if (found === undefined && locale !== DEFAULT_LOCALE) found = lookup(DEFAULT_LOCALE, `${key}#${new Intl.PluralRules(DEFAULT_LOCALE).select(vars.count)}`) ?? lookup(DEFAULT_LOCALE, `${key}#other`);
+    found = lookup(locale, `${key}#${rule}`, edition) ?? lookup(locale, `${key}#other`, edition);
+    if (found === undefined && locale !== DEFAULT_LOCALE) found = lookup(DEFAULT_LOCALE, `${key}#${new Intl.PluralRules(DEFAULT_LOCALE).select(vars.count)}`, edition) ?? lookup(DEFAULT_LOCALE, `${key}#other`, edition);
   }
-  found ??= lookup(locale, key) ?? lookup(DEFAULT_LOCALE, key);
+  found ??= lookup(locale, key, edition) ?? lookup(DEFAULT_LOCALE, key, edition);
   if (found === undefined) { missingKeys.add(`${locale}:${key}`); return key; }
   return fmt(found, vars);
 }
 
 /** Übersetzer für eine feste Sprache */
-export const translator = (locale: Locale) => (key: string, vars?: Record<string, string | number>) => t(locale, key, vars);
+export const translator = (locale: Locale, edition?: string) => (key: string, vars?: Record<string, string | number>) => t(locale, key, vars, edition);
 
 // ---------- Datum, Zahlen, Geld nach Sprache ----------
 

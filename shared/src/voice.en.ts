@@ -283,13 +283,13 @@ export function voiceEn(tone: Tone | undefined): Voice {
     }),
     welcome: (name: string) => by({
       nett: `Hi ${name}! 👋 I'm Stella. Just write me what's coming up – for example:\n` +
-        '• "Latin homework p. 45 no. 3 Friday"\n• "Math test 12 Nov"\n• "what\'s up?"\n' +
+        '• "Dentist Friday 3 pm"\n• "Report due 12 Nov"\n• "what\'s up?"\n' +
         'I\'ll add it, remind you in time and make study plans. 💫',
       frech: `Well, ${name}? 😏 I'm Stella and from now on I remember everything you forget. Just write:\n` +
-        '• "Latin homework p. 45 no. 3 Friday"\n• "Math test 12 Nov"\n• "what\'s up?"\n' +
+        '• "Dentist Friday 3 pm"\n• "Report due 12 Nov"\n• "what\'s up?"\n' +
         'I\'ll do the rest. As always. 💅',
       cool: `Hey ${name} ✌️ Stella here. Just write what's coming up:\n` +
-        '• "Latin homework p. 45 no. 3 Friday"\n• "Math test 12 Nov"\n• "what\'s up?"\n' +
+        '• "Dentist Friday 3 pm"\n• "Report due 12 Nov"\n• "what\'s up?"\n' +
         'I\'ll add it and remind you. Easy.',
     }),
     // ----- Hints: "what did you forget?" -----

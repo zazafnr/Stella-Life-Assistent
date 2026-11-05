@@ -206,8 +206,8 @@
  "today.studyToday": "Oggi: {what}",
  "today.studyDefault": "studio",
  "today.inDays": "tra {count} giorni",
- "today.noTests": "Nessuna verifica",
- "today.noTestsHint": "Scrivi ad es. «Verifica di matematica 12/11»",
+ "today.noTests": "Nessun esame",
+ "today.noTestsHint": "Scrivi ad es. «Esame 12/11»",
  "today.steps": "Passi",
  "today.stepsCount": "{count} passi",
  "today.tomorrowAtSchool": "Domani a scuola",
@@ -222,7 +222,7 @@
  "today.importantMessages#other": "{count} messaggi importanti",
  "today.inboxMeta": " · {social} social · {trashed} pubblicità eliminate",
  "today.tellStella": "Scrivi qualcosa a Stella",
- "today.tellStellaHint": "«Compiti di latino p. 20 n. 3 venerdì» oppure chiedi pure",
+ "today.tellStellaHint": "«Dentista venerdì 15:00» o chiedi e basta",
  "today.greeting.named": "{greeting}, {name}!",
  "today.greeting.plain": "{greeting}!",
  "settings.books": "Libri di testo",
@@ -718,5 +718,7 @@
  "calendar.day.entries#one": "{date}, {count} voce",
  "calendar.day.entries#other": "{date}, {count} voci",
  "calendar.free.minutes": "{minutes} liberi",
- "calendar.dragHint": "Trascina per spostare, tira il bordo inferiore per cambiare la durata."
+ "calendar.dragHint": "Trascina per spostare, tira il bordo inferiore per cambiare la durata.",
+ "onboarding.studentsHint": "Vai a scuola o studi? Per questo c’è Stella for Students.",
+ "onboarding.studentsHint.link": "Apri Stella for Students"
 }

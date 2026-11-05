@@ -207,7 +207,7 @@
  "today.studyDefault": "çalışma",
  "today.inDays": "{count} gün sonra",
  "today.noTests": "Sınav yok",
- "today.noTestsHint": "Örneğin \"Matematik sınavı 12.11.\" yaz",
+ "today.noTestsHint": "Örneğin \"Sınav 12.11.\" yaz",
  "today.steps": "Adım",
  "today.stepsCount": "{count} adım",
  "today.tomorrowAtSchool": "Yarın okulda",
@@ -222,7 +222,7 @@
  "today.importantMessages#other": "{count} önemli mesaj",
  "today.inboxMeta": " · {social} sosyal medya · {trashed} reklam silindi",
  "today.tellStella": "Stella'ya bir şey söyle",
- "today.tellStellaHint": "\"Latince ödevi s. 20 no. 3 cuma\" yaz ya da doğrudan sor",
+ "today.tellStellaHint": "\"Cuma 15:00 diş hekimi\" ya da sadece sor",
  "today.greeting.named": "{greeting} {name}!",
  "today.greeting.plain": "{greeting}!",
  "settings.books": "Ders kitapları",
@@ -718,5 +718,7 @@
  "calendar.day.entries#one": "{date}, {count} kayıt",
  "calendar.day.entries#other": "{date}, {count} kayıt",
  "calendar.free.minutes": "{minutes} boş",
- "calendar.dragHint": "Taşımak için sürükle, süreyi değiştirmek için alt kenarı çek."
+ "calendar.dragHint": "Taşımak için sürükle, süreyi değiştirmek için alt kenarı çek.",
+ "onboarding.studentsHint": "Okula mı gidiyorsun, yoksa üniversitede mi okuyorsun? Stella for Students tam bunun için.",
+ "onboarding.studentsHint.link": "Stella for Students’ı aç"
 }

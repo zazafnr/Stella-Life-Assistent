@@ -20,7 +20,7 @@ import { checkResend, claimByCode, createLoginRequest, pendingCookie, sendLinkMa
 import { mailerConfigured } from './mailer.ts';
 import { filePath } from './files.ts';
 import { skipProfile, cleanProfile, applyProfile } from './profile.ts';
-import { voiceOf } from './locale.ts';
+import { welcomeText } from './locale.ts';
 
 export type RegistrationMode = 'closed' | 'invite' | 'open';
 
@@ -80,7 +80,7 @@ export async function startSignup(b: { name: string; email: string; password: st
     const { token, user } = registerFirst(b.name || 'Du', email, b.password, b.timeZone, b.device, edition);
     updateUserSettings(user.id, { onboarding: 'pending', ...base });
     const created = getUser(user.id)!;
-    addMessage(user.id, 'assistant', voiceOf(created).welcome(created.name));
+    addMessage(user.id, 'assistant', welcomeText(created));
     return { token, user: created, needsVerification: false as const };
   }
   const mode = registrationMode();

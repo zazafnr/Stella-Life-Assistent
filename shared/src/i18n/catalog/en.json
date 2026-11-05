@@ -206,8 +206,8 @@
  "today.studyToday": "Today: {what}",
  "today.studyDefault": "study",
  "today.inDays": "in {count} days",
- "today.noTests": "No tests",
- "today.noTestsHint": "Write e.g. \"Math test 12 Nov\"",
+ "today.noTests": "No exams",
+ "today.noTestsHint": "Write e.g. \"Exam 12 Nov\"",
  "today.steps": "Steps",
  "today.stepsCount": "{count} steps",
  "today.tomorrowAtSchool": "Tomorrow at school",
@@ -222,7 +222,7 @@
  "today.importantMessages#other": "{count} important messages",
  "today.inboxMeta": " · {social} social · {trashed} ads deleted",
  "today.tellStella": "Tell Stella something",
- "today.tellStellaHint": "\"Latin homework p. 20 no. 3 Friday\" or just ask",
+ "today.tellStellaHint": "\"Dentist Friday 3 pm\" or just ask",
  "today.greeting.named": "{greeting}, {name}!",
  "today.greeting.plain": "{greeting}!",
  "settings.books": "School books",
@@ -718,5 +718,7 @@
  "calendar.day.entries#one": "{date}, {count} entry",
  "calendar.day.entries#other": "{date}, {count} entries",
  "calendar.free.minutes": "{minutes} free",
- "calendar.dragHint": "Drag to move, pull the bottom edge to change the length."
+ "calendar.dragHint": "Drag to move, pull the bottom edge to change the length.",
+ "onboarding.studentsHint": "Going to school or studying? Stella for Students is made for that.",
+ "onboarding.studentsHint.link": "Open Stella for Students"
 }
