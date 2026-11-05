@@ -8,8 +8,7 @@ Dieselbe Datei liegt in beiden Repos.
 Es gibt jetzt **eine Codebasis, zwei Apps**: das normale Stella (Repo `Stella-Life-Assistent`, Kern) und Stella for Students
 (Repo `Stella-for-Students`, Edition-Plugin + eigene Web-Oberfläche). Ein Server, eine Datenbank, ein Stripe, ein VPS; Konten sind je Edition getrennt.
 Die **Web-Apps, der Server, der Kalender, die Abos, Uni, Lernkarten, Mitschriften und die Website sind gebaut und getestet.**
-Die **beiden iOS-Apps (Pakete 9 und 10) sind bewusst nicht gebaut**: dafür fehlen hier Xcode und ein Gerät; sie lassen sich ohne
-Simulator nicht ehrlich abnehmen.
+Beide **iOS-Apps (Pakete 9 und 10) sind gebaut**. Hier gibt es keinen Swift-Compiler; geprüft wurde über die macOS-CI: beide Apps kompilieren (Swift-Package und Xcode-Projekt), die Unit-Tests laufen, und die Studenten-App läuft im Simulator gegen einen echten Server mit Beispieldaten (Screenshots auf `ios-preview` im Students-Repo).
 
 ## Was gebaut wurde
 
@@ -24,7 +23,8 @@ Simulator nicht ehrlich abnehmen.
 | 6 Betrieb | ✅ Host-basierte Auslieferung (Caddy, Vercel-Datei, Build `build:students`), Kreuz-Login getestet; DNS und echte Auslieferung beim Nutzer |
 | 7 Kalender | ✅ Monat/Woche/Tag, Ziehen, Dehnen, Rückgängig, ICS-Quellen |
 | 8 Erwachsenes Vokabular | ✅ Mechanismus (`extendEditionCatalogs`) und Hauptstellen; Rest-Sweep offen |
-| 9 / 10 iOS-Apps | ⏸ nicht gebaut (siehe „Offen“) |
+| 9 Studenten-iOS-App | ✅ `ios/StellaStudents.swiftpm` (Bundle `app.stella.students.ios`, Violett, Lernen-Tab mit Lernkarten und Mitschriften), XcodeGen-Projekt mit Bildschirmzeit-Erweiterungen, CI `ios.yml` (Build, Appetize, Klick-Vorschau), Skill, Beispieldaten `scripts/demo-seed.mts`; **CI grün (macOS, Xcode 26): App kompiliert, Xcode-Projekt mit Bildschirmzeit-Erweiterungen kompiliert, Unit-Tests grün, Klick-Vorschau mit allen Screens (Heute, Chat, Planer, Lernen, Inbox, Woche, Einstellungen, Abo) liegt auf dem Branch `ios-preview`** |
+| 10 Normale iOS-App | ✅ Schule/Bücher/WebUntis/Handschrift/FreeNotes nur noch in der Students-Edition (Schalter `API.edition`), Kalender (`CalendarView`: Monat → Tag, neuer Termin) auf „Heute“ und im Planer; der tote Schul-Code in den Ansichten ist noch nicht gelöscht (siehe Offen) |
 | 11 Uni | ✅ Semester, Kurse, Stundenplan per ICS, Noten mit gewichtetem Schnitt, Oberfläche in Einstellungen und Lernen-Tab; Einführungsschritt offen |
 | 12 Lernkarten | ✅ Leitner-Wiederholung (1/3/7/16/35 Tage), Erzeugen mit KI, Abfrage im Chat, Anstoß in der Lernzeit, Karten-Ansicht im Lernen-Tab; iOS offen |
 | 13 Mitschrift aus Fotos | ✅ Seiten lesen, Zusammenfassung, offene Fragen; als Karten / Prüfungsstoff / Heft; Abbrechen räumt auf; Oberfläche im Lernen-Tab; Eingang über den Chat offen |
@@ -50,22 +50,23 @@ Texte in acht Sprachen, keine Gamification.
 | Anmeldung über Kreuz abgelehnt (echtes HTTP) | ✅ 409 `wrong_edition` |
 | Kalender in drei Ansichten | ✅ Skript `scripts/ui-check/calendar.cjs` |
 | Website auf Handy und Desktop | ✅ (auf `/stella` gab es schon vorher einen kleinen waagrechten Überlauf am Desktop, nicht von dieser Arbeit) |
-| CI auf GitHub, Push in beiden Apps, Offline-Start, HÜ-Durchlauf bis ins FreeNotes-Heft | ⚠ nicht von hier aus prüfbar (CI-Läufe, Geräte, FreeNotes-App) – bitte einmal von Hand |
+| CI auf GitHub (Kern, Students, beide iOS-Workflows) | ✅ grün |
+| Push auf echten Geräten, Offline-Start, HÜ-Durchlauf bis ins FreeNotes-Heft, Anmelden in der iOS-App mit echtem Konto | ⚠ nicht von hier aus prüfbar (Geräte, Apple-Konto, FreeNotes-App) – bitte einmal von Hand |
 
 ## Offen (Arbeit)
 
-1. **iOS-Apps (Pakete 9/10)**: normale App ohne Schule und mit Kalender; Students-App `app.stella.students.ios` mit eigenem Design. Außerdem iOS-Teile der Pakete 12 und 14 (Karten, Upgrade-Seite).
+1. **iOS**: Upgrade-Seite für Students in der iOS-App (die Pläne kommen vom Server, die Ansicht zeigt noch die des normalen Stella); im normalen Stella ist der Schul-Code in den Ansichten (`PlannerView` Stunden, `SettingsView`, Detail-Ansicht) nur abgeschaltet, nicht gelöscht; Kalender ohne Ziehen/Dehnen (nur Anzeigen und neuer Termin); die Studenten-App nutzt noch Ansichten, die Stundenplan-Raum nicht zeigen.
 2. **Reste aus Paket 3/8**: im Kern stehen noch Schul-Wörter (z. B. in `context.ts`, `quick.ts`, `assistant.ts`, `planner.ts`, `parser`), weil Hausübung und Prüfung weiter Elemente-Arten des Kerns sind; die Suche aus der Abnahme ergibt deshalb nicht null. Ein Rest-Sweep der Texte im normalen Stella steht aus.
 3. **Raum im Stundenplan** (Anzeige und Entfall-Hinweise mit Raum) fehlt.
 4. **Einführung (Paket 11)**: Schritt „Semester und Stundenplan-Adresse“ beim ersten Start.
 5. **Mitschrift über den Chat (Paket 13)**: Fotos im Chat werden noch nicht als Mitschrift erkannt; heute geht es über Lernen-Tab → „Mitschrift hinzufügen“. Dafür braucht der Kern einen Einhängepunkt für Chat-Fotos.
 6. **Upgrade-Seite und Dashboard (Paket 14)** für Students in iOS; das Dashboard zeigt Zahlen je Edition noch nicht getrennt.
-7. **Website-Bilder**: `/stella-students` zeigt Chips statt iPhone-Bildern, bis es die iOS-App gibt.
+7. **Website-Bilder**: `/stella-students` zeigt Chips statt iPhone-Bildern; sie entstehen aus der Klick-Vorschau der Studenten-App (`ios-preview`), sobald der CI-Lauf grün ist.
 8. **Eine E-Mail = ein Konto**: dieselbe Adresse kann nicht in beiden Apps ein Konto haben (so entschieden, jetzt als Einschränkung dokumentiert); wer beide will, braucht zwei Adressen.
 
 ## Aufgaben für dich (Betreiber)
 
-1. **Apple-Entwicklerkonto** für die zweite App: Bundle `app.stella.students.ios`, Name „Stella for Students“, App-Store-Eintrag, Datenschutz-Angaben (bestehende `/privacy`-Seite gilt).
+1. **Apple-Entwicklerkonto** für die zweite App (`app.stella.students.ios` und die App-Gruppe `group.app.stella.students.ios` anlegen, Family Controls für diese ID separat beantragen, Associated Domains: `apple-app-site-association` unter `login.stella.evolsior.com` um die zweite App-ID ergänzen, GitHub-Secret `APPETIZE_API_TOKEN` im Students-Repo): Bundle `app.stella.students.ios`, Name „Stella for Students“, App-Store-Eintrag, Datenschutz-Angaben (bestehende `/privacy`-Seite gilt).
 2. **Stripe**: je Edition und Plan Preise anlegen (Students: Plus 5 €, Pro 9 €, Max 19 € je Monat, Jahr = zwei Monate gratis) und die IDs eintragen; die angenommenen Preise bitte bestätigen oder ändern (`shared/src/plans.ts`, `PLANS_BY_EDITION.students`, dazu die Website `site-src/students.body.html`).
 3. **DNS**: A-Record `students.stella.evolsior.com` auf die VPS-IP (HTTPS holt Caddy), danach `deploy/install-vps.sh` erneut ausführen bzw. Docker neu bauen.
 4. **Cloudflare**: Website neu veröffentlichen (Push von `site/public/` nach `main`, wenn der Branch gemergt ist); Weiterleitung `/students` → `/stella-students` ist in `_redirects`.
