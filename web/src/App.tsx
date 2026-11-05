@@ -3,7 +3,7 @@ import { startWeatherOnce } from '@stella/web-core/weather.ts';
 import { meHas, meIsSchool, newConversation, refreshMe, startBackgroundSync, useStore } from '@stella/web-core/store.ts';
 import { Today } from './components/Today.tsx';
 import { Chat } from '@stella/web-core/components/Chat.tsx';
-import { Planner } from './components/Planner.tsx';
+import { CalendarTab } from './components/CalendarTab.tsx';
 import { Inbox } from '@stella/web-core/components/Inbox.tsx';
 import { Goals } from '@stella/web-core/components/Goals.tsx';
 import { Finance } from '@stella/web-core/components/Finance.tsx';
@@ -25,14 +25,15 @@ import type { Tab } from '@stella/web-core/nav.ts';
 const TABS: [Tab, IconName, string][] = [
   ['today', 'sparkle', 'nav.today'],
   ['chat', 'chat', 'nav.chat'],
-  ['planner', 'calendar', 'nav.planner'],
+  ['calendar', 'calendar', 'nav.calendar'],
   ['goals', 'target', 'nav.goals'],
   ['inbox', 'inbox', 'nav.inbox'],
 ];
-const ALL: Tab[] = ['today', 'chat', 'planner', 'goals', 'inbox', 'health', 'finance', 'plan', 'settings'];
+const ALL: Tab[] = ['today', 'chat', 'calendar', 'goals', 'inbox', 'health', 'finance', 'plan', 'settings'];
 
 function initialTab(): Tab {
-  const hash = location.hash.slice(1) as Tab;
+  const hash = location.hash.slice(1).split('/')[0] as Tab;
+  if ((hash as string) === 'planner') return 'calendar'; // der Planer lebt jetzt als Listenansicht im Kalender
   return ALL.includes(hash) ? hash : 'today';
 }
 
@@ -45,7 +46,9 @@ export function App() {
   const token = useStore((s) => s.token);
   const online = useStore((s) => s.online);
   const items = useStore((s) => s.items);
-  const [tab, setTab] = useState<Tab>(initialTab);
+  const [tab, setTabRaw] = useState<Tab>(initialTab);
+  /** „Planer“ gibt es nicht mehr als eigenen Tab: Sprünge dorthin landen im Kalender */
+  const setTab = useCallback((id: Tab) => setTabRaw(id === 'planner' ? 'calendar' : id), []);
   const me = useStore((s) => s.me);
   /** Einführung: beim ersten Mal von selbst (onboarding = pending), später aus den Einstellungen */
   const [onboarding, setOnboarding] = useState<{ startAt: 'language' | 'situation' } | null>(null);
@@ -62,7 +65,9 @@ export function App() {
   useEffect(() => { if (token) startBackgroundSync(); }, [token]);
   useEffect(() => { if (token && hasMe) startWeatherOnce(); }, [token, hasMe]);
   useEffect(() => { if (token && !hasMe) void refreshMe().catch(() => {}); }, [token, hasMe]);
-  useEffect(() => { history.replaceState(null, '', tab === 'today' ? location.pathname : `#${tab}`); }, [tab]);
+  useEffect(() => { if (!(tab === 'calendar' && location.hash.startsWith('#calendar/'))) history.replaceState(null, '', tab === 'today' ? location.pathname : `#${tab}`); }, [tab]);
+  // Sprunglinks (#calendar/JJJJ-MM-TT) wechseln auch bei laufender App in den Kalender
+  useEffect(() => { const on = () => { if (location.hash.startsWith('#calendar')) setTab('calendar'); }; window.addEventListener('hashchange', on); return () => window.removeEventListener('hashchange', on); }, [setTab]);
   useEffect(() => { document.documentElement.classList.toggle('is-desktop', isDesktopApp); }, []);
   // zurück von "Mit Google anmelden": ?provider=gmail&ok=1&message=…#settings
   useEffect(() => {
@@ -115,7 +120,7 @@ export function App() {
   const link = ([id, icon, label]: [Tab, IconName, string]) => (
     <button key={id} type="button" className={tab === id ? 'side-link active' : 'side-link'} onClick={() => setTab(id)} aria-current={tab === id ? 'page' : undefined} title={collapsed ? t(label) : undefined}>
       <Icon name={icon} size={18} /><span className="label">{t(label)}</span>
-      {id === 'planner' && openHomework > 0 && <span className="side-badge">{openHomework}</span>}
+      {id === 'calendar' && openHomework > 0 && <span className="side-badge">{openHomework}</span>}
     </button>
   );
 
@@ -142,7 +147,7 @@ export function App() {
         <Topbar title={titleOf(tab)} onSearch={() => setPalette(true)} />
         {tab === 'today' && <Today go={setTab} />}
         {tab === 'chat' && <Chat />}
-        {tab === 'planner' && <Planner />}
+        {tab === 'calendar' && <CalendarTab go={setTab} />}
         {tab === 'goals' && <Goals />}
         {tab === 'inbox' && <Inbox />}
         {tab === 'health' && <Health back={() => setTab('today')} />}

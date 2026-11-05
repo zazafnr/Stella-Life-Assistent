@@ -111,14 +111,24 @@ export function Ring({ value, color, label, size = 64 }: { value: number; color:
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
-/** Kurze Meldung oben (ohne Abhängigkeiten). */
-export function showToast(text: string, error = false) {
+/** Kurze Meldung oben (ohne Abhängigkeiten). Mit `action` bekommt sie einen Knopf (z. B. „Rückgängig“) und bleibt etwas länger. */
+export function showToast(text: string, error = false, action?: { label: string; run: () => void }) {
   document.querySelector('.toast')?.remove();
   const el = document.createElement('div');
   el.className = error ? 'toast error' : 'toast';
   el.setAttribute('role', 'status');
-  el.textContent = text;
+  const label = document.createElement('span');
+  label.textContent = text;
+  el.appendChild(label);
+  if (action) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'toast-action';
+    btn.textContent = action.label;
+    btn.onclick = () => { el.remove(); action.run(); };
+    el.appendChild(btn);
+  }
   document.body.appendChild(el);
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.remove(), 3200);
+  toastTimer = setTimeout(() => el.remove(), action ? 7000 : 3200);
 }

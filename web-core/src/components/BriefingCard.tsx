@@ -6,7 +6,7 @@ import { showToast } from '../ui/Decor.tsx';
 import { ActionCard } from './ActionCard.tsx';
 import { Rich } from './Rich.tsx';
 import { NewsList } from './settings/News.tsx';
-import { useLocale } from '../i18n.ts';
+import { useLocale, useT } from '../i18n.ts';
 
 const ICON: Record<string, string> = { news: '📰', school: '🏫', due: '📌', plan: '🗓️', tomorrow: '🌙', done: '✅', inbox: '✉️', goals: '🎯', finance: '💶' };
 
@@ -16,6 +16,7 @@ export function BriefingCard({ onOpen }: { onOpen: (tab: 'chat' | 'inbox' | 'goa
   const [b, setB] = useState<Briefing | null>(null);
   const [gone, setGone] = useState<string[]>([]);
   const locale = useLocale();
+  const t = useT();
 
   useEffect(() => { api<Briefing>('/api/briefing').then(setB).catch(() => {}); }, [lastSync]);
   if (!b) return null;
@@ -29,7 +30,7 @@ export function BriefingCard({ onOpen }: { onOpen: (tab: 'chat' | 'inbox' | 'goa
     <section className="card briefing" aria-label="Dein Überblick">
       {sections.length > 0 && (
         <>
-          <span className="eyebrow">Dein Überblick</span>
+          <span className="eyebrow" style={{ display: 'flex', justifyContent: 'space-between' }}>Dein Überblick <a className="link small" href={`#calendar/${b.date}`}>{t('nav.calendar')} →</a></span>
           <div className="briefing-sections">
             {sections.map((s) => (
               <div key={s.id} className="briefing-section">
