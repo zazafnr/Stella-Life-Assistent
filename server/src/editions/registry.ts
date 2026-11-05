@@ -121,6 +121,8 @@ export interface EditionPlugin {
   integrations?: (user: User) => Record<string, unknown>;
   /** Wird nach dem Anlegen eines Eintrags aufgerufen (z. B. Buchseite holen) */
   onItemCreated?: (user: User, item: Item) => void;
+  /** Zusätzliche Erinnerungen zu einem Eintrag (z. B. Abgabe einer Uni-Veranstaltung 7 Tage vorher); gehen beim Neuplanen nicht verloren */
+  reminders?: (user: User, item: Item) => { date: string; time: string; message: string; withAttachments?: boolean }[];
 }
 
 // ---------- Registry ----------
@@ -214,6 +216,9 @@ export function pluginParser(): ParserExtension | undefined {
     kinds: all.flatMap((x) => x.kinds ?? []), kindsEn: all.flatMap((x) => x.kindsEn ?? []),
     labels: Object.assign({}, ...all.map((x) => x.labels ?? {})), subjectNamesEn: Object.assign({}, ...all.map((x) => x.subjectNamesEn ?? {})),
   };
+}
+export function pluginReminders(user: User, item: Item): { date: string; time: string; message: string; withAttachments: boolean }[] {
+  return editions().flatMap((p) => p.reminders?.(user, item) ?? []).map((r) => ({ ...r, withAttachments: !!r.withAttachments }));
 }
 export function pluginItemCreated(user: User, item: Item): void { for (const p of plugins.values()) p.onItemCreated?.(user, item); }
 export async function pluginPeriodic(userId: string, every: (key: string, ms: number, fn: () => Promise<void>) => Promise<void>): Promise<void> {

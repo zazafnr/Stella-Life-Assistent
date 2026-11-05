@@ -4,7 +4,7 @@ import {
   addDays, buildStudyPlan, DEFAULT_PREFS, nextOccurrence, planReminders, zonedToUtc, todayIn, type Item, type ParsedEntry,
 } from '@stella/shared';
 import { tr } from './locale.ts';
-import { pluginItemCreated, pluginNextLessonDate } from './editions/registry.ts';
+import { pluginItemCreated, pluginNextLessonDate, pluginReminders } from './editions/registry.ts';
 import {
   addReminder, clearOpenReminders, createItem, enqueueJob, getItem, getItemRaw, listItems, type NewItem, updateItem, type User,
 } from './db.ts';
@@ -19,7 +19,8 @@ export function scheduleReminders(user: User, item: Item) {
   clearOpenReminders(user.id, item.id);
   if (item.status !== 'open' || item.deleted || item.recurrencePaused) return;
   const today = todayIn(user.timeZone);
-  for (const r of planReminders(item, today, prefsOf(user))) {
+  const planned = [...planReminders(item, today, prefsOf(user)), ...pluginReminders(user, item).filter((r) => r.date >= today)];
+  for (const r of planned) {
     const at = zonedToUtc(r.date, r.time, user.timeZone);
     if (at.getTime() > Date.now()) addReminder(user.id, item.id, at, r.message, r.withAttachments);
   }
