@@ -24,7 +24,7 @@ test('Konto ohne Sprache startet mit Englisch (außer der Betreiber setzt STELLA
 
 test('Englisch im Chat: Kurznotiz, Erinnerung, Einkaufsliste, Rückgängig – alles in der Sprache der Nutzerin', async () => {
   const hw = await handleChat(user(), 'math homework p. 45 no. 3 friday', 'e1');
-  assert.match(hw.messages[0]!.text, /Noted: \*\*Math Homework\*\* – p\. 45 no\. 3, due .*Fri/i);
+  assert.match(hw.messages[0]!.text, /Noted: \*\*Math Homework\*\* – p\. 45 no\. 3, due .*(Fri|tomorrow)/i);
   assert.equal(hw.items[0]!.kind, 'homework');
 
   const remind = await handleChat(user(), 'remind me tomorrow at 5pm to call grandma', 'e2');

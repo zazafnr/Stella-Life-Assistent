@@ -31,6 +31,29 @@ Acht Sprachen (`shared/src/i18n/locales.ts`: en, de, es, fr, it, pt-BR, tr, pl),
 - **Kurznotizen ohne KI:** Deutsch (`parser.ts`) und Englisch (`parser.en.ts`). Für alle anderen Sprachen geht die Nachricht an Haiku.
 - Noch nicht umgestellt: die Dateien in `OPEN` in `shared/src/i18n/jsx.test.ts` (Web) und die meisten iOS-Views.
 
+## 0d. Zwei Editionen (Plan: `docs/plan/stella-students.md`)
+
+Stella gibt es in zwei Apps mit **einem** Server, **einer** Datenbank, **einem** Stripe und **einem** VPS:
+
+| Edition | App | Adresse | Repo |
+|---|---|---|---|
+| `life` | Stella (Alltag, Beruf, Haushalt) | `stella.evolsior.com` | dieses Repo |
+| `students` | Stella for Students (Schule, Lehre, Studium) | `students.stella.evolsior.com` | `zazafnr/Stella-for-Students` |
+
+Begriffe (überall gleich benutzen): **Edition**, **Edition-Plugin** (Code der Students-Edition, den der Server lädt),
+**Kern-Spiegel** (`core/` im Students-Repo, eine eingecheckte Kopie dieses Repos).
+
+Entscheidungen:
+1. Konten sind getrennt und gehören zu genau einer Edition (`users.edition`). Anmeldung auf der falschen Oberfläche wird abgelehnt.
+2. Der Server ist ein Prozess. Die Students-Funktionen kommen als **Edition-Plugin** über feste Einhängepunkte
+   (`server/src/plugin-api.ts`, `server/src/editions/registry.ts`). Fehlt das Plugin, läuft das normale Stella vollständig.
+3. Der Schul-Code zieht in das Students-Repo (`server-plugin/`). Dieses Repo bleibt der Kern und das normale Stella.
+4. Änderungen am Kern passieren nur hier; das Students-Repo spiegelt sie mit `npm run sync:core`.
+5. Normales Stella: Kalender statt Stundenplan; Prüfungen und Lernpläne bleiben mit erwachsenem Vokabular.
+6. Keine Gamification, auch nicht bei Lernkarten.
+
+Details (Submodul, Spiegel, Einhängepunkte) kommen mit den Paketen 1 und 2 in die Abschnitte unten.
+
 ## 1. KI-Modell: OpenRouter, automatisch das beste kostenlose (Notfall bzw. ohne Claude-Schlüssel)
 
 **Stimmt das mit den 10 $?** Ja. Laut den offiziellen [OpenRouter-Limits](https://openrouter.ai/docs/api-reference/limits) gilt:
