@@ -8,35 +8,41 @@
 
 *Stella by **EVOLSIOR** – Built to become.*
 
-Stella ist dein eigener KI-Assistent für Schule und Alltag. Du schreibst in Stichworten, Stella erledigt den Rest:
+Stella ist dein eigener KI-Assistent für Alltag und Beruf. Du schreibst in Stichworten, Stella erledigt den Rest:
 
 | Du schreibst | Stella macht |
 |---|---|
-| `Französisch HÜ S. 45 Nr. 16 Freitag` | trägt die HÜ ein, holt Seite 45 aus scook/digi4school, **löst die Aufgabe** und schreibt sie in deiner Handschrift in dein FreeNotes-Heft. Am Vorabend kommt nur noch: „✅ Französisch HÜ erledigt“ |
-| 📷 Foto vom Arbeitsblatt + `Mathe HÜ AB Nr 3 morgen` | genauso, nur vom Foto |
-| `Mathe SA 12.11.` | trägt die Schularbeit ein, fragt nach dem Stoff, baut einen Lernplan und erinnert eine Woche und einen Tag vorher |
-| `Latein HÜ S. 20 Nr. 1` (ohne Datum) | nimmt die nächste Lateinstunde laut WebUntis |
+| `Zahnarzt Freitag 15 Uhr` | trägt den Termin in den Kalender ein und erinnert dich |
+| `jeden Montag Mülltonne raus` | legt eine Routine an, die von selbst weiterläuft |
+| `ich will dreimal pro Woche laufen` | legt ein Ziel an, zählt mit und fragt zur gewählten Zeit nach |
+| `Milch und Eier auf die Einkaufsliste` | ergänzt die Liste |
 | `was steht an?` | Übersicht der nächsten zwei Wochen |
-| alles andere | die KI antwortet und kann Einträge selbst anlegen, ändern und Lernpläne bauen |
+| alles andere | die KI antwortet und kann Einträge selbst anlegen, ändern und planen |
 
 Dazu im Hintergrund:
-- 📧 **2× Gmail + iCloud**: Wichtige Mails kommen als Nachricht, Werbung und Spam wandern in den Papierkorb (in der App wiederherstellbar)
-- 📸 **Social**: Benachrichtigungen von Instagram, TikTok usw. landen gesammelt im Inbox-Tab
-- 🏫 **WebUntis**: Stundenplan, Entfall („🎉 Morgen entfällt Mathe“), Hausübungen und Tests, die Lehrer:innen eintragen
+- 📧 **Gmail, iCloud, IMAP**: Wichtige Mails kommen als Nachricht, Werbung und Spam wandern in den Papierkorb (in der App wiederherstellbar)
+- 🗓️ **Kalender** (Monat, Woche, Tag): alles auf einer Fläche, per Ziehen verschieben, mit Rückgängig
+- 📰 **News** im Morgenbriefing, Wetter, Alltagsaufgaben, Telegram
+
+> **Du gehst zur Schule, machst eine Lehre oder studierst?** Dann ist **Stella for Students** die richtige App:
+> Stundenplan mit Entfall, Hausübungen mit Autopilot, Prüfungen, Lernkarten, Mitschriften aus Fotos, Semester und Noten.
+> Sie liegt in [`zazafnr/Stella-for-Students`](https://github.com/zazafnr/Stella-for-Students) und läuft auf demselben Server.
 
 Läuft als **Web-App, native iPhone-/iPad-App (SwiftUI) und PC-App (Electron)** mit einem Konto, alles synchronisiert. Der Server läuft auf deinem VPS.
 
 ## Was schon geht
 
-- 💬 Chat mit Kurznotiz-Erkennung, die **ohne KI und offline** funktioniert, plus Fotos (Arbeitsblätter)
-- ✍️ **HÜ-Autopilot**: Buchseite (scook, digi4school) oder Foto → Bild-Modell löst die Aufgabe → Heft-Text → **FreeNotes** schreibt sie Strich für Strich in deiner Handschrift ins Fach-Heft (im Chat gibt es eine Vorschau als Heftseite)
-- 🗓️ Planer mit Stundenplan, Erinnerungen per Push (iPhone, iPad, PC), Lernpläne für Tests
-- 📥 Inbox: E-Mails (Gmail, iCloud, IMAP), Social-Media-Benachrichtigungen, SMS
-- 🏫 WebUntis (Passwort oder QR-Code bei Microsoft-Login)
-- 📅 Kalender-Abo für den iPhone-, Google- oder Outlook-Kalender
+- 💬 Chat mit Kurznotiz-Erkennung, die **ohne KI und offline** funktioniert, plus Sprachnachrichten und Fotos
+- 🗓️ Kalender, Planer, Routinen und Erinnerungen per Push (iPhone, iPad, PC, Telegram)
+- 🎯 Ziele ohne Druck: keine Serien, keine Abzeichen
+- 📥 Inbox: E-Mails (Gmail, iCloud, IMAP) mit Antwortentwürfen, Social-Media-Benachrichtigungen, SMS
+- 📰 News, 🌦️ Wetter, 🍝 Restaurants und Besorgungen, ⏱️ Bildschirmzeit-Ziele
+- 📅 Kalender-Abo für den iPhone-, Google- oder Outlook-Kalender, ICS-Import
 - ❤️ Schritte aus Apple Health und SMS-Weiterleitung über Kurzbefehle
+- 🔐 Rechte je Bereich (fragen, Bescheid sagen oder einfach tun) und **Rückgängig** für jede Aktion
 - 📴 Offline-fähig, der VPS arbeitet weiter, auch wenn dein Handy aus ist
-- 🤖 KI über OpenRouter: wählt automatisch die besten **kostenlosen** Modelle (auch Bildmodelle) und weicht bei Limits auf andere aus
+- 🌍 Acht Sprachen
+- 🤖 KI über Anthropic bzw. OpenRouter, je Aufgabe das passende Modell
 
 Was als Nächstes kommt und was technisch (noch) nicht geht, steht in **[docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md)**.
 
@@ -81,6 +87,9 @@ Ohne App geht es auch über Safari → Teilen → **„Zum Home-Bildschirm“**.
 ### Auf den PC
 **Windows:** Unter Releases → [„Stella für Windows“](../../releases/tag/pc-app) die `.exe` laden und doppelklicken (Details in [`desktop/`](desktop/README.md)). Stella sitzt dann in der Taskleiste und meldet sich mit echten Windows-Mitteilungen.
 
+### Stella for Students dazunehmen
+Der Server lädt das Plugin aus `editions/students` (`scripts/fetch-edition.sh`, `STELLA_STUDENTS_REF` wählt Branch oder Tag; `STELLA_EDITION_STUDENTS=off` schaltet es ab). Die Oberfläche läuft unter `students.<deine Domain>` (`npm run build:students`), siehe [`docs/ARCHITEKTUR.md`](docs/ARCHITEKTUR.md).
+
 ### FreeNotes (iPad) verbinden
 In FreeNotes → Einstellungen → **Stella** → Server-Adresse, E-Mail und Passwort eingeben. FreeNotes holt gelöste HÜs beim Öffnen und alle 5 Minuten ab und schreibt sie ins Heft des passenden Fachs (gibt es keins, legt es eins an). Die Anbindung liegt im FreeNotes-Repo auf dem Branch `claude/stella-anbindung`.
 
@@ -103,11 +112,13 @@ Die App läuft dann auf http://localhost:5173. Tests mit `npm test`, Typprüfung
 ## Aufbau
 
 ```
-shared/   Parser für Kurznotizen, Datumslogik, Erinnerungs- und Lernplan-Regeln (Server + App)
-server/   Fastify + SQLite: API, KI-Agent, Erinnerungen, Jobs, Schulbücher (scook, digi4school),
-          HÜ-Löser, Handschrift-Vorschau, E-Mail (IMAP), WebUntis, Push, Kalender-Abo, FreeNotes-Schnittstelle
-web/      React-PWA: Chat, Planer, Gesundheit, Einstellungen, Offline-Speicher
-deploy/   Docker Compose + Caddy (HTTPS) + Backup-Skript
+shared/     Parser für Kurznotizen, Datumslogik, Kalender-Logik, Pläne, Texte (Server + Apps)
+server/     Fastify + SQLite: API, KI-Agent, Erinnerungen, Jobs, E-Mail, Push, Kalender, Edition-Plugins
+web-core/   gemeinsame Bausteine der Web-Oberflächen (Store, Texte, Kalender, Komponenten)
+web/        React-PWA des normalen Stella: Chat, Planer, Kalender, Inbox, Einstellungen, Offline-Speicher
+editions/   hier landet beim Bauen das Plugin von Stella for Students (scripts/fetch-edition.sh)
+site-src/   Quellen der Website evolsior.com (gebaut nach site/public/)
+deploy/     Docker Compose + Caddy (HTTPS, beide Adressen) + Backup-Skript
 ```
 
 ## Rechte

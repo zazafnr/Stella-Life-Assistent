@@ -67,6 +67,15 @@ Entscheidungen:
   Anmeldung auf der falschen Oberfläche → `409` mit `code: 'wrong_edition'`, `edition` und `url` (nie eine Sitzung); Anmelde-Links für Konten der anderen App werden nicht verschickt (ohne zu verraten, dass es das Konto gibt).
   `GET /api/me` liefert `edition` und `editionUrl`; `GET /api/edition` beschreibt, was die Plugins an Einstellungen und Einführung beisteuern.
 - **Mails**: Absendername, Betreff, Kopf und Fuß nennen das Produkt der Edition (`Stella` / `Stella for Students`); die Kataloge sagen weiter nur „Stella“, `brandText()` ersetzt es.
+### Stand der Students-Pakete (Endstand dieser Runde)
+
+- **Kalender** (Paket 7, Kern): `shared/src/calendar.ts` (reine Logik), `GET /api/calendar`, Oberfläche in `web-core/src/calendar/` (Monat, Woche, Tag; Ziehen, Dehnen, Rückgängig). Ersetzt im normalen Stella den Stundenplan.
+- **Abos je Edition** (Paket 14): `PLANS_BY_EDITION`, Überschreibungen je Edition gespeichert, Mengen `flashcards` und `notes` neben `ai_message` und `pro_task` (`quotaFor`, `consumeQuota`). Stripe-Preise je Edition und Plan.
+- **Uni** (Paket 11, Plugin): Semester, Kurse, Stundenplan per ICS (Zeitzone der Quelle, wiederkehrende Serien über Sommerzeit), Noten mit gewichtetem Schnitt.
+- **Lernkarten** (Paket 12, Plugin): Stapel und Karten, Wiederholung in Stufen 1/3/7/16/35 Tage (falsch → Stufe 1), Erzeugen mit KI (höchstens 40 Karten je Aufruf, privat, Quote erst nach Erfolg), Abfrage im Chat, Anstoß in der Lernzeit, Zeile im Briefing.
+- **Mitschriften aus Fotos** (Paket 13, Plugin): Tabelle `notes_summaries`, Seiten nacheinander lesen, eine Zusammenfassung, eine Profi-Aufgabe je Mitschrift, Abbrechen räumt auf; weiter als Karten, Prüfungsstoff (Aktion `study_plan.create`) oder über die FreeNotes-Abholung ins Heft.
+- **Website** (Paket 15): zwei Karten auf der Startseite, `/stella`, `/stella-students` (siehe `docs/WEBSITE.md`).
+
 ### Zwei Repos, ein Server (Paket 2)
 
 - **Kein Git-Submodul.** `git archive` (in `scripts/deploy-vps.sh`) nimmt Submodule nicht mit, und ein gepinnter Stand hinkt der Arbeit am Plugin hinterher.
