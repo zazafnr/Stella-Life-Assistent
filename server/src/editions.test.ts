@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -246,4 +246,22 @@ test('externes Plugin aus einem Ordner: bekommt die Plugin-API hereingereicht un
 
   resetEditions();
   await assert.rejects(() => loadEditions(path.join(dir, 'gibt-es-nicht')), /kein Plugin/);
+});
+
+// Zusammenspiel mit dem echten Plugin aus Stella-for-Students (CI-Job „students-plugin“ holt es nach editions/students)
+const realPlugin = path.resolve(import.meta.dirname, '../../editions/students/server-plugin/index.ts');
+test('echtes Students-Plugin: lädt im Server, bringt Werkzeuge, Rechte, Parser-Wörter und Routen mit', { skip: !existsSync(realPlugin) }, async () => {
+  resetEditions();
+  const res = await loadEditions(undefined);
+  assert.deepEqual(res, { loaded: ['students'], source: 'external' });
+  const user = owner();
+  assert.deepEqual(pluginTools(user).map((x) => x.def.function.name), ['solve_homework', 'timetable']);
+  assert.equal(levelFor(user, 'homework'), 'auto');
+  assert.ok(pluginParser()?.subjects?.length);
+  const app = await newApp((a) => { a.register(async (api: FastifyInstance) => { api.addHook('preHandler', requireUser); pluginRoutes(api); }); });
+  const token = login('owner@example.com', 'supergeheim', undefined, '', 'students').token;
+  const timetable = await app.inject({ method: 'GET', url: '/api/timetable', headers: { authorization: `Bearer ${token}` } });
+  assert.equal(timetable.statusCode, 200);
+  await app.close();
+  resetEditions();
 });
