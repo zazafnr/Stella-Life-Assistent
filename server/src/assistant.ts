@@ -8,7 +8,7 @@ import {
   addAttachment, addMessage, chatContext, clearPending, conversationMessages, db, enqueueJob, findMessageByClientId, getConversation,
   getItem, getPending, listItems, notifyOnce, setPending, todayConversation, type User,
 } from './db.ts';
-import { pluginBookProviderName, pluginPrompt, pluginTool, pluginTools } from './editions/registry.ts';
+import { pluginBookProviderName, pluginParser, pluginPrompt, pluginTool, pluginTools } from './editions/registry.ts';
 import { getAction, lastChatItemId, lastUndoable, levelFor, perform, record, undo, type ActionParams, type ActionType, type Performed } from './actions.ts';
 import { buildLagebild, isoWeekday, lagebildPrompt } from './context.ts';
 import { offerWeekPlan, planWeek } from './weekplan.ts';
@@ -82,7 +82,7 @@ async function handleChatIn(user: User, text: string, clientId: string | null, i
   const userMessage = addMessage(user.id, 'user', text, { clientId, attachments: [...images, ...extra] });
 
   const t: Turn = { user, conversationId: convId, today: todayIn(user.timeZone), replies: [], changed: new Map(), images };
-  const intent = interpret(text, t.today, timeIn(user.timeZone), { locale: userLocale(user) });
+  const intent = interpret(text, t.today, timeIn(user.timeZone), { locale: userLocale(user), extra: pluginParser() });
   const pending = getPending(user.id);
 
   let handled = false;
@@ -302,7 +302,7 @@ async function onMove(t: Turn, intent: Extract<Intent, { type: 'move' }>, text: 
   const item = findItem(t, intent.query);
   if (item) { changeTo(t, item, intent.due, intent.time); return; }
   // "Latein HÜ auf Freitag" ohne vorhandene HÜ ist eher eine neue HÜ
-  const entry = parseEntry(text.replace(/\bauf\b/iu, 'bis'), t.today);
+  const entry = parseEntry(text.replace(/\bauf\b/iu, 'bis'), t.today, pluginParser());
   if (entry) { await onCreate(t, entry); return; }
   say(t, v(t).notFound(queryLabel(t, intent.query)));
 }

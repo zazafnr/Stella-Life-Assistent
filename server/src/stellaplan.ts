@@ -6,9 +6,9 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import {
   addDays, describeRecurrence, formatDateDe, timeIn, todayIn, weekdayOf,
-  type StellaPlanControl, type StellaPlanEntry,
+  type ActionGroup, type StellaPlanControl, type StellaPlanEntry,
 } from '@stella/shared';
-import { applyPlanSetting, GROUPS, isGroup, levelFor, planSettingValue, record, type PlanSettingKey } from './actions.ts';
+import { applyPlanSetting, groupDef, isGroup, levelFor, planSettingValue, record, type PlanSettingKey } from './actions.ts';
 import { HttpError } from './auth.ts';
 import { briefingTime } from './briefing.ts';
 import { buildLagebild } from './context.ts';
@@ -113,7 +113,7 @@ export function buildStellaPlan(user: User): { entries: StellaPlanEntry[]; soon:
     });
   }
   const automatic = (key: Extract<PlanSettingKey, `perm:${string}`>, title: string, when: string) => {
-    const level = levelFor(user, key.slice(5) as keyof typeof GROUPS);
+    const level = levelFor(user, key.slice(5) as ActionGroup);
     regular.push({ id: key, kind: 'automation', group: 'regular', title, when: level === 'never' ? 'ausgeschaltet' : when, at: null, recurrence: null, enabled: level !== 'never', controls: [toggle(level !== 'never', 'An'), permLink] });
   };
   if (hasFeature(user, 'mails')) automatic('perm:mail_sort', 'Werbung automatisch löschen', 'laufend – in der Inbox zurückholbar');
@@ -172,7 +172,7 @@ export function changePlanEntry(user: User, id: string, change: PlanChange): { a
     case 'perm': {
       if (!isGroup(ref) || !['homework', 'mail_sort', 'memory'].includes(ref)) throw new HttpError(404, 'Unbekannt');
       const current = planSettingValue(user, `perm:${ref}` as PlanSettingKey);
-      return setting(`perm:${ref}` as PlanSettingKey, change.on ? (current === 'never' ? GROUPS[ref].default : current) : 'never');
+      return setting(`perm:${ref}` as PlanSettingKey, change.on ? (current === 'never' ? groupDef(ref)!.default : current) : 'never');
     }
     case 'recurring':
     case 'item':

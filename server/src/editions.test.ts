@@ -17,15 +17,18 @@ const { setMailTransportFactory } = await import('./mailer.ts');
 const { registerSignupRoutes } = await import('./signup.ts');
 const { registerLoginApi } = await import('./loginlink.ts');
 const { loadEditions } = await import('./editions/load.ts');
-const { editions, pluginRoutes, pluginTools, registerEdition, requestEdition, resetEditions } = await import('./editions/registry.ts');
+const { editions, pluginAutomations, pluginIcal, pluginParser, pluginRoutes, pluginTools, registerEdition, requestEdition, resetEditions } = await import('./editions/registry.ts');
+const { levelFor } = await import('./actions.ts');
+const { toICalendar } = await import('./ical.ts');
 const { buildLagebild } = await import('./context.ts');
 const { systemPrompt } = await import('./assistant.ts');
 const { quickActions } = await import('./quick.ts');
 const { findHints } = await import('./hints.ts');
 const { buildBriefing } = await import('./briefing.ts');
-const { todayIn } = await import('@stella/shared');
+const { interpret, todayIn } = await import('@stella/shared');
 const Fastify = (await import('fastify')).default;
 import type { FastifyInstance } from 'fastify';
+import type { EditionPlugin } from './editions/registry.ts';
 
 const sent: { from: string; to: string; subject: string; text: string; html?: string }[] = [];
 setMailTransportFactory(() => ({ sendMail: async (m: never) => { sent.push(m); return {} as never; } }));
@@ -154,28 +157,54 @@ test('ohne Plugin: keine Schul-Routen, keine Schul-Werkzeuge, keine Schul-Sätze
   await app.close();
 });
 
-test('mit Plugin: Routen, Werkzeuge, Prompt und Schnellwege wie bisher', async () => {
+test('mit Plugin: Routen, Werkzeuge, Prompt, Schnellwege, Hinweise, Briefing und Parser werden eingehängt', async () => {
   resetEditions();
-  const res0 = await loadEditions('builtin');
-  assert.deepEqual(res0, { loaded: ['students'], source: 'builtin' });
+  const plugin: EditionPlugin = {
+    id: 'demo', edition: 'students',
+    routes: (api) => { api.get('/api/demo/ping', async () => ({ pong: true })); },
+    tools: [{ def: { type: 'function', function: { name: 'demo_tool', description: 'x', parameters: { type: 'object', properties: {} } } }, run: (ctx) => ({ hello: ctx.user.name }) }],
+    prompt: (u) => ({ rules: [`Demo rule for ${u.name}.`], capabilities: ['Demo capability.'] }),
+    quickActions: () => [{ id: 'photo', icon: 'camera', symbol: 'camera.fill', kind: 'camera', after: 'briefing' }],
+    hints: (u) => [{ key: 'demo-hint', priority: 'normal', text: `Hallo ${u.name}` }],
+    briefing: { sections: () => [{ id: 'demo', title: 'Demo', lines: ['eine Zeile'] }], done: () => ['Demo erledigt'] },
+    stellaPlan: () => [{ key: 'perm:homework', title: 'Demo-Automatik', when: 'immer' }],
+    context: { lessons: (_id, from) => [{ date: from, start: '08:00', end: '08:50', subject: 'Mathe', code: 'M', status: 'normal', info: null }], daySummary: (l) => (l.length ? 'Demo-Unterricht' : '') },
+    actions: { groups: { homework: { label: 'Demo-Recht', help: 'x', default: 'auto', levels: ['auto', 'ask', 'never'] } }, defs: {} },
+    parser: { kinds: [['homework', 'HÜ', ['hü']]], subjects: [['Latein', ['latein']]] },
+    ical: () => ['BEGIN:VEVENT', 'UID:demo@stella', 'SUMMARY:Demo', 'END:VEVENT'],
+  };
+  registerEdition(plugin);
 
   const app = await newApp((a) => { a.register(async (api: FastifyInstance) => { api.addHook('preHandler', requireUser); pluginRoutes(api); }); });
   const token = login('owner@example.com', 'supergeheim', undefined, '', 'students').token;
-  const timetable = await app.inject({ method: 'GET', url: '/api/timetable', headers: { authorization: `Bearer ${token}` } });
-  assert.equal(timetable.statusCode, 200);
-  assert.deepEqual(timetable.json(), []);
-  assert.equal((await app.inject({ method: 'GET', url: '/api/notes/inbox', headers: { authorization: `Bearer ${token}` } })).statusCode, 200);
+  assert.equal((await app.inject({ method: 'GET', url: '/api/demo/ping', headers: { authorization: `Bearer ${token}` } })).statusCode, 200);
+  await app.close();
 
   const user = owner();
-  assert.deepEqual(pluginTools(user).map((x) => x.def.function.name), ['solve_homework', 'timetable']);
+  assert.deepEqual(pluginTools(user).map((x) => x.def.function.name), ['demo_tool']);
   const prompt = systemPrompt(user, todayIn(user.timeZone)).fixed;
-  assert.match(prompt, /solve_homework/);
-  assert.match(prompt, /School words/);
-  const ids = quickActions(user, 9).actions.map((a) => a.id);
-  assert.deepEqual(ids.slice(0, 3), ['briefing', 'photo', 'homework'], 'Reihenfolge wie vor dem Umbau');
-  updateUserSettings(user.id, { profile: { situation: 'work', features: ['planner'] } });
-  assert.doesNotMatch(systemPrompt(owner(), todayIn(user.timeZone)).fixed, /School words/, 'Berufstätige bekommen auch mit Plugin kein Schulvokabular');
-  await app.close();
+  assert.match(prompt, /- Demo rule for /);
+  assert.match(prompt, /- Demo capability\./);
+  assert.deepEqual(quickActions(user, 9).actions.slice(0, 2).map((a) => a.id), ['briefing', 'photo'], 'Schnellweg an der gewünschten Stelle');
+  const lb = buildLagebild(user, 2);
+  assert.equal(lb.days[0]!.lessons.length, 1, 'Stunden aus dem Plugin im Lagebild');
+  assert.ok(findHints(user, lb).some((h) => h.key === 'demo-hint'));
+  const briefing = buildBriefing(user, lb);
+  assert.ok(briefing.sections.some((s) => s.id === 'demo'));
+  assert.ok(briefing.sections.find((s) => s.id === 'done')!.lines.includes('Demo erledigt'));
+  assert.ok(pluginAutomations(user).some((a) => a.title === 'Demo-Automatik'));
+  assert.match(toICalendar([], 'Europe/Vienna', pluginIcal(user)), /UID:demo@stella/);
+  assert.equal(levelFor(user, 'homework'), 'auto', 'Rechte-Bereich des Plugins');
+
+  // Parser: ohne Plugin ist „Latein HÜ S. 45 Nr. 3 Freitag“ keine Hausübung, mit Plugin schon
+  const extra = pluginParser();
+  const entry = (e?: typeof extra) => (interpret('Latein HÜ S. 45 Nr. 3 Freitag', '2026-10-28', '12:00', { extra: e }) as { entry?: { kind: string } } | null)?.entry;
+  assert.equal(entry(extra)?.kind, 'homework');
+  resetEditions();
+  assert.equal(pluginParser(), undefined);
+  assert.notEqual(entry(undefined)?.kind, 'homework', 'ohne Plugin keine Hausübung');
+  assert.equal(levelFor(owner(), 'homework'), 'never', 'ohne Plugin ist der Bereich aus');
+  assert.deepEqual(pluginTools(owner()), []);
 });
 
 test('ein Plugin wird nicht doppelt geladen; Migrationen laufen in eigenem Zähler und nur einmal', () => {

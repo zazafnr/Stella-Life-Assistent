@@ -33,10 +33,10 @@ test('Alltagstermin + "nein, Donnerstag" korrigiert ihn + Rückgängig-Karte', a
 });
 
 test('verschieben trifft den vorhandenen Eintrag statt einen neuen anzulegen', async () => {
-  const hw = (await say('Mathe HÜ S. 12 Nr. 4 Freitag')).items[0]!;
-  await say('verschieb die Mathe HÜ auf Montag');
+  const hw = (await say('Steuer Abgabe Freitag')).items[0]!;
+  await say('verschieb die Steuer Abgabe auf Montag');
   assert.equal(getItem(created.id, hw.id)!.due, nextWeekday(today, 1));
-  assert.equal(listItems(created.id, { kind: 'homework' }).filter((i) => i.subject === 'Mathe').length, 1);
+  assert.equal(listItems(created.id, { kind: 'assignment' }).filter((i) => i.title === 'Abgabe').length, 1);
 });
 
 test('absagen/löschen mit Rückgängig', async () => {
@@ -68,9 +68,9 @@ test('"merk dir" speichert sofort, "vergiss" löscht', async () => {
   assert.ok(!listMemories(created.id).some((x) => x.text.includes('Erdnuss')));
 });
 
-test('„Latein HÜ auf Freitag“ ohne vorhandene HÜ legt eine neue an', async () => {
-  const res = await say('Latein HÜ auf Freitag');
-  assert.equal(res.items[0]?.subject, 'Latein');
+test('„Bericht Abgabe auf Freitag“ ohne vorhandene Abgabe legt eine neue an', async () => {
+  const res = await say('Bericht Abgabe auf Freitag');
+  assert.equal(res.items[0]?.kind, 'assignment');
   assert.equal(res.items[0]?.due, nextWeekday(today, 5));
   assert.ok(addDays(today, 0));
 });

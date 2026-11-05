@@ -4,6 +4,7 @@ import Fastify, { type FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { addDays, isCountry, isLocale, isLocationPermission, isTone, todayIn, voice, type Item } from '@stella/shared';
 import { userLocale } from './locale.ts';
+import type { ActionGroup } from '@stella/shared';
 import { pluginIcal, pluginIntegrations, pluginRoutes, pluginSettings, pluginOnboarding, editions, requestEdition } from './editions/registry.ts';
 import { loadEditions } from './editions/load.ts';
 import { editionUrl } from './editions/access.ts';
@@ -29,7 +30,7 @@ import { checkAllMail, draftReply, getMailBody, getMailEvent, isMailCategory, li
 import { FILE_TYPES, filePath, saveDataUrl, saveFile } from './files.ts';
 import type { BookProvider } from './db.ts';
 import { finishGoogle, finishGoogleLink, finishTarget, googleAuthUrl, googleConfigured, readState, type OAuthClient } from './oauth.ts';
-import { approve, GROUPS, isGroup, isLevel, levelFor, listActions, perform, reject, undo } from './actions.ts';
+import { allGroups, approve, groupDef, isGroup, isLevel, levelFor, listActions, perform, reject, undo } from './actions.ts';
 import { LlmUnavailable } from './llm.ts';
 import { buildBriefing } from './briefing.ts';
 import { registerWeatherRoutes, warmWeather } from './weather.ts';
@@ -271,7 +272,7 @@ app.register(async (api) => {
     }
     if (b.permissions && typeof b.permissions === 'object') {
       for (const [g, level] of Object.entries(b.permissions as Record<string, unknown>)) {
-        if (!isGroup(g) || !isLevel(level) || !GROUPS[g].levels.includes(level)) throw new HttpError(400, `Ungültiges Recht: ${g}`);
+        if (!isGroup(g) || !isLevel(level) || !groupDef(g)!.levels.includes(level)) throw new HttpError(400, `Ungültiges Recht: ${g}`);
         permissions[g] = level;
       }
       // die alten Schalter mitziehen, damit ältere Apps dasselbe anzeigen
@@ -600,8 +601,8 @@ app.register(async (api) => {
   });
 
   // ----- Was Stella selbst darf -----
-  api.get('/api/permissions', async (req) => Object.entries(GROUPS).map(([group, g]) => ({
-    group, label: g.label, help: g.help, levels: g.levels, default: g.default, level: levelFor(req.user, group as keyof typeof GROUPS),
+  api.get('/api/permissions', async (req) => Object.entries(allGroups()).map(([group, g]) => ({
+    group, label: g.label, help: g.help, levels: g.levels, default: g.default, level: levelFor(req.user, group as ActionGroup),
   })));
 
   // ----- Protokoll, Vorschläge, Rückgängig -----

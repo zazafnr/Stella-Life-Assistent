@@ -7,7 +7,7 @@
 // (siehe plugin-api.ts) von außen gereicht und importiert vom Kern nur Typen.
 
 import type { FastifyInstance } from 'fastify';
-import type { Briefing, BriefingSection, Edition, Hint, Item, Locale } from '@stella/shared';
+import type { BriefingSection, Edition, Hint, Item, Locale, ParserExtension } from '@stella/shared';
 import { extendCatalogs, type Catalog } from '@stella/shared';
 import { db } from '../db.ts';
 import type { ToolDef } from '../llm-types.ts';
@@ -39,8 +39,6 @@ export interface PluginTool {
   enabledFor?: (user: User) => boolean;
 }
 
-/** Zusatzwörter für `interpret()` – wird mit Paket 3 befüllt (Schulwörter, Seitenerkennung, Fächer) */
-export interface ParserExtension { words?: Record<string, string[]> }
 
 export interface PluginContext {
   lessons?: (userId: string, from: string, to: string) => Lesson[];
@@ -62,6 +60,12 @@ export interface PluginBriefing {
   sections?: (user: User, lb: Lagebild) => BriefingSection[];
   /** Zeilen für „Das habe ich für dich erledigt“ (seit `sinceIso`) */
   done?: (user: User, sinceIso: string) => string[];
+}
+
+/** Aktionen und Rechte-Bereiche eines Plugins (Form wie in actions.ts: `Def` / `GroupDef`) */
+export interface PluginActions {
+  groups?: Record<string, { label: string; help: string; default: 'auto' | 'notify' | 'ask' | 'never'; levels: ('auto' | 'notify' | 'ask' | 'never')[] }>;
+  defs?: Record<string, unknown>;
 }
 
 export interface PluginAutomation { key: `perm:${string}`; title: string; when: string }
@@ -95,6 +99,8 @@ export interface EditionPlugin {
   /** API-Pfade, innerhalb des Logins registriert (`req.user` ist gesetzt) */
   routes?: (app: FastifyInstance) => void;
   tools?: PluginTool[];
+  /** Aktionen mit Rechte-Stufe (siehe actions.ts) */
+  actions?: PluginActions;
   /** Zusatz zum System-Prompt: `rules` nach der Sprachregel, `capabilities` nach der Test-Regel */
   prompt?: (user: User) => { rules?: string[]; capabilities?: string[] };
   parser?: ParserExtension;
@@ -170,6 +176,9 @@ export function pluginBookProviderName(provider: string): string {
   return provider;
 }
 
+export const pluginActionGroups = (): NonNullable<PluginActions['groups']> => Object.assign({}, ...editions().map((p) => p.actions?.groups ?? {}));
+export const pluginActionDefs = (): NonNullable<PluginActions['defs']> => Object.assign({}, ...editions().map((p) => p.actions?.defs ?? {}));
+
 export const pluginTools = (user: User): PluginTool[] => editions().flatMap((p) => p.tools ?? []).filter((t) => !t.enabledFor || t.enabledFor(user));
 export const pluginTool = (name: string): PluginTool | undefined => editions().flatMap((p) => p.tools ?? []).find((t) => t.def.function.name === name);
 
@@ -193,7 +202,16 @@ export const pluginSettings = (user: User): PluginSettingsSection[] => editions(
 export const pluginOnboarding = (): PluginOnboardingStep[] => editions().flatMap((p) => p.onboarding ?? []);
 export const pluginIcal = (user: User): string[] => editions().flatMap((p) => p.ical?.(user) ?? []);
 export const pluginIntegrations = (user: User): Record<string, unknown> => Object.assign({}, ...editions().map((p) => p.integrations?.(user) ?? {}));
-export const pluginParser = (): ParserExtension => ({ words: Object.assign({}, ...editions().map((p) => p.parser?.words ?? {})) });
+/** Zusatzwörter aller Plugins für `interpret()`; ohne Plugin `undefined` (dann gilt der Wortschatz des Kerns) */
+export function pluginParser(): ParserExtension | undefined {
+  const all = editions().map((p) => p.parser).filter((x): x is ParserExtension => !!x);
+  if (!all.length) return undefined;
+  return {
+    subjects: all.flatMap((x) => x.subjects ?? []), singleLetters: Object.assign({}, ...all.map((x) => x.singleLetters ?? {})),
+    kinds: all.flatMap((x) => x.kinds ?? []), kindsEn: all.flatMap((x) => x.kindsEn ?? []),
+    labels: Object.assign({}, ...all.map((x) => x.labels ?? {})), subjectNamesEn: Object.assign({}, ...all.map((x) => x.subjectNamesEn ?? {})),
+  };
+}
 export function pluginItemCreated(user: User, item: Item): void { for (const p of plugins.values()) p.onItemCreated?.(user, item); }
 export async function pluginPeriodic(userId: string, every: (key: string, ms: number, fn: () => Promise<void>) => Promise<void>): Promise<void> {
   for (const p of plugins.values()) await p.scheduler?.periodic?.(userId, every);

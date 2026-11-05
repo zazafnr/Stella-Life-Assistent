@@ -6,18 +6,26 @@
 // (Submodul) geladen wird und dort eine gespiegelte Kopie des Kerns liegt.
 
 import { t as translate } from '@stella/shared';
-import { getSecret, HttpError, setSecret } from './auth.ts';
+import { deleteSecret, getSecret, hasSecret, HttpError, requireOwner, setSecret } from './auth.ts';
 import { config } from './config.ts';
-import { addMessage, createItem, db, enqueueJob, getItem, getUser, listItems, notifyOnce, updateItem, updateUserSettings } from './db.ts';
+import { addAttachment, addMessage, addReminder, createItem, db, enqueueJob, getItem, getItemByExternalId, getUser, listItems, newId, notifyOnce, now, updateItem, updateUserSettings } from './db.ts';
 import { perform, record, levelFor } from './actions.ts';
 import { complete } from './llm.ts';
-import { tr } from './locale.ts';
+import { tr, userLocale, userTerms, voiceOf } from './locale.ts';
+import { pushToUser } from './push.ts';
+import { mailerConfigured, sendTemplateMail } from './mailer.ts';
+import { filePath, saveFile } from './files.ts';
+import { consumeQuota } from './billing.ts';
+import { resolveTier } from './router.ts';
+import { hasFeature, isSchool } from './profile.ts';
+import { toHhmm, toMin } from './context.ts';
 import { notify } from './channels/deliver.ts';
 import { assertPublicUrl, fetchText } from './news/net.ts';
-import { addItem, changeItem } from './planner.ts';
+import { addItem, bookFor, bookForItem, changeItem } from './planner.ts';
 
 export type { EditionPlugin, PluginTool, PluginToolContext, Lesson, PluginMigration } from './editions/registry.ts';
-export type { User, UserSettings } from './db.ts';
+export type { User, UserSettings, BookProvider, BookConfig, NewItem } from './db.ts';
+export type { ContentPart } from './llm-types.ts';
 export type { ActionType, ActionParams, Performed } from './actions.ts';
 export type { Lagebild, DayContext, Busy, Interval } from './context.ts';
 export type { ToolDef, LlmMessage } from './llm-types.ts';
@@ -27,16 +35,26 @@ export const pluginApi = {
   config,
   HttpError,
   getUser, updateUserSettings,
+  now, newId,
+  addAttachment, addReminder, getItemByExternalId,
   addMessage,
   createItem, updateItem, getItem, listItems,
   /** Eintrag mit Erinnerungen anlegen/ändern (statt `createItem`/`updateItem`) */
-  addItem, changeItem,
+  addItem, changeItem, bookFor, bookForItem,
   /** Aktionen mit Rechte-Stufe, Karte und Rückgängig */
   perform, record, levelFor,
   notify, notifyOnce,
   /** KI-Aufruf mit Kosten-Router; für private Inhalte immer `private: true` */
   complete,
-  getSecret, setSecret,
+  getSecret, setSecret, hasSecret, deleteSecret, requireOwner,
+  /** Sprache, Begriffe und Ton der Nutzerin */
+  userLocale, userTerms, voiceOf,
+  pushToUser, mailerConfigured, sendTemplateMail,
+  saveFile, filePath,
+  /** Abo-Kontingent und Modellwahl (Profi-Aufgaben) */
+  consumeQuota, resolveTier,
+  hasFeature, isSchool,
+  toMin, toHhmm,
   /** Text aus dem Sprachkatalog in der Sprache der Nutzerin */
   tr, t: translate,
   enqueueJob,

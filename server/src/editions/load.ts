@@ -12,7 +12,6 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { pluginApi } from '../plugin-api.ts';
 import { hasEdition, registerEdition, type EditionPlugin } from './registry.ts';
-import { schoolPlugin } from './school.ts';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../../..');
 export const DEFAULT_PLUGIN_DIR = path.join(REPO_ROOT, 'editions/students/server-plugin');
@@ -25,12 +24,12 @@ function entryOf(p: string): string | null {
   return existsSync(index) ? index : null;
 }
 
-export interface LoadResult { loaded: string[]; source: 'none' | 'builtin' | 'external' }
+export interface LoadResult { loaded: string[]; source: 'none' | 'external' }
 
 export async function loadEditions(setting: string | undefined = process.env.STELLA_EDITION_STUDENTS): Promise<LoadResult> {
   if (setting === 'off') return { loaded: [], source: 'none' };
-  const entry = setting === 'builtin' ? null : entryOf(setting || DEFAULT_PLUGIN_DIR);
-  if (setting && setting !== 'builtin' && !entry) throw new Error(`STELLA_EDITION_STUDENTS zeigt auf „${setting}“, dort gibt es kein Plugin (index.ts fehlt).`);
+  const entry = entryOf(setting || DEFAULT_PLUGIN_DIR);
+  if (setting && !entry) throw new Error(`STELLA_EDITION_STUDENTS zeigt auf „${setting}“, dort gibt es kein Plugin (index.ts fehlt).`);
   if (entry) {
     const mod = await import(pathToFileURL(entry).href) as { default?: (api: typeof pluginApi) => EditionPlugin | null };
     if (typeof mod.default !== 'function') throw new Error(`Das Plugin ${entry} muss als default eine Funktion (api) => EditionPlugin exportieren.`);
@@ -40,6 +39,5 @@ export async function loadEditions(setting: string | undefined = process.env.STE
       return { loaded: [plugin.id], source: 'external' };
     }
   }
-  if (!hasEdition(schoolPlugin.id)) registerEdition(schoolPlugin);
-  return { loaded: [schoolPlugin.id], source: 'builtin' };
+  return { loaded: [], source: 'none' };
 }

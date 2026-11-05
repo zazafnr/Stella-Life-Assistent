@@ -8,63 +8,6 @@ import { describeRecurrence, nextOccurrence, parseRecurrence } from './recurrenc
 
 const WED = '2026-10-28'; // Mittwoch
 
-test('das Beispiel aus der Idee: Latein Hü Seite 45 nr 3 Freitag', () => {
-  const e = parseEntry('Latein Hü Seite 45 nr 3 Freitag', WED)!;
-  assert.equal(e.kind, 'homework');
-  assert.equal(e.subject, 'Latein');
-  assert.equal(e.page, '45');
-  assert.equal(e.exercises, '3');
-  assert.equal(e.due, '2026-10-30');
-  assert.equal(e.title, 'Latein HÜ');
-  assert.equal(e.detail, 'S. 45 Nr. 3');
-});
-
-test('Kurzformen', () => {
-  const e = parseEntry('M hü s.112 bsp 3a, 4b - 6 bis do', WED)!;
-  assert.equal(e.kind, 'homework');
-  assert.equal(e.page, '112');
-  assert.equal(e.exercises, '3a, 4b–6');
-  assert.equal(e.due, '2026-10-29');
-
-  const ah = parseEntry('englisch AH S45 nr 2+3 morgen', WED)!;
-  assert.equal(ah.subject, 'Englisch');
-  assert.equal(ah.book, 'Arbeitsheft');
-  assert.equal(ah.exercises, '2, 3');
-  assert.equal(ah.due, '2026-10-29');
-});
-
-test('Schularbeiten und Tests', () => {
-  const sa = parseEntry('Mathe SA 12.11.', WED)!;
-  assert.equal(sa.kind, 'exam');
-  assert.equal(sa.kindLabel, 'Schularbeit');
-  assert.equal(sa.due, '2026-11-12');
-
-  const t = parseEntry('Bio Test nächste Woche Dienstag Kapitel 4-5', WED)!;
-  assert.equal(t.kind, 'exam');
-  assert.equal(t.due, '2026-11-03');
-  assert.equal(t.rest, 'Kapitel 4-5');
-
-  const v = parseEntry('vokabeltest englisch in 2 wochen', WED)!;
-  assert.equal(v.due, '2026-11-11');
-  assert.equal(v.title, 'Englisch Vokabeltest');
-});
-
-test('Datum ohne Jahr in der Vergangenheit → nächstes Jahr', () => {
-  assert.equal(parseEntry('Deutsch Referat 3.2.', WED)!.due, '2027-02-03');
-});
-
-test('HÜ ohne Datum → nächster Schultag (angenommen)', () => {
-  const e = parseEntry('Physik HÜ S 20 Nr 1', '2026-10-30')!; // Freitag
-  assert.equal(e.due, '2026-11-02');
-  assert.equal(e.dueAssumed, true);
-});
-
-test('"am" vor Datum ist kein Fach', () => {
-  const e = parseEntry('Latein Test am 5.11.', WED)!;
-  assert.equal(e.subject, 'Latein');
-  assert.equal(e.rest, '');
-});
-
 test('Freitag am Freitag heißt nächster Freitag', () => {
   assert.equal(nextWeekday('2026-10-30', 5), '2026-11-06');
 });
@@ -73,12 +16,6 @@ test('normale Sätze gehen an die KI', () => {
   assert.equal(interpret('Wie wird das Wetter morgen?', WED), null);
   assert.equal(interpret('Erzähl mir einen Witz', WED), null);
   assert.equal(interpret('hallo', WED), null);
-});
-
-test('Erledigt- und Agenda-Befehle', () => {
-  assert.deepEqual(interpret('Latein HÜ erledigt', WED), { type: 'done', subject: 'Latein', kind: 'homework' });
-  assert.equal(interpret('was steht an?', WED)?.type, 'agenda');
-  assert.equal(interpret('Was habe ich diese Woche', WED)?.type, 'agenda');
 });
 
 test('Erinnerungen: HÜ am Vorabend mit Bild, Test 7 und 1 Tag vorher', () => {
@@ -105,33 +42,6 @@ test('Lernplan: verteilt, endet mit Wiederholung, nie am Prüfungstag', () => {
 test('Zeitzonen inkl. Sommerzeit', () => {
   assert.equal(zonedToUtc('2026-10-29', '19:00', 'Europe/Vienna').toISOString(), '2026-10-29T18:00:00.000Z');
   assert.equal(zonedToUtc('2026-07-01', '19:00', 'Europe/Vienna').toISOString(), '2026-07-01T17:00:00.000Z');
-});
-
-test('Fächer aus WebUntis-Kürzeln', () => {
-  assert.equal(normalizeSubject('F'), 'Französisch');
-  assert.equal(normalizeSubject('M'), 'Mathe');
-  assert.equal(normalizeSubject('Latein'), 'Latein');
-  assert.equal(normalizeSubject('BSPK'), 'Sport');
-  assert.equal(normalizeSubject('Mathematik'), 'Mathe');
-  assert.equal(normalizeSubject('Robotik'), 'Robotik');
-});
-
-test('Französisch-HÜ aus dem scook-Buch', () => {
-  const e = parseEntry('Französisch HÜ S. 45 Nr. 16 Freitag', WED)!;
-  assert.equal(e.subject, 'Französisch');
-  assert.equal(e.exercises, '16');
-});
-
-test('Phase 3: verschieben und löschen sind Befehle, keine neuen Einträge', () => {
-  assert.deepEqual(interpret('verschieb die Mathe HÜ auf Montag', WED), {
-    type: 'move', query: { subject: 'Mathe', kind: 'homework', words: [] }, due: '2026-11-02', time: null,
-  });
-  assert.deepEqual(interpret('Zahnarzt auf 16 Uhr verschieben', WED), {
-    type: 'move', query: { subject: null, kind: null, words: ['zahnarzt'] }, due: null, time: '16:00',
-  });
-  assert.equal(interpret('lösch die Deutsch HÜ', WED)?.type, 'delete');
-  assert.deepEqual(interpret('Zahnarzt absagen', WED), { type: 'delete', query: { subject: null, kind: null, words: ['zahnarzt'] } });
-  assert.equal(interpret('Latein HÜ S. 45 Nr. 3 Freitag', WED)?.type, 'create', 'Kurznotizen bleiben Kurznotizen');
 });
 
 test('Phase 3: Erinnerungen mit relativer und fester Zeit', () => {
@@ -180,13 +90,6 @@ test('Einkaufsliste anzeigen und abhaken', () => {
   assert.deepEqual(interpret('Eier und Butter hab ich', TODAY), { type: 'list_done', items: ['Eier', 'Butter'] });
   assert.deepEqual(interpret('hab eingekauft', TODAY), { type: 'list_done', items: 'all' });
   assert.deepEqual(interpret('alles eingekauft', TODAY), { type: 'list_done', items: 'all' });
-});
-
-test('Einkaufsliste: Sätze, die nichts mit Einkaufen zu tun haben, bleiben bei der KI', () => {
-  for (const s of ['ich brauche Hilfe bei Mathe', 'wir brauchen Zeit und Ruhe', 'das hab ich', 'Latein HÜ hab ich', 'wie wird das Wetter morgen']) {
-    const i = interpret(s, TODAY);
-    assert.ok(!i || !['list_add', 'list_show', 'list_done', 'errand'].includes(i.type), `${s} → ${JSON.stringify(i)}`);
-  }
 });
 
 test('Erledigung mit Ort: „nach der Arbeit Blumen kaufen“ → Blumenladen', () => {

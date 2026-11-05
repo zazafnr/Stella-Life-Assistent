@@ -8,7 +8,7 @@ import type { AddressInfo } from 'node:net';
 
 // Mock-Groq: Whisper mit Umschalter für „Groq ist down“
 let groqDown = false;
-let transcript = 'Mathe HÜ S. 45 Nr. 3 Freitag';
+let transcript = 'Steuer Abgabe Freitag';
 let transcribeCalls = 0;
 const mock = createServer((req, res) => {
   const chunks: Buffer[] = [];
@@ -62,12 +62,12 @@ test('Sprachnachricht → Transkript wird zur Nutzernachricht, die Aufnahme hän
   const res = await upload(me.token, recording(), 'audio/mp4', '?clientId=a1&duration=7');
   assert.equal(res.statusCode, 200, res.body);
   const json = res.json();
-  assert.equal(json.transcript, 'Mathe HÜ S. 45 Nr. 3 Freitag');
-  assert.equal(json.userMessage.text, 'Mathe HÜ S. 45 Nr. 3 Freitag');
+  assert.equal(json.transcript, 'Steuer Abgabe Freitag');
+  assert.equal(json.userMessage.text, 'Steuer Abgabe Freitag');
   assert.deepEqual(json.userMessage.attachments.map((a: { kind: string }) => a.kind), ['audio']);
   assert.ok(filePath(json.audioId), 'die Aufnahme liegt auf dem Server');
   assert.ok(json.messages.length >= 1, 'Antwort von Stella');
-  assert.ok(listItems(me.user.id, { kind: 'homework' }).some((i) => i.subject === 'Mathe'), 'normal verarbeitet: HÜ ist eingetragen');
+  assert.ok(listItems(me.user.id, { kind: 'assignment' }).some((i) => i.title === 'Abgabe'), 'normal verarbeitet: Abgabe ist eingetragen');
   assert.equal(json.conversationId, json.userMessage && (db.prepare('SELECT conversation_id AS c FROM messages WHERE id = ?').get(json.userMessage.id) as { c: string }).c);
 });
 
@@ -91,19 +91,19 @@ test('Länge über 2 Minuten, leere Datei, unbekanntes Format', async () => {
 
 test('Groq fällt aus: klare Meldung, Aufnahme bleibt, „Nochmal versuchen“ ohne neuen Upload', async () => {
   groqDown = true;
-  transcript = 'Englisch HÜ S. 12 Nr. 2 Montag';
+  transcript = 'Bericht Abgabe Montag';
   const failed = await upload(me.token, recording(), 'audio/mp4', '?clientId=a3');
   assert.equal(failed.statusCode, 503);
   const body = failed.json();
   assert.equal(body.retry, true);
   assert.match(body.error, /Nochmal versuchen/);
   assert.ok(filePath(body.audioId), 'Aufnahme ist trotzdem gespeichert');
-  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM messages WHERE user_id = ? AND text LIKE 'Englisch%'").get(me.user.id) as { n: number }).n, 0, 'noch keine Nachricht');
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM messages WHERE user_id = ? AND text LIKE 'Bericht%'").get(me.user.id) as { n: number }).n, 0, 'noch keine Nachricht');
 
   groqDown = false;
   const retry = await app.inject({ method: 'POST', url: '/api/chat/audio/retry', headers: auth(me.token), payload: { audioId: body.audioId, clientId: 'a3' } });
   assert.equal(retry.statusCode, 200, retry.body);
-  assert.equal(retry.json().userMessage.text, 'Englisch HÜ S. 12 Nr. 2 Montag');
+  assert.equal(retry.json().userMessage.text, 'Bericht Abgabe Montag');
   assert.equal(retry.json().audioId, body.audioId, 'dieselbe Aufnahme');
 });
 

@@ -17,9 +17,13 @@ import { addMemory, deleteMemory, getMemory, updateMemory, type NewMemory } from
 import type { OutgoingMail } from './mail.ts';
 import { addItem, bookFor, changeItem, createStudyPlan } from './planner.ts';
 import { addListItems, removeListItems, setListItemsDone, shoppingListId } from './lists.ts';
+import { pluginActionDefs, pluginActionGroups } from './editions/registry.ts';
 import { cleanGoal, createGoal, deleteGoal, deleteLog, getGoal, logGoal, updateGoal, type NewGoal } from './goals.ts';
 
-export const GROUPS: Record<ActionGroup, { label: string; help: string; default: PermissionLevel; levels: PermissionLevel[] }> = {
+export type GroupDef = { label: string; help: string; default: PermissionLevel; levels: PermissionLevel[] };
+
+/** Bereiche des Kerns; Edition-Plugins bringen weitere mit (z. B. „HÜs lösen“) – siehe `allGroups()` */
+export const GROUPS: Partial<Record<ActionGroup, GroupDef>> = {
   planner: {
     label: 'Planer ändern',
     help: 'Einträge anlegen, verschieben, Lernpläne erstellen',
@@ -29,11 +33,6 @@ export const GROUPS: Record<ActionGroup, { label: string; help: string; default:
     label: 'Einträge löschen',
     help: 'wenn Stella von sich aus etwas entfernen will',
     default: 'ask', levels: ['auto', 'notify', 'ask', 'never'],
-  },
-  homework: {
-    label: 'HÜs lösen',
-    help: 'lösen und in deiner Handschrift ins Heft schreiben',
-    default: 'auto', levels: ['auto', 'notify', 'ask', 'never'],
   },
   mail_sort: {
     label: 'Werbung löschen',
@@ -56,15 +55,21 @@ export const GROUPS: Record<ActionGroup, { label: string; help: string; default:
 const SENSITIVE = new Set<ActionGroup>(['mail_send']);
 
 export const isLevel = (v: unknown): v is PermissionLevel => v === 'auto' || v === 'notify' || v === 'ask' || v === 'never';
-export const isGroup = (v: unknown): v is ActionGroup => typeof v === 'string' && v in GROUPS;
+/** Kern-Bereiche plus die der geladenen Edition-Plugins */
+export const allGroups = (): Partial<Record<ActionGroup, GroupDef>> => ({ ...GROUPS, ...(pluginActionGroups() as Partial<Record<ActionGroup, GroupDef>>) });
+export const groupDef = (group: ActionGroup): GroupDef | undefined => allGroups()[group];
+export const isGroup = (v: unknown): v is ActionGroup => typeof v === 'string' && v in allGroups();
 
 export function levelFor(user: User, group: ActionGroup): PermissionLevel {
   const set = user.settings.permissions?.[group];
-  if (set && GROUPS[group].levels.includes(set)) return set;
+  const def = groupDef(group);
+  // Bereich eines nicht geladenen Plugins: aus
+  if (!def) return 'never';
+  if (set && def.levels.includes(set)) return set;
   // ältere Schalter aus den Einstellungen
   if (group === 'homework' && user.settings.homeworkAutopilot === false) return 'never';
   if (group === 'mail_sort' && user.settings.mailAutoTrash === false) return 'never';
-  return GROUPS[group].default;
+  return def.default;
 }
 
 // ---------- Aktionstypen ----------
@@ -90,6 +95,10 @@ export interface ActionParams {
   'plan.setting': { key: PlanSettingKey; value: string };
 }
 export type ActionType = keyof ActionParams;
+/** Aktionen, die ein Edition-Plugin umsetzt (der Kern kennt nur ihre Form) */
+export type PluginActionType = 'homework.solve';
+
+const defOf = (type: ActionType): Def<ActionType> | undefined => (DEFS as Record<string, Def<ActionType>>)[type] ?? (pluginActionDefs()[type] as Def<ActionType> | undefined);
 
 /** Schalter, die „Was Stella vorhat“ ein-/ausschaltet (mit Rückgängig) */
 export type PlanSettingKey = 'briefing' | 'weekPlan' | 'perm:homework' | 'perm:mail_sort' | 'perm:memory';
@@ -113,7 +122,7 @@ export function applyPlanSetting(userId: string, key: PlanSettingKey, value: str
     updateUserSettings(userId, { weekPlan: value });
   } else {
     const group = key.slice(5) as ActionGroup;
-    if (!isGroup(group) || !GROUPS[group].levels.includes(value as PermissionLevel)) throw new Error(`Ungültiges Recht: ${group}`);
+    if (!isGroup(group) || !groupDef(group)!.levels.includes(value as PermissionLevel)) throw new Error(`Ungültiges Recht: ${group}`);
     const patch: Parameters<typeof updateUserSettings>[1] = { permissions: { ...user.settings.permissions, [group]: value as PermissionLevel } };
     // die alten Schalter mitziehen, damit ältere Apps dasselbe anzeigen
     if (group === 'homework') patch.homeworkAutopilot = value !== 'never';
@@ -127,7 +136,7 @@ const settingSummary = (key: PlanSettingKey, value: string): string => {
   if (key === 'briefing') return value === 'off' ? 'Morning Briefing ausschalten' : value === 'auto' ? 'Morning Briefing einschalten' : `Morning Briefing auf ${value} Uhr legen`;
   if (key === 'weekPlan') return value === 'off' ? 'Wochenplan-Vorschlag am Sonntag ausschalten' : 'Wochenplan-Vorschlag am Sonntag einschalten';
   const group = key.slice(5) as ActionGroup;
-  return `${GROUPS[group]?.label ?? group}: ${value === 'never' ? 'ausschalten' : 'einschalten'}`;
+  return `${groupDef(group)?.label ?? group}: ${value === 'never' ? 'ausschalten' : 'einschalten'}`;
 };
 
 interface Def<T extends ActionType> {
@@ -148,7 +157,7 @@ function describePatch(p: ItemPatch): string {
   return 'ändern';
 }
 
-const DEFS: { [T in ActionType]: Def<T> } = {
+const DEFS: { [T in Exclude<ActionType, PluginActionType>]: Def<T> } = {
   'item.create': {
     group: () => 'planner',
     summary: (_u, p) => `${p.title}${p.due ? ` am ${formatDateDe(p.due)}` : ''} eintragen`,
@@ -208,26 +217,6 @@ const DEFS: { [T in ActionType]: Def<T> } = {
       return { result: { count: items.length }, undo: { ids: items.map((i) => i.id) }, changed: items };
     },
     undo: (u, d: { ids: string[] }) => d.ids.map((id) => changeItem(u, id, { deleted: true })).filter((i): i is Item => !!i),
-  },
-  'homework.solve': {
-    group: () => 'homework',
-    summary: (u, p) => `${itemTitle(u, p.itemId)} lösen und ins Heft schreiben`,
-    run: (u, p) => {
-      let item = getItem(u.id, p.itemId);
-      if (!item) throw new Error('HÜ nicht gefunden');
-      if (p.again) {
-        // alte Lösung entfernen, damit neu gelöst (und erneut ins Heft geschrieben) wird
-        db.prepare('DELETE FROM notes_deliveries WHERE user_id = ? AND item_id = ?').run(u.id, item.id);
-        item = changeItem(u, item.id, {
-          status: 'open', notes: null, attachments: item.attachments.filter((a) => !a.caption?.startsWith('Lösung')),
-        })!;
-      }
-      if (!item.attachments.length && !(item.page && bookFor(u, item.subject))) {
-        throw new Error('Kein Foto und kein Buch hinterlegt – bitte ein Foto der Aufgabe schicken.');
-      }
-      enqueueJob(u.id, item.attachments.length ? 'solve_homework' : 'book_page', { itemId: item.id });
-      return { result: { ok: true, info: 'Wird im Hintergrund gelöst, der Nutzer bekommt eine Nachricht.' }, changed: [item] };
-    },
   },
   'mail.send': {
     group: () => 'mail_send',
@@ -344,9 +333,9 @@ const toEntry = (r: Row): ActionEntry => {
   const type = r.type as ActionType;
   const params = JSON.parse(r.params);
   return {
-    id: r.id, type: r.type, group: DEFS[type]?.group(params) ?? 'planner', summary: r.summary, status: r.status as ActionStatus,
+    id: r.id, type: r.type, group: defOf(type)?.group(params) ?? 'planner', summary: r.summary, status: r.status as ActionStatus,
     source: r.source as ActionEntry['source'],
-    canUndo: r.status === 'done' && !!r.undo && !!DEFS[type]?.undo && Date.now() - Date.parse(r.created_at) < UNDO_WINDOW,
+    canUndo: r.status === 'done' && !!r.undo && !!defOf(type)?.undo && Date.now() - Date.parse(r.created_at) < UNDO_WINDOW,
     createdAt: r.created_at, updatedAt: r.updated_at,
   };
 };
@@ -391,11 +380,12 @@ export interface PerformOptions {
 }
 
 export function perform<T extends ActionType>(user: User, type: T, params: ActionParams[T], opts: PerformOptions): Performed {
-  const def = DEFS[type] as Def<T>;
+  const def = defOf(type) as Def<T> | undefined;
+  if (!def) throw new Error(`Die Aktion „${type}“ gibt es nicht (Plugin nicht geladen?).`);
   const group = def.group(params);
   const level = levelFor(user, group);
   if (level === 'never') {
-    return { status: 'refused', reason: `In den Einstellungen ist „${GROUPS[group].label}“ ausgeschaltet.`, changed: [] };
+    return { status: 'refused', reason: `In den Einstellungen ist „${groupDef(group)?.label ?? group}“ ausgeschaltet.`, changed: [] };
   }
   const summary = def.summary(user, params);
   const id = newId();
@@ -428,7 +418,7 @@ export function record<T extends ActionType>(user: User, type: T, params: Action
   const t = now();
   db.prepare(`INSERT INTO actions (id, user_id, type, summary, params, status, source, undo, result, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, 'done', 'chat', ?, ?, ?, ?)`)
-    .run(id, user.id, type, DEFS[type].summary(user, params), JSON.stringify(params), JSON.stringify(undoData), JSON.stringify(result), t, t);
+    .run(id, user.id, type, defOf(type)!.summary(user, params), JSON.stringify(params), JSON.stringify(undoData), JSON.stringify(result), t, t);
   return id;
 }
 
@@ -449,7 +439,7 @@ export function approve(userId: string, id: string): { entry: ActionEntry; chang
   const user = getUser(userId);
   if (!r || !user) throw new Error('Nicht gefunden');
   if (r.status !== 'proposed') throw new Error('Schon entschieden');
-  const def = DEFS[r.type as ActionType] as Def<ActionType>;
+  const def = defOf(r.type as ActionType)!;
   try {
     const out = def.run(user, JSON.parse(r.params));
     setStatus(userId, id, 'done', { undo: out.undo ?? null, result: out.result ?? null });
@@ -476,7 +466,7 @@ export function undo(userId: string, id: string): { entry: ActionEntry; changed:
   if (!r || !user) throw new Error('Nicht gefunden');
   const entry = toEntry(r);
   if (!entry.canUndo) throw new Error(r.status === 'undone' ? 'Ist schon rückgängig gemacht' : 'Das lässt sich nicht rückgängig machen');
-  const def = DEFS[r.type as ActionType] as Def<ActionType>;
+  const def = defOf(r.type as ActionType)!;
   const changed = def.undo!(user, JSON.parse(r.undo!)) ?? [];
   setStatus(userId, id, 'undone');
   return { entry: getAction(userId, id)!, changed };

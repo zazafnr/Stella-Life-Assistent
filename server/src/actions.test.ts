@@ -23,10 +23,13 @@ const today = todayIn('Europe/Vienna');
 test('Standard-Rechte: Planer selbst, Löschen fragt, alte Schalter zählen weiter', () => {
   assert.equal(levelFor(user(), 'planner'), 'auto');
   assert.equal(levelFor(user(), 'delete'), 'ask');
-  updateUserSettings(created.id, { homeworkAutopilot: false });
+  updateUserSettings(created.id, { mailAutoTrash: false });
+  assert.equal(levelFor(user(), 'mail_sort'), 'never');
+  updateUserSettings(created.id, { mailAutoTrash: true, permissions: { delete: 'auto' } });
+  assert.equal(levelFor(user(), 'delete'), 'auto');
+  updateUserSettings(created.id, { permissions: {} });
+  // Bereiche eines nicht geladenen Plugins (z. B. „HÜs lösen“) sind aus
   assert.equal(levelFor(user(), 'homework'), 'never');
-  updateUserSettings(created.id, { homeworkAutopilot: true, permissions: { homework: 'ask' } });
-  assert.equal(levelFor(user(), 'homework'), 'ask');
 });
 
 test('Aktion im Auftrag: wird ausgeführt, protokolliert und lässt sich rückgängig machen', () => {

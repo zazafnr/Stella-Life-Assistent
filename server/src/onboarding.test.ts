@@ -13,7 +13,6 @@ const { register } = await import('./auth.ts');
 const { getUser, updateUserSettings } = await import('./db.ts');
 const { setKey } = await import('./keys.ts');
 const { setMailTransportFactory } = await import('./mailer.ts');
-const { freenotesWaitlist, announceFreenotes } = await import('./notes.ts');
 const { shouldAskLocation, recordLocationAnswer, locationAskText } = await import('./location.ts');
 
 const sent: { to: string; subject: string; html?: string }[] = [];
@@ -26,26 +25,6 @@ const mk = (name: string, locale: 'de' | 'es' | 'en', notify: boolean) => {
   updateUserSettings(user.id, { locale, ...(notify ? { notify: { freenotes: true } } : {}) });
   return user.id;
 };
-
-test('„Benachrichtige mich“: Warteliste, Mail in der Sprache der Person, jede Person genau einmal', async () => {
-  const mia = mk('Mia', 'de', true);
-  mk('Nico', 'en', false);
-  const eva = mk('Eva', 'es', true);
-  assert.deepEqual(freenotesWaitlist().sort(), [mia, eva].sort());
-
-  config.freenotesUrl = '';
-  await assert.rejects(announceFreenotes(), /STELLA_FREENOTES_URL/);
-
-  config.freenotesUrl = 'https://freenotes.example.com/get';
-  const r = await announceFreenotes();
-  assert.deepEqual(r, { notified: 2, failed: 0 });
-  assert.equal(sent.length, 2);
-  assert.ok(sent.find((m) => m.to === 'mia@example.com')!.subject.includes('FreeNotes ist da'));
-  assert.ok(sent.find((m) => m.to === 'eva@example.com')!.subject.includes('ya está aquí'));
-  assert.ok(sent[0]!.html!.includes('https://freenotes.example.com/get'));
-  assert.deepEqual(freenotesWaitlist(), []);
-  assert.deepEqual(await announceFreenotes(), { notified: 0, failed: 0 });
-});
 
 test('Standort: „Später“ wird beim ersten Bedarf erneut gefragt, „Nein“ nicht', () => {
   const id = mk('Lena', 'de', false);
