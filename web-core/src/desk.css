@@ -1,14 +1,14 @@
 /* Stella für Web und PC: eigenes Desktop-Layout (Seitenleiste, Kopfleiste, mehrspaltige Seiten, Seitenfenster).
    Es liegt über styles.css und übernimmt von dort nur die Marke: Farben, Schrift, Stern. Das Handy-Layout bleibt als schmale Notlösung unter 760 px. */
 :root {
-  --bg: #F3F6FB;
+  --bg: var(--bg);
   --surface: #FFFFFF;
-  --surface-2: #EDF2F9;
-  --tint: #E8F0FE;
-  --border: rgba(15, 42, 74, .09);
-  --border-strong: rgba(15, 42, 74, .18);
-  --shadow: 0 1px 2px rgba(15, 42, 74, .05);
-  --shadow-lg: 0 16px 40px rgba(15, 42, 74, .16);
+  --surface-2: var(--surface-2);
+  --tint: var(--tint);
+  --border: color-mix(in srgb, var(--text) 9%, transparent);
+  --border-strong: color-mix(in srgb, var(--text) 18%, transparent);
+  --shadow: 0 1px 2px color-mix(in srgb, var(--text) 5%, transparent);
+  --shadow-lg: 0 16px 40px color-mix(in srgb, var(--text) 16%, transparent);
   --radius: 12px;
   --r-sm: 8px;
   --side-w: 244px;
@@ -25,9 +25,9 @@ h2 { font-size: 15px; }
 /* ---------- Bausteine, kompakt ---------- */
 .card { border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px; }
 .card.interactive { transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
-.card.interactive:hover { transform: none; border-color: rgba(31, 111, 235, .45); box-shadow: 0 2px 10px rgba(31, 111, 235, .1); }
+.card.interactive:hover { transform: none; border-color: color-mix(in srgb, var(--blue) 45%, transparent); box-shadow: 0 2px 10px color-mix(in srgb, var(--blue) 10%, transparent); }
 .btn { min-height: 36px; padding: 0 14px; border-radius: var(--r-sm); font-size: 13.5px; box-shadow: none; transition: background .15s ease, filter .15s ease, border-color .15s ease; }
-.btn:hover { filter: none; background: #1A62D2; }
+.btn:hover { filter: none; background: var(--blue); }
 .btn:active { transform: none; }
 .btn.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); }
 .btn.secondary:hover { background: var(--surface-2); }
@@ -40,11 +40,11 @@ h2 { font-size: 15px; }
 .link { padding: 2px 0; font-size: 13px; }
 .link:hover { text-decoration: underline; }
 input, textarea, select { border-radius: var(--r-sm); padding: 7px 10px; min-height: 34px; font-size: 13.5px; }
-input:focus, textarea:focus, select:focus { box-shadow: 0 0 0 3px rgba(31, 111, 235, .15); }
+input:focus, textarea:focus, select:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 15%, transparent); }
 .field, .form-grid label { font-size: 12.5px; }
 .chip { padding: 5px 11px; font-size: 12.5px; border-radius: 999px; }
 .chip:hover { transform: none; }
-.chip.active { background: var(--tint); border-color: rgba(31, 111, 235, .5); color: var(--blue); font-weight: 600; }
+.chip.active { background: var(--tint); border-color: color-mix(in srgb, var(--blue) 50%, transparent); color: var(--blue); font-weight: 600; }
 .segmented { box-shadow: none; border-radius: var(--r-sm); padding: 3px; width: max-content; max-width: 100%; }
 .segmented button { min-height: 28px; border-radius: 6px; padding: 0 12px; flex: 0 0 auto; }
 .pill { padding: 3px 9px; font-size: 11.5px; }
@@ -121,7 +121,7 @@ input:focus, textarea:focus, select:focus { box-shadow: 0 0 0 3px rgba(31, 111, 
 .toolbar .grow { flex: 1; }
 
 /* Seitenfenster (früher „Sheets“): rechts eingeschoben, Esc schließt */
-.sheet-backdrop { background: rgba(15, 42, 74, .32); align-items: stretch; justify-content: flex-end; backdrop-filter: blur(1.5px); animation: fadeIn .18s ease both; }
+.sheet-backdrop { background: color-mix(in srgb, var(--text) 32%, transparent); align-items: stretch; justify-content: flex-end; backdrop-filter: blur(1.5px); animation: fadeIn .18s ease both; }
 .sheet {
   width: min(560px, 100vw); max-width: none; height: 100%; max-height: none; border-radius: 0; margin: 0; padding: 0 24px 32px;
   background: var(--bg); box-shadow: var(--shadow-lg); border-left: 1px solid var(--border); overflow-y: auto; animation: drawerIn .26s var(--ease) both;
@@ -132,7 +132,7 @@ input:focus, textarea:focus, select:focus { box-shadow: 0 0 0 3px rgba(31, 111, 
 @keyframes drawerIn { from { transform: translateX(32px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* Befehlspalette (Strg+K) */
-.palette-backdrop { position: fixed; inset: 0; z-index: 80; background: rgba(15, 42, 74, .35); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; animation: fadeIn .12s ease both; }
+.palette-backdrop { position: fixed; inset: 0; z-index: 80; background: color-mix(in srgb, var(--text) 35%, transparent); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; animation: fadeIn .12s ease both; }
 .palette { width: min(640px, calc(100vw - 32px)); background: var(--surface); border-radius: 14px; box-shadow: var(--shadow-lg); border: 1px solid var(--border); overflow: hidden; animation: pop .18s var(--ease) both; }
 .palette input { border: 0; border-bottom: 1px solid var(--border); border-radius: 0; min-height: 52px; padding: 0 18px; font-size: 15px; box-shadow: none !important; }
 .palette ul { list-style: none; margin: 0; padding: 6px; max-height: 52vh; overflow-y: auto; }
@@ -147,7 +147,7 @@ input:focus, textarea:focus, select:focus { box-shadow: 0 0 0 3px rgba(31, 111, 
 .dash > section, .dash > div { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
 .hero {
   display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 26px; border-radius: var(--radius);
-  background: linear-gradient(120deg, #DCEBFF 0%, #EAF3FF 55%, #FCEAF3 100%); border: 1px solid rgba(31, 111, 235, .12);
+  background: linear-gradient(120deg, var(--hero-from, var(--sky)) 0%, var(--hero-via, var(--tint)) 55%, var(--hero-to, var(--pink-tint)) 100%); border: 1px solid color-mix(in srgb, var(--blue) 12%, transparent);
 }
 .hero h1 { font-size: 26px; }
 .hero .when { display: flex; align-items: center; gap: 10px; color: var(--text-2); font-weight: 500; font-size: 13.5px; margin-bottom: 4px; }
@@ -176,7 +176,7 @@ input:focus, textarea:focus, select:focus { box-shadow: 0 0 0 3px rgba(31, 111, 
 .suggestions { max-width: 860px; padding: 0 28px 8px; background: var(--bg); width: 100%; margin: 0; box-sizing: border-box; }
 .composer-wrap { padding: 10px 28px 18px; background: var(--bg); }
 .composer { max-width: 860px; border-radius: 12px; padding: 6px; background: var(--surface); backdrop-filter: none; box-shadow: var(--shadow); border-color: var(--border-strong); }
-.composer:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(31, 111, 235, .12); }
+.composer:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 12%, transparent); }
 .composer textarea { padding: 8px 8px; min-height: 36px; }
 .composer .attach, .composer .send { width: 36px; height: 36px; border-radius: 9px; }
 .composer-hint { max-width: 860px; margin: 6px auto 0; font-size: 11.5px; color: var(--faint); display: flex; gap: 14px; }
@@ -210,7 +210,7 @@ input:focus, textarea:focus, select:focus { box-shadow: 0 0 0 3px rgba(31, 111, 
 /* ---------- Planer: Woche ---------- */
 .board { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; align-items: start; }
 .board-day { min-height: calc(100vh - 270px) !important; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); min-height: 220px; display: flex; flex-direction: column; overflow: hidden; }
-.board-day.today { border-color: rgba(31, 111, 235, .5); box-shadow: 0 0 0 1px rgba(31, 111, 235, .25); }
+.board-day.today { border-color: color-mix(in srgb, var(--blue) 50%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--blue) 25%, transparent); }
 .board-head { display: flex; align-items: baseline; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
 .board-day.today .board-head { background: var(--tint); }
 .board-head .wd { font-weight: 700; font-size: 12.5px; }
@@ -249,7 +249,7 @@ input:focus, textarea:focus, select:focus { box-shadow: 0 0 0 3px rgba(31, 111, 
 .login { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(420px, 520px); min-height: 100%; padding: 0; background: var(--surface); }
 .login .login-art {
   position: relative; display: flex; flex-direction: column; justify-content: center; gap: 18px; padding: 64px; overflow: hidden;
-  background: linear-gradient(160deg, #CFE6FF 0%, #E6F2FF 50%, #FDEBF4 100%);
+  background: linear-gradient(160deg, var(--sky) 0%, var(--tint) 50%, var(--pink-tint) 100%);
 }
 .login-art h1 { font-size: 40px; line-height: 1.1; max-width: 520px; }
 .login-art p { max-width: 460px; color: var(--text-2); font-size: 16px; margin: 0; }
