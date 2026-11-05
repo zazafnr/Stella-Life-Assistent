@@ -43,6 +43,9 @@ export function PlanSheet() {
       `${t('plan.f.news')}: ${l.newsFavorites ? t('plan.f.newsFavorites', { count: l.newsCount }) : l.newsCount}`,
       `${t('plan.f.screenTime')}: ${l.screenTime ? '✓' : '–'}`,
       `${t('plan.f.webTasks')}: ${l.webTasks ? '✓' : '–'}`,
+      // Stella for Students: Lernkarten und Mitschriften (im normalen Stella 0 = nicht gezeigt)
+      ...(l.flashcardsPerMonth ? [`${t('plan.f.flashcards')}: ${l.flashcardsPerMonth}`] : []),
+      ...(l.notesPerMonth ? [`${t('plan.f.notes')}: ${l.notesPerMonth}`] : []),
       ...(l.priority ? [t('plan.f.priority')] : []),
     ];
   };

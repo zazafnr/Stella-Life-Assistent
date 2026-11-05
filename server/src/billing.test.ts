@@ -250,3 +250,57 @@ test('Dashboard-Zahlen: Nutzer je Abo, MRR, Kosten je Nutzer, Marge, teuerste Nu
   assert.equal(ov.topUsers[0]!.name, 'Lena', 'Lena hat die höchsten Kosten');
   assert.ok(ov.plans.find((p) => p.plan === 'plus')!.avgCostEur > 0);
 });
+
+// ---------- Abos je Edition (Paket 14) ----------
+
+test('Pläne je Edition: Students-Preise 5/9/19 €, Lernkarten- und Mitschrift-Limits, HÜ-Autopilot auch im Free-Abo', async () => {
+  const { PLANS_BY_EDITION, effectivePlan } = await import('@stella/shared');
+  assert.deepEqual(['free', 'plus', 'pro', 'max'].map((id) => PLANS_BY_EDITION.life[id as 'free'].priceCents), [0, 800, 1500, 3500]);
+  assert.deepEqual(['free', 'plus', 'pro', 'max'].map((id) => PLANS_BY_EDITION.students[id as 'free'].priceCents), [0, 500, 900, 1900]);
+  assert.deepEqual(['free', 'plus', 'pro', 'max'].map((id) => PLANS_BY_EDITION.students[id as 'free'].limits.flashcardsPerMonth), [2, 15, 50, 200]);
+  assert.deepEqual(['free', 'plus', 'pro', 'max'].map((id) => PLANS_BY_EDITION.students[id as 'free'].limits.notesPerMonth), [1, 8, 25, 100]);
+  assert.ok(PLANS_BY_EDITION.life.max.limits.flashcardsPerMonth === 0, 'im normalen Stella gibt es Lernkarten nicht');
+  assert.equal(PLANS_BY_EDITION.students.free.limits.proTasksHomeworkOnly, true);
+  assert.equal(effectivePlan('plus', { plus: { priceCents: 599 } }, 'students').priceCents, 599);
+  assert.equal(effectivePlan('plus', { plus: { priceCents: 599 } }, 'life').priceCents, 599, 'Überschreibung gilt für die Edition, mit der sie gelesen wird');
+});
+
+test('Students-Konto: Checkout mit Students-Preis, Limits der Students-Pläne, Überschreibungen getrennt je Edition, Dashboard trennt sauber', async () => {
+  const { createSession } = await import('./auth.ts');
+  const sam = mk('Sam');
+  db.prepare("UPDATE users SET edition = 'students' WHERE id = ?").run(sam().id);
+  const auth = { authorization: `Bearer ${createSession(sam().id, 'test')}` };
+
+  const res = await app.inject({ method: 'POST', url: '/api/billing/checkout', headers: auth, payload: { plan: 'plus', interval: 'month' } });
+  assert.equal(res.statusCode, 200, res.body);
+  assert.equal(stripeCalls.filter((c) => c.path === '/v1/checkout/sessions').at(-1)!.body.get('line_items[0][price_data][unit_amount]'), '500', 'Students Plus = 5 €');
+  await app.inject({ method: 'POST', url: '/api/billing/checkout', headers: auth, payload: { plan: 'pro', interval: 'year' } });
+  assert.equal(stripeCalls.filter((c) => c.path === '/v1/checkout/sessions').at(-1)!.body.get('line_items[0][price_data][unit_amount]'), '9000', 'Jahresabo: zwei Monate gratis');
+
+  // Status zeigt die Pläne der eigenen Edition
+  const status = (await app.inject({ method: 'GET', url: '/api/billing/status', headers: auth })).json();
+  assert.equal(status.edition, 'students');
+  assert.deepEqual(status.plans.map((p: { priceCents: number }) => p.priceCents), [0, 500, 900, 1900]);
+
+  // Überschreibungen je Edition getrennt
+  billing.setPlanOverrides({ plus: { priceCents: 700 } }, 'students');
+  assert.equal(billing.planFor('plus', 'students').priceCents, 700);
+  assert.equal(billing.planFor('plus', 'life').priceCents, 800, 'das normale Stella bleibt bei 8 €');
+  billing.setPlanOverrides({}, 'students');
+  assert.equal(billing.planFor('plus', 'students').priceCents, 500);
+
+  // Kontingent für Lernkarten (Free: 2 pro Monat, Students)
+  const check = () => billing.quotaFor(sam(), 'flashcards');
+  assert.deepEqual([check().ok, check().limit], [true, 2]);
+  billing.consumeQuota(sam(), 'flashcards'); billing.consumeQuota(sam(), 'flashcards');
+  assert.deepEqual([check().ok, check().reason], [false, 'limit']);
+  assert.equal(billing.quotaFor(sam(), 'notes').limit, 1);
+
+  // Dashboard: je Edition und Summe
+  const ov = billing.billingOverview(30);
+  assert.ok(ov.editions.students.accounts >= 1);
+  assert.ok(ov.editions.life.accounts >= 1);
+  assert.equal(ov.total.accounts, ov.editions.life.accounts + ov.editions.students.accounts);
+  assert.equal(ov.editions.students.plans.find((p) => p.plan === 'plus')!.priceCents, 500);
+  assert.equal(ov.plans.find((p) => p.plan === 'plus')!.priceCents, 800, 'bisherige Felder = normales Stella');
+});

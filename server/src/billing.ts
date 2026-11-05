@@ -7,7 +7,8 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { effectivePlan, isPlanId, PLAN_IDS, todayIn, yearlyPriceCents, type Plan, type PlanId, type PlanLimits, type PlanOverrides } from '@stella/shared';
+import { EDITIONS, effectivePlan, isPlanId, PLAN_IDS, todayIn, yearlyPriceCents, type Edition, type Plan, type PlanId, type PlanLimits, type PlanOverrides } from '@stella/shared';
+import { editionOfUser } from './editions/registry.ts';
 import { config } from './config.ts';
 import { costPerUser } from './costs.ts';
 import { db, getUser, notifyOnce, now, type User } from './db.ts';
@@ -16,7 +17,7 @@ import { stripeKey, SYSTEM_SCOPE } from './keys.ts';
 import { userLocale } from './locale.ts';
 import { sendTemplateMail, mailerConfigured } from './mailer.ts';
 
-export type QuotaKind = 'ai_message' | 'pro_task';
+export type QuotaKind = 'ai_message' | 'pro_task' | 'flashcards' | 'notes';
 export type SubStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'incomplete';
 
 export interface Subscription {
@@ -54,14 +55,23 @@ export function currentPlanId(user: Pick<User, 'id'>, at = Date.now()): PlanId {
   return s.plan;
 }
 
-export function planOverrides(): PlanOverrides {
-  return getSecret<PlanOverrides>(SYSTEM_SCOPE, 'setting:plans') ?? {};
+type StoredOverrides = Partial<Record<Edition, PlanOverrides>>;
+
+/** Gespeichert je Edition ({ life, students }); der ältere Stand (nur Abos als Schlüssel) gilt für `life` */
+function storedOverrides(): StoredOverrides {
+  const raw = getSecret<Record<string, unknown>>(SYSTEM_SCOPE, 'setting:plans') ?? {};
+  if ('life' in raw || 'students' in raw) return raw as StoredOverrides;
+  return Object.keys(raw).length ? { life: raw as PlanOverrides } : {};
 }
 
-const LIMIT_KEYS: (keyof PlanLimits)[] = ['aiMessagesPerDay', 'proTasksPerMonth', 'proTasksHomeworkOnly', 'mailboxes', 'newsCount', 'newsFavorites', 'screenTime', 'webTasks', 'priority'];
+export function planOverrides(edition: Edition = 'life'): PlanOverrides {
+  return storedOverrides()[edition] ?? {};
+}
+
+const LIMIT_KEYS: (keyof PlanLimits)[] = ['aiMessagesPerDay', 'proTasksPerMonth', 'proTasksHomeworkOnly', 'mailboxes', 'newsCount', 'newsFavorites', 'screenTime', 'webTasks', 'priority', 'flashcardsPerMonth', 'notesPerMonth'];
 
 /** Überschreibungen prüfen und speichern (nur bekannte Abos und Felder, sinnvolle Werte) */
-export function setPlanOverrides(raw: unknown): PlanOverrides {
+export function setPlanOverrides(raw: unknown, edition: Edition = 'life'): PlanOverrides {
   const out: PlanOverrides = {};
   for (const id of PLAN_IDS) {
     const o = ((raw ?? {}) as Record<string, unknown>)[id];
@@ -75,18 +85,19 @@ export function setPlanOverrides(raw: unknown): PlanOverrides {
     }
     if (Object.keys(clean).length) out[id] = clean as PlanOverrides[PlanId];
   }
-  setSecret(SYSTEM_SCOPE, 'setting:plans', out);
+  setSecret(SYSTEM_SCOPE, 'setting:plans', { ...storedOverrides(), [edition]: out });
   return out;
 }
 
-export const planFor = (id: PlanId): Plan => effectivePlan(id, planOverrides());
-export const planOf = (user: Pick<User, 'id'>): Plan => planFor(currentPlanId(user));
+/** Abo einer Edition mit den Überschreibungen des Betreibers (Standard: normales Stella) */
+export const planFor = (id: PlanId, edition: Edition = 'life'): Plan => effectivePlan(id, planOverrides(edition), edition);
+export const planOf = (user: Pick<User, 'id'>): Plan => planFor(currentPlanId(user), editionOfUser(user.id));
 
 // ---------- Zähler und Kontingente ----------
 
 const period = (user: Pick<User, 'timeZone'>, kind: QuotaKind) => {
   const day = todayIn(user.timeZone || config.defaultTimeZone);
-  return kind === 'ai_message' ? day : day.slice(0, 7);
+  return kind === 'ai_message' ? day : day.slice(0, 7); // nur KI-Nachrichten zählen je Tag, alles andere je Monat
 };
 
 export function usedCount(user: Pick<User, 'id' | 'timeZone'>, kind: QuotaKind): number {
@@ -103,9 +114,9 @@ export interface QuotaCheck { ok: boolean; used: number; limit: number; plan: Pl
 /** Darf diese Nutzerin noch? `homework`: die Profi-Aufgabe ist das Lösen einer Hausübung (im Free-Abo erlaubt). */
 export function quotaFor(user: User, kind: QuotaKind, opts: { homework?: boolean } = {}): QuotaCheck {
   const planId = currentPlanId(user);
-  const limits = planFor(planId).limits;
+  const limits = planFor(planId, user.edition).limits;
   const used = usedCount(user, kind);
-  const limit = kind === 'ai_message' ? limits.aiMessagesPerDay : limits.proTasksPerMonth;
+  const limit = kind === 'ai_message' ? limits.aiMessagesPerDay : kind === 'pro_task' ? limits.proTasksPerMonth : kind === 'flashcards' ? limits.flashcardsPerMonth : limits.notesPerMonth;
   if (kind === 'pro_task' && limits.proTasksHomeworkOnly && !opts.homework) return { ok: false, used, limit, plan: planId, reason: 'homework_only' };
   return used < limit ? { ok: true, used, limit, plan: planId } : { ok: false, used, limit, plan: planId, reason: 'limit' };
 }
@@ -179,7 +190,7 @@ export type Interval = 'month' | 'year';
 
 export async function createCheckout(user: User, planId: PlanId, interval: Interval, returnUrl = config.publicUrl): Promise<{ url: string }> {
   if (planId === 'free') throw new HttpError(400, 'Das Free-Abo braucht keine Bezahlung.');
-  const plan = planFor(planId);
+  const plan = planFor(planId, user.edition);
   const sub = subscriptionOf(user.id);
   if (sub?.provider === 'stripe' && sub.sub && PAYING.includes(sub.status)) throw new HttpError(409, 'Du hast schon ein Abo. Wechseln oder kündigen geht im Kundenportal.');
   const unit = interval === 'year' ? yearlyPriceCents(plan) : plan.priceCents;
@@ -285,38 +296,56 @@ const percentile = (sorted: number[], p: number) => (sorted.length ? sorted[Math
 export function billingOverview(days = 30) {
   const to = new Date().toISOString().slice(0, 10);
   const from = new Date(Date.now() - (days - 1) * 86_400_000).toISOString().slice(0, 10);
-  const users = db.prepare('SELECT id, name FROM users WHERE verified = 1').all() as { id: string; name: string }[];
+  const users = db.prepare('SELECT id, name, edition FROM users WHERE verified = 1').all() as { id: string; name: string; edition: string }[];
   const cost = new Map(costPerUser(from, to).map((c) => [c.userId, c.costMicroUsd]));
   const eur = config.pricing.eurPerUsd;
-  const perPlan = Object.fromEntries(PLAN_IDS.map((id) => [id, { users: 0, paying: 0, costs: [] as number[] }])) as Record<PlanId, { users: number; paying: number; costs: number[] }>;
-  const table: { id: string; name: string; plan: PlanId; costEur: number }[] = [];
-  for (const u of users) {
-    const plan = currentPlanId(u);
-    const eurCost = ((cost.get(u.id) ?? 0) / 1e6) * eur;
-    perPlan[plan].users++;
-    perPlan[plan].costs.push(eurCost);
-    if (subscriptionOf(u.id)?.provider === 'stripe' && plan !== 'free') perPlan[plan].paying++;
-    table.push({ id: u.id, name: u.name, plan, costEur: eurCost });
-  }
-  let mrrCents = 0;
-  const plans = PLAN_IDS.map((id) => {
-    const p = perPlan[id];
-    const sorted = [...p.costs].sort((a, b) => a - b);
-    const avg = sorted.length ? sorted.reduce((a, b) => a + b, 0) / sorted.length : 0;
-    const price = planFor(id).priceCents;
-    mrrCents += p.paying * price;
-    // Kosten sind für `days` Tage gemessen – auf einen Monat hochrechnen
-    const monthly = avg * (30 / days);
+  const table: { id: string; name: string; plan: PlanId; costEur: number; edition: Edition }[] = [];
+
+  /** Zahlen für eine Edition: Konten und Kosten je Abo, Umsatz (MRR), Marge */
+  const forEdition = (edition: Edition) => {
+    const perPlan = Object.fromEntries(PLAN_IDS.map((id) => [id, { users: 0, paying: 0, costs: [] as number[] }])) as Record<PlanId, { users: number; paying: number; costs: number[] }>;
+    for (const u of users.filter((x) => (x.edition === 'students' ? 'students' : 'life') === edition)) {
+      const plan = currentPlanId(u);
+      const eurCost = ((cost.get(u.id) ?? 0) / 1e6) * eur;
+      perPlan[plan].users++;
+      perPlan[plan].costs.push(eurCost);
+      if (subscriptionOf(u.id)?.provider === 'stripe' && plan !== 'free') perPlan[plan].paying++;
+      table.push({ id: u.id, name: u.name, plan, costEur: eurCost, edition });
+    }
+    let mrrCents = 0;
+    const plans = PLAN_IDS.map((id) => {
+      const p = perPlan[id];
+      const sorted = [...p.costs].sort((a, b) => a - b);
+      const avg = sorted.length ? sorted.reduce((a, b) => a + b, 0) / sorted.length : 0;
+      const price = planFor(id, edition).priceCents;
+      mrrCents += p.paying * price;
+      // Kosten sind für `days` Tage gemessen – auf einen Monat hochrechnen
+      const monthly = avg * (30 / days);
+      return {
+        plan: id, users: p.users, paying: p.paying, priceCents: price,
+        avgCostEur: avg, p95CostEur: percentile(sorted, 0.95), totalCostEur: sorted.reduce((a, b) => a + b, 0),
+        marginPerUserEur: price === 0 ? -monthly : netCents(price) / 100 - monthly,
+      };
+    });
     return {
-      plan: id, users: p.users, paying: p.paying, priceCents: price,
-      avgCostEur: avg, p95CostEur: percentile(sorted, 0.95), totalCostEur: sorted.reduce((a, b) => a + b, 0),
-      marginPerUserEur: price === 0 ? -monthly : netCents(price) / 100 - monthly,
+      accounts: plans.reduce((a, p) => a + p.users, 0), paying: plans.reduce((a, p) => a + p.paying, 0),
+      mrrCents, plans, totalCostEur: plans.reduce((a, p) => a + p.totalCostEur, 0),
     };
-  });
+  };
+
+  const editions = Object.fromEntries(EDITIONS.map((e) => [e, forEdition(e)])) as Record<Edition, ReturnType<typeof forEdition>>;
+  const life = editions.life;
   return {
-    days, mrrCents, plans,
-    totalCostEur: plans.reduce((a, p) => a + p.totalCostEur, 0),
-    topUsers: table.sort((a, b) => b.costEur - a.costEur).slice(0, 10).map((r, i) => ({ rank: i + 1, name: r.name, plan: r.plan, costEur: r.costEur })),
+    days,
+    // bisherige Felder = normales Stella (ältere Dashboards zeigen weiter dasselbe)
+    mrrCents: life.mrrCents, plans: life.plans, totalCostEur: life.totalCostEur,
+    // neu: Zahlen je Edition und eine Summe
+    editions,
+    total: {
+      accounts: EDITIONS.reduce((a, e) => a + editions[e].accounts, 0), paying: EDITIONS.reduce((a, e) => a + editions[e].paying, 0),
+      mrrCents: EDITIONS.reduce((a, e) => a + editions[e].mrrCents, 0), totalCostEur: EDITIONS.reduce((a, e) => a + editions[e].totalCostEur, 0),
+    },
+    topUsers: table.sort((a, b) => b.costEur - a.costEur).slice(0, 10).map((r, i) => ({ rank: i + 1, name: r.name, plan: r.plan, edition: r.edition, costEur: r.costEur })),
   };
 }
 
@@ -325,11 +354,12 @@ export function billingOverview(days = 30) {
 export function billingStatus(user: User) {
   const sub = subscriptionOf(user.id);
   const planId = currentPlanId(user);
-  const ov = planOverrides();
+  const ov = planOverrides(user.edition);
   return {
+    edition: user.edition,
     plan: planId, subscription: sub && { status: sub.status, provider: sub.provider, currentPeriodEnd: sub.currentPeriodEnd, cancelAt: sub.cancelAt },
     usage: usageOverview(user),
-    plans: PLAN_IDS.map((id) => effectivePlan(id, ov)),
+    plans: PLAN_IDS.map((id) => effectivePlan(id, ov, user.edition)),
     canCheckout: !!stripeKey() && sub?.provider !== 'gift',
     canManage: !!sub?.customer,
   };

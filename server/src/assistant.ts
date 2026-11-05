@@ -964,7 +964,7 @@ function limitReachedText(t: Turn, limit: number, planId: PlanId): string {
   let text = tr(t.user, `paywall.limit.${tone}`, { limit });
   const next = nextPlan(planId);
   if (next && paywallHintDue(t.user)) {
-    const p = planFor(next);
+    const p = planFor(next, t.user.edition);
     text += `\n\n${tr(t.user, 'paywall.hint', { plan: next.charAt(0).toUpperCase() + next.slice(1), limit: p.limits.aiMessagesPerDay })}`;
   }
   return text;

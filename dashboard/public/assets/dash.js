@@ -233,25 +233,34 @@
         if (!b) return;
         $('sub-hint').textContent = 'Last ' + b.days + ' days · cost per user is AI usage in euros; margin is per month after tax and Stripe fees';
         var tiles = $('sub-tiles'); clear(tiles);
-        var paying = 0, users = 0; b.plans.forEach(function (p) { paying += p.paying; users += p.users; });
-        tiles.appendChild(tile('Monthly revenue', eur(b.mrrCents / 100), ['from ' + paying + ' paying']));
-        tiles.appendChild(tile('AI cost', eur(b.totalCostEur), ['last ' + b.days + ' days']));
-        tiles.appendChild(tile('Paying', fmt(paying), [users ? Math.round(paying / users * 100) + ' % of ' + fmt(users) + ' accounts' : '–']));
+        // Zahlen je Edition (Stella · Stella for Students) und eine Summe; ältere Server liefern nur `plans`
+        var EDITION = { life: 'Stella', students: 'Students' };
+        var eds = b.editions || { life: { plans: b.plans, mrrCents: b.mrrCents, totalCostEur: b.totalCostEur } };
+        var total = b.total || { accounts: 0, paying: 0, mrrCents: b.mrrCents, totalCostEur: b.totalCostEur };
+        if (!b.total) b.plans.forEach(function (p) { total.paying += p.paying; total.accounts += p.users; });
+        tiles.appendChild(tile('Monthly revenue', eur(total.mrrCents / 100), ['from ' + total.paying + ' paying']));
+        tiles.appendChild(tile('AI cost', eur(total.totalCostEur), ['last ' + b.days + ' days']));
+        tiles.appendChild(tile('Paying', fmt(total.paying), [total.accounts ? Math.round(total.paying / total.accounts * 100) + ' % of ' + fmt(total.accounts) + ' accounts' : '–']));
+        Object.keys(eds).forEach(function (k) {
+          if (Object.keys(eds).length > 1) tiles.appendChild(tile(EDITION[k] + ' revenue', eur(eds[k].mrrCents / 100), [fmt(eds[k].accounts || 0) + ' accounts · ' + eur(eds[k].totalCostEur) + ' AI cost']));
+        });
         var body = $('sub-plans'); clear(body);
-        b.plans.forEach(function (p) {
-          var tr = document.createElement('tr');
-          [PLAN[p.plan] || p.plan, fmt(p.users), fmt(p.paying), eur(p.avgCostEur), eur(p.p95CostEur), eur(p.marginPerUserEur)].forEach(function (v, i) {
-            var td = el('td', v, i ? 'n' : null);
-            if (i === 5 && p.marginPerUserEur < 0) td.className = 'n bad';
-            tr.appendChild(td);
+        Object.keys(eds).forEach(function (k) {
+          eds[k].plans.forEach(function (p) {
+            var tr = document.createElement('tr');
+            [(Object.keys(eds).length > 1 ? EDITION[k] + ' · ' : '') + (PLAN[p.plan] || p.plan), fmt(p.users), fmt(p.paying), eur(p.avgCostEur), eur(p.p95CostEur), eur(p.marginPerUserEur)].forEach(function (v, i) {
+              var td = el('td', v, i ? 'n' : null);
+              if (i === 5 && p.marginPerUserEur < 0) td.className = 'n bad';
+              tr.appendChild(td);
+            });
+            body.appendChild(tr);
           });
-          body.appendChild(tr);
         });
         var top = $('sub-top'); clear(top);
         if (!b.topUsers.length) { var r0 = document.createElement('tr'); var c0 = el('td', 'No usage yet.', 'empty'); c0.colSpan = 4; r0.appendChild(c0); top.appendChild(r0); }
         b.topUsers.forEach(function (u) {
           var tr = document.createElement('tr');
-          [String(u.rank), u.name, PLAN[u.plan] || u.plan, eur(u.costEur)].forEach(function (v, i) { tr.appendChild(el('td', v, i === 3 ? 'n' : null)); });
+          [String(u.rank), u.name, (u.edition === 'students' ? 'Students · ' : '') + (PLAN[u.plan] || u.plan), eur(u.costEur)].forEach(function (v, i) { tr.appendChild(el('td', v, i === 3 ? 'n' : null)); });
           top.appendChild(tr);
         });
       }).catch(function () { /* nur Owner sehen die Abos */ });
