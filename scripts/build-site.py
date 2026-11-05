@@ -12,7 +12,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 SRC, OUT = os.path.join(ROOT, 'site-src'), os.path.join(ROOT, 'site', 'public')
 BASE = 'https://evolsior.com'
 MARK = '<svg viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><rect x="10" y="5" width="18" height="5" rx="2.5"/><rect x="4" y="13.5" width="18" height="5" rx="2.5"/><rect x="10" y="22" width="18" height="5" rx="2.5"/></svg>'
-LINKS = {'__HOME__': '/', '__STELLA__': '/stella', '__IMPRINT__': '/imprint', '__PRIVACY__': '/privacy'}
+LINKS = {'__HOME__': '/', '__STELLA__': '/stella', '__STUDENTS__': '/stella-students', '__IMPRINT__': '/imprint', '__PRIVACY__': '/privacy'}
 
 def read(name):
     with open(os.path.join(SRC, name), encoding='utf-8') as f: return f.read()
@@ -62,11 +62,13 @@ def page(path, title, description, body, og='/assets/og.png', noindex=False):
 
 def main():
     imgs = ':root { ' + ' '.join(f'--img-{n}: url(/assets/stella/{n}.jpg);' for n in ['goals', 'plan', 'plans']) + ' }'
-    write('assets/site.css', '\n'.join([read('common.css'), imgs, read('index.css'), read('stella.css'), read('legal.css')]))
+    write('assets/site.css', '\n'.join([read('common.css'), imgs, read('index.css'), read('stella.css'), read('students.css'), read('legal.css')]))
     write('assets/site.js', read('common.js') + '\n' + read('stella.js'))
 
     write('index.html', page('/index', 'EVOLSIOR – Built to become', 'EVOLSIOR builds calm, precise apps that grow with the people who use them. Home of Stella, a personal assistant for your whole life.', read('index.body.html')))
     write('stella/index.html', page('/stella', 'Stella – Let Stella handle it | EVOLSIOR', 'Stella is an AI personal assistant for your whole day. Plans, homework, reminders, mail, restaurants, news and goals, handled in one conversation on iPhone, desktop, web and Telegram.', read('stella.body.html')))
+
+    write('stella-students/index.html', page('/stella-students', 'Stella for Students – Study with less chaos | EVOLSIOR', 'Stella for Students is the assistant for school, apprenticeship and university: timetable with cancellations, homework on autopilot, exams with a study plan, flashcards and notes from photos.', read('students.body.html')))
 
     legal = read('legal.body.html')
     head, rest = legal.split('<main id="main">', 1)
@@ -84,8 +86,8 @@ def main():
 <main id="main"><section class="hero"><div class="wrap"><p class="label" style="margin-bottom:28px">Error 404</p><h1>Nothing<br>here.</h1><p class="lead">This page does not exist, or it has moved.</p><div class="actions"><a class="btn" href="/">Back to start <span class="arrow">→</span></a></div></div></section></main>''', noindex=True))
 
     write('robots.txt', f'User-agent: *\nAllow: /\n\nSitemap: {BASE}/sitemap.xml\n')
-    write('sitemap.xml', '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + ''.join(f'  <url><loc>{BASE}{p}</loc></url>\n' for p in ['/', '/stella', '/imprint', '/privacy']) + '</urlset>\n')
-    write('_redirects', '/impressum /imprint 301\n/datenschutz /privacy 301\n/stella/app https://stella.evolsior.com 302\n')
+    write('sitemap.xml', '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + ''.join(f'  <url><loc>{BASE}{p}</loc></url>\n' for p in ['/', '/stella', '/stella-students', '/imprint', '/privacy']) + '</urlset>\n')
+    write('_redirects', '/impressum /imprint 301\n/datenschutz /privacy 301\n/stella/app https://stella.evolsior.com 302\n/students /stella-students 301\n/stella-students/app https://students.stella.evolsior.com 302\n')
     write('_headers', '''/*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin

@@ -5,7 +5,8 @@ Statische Seite (kein Framework). Quellen in `site-src/`, gebaut nach `site/publ
 | Adresse | Inhalt |
 |---|---|
 | `evolsior.com` | Firmenseite (EVOLSIOR, „Built to become“, Apps) |
-| `evolsior.com/stella` | Vorstellung von Stella |
+| `evolsior.com/stella` | Vorstellung von Stella (Alltag und Beruf, Pläne der Edition `life`) |
+| `evolsior.com/stella-students` | Vorstellung von Stella for Students (Quellen `students.body.html`, `students.css`; Pläne der Edition `students`); `/students` leitet dorthin um |
 | `evolsior.com/imprint`, `/privacy` | Impressum und Datenschutz (englisch; `/impressum` und `/datenschutz` leiten um) |
 | `stella.evolsior.com` | die Stella-Web-App (VPS), `evolsior.com/stella/app` leitet dorthin |
 | `students.stella.evolsior.com` | die Studenten-Web-App „Stella for Students“ (gleicher Server, andere Oberfläche; DNS: A-Record auf die VPS-IP, HTTPS holt Caddy), `evolsior.com/stella-students` stellt sie vor |
@@ -15,6 +16,8 @@ Statische Seite (kein Framework). Quellen in `site-src/`, gebaut nach `site/publ
 1. Texte und Aussehen in `site-src/` ändern (`*.body.html`, `*.css`, `*.js`).
 2. `python3 scripts/build-site.py` – baut `site/public/`.
 3. `site/` committen und nach `main` pushen. Cloudflare veröffentlicht automatisch.
+
+Die Seite von Stella for Students hat noch keine iPhone-Bilder (sie kommen mit der iOS-App); bis dahin zeigt sie Chips statt Telefon. Die Preise dort stehen in `shared/src/plans.ts` (`PLANS_BY_EDITION.students`) und müssen mit der Seite übereinstimmen.
 
 Die iPhone-Bilder (`site/public/assets/stella/*.jpg`, 1179×2556, mit Statusleiste) entstehen aus der Web-App mit Demo-Daten
 (`server/scripts/demo-seed.ts`). Die App spricht Deutsch, die Bilder sind für die englische Seite übersetzt.
