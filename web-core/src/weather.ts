@@ -2,12 +2,13 @@
 // Nichts hiervon blockiert den Start.
 
 import { useSyncExternalStore } from 'react';
+import { appConfig } from './app.ts';
 import { isAnimMode, isWeatherType, startWeather, type AnimMode, type WeatherState, type WeatherType } from '@stella/shared';
 import { api, getState } from './store.ts';
 import { isDesktopApp } from './platform.ts';
 
-const CACHE_KEY = 'stella.weather';
-const FORCE_KEY = 'stella.forceWeather';
+const CACHE_KEY = `${appConfig().storagePrefix}.weather`;
+const FORCE_KEY = `${appConfig().storagePrefix}.forceWeather`;
 
 function read<T>(key: string): T | null {
   try { const v = localStorage.getItem(key); return v ? (JSON.parse(v) as T) : null; } catch { return null; }
@@ -65,7 +66,7 @@ export function startWeatherOnce() {
 
 // ---------- Einstellungen → Darstellung → Wetter-Animationen: an / ruhig / aus ----------
 
-const ANIM_KEY = 'stella.weatherAnim';
+const ANIM_KEY = `${appConfig().storagePrefix}.weatherAnim`;
 let animMode: AnimMode = (() => { try { const v = localStorage.getItem(ANIM_KEY); return isAnimMode(v) ? v : 'on'; } catch { return 'on'; } })();
 export function setAnimMode(m: AnimMode) {
   animMode = m;

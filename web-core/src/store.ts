@@ -4,6 +4,7 @@
 // im Planer an. Sobald wieder Netz da ist, wird alles mit dem VPS abgeglichen.
 
 import { useSyncExternalStore } from 'react';
+import { appConfig } from './app.ts';
 import {
   formatDateDe, interpret, t as translate, profileHas, profileIsLearner, profileIsSchool, todayIn, type ActionEntry, type ActionGroup, type ChatMessage, type ChatResponse, type Conversation, type Item, type PermissionLevel,
   type Locale, type SyncResponse, type Tone, type Feature, type UserProfile,
@@ -71,7 +72,7 @@ interface State {
   conversations: Conversation[];
 }
 
-const STORAGE_KEY = 'stella-state-v1';
+const STORAGE_KEY = `${appConfig().storagePrefix}-state-v1`;
 
 function load(): State {
   const base: State = { token: null, me: null, items: {}, messages: [], outbox: [], lastSync: null, online: navigator.onLine, thinking: false, busyItems: [], actions: {}, conversationId: null, pinned: false, current: null, conversations: [] };
@@ -106,6 +107,8 @@ export class ApiError extends Error { constructor(public status: number, message
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
   if (state.token) headers.Authorization = `Bearer ${state.token}`;
+  // welche App fragt: der Server prüft, ob das Konto zu dieser Edition gehört
+  headers['X-Stella-Edition'] = appConfig().edition;
   if (init.json !== undefined) headers['Content-Type'] = 'application/json';
   const res = await fetch(path, { ...init, headers, body: init.json !== undefined ? JSON.stringify(init.json) : init.body });
   if (res.status === 401 && state.token) { logoutLocal(); throw new ApiError(401, 'Bitte neu anmelden.'); }
@@ -143,7 +146,7 @@ export async function authenticate(mode: 'login' | 'register', body: Record<stri
 // dann die Sitzung ab. Öffnet man den Link auf einem anderen Gerät, tippt man dort angezeigten Code hier ein.
 
 export interface PendingLogin { requestId: string; deviceSecret: string; email: string; purpose: 'signup' | 'login' | 'reset' }
-const PENDING_KEY = 'stella.pending';
+const PENDING_KEY = `${appConfig().storagePrefix}.pending`;
 
 export const pendingLogin = {
   get(): PendingLogin | null {
@@ -206,7 +209,7 @@ export async function logout() {
 }
 
 /** Diese Web-App ist das normale Stella; ein Students-Konto gehört in die andere App. */
-export const APP_EDITION: 'life' | 'students' = 'life';
+export const APP_EDITION: 'life' | 'students' = appConfig().edition;
 
 export async function refreshMe() {
   const me = await api<Me>('/api/me');

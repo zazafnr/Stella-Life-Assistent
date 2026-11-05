@@ -4,8 +4,9 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { DEFAULT_LOCALE, isLocale, matchLocale, t as translate, type Locale } from '@stella/shared';
 import { useStore } from './store.ts';
+import { appConfig } from './app.ts';
 
-const KEY = 'stella.locale';
+const KEY = `${appConfig().storagePrefix}.locale`;
 
 function stored(): Locale | null {
   try { const v = localStorage.getItem(KEY); return isLocale(v) ? v : null; } catch { return null; }

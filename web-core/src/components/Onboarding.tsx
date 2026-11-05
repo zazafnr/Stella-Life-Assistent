@@ -62,7 +62,7 @@ function NotebookMockup({ alt }: { alt: string }) {
  * Einführung in ein paar Klicks: Sprache, wer bist du, wobei soll Stella helfen. Jederzeit „Überspringen“.
  * `startAt = 'situation'` öffnet sie als „Profil bearbeiten“ ohne Begrüßung.
  */
-export function Onboarding({ onDone, startAt = 'language' }: { onDone: (after?: 'settings') => void; startAt?: StepId }) {
+export function Onboarding({ onDone, startAt = 'language', situations }: { onDone: (after?: 'settings') => void; startAt?: StepId; /** welche Lebenssituationen die App anbietet (Standard: alle) */ situations?: Situation[] }) {
   const me = useStore((s) => s.me) as Me;
   const t = useT();
   const locale = useLocale();
@@ -215,7 +215,7 @@ export function Onboarding({ onDone, startAt = 'language' }: { onDone: (after?: 
           <>
             <h1 className="display">{t('onboarding.situation.title')}</h1>
             <div className="choice-grid">
-              {SITUATIONS.map((s) => (
+              {SITUATIONS.filter((s) => !situations || situations.includes(s.id)).map((s) => (
                 <button key={s.id} type="button" className={d.situation === s.id ? 'choice on' : 'choice'} onClick={() => pickSituation(s.id)} aria-pressed={d.situation === s.id}>
                   <span className="icon-tile blue"><Icon name={s.icon} size={22} /></span>
                   <strong>{t(`onboarding.situation.${s.id}.label`)}</strong>
