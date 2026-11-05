@@ -17,6 +17,8 @@ ENV_FILE=$ENV_DIR/stella.env
 PORT=${STELLA_PORT:-8795}
 DOMAIN=${STELLA_DOMAIN:?STELLA_DOMAIN setzen, z. B. stella.example.at}
 ALIASES=${STELLA_ALIASES:-}
+# Stella for Students: eigene Adresse auf demselben Dienst (DNS: A-Record auf diese IP). STELLA_STUDENTS_HOST=off lässt sie weg.
+STUDENTS_HOST=${STELLA_STUDENTS_HOST:-students.$DOMAIN}
 CADDYFILE=/etc/caddy/Caddyfile
 BROWSERS=$APP/ms-playwright
 
@@ -42,7 +44,7 @@ if [[ ${STELLA_EDITION_STUDENTS:-} != off && ! -d $APP/editions/students/server-
   else echo "git fehlt – es läuft das eingebaute Schul-Plugin."; fi
 fi
 
-log "Abhängigkeiten installieren und Web-App bauen"
+log "Abhängigkeiten installieren und beide Web-Apps bauen (Stella und, wenn das Plugin da ist, Stella for Students)"
 cd "$APP"
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci --no-audit --no-fund
 npm run build
@@ -68,6 +70,7 @@ set_env STELLA_PUBLIC_URL "https://$DOMAIN"
 # Anmelde-Links aus den Mails liegen auf eigenem Namen (login.<domain>), DNS: A-Record auf diese IP
 LOGIN_HOST=${STELLA_LOGIN_HOST:-login.$DOMAIN}
 set_env STELLA_LOGIN_URL "https://$LOGIN_HOST"
+[[ $STUDENTS_HOST != off ]] && set_env STELLA_STUDENTS_URL "https://$STUDENTS_HOST"
 set_env PORT "$PORT"
 set_env HOST 127.0.0.1
 set_env STELLA_DATA_DIR "$DATA"
@@ -136,6 +139,8 @@ $NAMES {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:$PORT
 }
+
+$([[ $STUDENTS_HOST != off ]] && printf '# Stella for Students: gleicher Dienst, der Server liefert je Host die passende Web-App aus\n%s {\n\tencode zstd gzip\n\treverse_proxy 127.0.0.1:%s\n}\n' "$STUDENTS_HOST" "$PORT")
 
 # Anmelde-Links: nur die Link-Seite und die Apple-Datei sind unter diesem Namen erreichbar
 $LOGIN_HOST {

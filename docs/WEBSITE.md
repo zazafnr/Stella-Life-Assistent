@@ -8,6 +8,7 @@ Statische Seite (kein Framework). Quellen in `site-src/`, gebaut nach `site/publ
 | `evolsior.com/stella` | Vorstellung von Stella |
 | `evolsior.com/imprint`, `/privacy` | Impressum und Datenschutz (englisch; `/impressum` und `/datenschutz` leiten um) |
 | `stella.evolsior.com` | die Stella-Web-App (VPS), `evolsior.com/stella/app` leitet dorthin |
+| `students.stella.evolsior.com` | die Studenten-Web-App „Stella for Students“ (gleicher Server, andere Oberfläche; DNS: A-Record auf die VPS-IP, HTTPS holt Caddy), `evolsior.com/stella-students` stellt sie vor |
 
 ## Ändern
 
@@ -58,3 +59,17 @@ bewusst wie eine normale Kunden-Anmeldung aus. Mit „← evolsior.com“ kommt 
 Workers & Pages → Create → Import a repository → `Stella-Life-Assistent`, Project name `evolsior-dashboard`, **Root directory** `dashboard`,
 Deploy command `npx wrangler deploy`. Danach unter Settings → Domains & Routes die Custom domain `dashboard.evolsior.com` hinzufügen.
 Optional zusätzlich Cloudflare Zero Trust → Access vor die Adresse legen (Einmalcode per E-Mail an dich).
+
+## Zwei Adressen, ein Server (Paket 6)
+
+- Beide Adressen zeigen auf **denselben** Dienst (`stella:8787`). Der Server liefert je Host die passende Web-App aus (`server/src/webapps.ts`):
+  Host `students.*` → `editions/students/web/dist` (oder `STELLA_STUDENTS_WEB_DIR`), alles andere → `web/dist`.
+  Fehlt die Studenten-App, antwortet der students-Host mit 503 (er zeigt nie die falsche App).
+- **Bauen:** `npm run build` baut beide (`npm run build:students` nur die Studenten-App; sie nutzt die Abhängigkeiten dieses Repos und den Kern-Spiegel im Students-Repo).
+  Das Plugin kommt mit `scripts/fetch-edition.sh` nach `editions/students` (siehe `docs/ARCHITEKTUR.md`).
+- **Caddy:** `deploy/Caddyfile` hat den Block `students.{$STELLA_DOMAIN}`; `deploy/install-vps.sh` trägt `students.<domain>` ein (abschaltbar mit `STELLA_STUDENTS_HOST=off`)
+  und setzt `STELLA_STUDENTS_URL`.
+- **Vercel** (falls genutzt): zweites Projekt mit `vercel.students.json` (`installCommand` holt das Plugin, `outputDirectory` `editions/students/web/dist`, gleiche `/api`-Umschreibung;
+  die App schickt den Header `X-Stella-Edition`, daher ist auch hinter einem anderen Host klar, zu welcher App ein Konto gehört).
+- **Anmeldung:** Konten gehören zu genau einer Edition. Wer sich auf der falschen Adresse anmeldet, bekommt `409` mit Link zur richtigen App; Anmelde-Links
+  (`login.<domain>`) führen nach dem Bestätigen auf die Adresse der Edition des Kontos.

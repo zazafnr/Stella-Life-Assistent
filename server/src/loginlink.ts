@@ -12,7 +12,8 @@ import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { matchLocale, t, type Locale } from '@stella/shared';
 import { config } from './config.ts';
-import { requestEdition } from './editions/registry.ts';
+import { editionOfUser, requestEdition } from './editions/registry.ts';
+import { editionUrl } from './editions/access.ts';
 import { createSession, hashPassword, HttpError } from './auth.ts';
 import { addMessage, db, getUser, newId, now, type User } from './db.ts';
 import { sendTemplateMail, mailerConfigured } from './mailer.ts';
@@ -151,7 +152,7 @@ function finish(r: Row, device?: string): Claimed {
     addMessage(verified.id, 'assistant', voiceOf(verified).welcome(verified.name));
     // Willkommens-Mail mit drei Schritten (nach der Bestätigung)
     if (mailerConfigured()) {
-      void sendTemplateMail(verified.email, userLocale(verified), 'welcome', { name: verified.name, appUrl: config.publicUrl }, 'noreply', { purpose: 'welcome', userId: verified.id }).catch(() => {});
+      void sendTemplateMail(verified.email, userLocale(verified), 'welcome', { name: verified.name, appUrl: editionUrl(verified.edition) }, 'noreply', { purpose: 'welcome', userId: verified.id }).catch(() => {});
     }
   }
   return { token: createSession(user.id, device), user: getUser(user.id)!, purpose: r.purpose };
@@ -191,12 +192,19 @@ function describeDevice(ua: string | null): string {
   return [browser, os].filter(Boolean).join(' · ');
 }
 
+/** Adresse der App, zu der das Konto hinter diesem Link gehört (Stella oder Stella for Students) */
+function appUrlForToken(token: string): string {
+  const r = rowByToken(token);
+  return r ? editionUrl(editionOfUser(r.user_id)) : config.publicUrl;
+}
+
 function linkPage(locale: Locale, token: string, view: LinkView): string {
+  const appUrl = appUrlForToken(token);
   const tt = (k: string, v?: Record<string, string | number>) => t(locale, `login.${k}`, v);
   switch (view.kind) {
     case 'invalid': return simplePage({ locale, tone: 'warn', title: tt('invalidTitle'), text: tt('invalidText') });
-    case 'expired': return simplePage({ locale, tone: 'warn', title: tt('expiredTitle'), text: tt('expiredText'), link: { href: config.publicUrl, label: tt('openStella') } });
-    case 'done': return simplePage({ locale, title: tt('doneTitle'), text: tt('doneText'), link: { href: config.publicUrl, label: tt('openStella') } });
+    case 'expired': return simplePage({ locale, tone: 'warn', title: tt('expiredTitle'), text: tt('expiredText'), link: { href: appUrl, label: tt('openStella') } });
+    case 'done': return simplePage({ locale, title: tt('doneTitle'), text: tt('doneText'), link: { href: appUrl, label: tt('openStella') } });
     case 'same-device':
       // Mit JavaScript sofort abschließen, ohne JavaScript über den Knopf (Formular)
       return simplePage({ locale, title: tt('sameTitle'), text: tt('sameText'), form: { action: `/v/${token}`, button: tt('finish') } })

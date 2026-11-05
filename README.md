@@ -1,5 +1,9 @@
 # ✦ Stella Life Assistant
 
+> **Zwei Apps, ein Server.** Dieses Repo ist der **Kern** und das normale **Stella** (Alltag, Beruf, Haushalt) unter `stella.evolsior.com`.
+> **Stella for Students** (Schule, Lehre, Studium) liegt in [`zazafnr/Stella-for-Students`](https://github.com/zazafnr/Stella-for-Students) und läuft als Edition-Plugin im selben Server
+> unter `students.stella.evolsior.com`. Plan und Stand: [`docs/plan/stella-students.md`](docs/plan/stella-students.md), Aufbau: [`docs/ARCHITEKTUR.md`](docs/ARCHITEKTUR.md).
+
 **Let Stella handle your life.**
 
 *Stella by **EVOLSIOR** – Built to become.*

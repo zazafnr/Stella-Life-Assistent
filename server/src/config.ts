@@ -129,6 +129,8 @@ export const config = {
     finance: env.STELLA_FEATURE_FINANCE === 'true',
   },
   webDist: path.resolve(import.meta.dirname, '../../web/dist'),
+  /** gebaute Studenten-Web-App (Host students.*); STELLA_STUDENTS_WEB_DIR überschreibt den Pfad */
+  studentsWebDist: env.STELLA_STUDENTS_WEB_DIR ? path.resolve(env.STELLA_STUDENTS_WEB_DIR) : path.resolve(import.meta.dirname, '../../editions/students/web/dist'),
 };
 
 mkdirSync(path.join(config.dataDir, 'files'), { recursive: true });

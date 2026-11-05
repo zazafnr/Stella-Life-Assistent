@@ -11,10 +11,11 @@
   "scripts": {
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",
-    "build": "npm run build -w web",
+    "build": "npm run build -w web && npm run build:students",
     "start": "npm run start -w server",
     "test": "npm test -w shared && npm test -w server",
-    "typecheck": "tsc -p shared && tsc -p web-core && tsc -p server && tsc -p web"
+    "typecheck": "tsc -p shared && tsc -p web-core && tsc -p server && tsc -p web",
+    "build:students": "node scripts/build-students.mjs"
   },
   "engines": {
     "node": ">=22"
