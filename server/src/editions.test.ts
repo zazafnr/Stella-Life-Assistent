@@ -265,7 +265,7 @@ test('echtes Students-Plugin: lädt im Server, bringt Werkzeuge, Rechte, Parser-
   const res = await loadEditions(undefined);
   assert.deepEqual(res, { loaded: ['students'], source: 'external' });
   const user = owner();
-  assert.deepEqual(pluginTools(user).map((x) => x.def.function.name), ['solve_homework', 'timetable']);
+  assert.deepEqual(pluginTools(user).map((x) => x.def.function.name).sort(), ['grade_average', 'solve_homework', 'timetable']);
   assert.equal(levelFor(user, 'homework'), 'auto');
   assert.ok(pluginParser()?.subjects?.length);
   const app = await newApp((a) => { a.register(async (api: FastifyInstance) => { api.addHook('preHandler', requireUser); pluginRoutes(api); }); });
