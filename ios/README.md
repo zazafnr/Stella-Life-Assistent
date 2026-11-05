@@ -1,7 +1,12 @@
 # Stella für iPhone und iPad
 
-Native SwiftUI-App im hellen Stella-Design. Sie ist ein Betrachter: gerechnet wird
+Native SwiftUI-App im hellen Stella-Design für Alltag und Beruf (Bundle `app.stella.ios`). Sie ist ein Betrachter: gerechnet wird
 auf dem Server, die App zeigt an, plant Erinnerungen ein und schickt Nachrichten.
+
+> **Zwei Apps:** Die Studenten-App „Stella for Students“ (`app.stella.students.ios`) liegt im Repo
+> [`Stella-for-Students`](https://github.com/zazafnr/Stella-for-Students) unter `ios/StellaStudents.swiftpm`. Ihr `Core/` und `Design/` sind eine Kopie von hier;
+> die App erkennt ihre Edition an der Bundle-ID (`API.edition`) und meldet sich mit dem Header `x-stella-edition` an.
+> Änderungen an `Core/` und `Design/` passieren nur hier; danach im Students-Repo `npm run sync:core && scripts/sync-ios.sh`.
 
 ## Auf das iPad (Swift Playgrounds)
 
@@ -27,17 +32,17 @@ Swift Playgrounds gibt es nicht für das iPhone. Zwei Wege:
 
 | Bereich | |
 |---|---|
-| Heute | Fälliges für morgen, nächster Test als Countdown-Ring, Schritte, Stundenplan von morgen, Inbox-Zusammenfassung |
-| Chat | Kurzschrift wie „Latein HÜ S. 45 Nr. 3 Freitag“, Fotos und Kamera, Ohne-Netz-Postausgang |
-| Planer | Wochenleiste, Stunden aus WebUntis mit angehängten HÜs, Abhaken mit Konfetti, Überfälliges |
+| Heute | Fälliges für morgen, nächster Test als Countdown-Ring, Schritte, Kalender, Inbox-Zusammenfassung |
+| Chat | Kurzschrift wie „Zahnarzt Freitag 15 Uhr“, Fotos und Kamera, Sprachnachrichten, Ohne-Netz-Postausgang |
+| Planer | Wochenleiste, Einträge, Abhaken mit Konfetti, Überfälliges; Knopf „Kalender“ öffnet Monat → Tag (`CalendarView`) mit neuem Termin |
 | Inbox | Wichtig / Social / SMS / Gelöscht, gelöschte Werbung zurückholen |
-| Einstellungen | HÜ-Autopilot, Werbung löschen, Zeiten, Schritte-Ziel, Verbindungen, KI-Verbrauch |
+| Einstellungen | Werbung löschen, Zeiten, Schritte-Ziel, Verbindungen (E-Mail), KI-Verbrauch |
 
 * **Erinnerungen** kommen als lokale Mitteilungen: Die App holt `/api/reminders/upcoming`
   und plant sie auf dem Gerät ein. Sie kommen also auch ohne Netz pünktlich.
 * **Schritte** liest das iPhone direkt aus dem Bewegungssensor und meldet sie an Stella.
   Der Apple-Kurzbefehl dafür ist nicht mehr nötig.
-* Zugangsdaten (Schulbücher, E-Mail, WebUntis) richtest du einmal auf der Website ein.
+* Zugangsdaten (E-Mail) richtest du einmal auf der Website ein.
   Die App zeigt, was verbunden ist, und öffnet die Seite mit einem Tipp.
 
 ## Aufbau
