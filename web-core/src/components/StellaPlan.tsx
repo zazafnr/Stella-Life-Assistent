@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { StellaPlanControl, StellaPlanEntry } from '@stella/shared';
 import { api, decideAction, sync } from '../store.ts';
-import type { Tab } from '../App.tsx';
+import type { Tab } from '../nav.ts';
 import { Icon } from '../ui/Icon.tsx';
 import { Switch, showToast } from '../ui/Decor.tsx';
 

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
-import { api, getState, refreshMe, type Me } from '../../store.ts';
-import { AuthImage } from '../Rich.tsx';
-import { Section, useAction } from './ui.tsx';
+import { api, getState, refreshMe, type Me } from '@stella/web-core/store.ts';
+import { AuthImage } from '@stella/web-core/components/Rich.tsx';
+import { Section, useAction } from '@stella/web-core/components/settings/ui.tsx';
 
 export function Handwriting({ me }: { me: Me }) {
   const [run, view] = useAction();

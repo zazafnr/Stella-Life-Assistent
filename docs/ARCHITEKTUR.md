@@ -21,7 +21,7 @@ Wiederholung), `server/src/router.ts` (`pickTier`, `resolveTier`, Kontingent-Stu
 Acht Sprachen (`shared/src/i18n/locales.ts`: en, de, es, fr, it, pt-BR, tr, pl), Englisch ist Standard. Texte stehen in
 **einer** Quelle: `shared/src/i18n/catalog/<locale>.json` (flache Schlüssel, Platzhalter `{name}`, Mehrzahl `key#one/#other`).
 
-- **Web:** `useT()` aus `web/src/i18n.ts`. **iOS:** `L("schlüssel")`; `scripts/gen-i18n.ts` erzeugt daraus `Core/I18nCatalogs.swift`
+- **Web:** `useT()` aus `web-core/src/i18n.ts`. **iOS:** `L("schlüssel")`; `scripts/gen-i18n.ts` erzeugt daraus `Core/I18nCatalogs.swift`
   (die CI prüft mit `--check`, dass sie aktuell ist). **Server:** `tr(user, key)`, `voiceOf(user)`, `dayFor(user, ymd)` aus `server/src/locale.ts`.
 - `voice(tone, locale)` bleibt als typisierter Code (Funktionen mit Varianten): `voice.de.ts` und `voice.en.ts` sind vollständig,
   die übrigen Sprachen überschreiben in `voice.more.ts` nur, was sie haben (Rest: Englisch).

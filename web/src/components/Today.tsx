@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { addDays, diffDays, formatDateDe, todayIn, type FinanceMonth, type GoalProgress, type Item } from '@stella/shared';
-import { api, meHas, useStore } from '../store.ts';
-import { useLocale, useT } from '../i18n.ts';
-import type { Tab } from '../App.tsx';
-import { Icon, type IconName } from '../ui/Icon.tsx';
-import { Confetti, Ring } from '../ui/Decor.tsx';
-import { BriefingCard } from './BriefingCard.tsx';
-import { ListsSheet } from './Lists.tsx';
-import { WeekBar, amount } from './Goals.tsx';
-import { euro } from './Finance.tsx';
-import { StellaPlanCard } from './StellaPlan.tsx';
+import { api, meHas, useStore } from '@stella/web-core/store.ts';
+import { useLocale, useT } from '@stella/web-core/i18n.ts';
+import type { Tab } from '@stella/web-core/nav.ts';
+import { Icon, type IconName } from '@stella/web-core/ui/Icon.tsx';
+import { Ring } from '@stella/web-core/ui/Decor.tsx';
+import { ItemStatus } from '@stella/web-core/components/ItemStatus.tsx';
+import { BriefingCard } from '@stella/web-core/components/BriefingCard.tsx';
+import { ListsSheet } from '@stella/web-core/components/Lists.tsx';
+import { WeekBar, amount } from '@stella/web-core/components/Goals.tsx';
+import { euro } from '@stella/web-core/components/Finance.tsx';
+import { StellaPlanCard } from '@stella/web-core/components/StellaPlan.tsx';
 
 interface Lesson { date: string; start: string; subject: string | null; code: string | null; status: string }
 interface InboxEntry { source: string; category: string | null; action: string | null; createdAt: string }
@@ -22,25 +23,6 @@ const KIND_ICON: Record<string, [IconName, string]> = {
 function greetingKey() {
   const h = new Date().getHours();
   return h < 11 ? 'today.greeting.morning' : h < 18 ? 'today.greeting.afternoon' : 'today.greeting.evening';
-}
-
-export function solvedInNotebook(i: Item) {
-  return i.attachments.some((a) => a.caption?.startsWith('Lösung'));
-}
-
-export function ItemStatus({ item, busy }: { item: Item; busy: boolean }) {
-  const t = useT();
-  if (item.status === 'done' && solvedInNotebook(item)) {
-    return (
-      <span className="pill green" style={{ position: 'relative' }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path className="check-draw" d="M5 12.5l4.5 4.5L19 7.5" /></svg>
-        {t('today.status.inNotebook')}<Confetti delay={0.7} />
-      </span>
-    );
-  }
-  if (item.status === 'done') return <span className="pill green"><Icon name="check" size={14} stroke={3} />{t('today.status.done')}</span>;
-  if (busy) return <span className="pill blue">{t('today.status.solving')}</span>;
-  return <span className="pill gray">{t('today.status.open')}</span>;
 }
 
 export function Today({ go }: { go: (t: Tab) => void }) {

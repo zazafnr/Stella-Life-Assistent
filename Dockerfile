@@ -6,6 +6,7 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 COPY package.json package-lock.json ./
 COPY shared/package.json shared/
 COPY server/package.json server/
+COPY web-core/package.json web-core/
 COPY web/package.json web/
 RUN npm ci --no-audit --no-fund
 

@@ -4,7 +4,7 @@ import { useLocale, useT } from '../i18n.ts';
 import { api, compressImage, newConversation, openConversation, retryAudio, sendAudio, sendMessage, useStore } from '../store.ts';
 import { MAX_SECONDS, recordingSupported, startRecording, type Recording } from '../audio.ts';
 import { AudioPlayer, VoiceLine, AuthImage, Lightbox, Rich } from './Rich.tsx';
-import { ItemStatus } from './Today.tsx';
+import { ItemStatus } from './ItemStatus.tsx';
 import { ActionCard } from './ActionCard.tsx';
 import { Icon } from '../ui/Icon.tsx';
 import { Sheet, StarMark, showToast } from '../ui/Decor.tsx';

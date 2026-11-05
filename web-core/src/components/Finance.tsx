@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { FINANCE_CATEGORIES, formatDateDe, todayIn, type FinanceCategory, type FinanceMonth, type MessageCard, type Transaction } from '@stella/shared';
 import { api, useStore } from '../store.ts';
-import type { Tab } from '../App.tsx';
+import type { Tab } from '../nav.ts';
 import { Icon } from '../ui/Icon.tsx';
 import { Sheet, showToast } from '../ui/Decor.tsx';
 

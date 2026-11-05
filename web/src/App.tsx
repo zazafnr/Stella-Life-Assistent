@@ -1,25 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { startWeatherOnce } from './weather.ts';
-import { meHas, meIsSchool, newConversation, refreshMe, startBackgroundSync, useStore } from './store.ts';
+import { startWeatherOnce } from '@stella/web-core/weather.ts';
+import { meHas, meIsSchool, newConversation, refreshMe, startBackgroundSync, useStore } from '@stella/web-core/store.ts';
 import { Today } from './components/Today.tsx';
-import { Chat } from './components/Chat.tsx';
+import { Chat } from '@stella/web-core/components/Chat.tsx';
 import { Planner } from './components/Planner.tsx';
-import { Inbox } from './components/Inbox.tsx';
-import { Goals } from './components/Goals.tsx';
-import { Finance } from './components/Finance.tsx';
-import { StellaPlan } from './components/StellaPlan.tsx';
-import { Health } from './components/Health.tsx';
+import { Inbox } from '@stella/web-core/components/Inbox.tsx';
+import { Goals } from '@stella/web-core/components/Goals.tsx';
+import { Finance } from '@stella/web-core/components/Finance.tsx';
+import { StellaPlan } from '@stella/web-core/components/StellaPlan.tsx';
+import { Health } from '@stella/web-core/components/Health.tsx';
 import { Settings } from './components/Settings.tsx';
 import { Intro, dismissBoot, introShown } from './components/Intro.tsx';
-import { Onboarding } from './components/Onboarding.tsx';
-import { Login } from './components/Login.tsx';
-import { Icon, type IconName } from './ui/Icon.tsx';
-import { StarMark, showToast } from './ui/Decor.tsx';
-import { CommandPalette, Topbar, type PaletteEntry } from './ui/Shell.tsx';
-import { isDesktopApp } from './platform.ts';
-import { useHtmlLang, useT } from './i18n.ts';
+import { Onboarding } from '@stella/web-core/components/Onboarding.tsx';
+import { Login } from '@stella/web-core/components/Login.tsx';
+import { Icon, type IconName } from '@stella/web-core/ui/Icon.tsx';
+import { StarMark, showToast } from '@stella/web-core/ui/Decor.tsx';
+import { CommandPalette, Topbar, type PaletteEntry } from '@stella/web-core/ui/Shell.tsx';
+import { isDesktopApp } from '@stella/web-core/platform.ts';
+import { useHtmlLang, useT } from '@stella/web-core/i18n.ts';
 
-export type Tab = 'today' | 'chat' | 'planner' | 'goals' | 'inbox' | 'health' | 'finance' | 'plan' | 'settings';
+export type { Tab } from '@stella/web-core/nav.ts';
+import type { Tab } from '@stella/web-core/nav.ts';
 
 const TABS: [Tab, IconName, string][] = [
   ['today', 'sparkle', 'nav.today'],

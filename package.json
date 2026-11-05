@@ -1,15 +1,22 @@
 {
   "name": "stella",
   "private": true,
-  "description": "Stella Life Assistant – Let Stella handle your life.",
-  "workspaces": ["shared", "server", "web"],
+  "description": "Stella Life Assistant \u2013 Let Stella handle your life.",
+  "workspaces": [
+    "shared",
+    "web-core",
+    "server",
+    "web"
+  ],
   "scripts": {
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",
     "build": "npm run build -w web",
     "start": "npm run start -w server",
     "test": "npm test -w shared && npm test -w server",
-    "typecheck": "tsc -p shared && tsc -p server && tsc -p web"
+    "typecheck": "tsc -p shared && tsc -p web-core && tsc -p server && tsc -p web"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  }
 }

@@ -8,7 +8,8 @@ import path from 'node:path';
 // Bereich, der wieder deutschen Text bekommt, lässt den Test scheitern; ein Eintrag, der keinen deutschen Text
 // mehr enthält, muss aus der Liste raus.
 
-const WEB = path.resolve(import.meta.dirname, '../../../web/src');
+// Beide Web-Apps teilen sich web-core; jede hat zusätzlich ihre eigenen Dateien
+const ROOTS = ['web/src', 'web-core/src'].map((r) => path.resolve(import.meta.dirname, '../../..', r));
 const OPEN = new Set([
   'components/Inbox.tsx', 'components/Goals.tsx', 'components/Planner.tsx', 'components/Finance.tsx',
   'components/StellaPlan.tsx', 'components/PlacesCard.tsx', 'components/WeekPlanSheet.tsx', 'components/Lists.tsx', 'components/Rich.tsx',
@@ -34,8 +35,8 @@ function germanTexts(source: string): string[] {
 }
 
 test('kein fester deutscher Text im Web-Code – außer in den noch offenen Dateien', () => {
-  for (const file of files(WEB)) {
-    const rel = path.relative(WEB, file).replaceAll('\\', '/');
+  for (const root of ROOTS) for (const file of files(root)) {
+    const rel = path.relative(root, file).replaceAll('\\', '/');
     const found = germanTexts(readFileSync(file, 'utf8'));
     if (OPEN.has(rel)) continue;
     assert.deepEqual(found, [], `${rel} enthält festen deutschen Text – bitte in den Katalog (t('…'))`);
@@ -45,7 +46,8 @@ test('kein fester deutscher Text im Web-Code – außer in den noch offenen Date
 test('die offene Liste ist ehrlich: jede Datei darin hat wirklich noch deutschen Text', () => {
   for (const rel of OPEN) {
     let source = '';
-    try { source = readFileSync(path.join(WEB, rel), 'utf8'); } catch { assert.fail(`${rel} gibt es nicht mehr – aus der Liste nehmen`); }
+    for (const root of ROOTS) { try { source = readFileSync(path.join(root, rel), 'utf8'); break; } catch { /* nächste App */ } }
+    if (!source) assert.fail(`${rel} gibt es nicht mehr – aus der Liste nehmen`);
     assert.ok(germanTexts(source).length > 0, `${rel} ist umgestellt – bitte aus OPEN streichen`);
   }
 });

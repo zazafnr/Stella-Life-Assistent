@@ -11,7 +11,8 @@
   "dependencies": {
     "@stella/shared": "*",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "@stella/web-core": "*"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",
