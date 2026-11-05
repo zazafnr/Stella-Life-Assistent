@@ -17,8 +17,8 @@ struct APIError: LocalizedError {
 /** Zugang zum Stella-Server. Der Login-Token liegt im Schlüsselbund. */
 final class API: @unchecked Sendable {
     static let shared = API()
-    /** Welche App das ist: "life" (Stella) oder "students" (Stella for Students). Steht im Info.plist unter StellaEdition. */
-    static let edition: String = (Bundle.main.object(forInfoDictionaryKey: "StellaEdition") as? String) ?? "life"
+    /** Welche App das ist: "life" (Stella) oder "students" (Stella for Students). Erkannt an der Bundle-ID (app.stella.students.ios, auch die Erweiterungen), das geht auch in Swift Playgrounds. */
+    static let edition: String = (Bundle.main.bundleIdentifier ?? "").contains(".students.") ? "students" : "life"
     static let defaultServer = edition == "students" ? "https://students.stella.evolsior.com" : "https://stella.evolsior.com"
 
     private let session: URLSession = {
