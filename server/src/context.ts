@@ -73,7 +73,7 @@ export function freeSlots(window: Interval, busy: Interval[], minMinutes = MIN_F
   return out;
 }
 
-function dayContext(user: User, date: Ymd, today: Ymd, nowHhmm: string, lessons: Lesson[], items: Item[], memories: Memory[]): DayContext {
+export function dayContext(user: User, date: Ymd, today: Ymd, nowHhmm: string, lessons: Lesson[], items: Item[], memories: Memory[]): DayContext {
   const wd = isoWeekday(date);
   const weekend = wd >= 6;
   const busy: Busy[] = [];
@@ -83,7 +83,7 @@ function dayContext(user: User, date: Ymd, today: Ymd, nowHhmm: string, lessons:
   }
   for (const i of items) {
     if (!i.time || i.status !== 'open') continue;
-    busy.push({ start: i.time, end: toHhmm(Math.min(toMin(i.time) + (DEFAULT_MINUTES[i.kind] ?? 30), 24 * 60 - 1)), label: i.title });
+    busy.push({ start: i.time, end: toHhmm(Math.min(toMin(i.time) + (i.duration ?? DEFAULT_MINUTES[i.kind] ?? 30), 24 * 60 - 1)), label: i.title });
   }
   // Edition-Plugin: geschätzte Belegung, wenn nichts bekannt ist (z. B. Schule ohne WebUntis)
   const estimated = pluginEstimatedBusy(user, date, weekend, lessons);

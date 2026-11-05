@@ -1,4 +1,5 @@
 export * from './dates.ts';
+export * from './calendar.ts';
 export * from './parser.ts';
 export * from './parser.vocab.ts';
 export * from './places.ts';

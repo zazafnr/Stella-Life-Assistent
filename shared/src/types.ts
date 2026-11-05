@@ -39,6 +39,10 @@ export interface Item {
   recurrence?: string | null;
   /** Dauerauftrag pausiert: keine Erinnerungen, bis er wieder eingeschaltet wird */
   recurrencePaused?: boolean;
+  /** Dauer in Minuten (Kalender: Länge des Blocks); fehlt sie, gilt ein Standard je Art */
+  duration?: number | null;
+  /** Ort eines Termins (Freitext) */
+  location?: string | null;
 }
 
 /** Ein Vorschlag auf der Restaurant-Karte */

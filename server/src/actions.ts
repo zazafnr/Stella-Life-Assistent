@@ -74,7 +74,7 @@ export function levelFor(user: User, group: ActionGroup): PermissionLevel {
 
 // ---------- Aktionstypen ----------
 
-type ItemPatch = Partial<Pick<Item, 'title' | 'detail' | 'notes' | 'due' | 'time' | 'status' | 'material' | 'subject' | 'kind' | 'deleted' | 'recurrencePaused'>>;
+type ItemPatch = Partial<Pick<Item, 'title' | 'detail' | 'notes' | 'due' | 'time' | 'status' | 'material' | 'subject' | 'kind' | 'deleted' | 'recurrencePaused' | 'duration' | 'location'>>;
 
 export interface ActionParams {
   'item.create': NewItem;

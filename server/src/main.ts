@@ -44,6 +44,7 @@ import { acceptHint, dismissHint } from './hints.ts';
 import { registerAdminRoutes } from './admin.ts';
 import { linkVerifiedAddress, registerAddressRoutes, registerInboundRoute } from './inbound.ts';
 import { registerOverviewRoutes } from './overview.ts';
+import { registerCalendarRoutes } from './calendar.ts';
 import { registerFinanceRoutes, recordPayment } from './finance.ts';
 import { registerGoalRoutes } from './goals.ts';
 import { registerStellaPlanRoutes } from './stellaplan.ts';
@@ -225,6 +226,7 @@ app.register(async (api) => {
   registerAdminRoutes(api);
   pluginRoutes(api);
   registerOverviewRoutes(api);
+  registerCalendarRoutes(api);
   registerAddressRoutes(api);
   registerListRoutes(api);
   registerGoalRoutes(api);
@@ -386,12 +388,14 @@ app.register(async (api) => {
     return addItem(req.user, {
       kind: b.kind, title: str(b.title, 200), subject: b.subject ?? null, detail: b.detail ?? null, notes: b.notes ?? null,
       due: b.due ?? null, time: b.time ?? null, material: b.material ?? null, source: 'app',
+      duration: Number.isFinite(Number(b.duration)) && Number(b.duration) > 0 ? Math.min(Math.round(Number(b.duration)), 24 * 60) : null,
+      location: b.location ? str(b.location, 200) : null,
     });
   });
 
   api.patch('/api/items/:id', async (req: FastifyRequest<{ Params: { id: string } }>) => {
     const b = req.body as Partial<Item>;
-    const allowed: (keyof Item)[] = ['title', 'detail', 'notes', 'due', 'time', 'status', 'material', 'subject', 'kind'];
+    const allowed: (keyof Item)[] = ['title', 'detail', 'notes', 'due', 'time', 'status', 'material', 'subject', 'kind', 'duration', 'location'];
     const patch = Object.fromEntries(Object.entries(b).filter(([k]) => allowed.includes(k as keyof Item)));
     const item = changeItem(req.user, req.params.id, patch);
     if (!item) throw new HttpError(404, 'Nicht gefunden');

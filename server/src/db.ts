@@ -557,6 +557,9 @@ const MIGRATIONS: string[] = [
   `,
   // Editionen: jedes Konto gehört zu genau einer Edition ('life' oder 'students'); bestehende Konten bleiben 'life'
   `ALTER TABLE users ADD COLUMN edition TEXT NOT NULL DEFAULT 'life';`,
+  // Kalender: Dauer (Minuten) und Ort eines Eintrags
+  `ALTER TABLE items ADD COLUMN duration INTEGER;
+   ALTER TABLE items ADD COLUMN location TEXT;`,
 ];
 
 function migrate() {
@@ -676,7 +679,7 @@ export function updateUserSettings(id: string, patch: Partial<UserSettings>, tim
 type ItemRow = {
   id: string; kind: string; subject: string | null; title: string; detail: string | null; notes: string | null;
   page: string | null; exercises: string | null; book: string | null; due: string | null; time: string | null; status: string;
-  material: string | null; parent_id: string | null; attachments: string; updated_at: string; deleted: number; place?: string | null; recurrence?: string | null; recurrence_paused?: number;
+  material: string | null; parent_id: string | null; attachments: string; updated_at: string; deleted: number; place?: string | null; recurrence?: string | null; recurrence_paused?: number; duration?: number | null; location?: string | null;
 };
 
 export const toItem = (r: ItemRow): Item => ({
@@ -686,6 +689,8 @@ export const toItem = (r: ItemRow): Item => ({
   updatedAt: r.updated_at, deleted: !!r.deleted,
   ...(r.place ? { place: JSON.parse(r.place) as Item['place'] } : {}),
   ...(r.recurrence ? { recurrence: r.recurrence, recurrencePaused: !!r.recurrence_paused } : {}),
+  ...(r.duration ? { duration: r.duration } : {}),
+  ...(r.location ? { location: r.location } : {}),
 });
 
 export interface NewItem {
@@ -694,17 +699,19 @@ export interface NewItem {
   material?: string | null; parentId?: string | null; source?: string; externalId?: string | null;
   place?: { category: string; label: string } | null;
   recurrence?: string | null;
+  duration?: number | null;
+  location?: string | null;
 }
 
 export function createItem(userId: string, n: NewItem): Item {
   const id = newId();
   const ts = now();
   db.prepare(`INSERT INTO items (id, user_id, kind, subject, title, detail, notes, page, exercises, book, due, time,
-      material, parent_id, source, external_id, created_at, updated_at, place, recurrence)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      material, parent_id, source, external_id, created_at, updated_at, place, recurrence, duration, location)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(id, userId, n.kind, n.subject ?? null, n.title, n.detail ?? null, n.notes ?? null, n.page ?? null,
       n.exercises ?? null, n.book ?? null, n.due ?? null, n.time ?? null, n.material ?? null, n.parentId ?? null,
-      n.source ?? 'chat', n.externalId ?? null, ts, ts, n.place ? JSON.stringify(n.place) : null, n.recurrence ?? null);
+      n.source ?? 'chat', n.externalId ?? null, ts, ts, n.place ? JSON.stringify(n.place) : null, n.recurrence ?? null, n.duration ?? null, n.location ?? null);
   return getItem(userId, id)!;
 }
 
@@ -725,7 +732,7 @@ export function getItemRaw(userId: string, id: string) {
 const ITEM_COLUMNS: Record<string, string> = {
   kind: 'kind', subject: 'subject', title: 'title', detail: 'detail', notes: 'notes', page: 'page',
   exercises: 'exercises', due: 'due', time: 'time', status: 'status', material: 'material', deleted: 'deleted',
-  recurrence: 'recurrence', recurrencePaused: 'recurrence_paused',
+  recurrence: 'recurrence', recurrencePaused: 'recurrence_paused', duration: 'duration', location: 'location',
 };
 
 export function updateItem(userId: string, id: string, patch: Partial<Item>): Item | null {

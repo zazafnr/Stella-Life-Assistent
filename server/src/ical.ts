@@ -28,7 +28,7 @@ export function toICalendar(items: Item[], timeZone: string, extra: string[] = [
     lines.push('BEGIN:VEVENT', `UID:${i.id}@stella`, `DTSTAMP:${utc(new Date(i.updatedAt))}`);
     if (i.time) {
       const start = zonedToUtc(i.due, i.time, timeZone);
-      const end = new Date(start.getTime() + (DURATION_MIN[i.kind] ?? 60) * 60_000);
+      const end = new Date(start.getTime() + (i.duration ?? DURATION_MIN[i.kind] ?? 60) * 60_000);
       lines.push(`DTSTART:${utc(start)}`, `DTEND:${utc(end)}`);
     } else {
       lines.push(`DTSTART;VALUE=DATE:${ymd(i.due)}`, `DTEND;VALUE=DATE:${ymd(addDays(i.due, 1))}`, 'TRANSP:TRANSPARENT');
