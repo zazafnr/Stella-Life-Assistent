@@ -8,8 +8,7 @@ import {
   addAttachment, addMessage, chatContext, clearPending, conversationMessages, db, enqueueJob, findMessageByClientId, getConversation,
   getItem, getPending, listItems, notifyOnce, setPending, todayConversation, type User,
 } from './db.ts';
-import { PROVIDERS } from './books.ts';
-import { lessonsFor } from './untis.ts';
+import { pluginBookProviderName, pluginPrompt, pluginTool, pluginTools } from './editions/registry.ts';
 import { getAction, lastChatItemId, lastUndoable, levelFor, perform, record, undo, type ActionParams, type ActionType, type Performed } from './actions.ts';
 import { buildLagebild, isoWeekday, lagebildPrompt } from './context.ts';
 import { offerWeekPlan, planWeek } from './weekplan.ts';
@@ -92,7 +91,7 @@ async function handleChatIn(user: User, text: string, clientId: string | null, i
   if (!handled && FORGOT_RE.test(text)) handled = await answerForgot(t);
   if (!handled && INBOX_RE.test(text)) handled = answerInbox(t);
   if (!handled && WEEK_RE.test(text)) handled = await answerWeek(t, text);
-  if (!handled && hasFeature(user, 'goals') && GOAL_START_RE.test(text) && (looksLikeGoal(text) || GOAL_EXPLICIT_RE.test(text))) handled = await onGoalCreate(t, text);
+  if (!handled && hasFeature(user, 'goals') && GOAL_RE.test(text) && (looksLikeGoal(text) || GOAL_EXPLICIT_RE.test(text))) handled = await onGoalCreate(t, text);
   if (!handled && !images.length && hasFeature(user, 'goals')) handled = await onGoalLog(t, text);
   if (!handled && hasFeature(user, 'finance') && SPEND_RE.test(text)) handled = onSpending(t, text);
   if (handled && pending) clearPending(user.id);
@@ -125,7 +124,6 @@ async function handleChatIn(user: User, text: string, clientId: string | null, i
 
 const BRIEFING_RE = /^\s*(\W*)(morning[- ]?)?briefing\b|^\s*(tages)?(überblick|ueberblick)\b|^\s*was (steht|ist) heute (an|los)\b|^\s*what'?s (up|on) today\b/iu;
 const INBOX_RE = /^\s*(\W*)(was (ist|gibt'?s) neu(es)? (in|bei) (der |meiner |meinen |deiner )?(mail|mails|post|inbox)|(gibt'?s |hab ich )?neue (mail|mails|post)|mail-?übersicht|hab ich post|what'?s new in (my )?(e-?mail|mail|inbox)|(do i have |any )new (e-?mails?|mail)s?)\b/iu;
-const GOAL_START_RE = GOAL_RE;
 const GOAL_EXPLICIT_RE = /^\s*(mein\s+ziel|ziel\s*[:,])/iu;
 const FORGOT_RE = /hab(e)? ich (was|etwas|irgendwas) vergessen|was (hab|habe) ich vergessen|did i forget (anything|something)|what did i forget/iu;
 
@@ -245,7 +243,7 @@ async function onCreate(t: Turn, e: ParsedEntry) {
       attachPhotos(t, item);
       if (autopilot(t.user)) parts.push(v(t).solveFromPhoto());
     } else if (book && item.page) {
-      parts.push(autopilot(t.user) ? v(t).fetchAndSolve(PROVIDERS[book.provider].name) : v(t).fetchOnly(PROVIDERS[book.provider].name));
+      parts.push(autopilot(t.user) ? v(t).fetchAndSolve(pluginBookProviderName(book.provider)) : v(t).fetchOnly(pluginBookProviderName(book.provider)));
     }
     if (e.dueAssumed) {
       const fromTimetable = item.due !== nextSchoolDay(t.today);
@@ -689,22 +687,6 @@ const TOOLS: ToolDef[] = [
   {
     type: 'function',
     function: {
-      name: 'solve_homework',
-      description: 'HÜ automatisch lösen und in Handschrift ins Heft schreiben (braucht Buchseite oder Foto der Aufgabe). again=true löst eine schon gelöste HÜ neu (z. B. "nochmal lösen", "Lösung ist falsch").',
-      parameters: { type: 'object', properties: { entry_id: { type: 'string' }, again: { type: 'boolean' } }, required: ['entry_id'] },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'timetable',
-      description: 'Stundenplan aus WebUntis (inkl. Entfall).',
-      parameters: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' } } },
-    },
-  },
-  {
-    type: 'function',
-    function: {
       name: 'spending_summary',
       description: 'Ausgaben (Kartenzahlungen aus Apple Pay) in einem Zeitraum: Summe, Kategorien, häufigste Händler. Optional nur eine Kategorie.',
       parameters: {
@@ -792,7 +774,7 @@ const TOOLS: ToolDef[] = [
 ];
 
 /** Werkzeuge für diese Nutzerin: ausgeblendete Funktionen (z. B. Finanzen) bekommt die KI gar nicht erst zu sehen. */
-const toolsFor = (user: User, tier: Tier = 'light', errand = false): ToolDef[] => TOOLS
+const toolsFor = (user: User, tier: Tier = 'light', errand = false): ToolDef[] => [...TOOLS, ...pluginTools(user).map((x) => x.def)]
   .filter((x) => x.function.name !== 'spending_summary' || hasFeature(user, 'finance'))
   .filter((x) => !ERRAND_TOOLS.has(x.function.name) || (errand && tier === 'heavy' && planAllows(user, 'webTasks')));
 
@@ -809,7 +791,7 @@ const STYLE_DETAILED = 'Style: the answer goes out by email. Confirm simple task
 export function systemPrompt(user: User, today: string): { fixed: string; dynamic: string } {
   const lb = buildLagebild(user, 8);
   const locale = userLocale(user);
-  const terms = userTerms(user);
+  const ext = pluginPrompt(user);
   return {
     dynamic: `Now: ${WEEKDAYS_EN[weekdayOf(today)]}, ${today}, ${timeIn(user.timeZone)} (${user.timeZone}).
 
@@ -820,14 +802,14 @@ ${describeUser(user)} You take work off ${user.name}'s plate: appointments, plan
 
 Rules:
 - ${languageRule(LANGUAGE_NAMES_EN[locale])}
-${isSchool(user) ? `- School words in ${user.name}'s country: homework = "${terms.homework}", big written exam = "${terms.exam}", short test = "${terms.quiz}". Use these words.\n` : ''}- ${chatContext.getStore()?.detailed ? STYLE_DETAILED : STYLE_RULES}
+${ext.rules.map((r) => `- ${r}\n`).join('')}- ${chatContext.getStore()?.detailed ? STYLE_DETAILED : STYLE_RULES}
 - ${toneInstruction(user.settings.tone, locale)}
 - ACT instead of explaining: when ${user.name} wants something organised, planned, moved, cancelled or prepared, do it with the tools (several steps are fine). Work out dates yourself (YYYY-MM-DD).
 - Some actions need ${user.name}'s approval: then ${user.name} gets a card with Yes/No – just say briefly that you asked.
 - Use the situation report (second system block: free time, tests, learning progress) and the current time for suggestions. Never plan into busy times.
 - Never invent appointments or facts. Ask if something important is missing.
 - For tests/exams: ask for the material, then call create_study_plan.
-${isSchool(user) ? `- You do the homework (solve_homework): Stella solves it and writes it into the notebook in handwriting.\n` : ''}- You cannot book, buy or pay for anything. Say so openly, prepare everything and give the next step. Never invent opening hours or stock: if a source is missing, say it is unclear.
+${ext.capabilities.map((r) => `- ${r}\n`).join('')}- You cannot book, buy or pay for anything. Say so openly, prepare everything and give the next step. Never invent opening hours or stock: if a source is missing, say it is unclear.
 - MEMORY: when you learn something lasting and useful about ${user.name} (people and their role, fixed appointments/routines with weekday and time, preferences, what is hard/easy, goals), save it right away with remember – without asking and without announcing it. Do not save: one-off things (that is a planner entry), trivia, passwords, things already in the situation report. If something is outdated, change or delete the old entry (update_memory/forget). Use what you know without mentioning it every time.
 - If a task is too hard for you (long multi-step planning, multi-step maths, weighing many sources), call escalate; a stronger model then takes over. Not for everyday things.`,
   };
@@ -907,9 +889,6 @@ async function runTool(t: Turn, name: string, args: Record<string, any>): Promis
     case 'create_study_plan':
       if (!getItem(u.id, String(args.exam_id))) return { error: 'Test nicht gefunden' };
       return act(t, 'study_plan.create', { examId: String(args.exam_id), material: String(args.material) });
-    case 'solve_homework':
-      if (!getItem(u.id, String(args.entry_id))) return { error: 'nicht gefunden' };
-      return act(t, 'homework.solve', { itemId: String(args.entry_id), again: !!args.again });
     case 'remember': {
       const text = String(args.text ?? '').trim();
       if (!text) return { error: 'text fehlt' };
@@ -936,8 +915,6 @@ async function runTool(t: Turn, name: string, args: Record<string, any>): Promis
       if (!m) return { error: 'Eintrag nicht gefunden' };
       return act(t, 'memory.delete', { id: m.id });
     }
-    case 'timetable':
-      return lessonsFor(u.id, args.from ?? t.today, args.to ?? addDays(t.today, 1));
     case 'spending_summary': {
       const ymd = /^\d{4}-\d{2}-\d{2}$/;
       const to = ymd.test(String(args.to ?? '')) ? String(args.to) : t.today;
@@ -962,8 +939,12 @@ async function runTool(t: Turn, name: string, args: Record<string, any>): Promis
         question: `✉️ Antwort an ${draft.to} – „${draft.subject}“:\n\n${draft.body.split('\n').map((l) => `> ${l}`).join('\n')}\n\nSoll ich das so senden?`,
       }));
     }
-    default:
+    default: {
+      // Werkzeuge des Edition-Plugins (z. B. solve_homework, timetable)
+      const ext = pluginTool(name);
+      if (ext && (!ext.enabledFor || ext.enabledFor(u))) return ext.run({ user: u, today: t.today, act: (type, params) => act(t, type, params) }, args);
       return { error: `Unbekanntes Werkzeug ${name}` };
+    }
   }
 }
 

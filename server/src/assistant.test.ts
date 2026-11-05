@@ -9,6 +9,7 @@ process.env.OPENROUTER_API_KEY = '';
 process.env.STELLA_SECRET = 'test-secret-1234567890';
 
 const { register, setSecret, getSecret } = await import('./auth.ts');
+await (await import('./testing/editions.ts')).loadSchoolForTests();
 const { db, getUser, listItems, updateUserSettings } = await import('./db.ts');
 const { handleChat } = await import('./assistant.ts');
 const { addDays, todayIn } = await import('@stella/shared');

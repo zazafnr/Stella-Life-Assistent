@@ -16,6 +16,17 @@ export type Catalog = Record<string, string>;
 /** Alle Kataloge. */
 export const CATALOGS: Record<Locale, Catalog> = { en, de, es, fr, it, 'pt-BR': ptBR, tr, pl };
 
+/**
+ * Edition-Plugins bringen eigene Schlüssel mit (in allen acht Sprachen). Vorhandene Schlüssel des Kerns werden nicht überschrieben.
+ */
+export function extendCatalogs(extra: Partial<Record<Locale, Catalog>>): void {
+  for (const [locale, entries] of Object.entries(extra) as [Locale, Catalog][]) {
+    const target = CATALOGS[locale];
+    if (!target) continue;
+    for (const [k, val] of Object.entries(entries)) if (!(k in target)) target[k] = val;
+  }
+}
+
 /** Für Tests: ein Schlüssel, der fehlt, wird hier gesammelt */
 export const missingKeys = new Set<string>();
 

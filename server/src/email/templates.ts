@@ -4,6 +4,7 @@ import { t, type Locale } from '@stella/shared';
 import { config } from '../config.ts';
 import { renderEmail, type EmailCard, type EmailParts } from './layout.ts';
 import { markdownToEmail } from './markdown.ts';
+import { brandText, EDITION_PRODUCT } from '../editions/registry.ts';
 
 export type TemplateName = 'verify-signup' | 'verify-address' | 'login-link' | 'welcome' | 'stella-reply' | 'unknown-sender' | 'subscription' | 'freenotes-launch';
 export const TEMPLATE_NAMES: TemplateName[] = ['verify-signup', 'verify-address', 'login-link', 'welcome', 'stella-reply', 'unknown-sender', 'subscription', 'freenotes-launch'];
@@ -28,6 +29,8 @@ export interface TemplateData {
   until?: string;
   /** welcome / unknown-sender: Knopf */
   appUrl?: string;
+  /** Produktname der Edition („Stella“ oder „Stella for Students“) – Platzhalter für Absender, Kopf und Texte */
+  product?: string;
 }
 
 export interface RenderedMail { subject: string; html: string; text: string }
@@ -35,10 +38,11 @@ export interface RenderedMail { subject: string; html: string; text: string }
 const hello = (l: Locale, name?: string) => (name ? t(l, 'email.hello', { name }) : '');
 
 function build(name: TemplateName, locale: Locale, d: TemplateData): { subject: string; parts: EmailParts } {
-  const tt = (key: string, vars?: Record<string, string | number>) => t(locale, `email.${key}`, vars);
+  const product = d.product ?? EDITION_PRODUCT.life;
+  const tt = (key: string, vars?: Record<string, string | number>) => brandText(t(locale, `email.${key}`, vars), product);
   const alt = tt('heroAlt');
   const minutes = d.minutes ?? 15;
-  const base = { locale, hero: { image: name, alt } };
+  const base = { locale, product, hero: { image: name, alt } };
 
   switch (name) {
     case 'verify-signup':

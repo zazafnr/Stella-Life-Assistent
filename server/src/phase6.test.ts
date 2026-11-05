@@ -29,6 +29,7 @@ process.env.OPENROUTER_API_KEY = 'test';
 process.env.OPENROUTER_BASE_URL = `http://127.0.0.1:${(mock.address() as AddressInfo).port}`;
 
 const { register } = await import('./auth.ts');
+await (await import('./testing/editions.ts')).loadSchoolForTests();
 const { db, getUser, newId, updateUserSettings } = await import('./db.ts');
 const { handleChat } = await import('./assistant.ts');
 const { applyProfile } = await import('./profile.ts');

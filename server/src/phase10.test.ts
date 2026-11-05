@@ -26,6 +26,7 @@ process.env.OPENROUTER_API_KEY = 'test';
 process.env.OPENROUTER_BASE_URL = base;
 
 const { register, requireUser, HttpError } = await import('./auth.ts');
+await (await import('./testing/editions.ts')).loadSchoolForTests();
 const { db, getItem, getUser, listItems, recentMessages } = await import('./db.ts');
 const { handleChat } = await import('./assistant.ts');
 const { levelFor, perform, undo } = await import('./actions.ts');

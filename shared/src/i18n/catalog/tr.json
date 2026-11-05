@@ -669,5 +669,7 @@
  "planner.viewWeek": "Hafta",
  "planner.viewDay": "Gün",
  "planner.studyTitle": "Çalış: {title}",
- "planner.doTitle": "Yap: {title}"
+ "planner.doTitle": "Yap: {title}",
+ "auth.wrongEdition.students": "Bu hesap Stella for Students'a ait. Lütfen oradan giriş yap.",
+ "auth.wrongEdition.life": "Bu hesap Stella'ya ait, Stella for Students'a değil. Lütfen oradan giriş yap."
 }

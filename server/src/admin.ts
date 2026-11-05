@@ -8,7 +8,6 @@ import { createInvite, deleteInvite, listInvites, registrationMode } from './sig
 import { isLocale, isPlanId, LOCALES, DEFAULT_LOCALE, PLAN_IDS, PLANS } from '@stella/shared';
 import { billingOverview, giftPlan, planFor, planOverrides, setPlanOverrides, subscriptionOf } from './billing.ts';
 import { db } from './db.ts';
-import { announceFreenotes } from './notes.ts';
 import { registerWebhook, unregisterWebhook } from './channels/telegram.ts';
 import { renderTemplate, SAMPLE, TEMPLATE_NAMES, type TemplateName } from './email/templates.ts';
 
@@ -40,11 +39,6 @@ export function registerAdminRoutes(api: FastifyInstance) {
     const mail = renderTemplate(req.params.template as TemplateName, locale, SAMPLE);
     if (req.query.format === 'json') return mail;
     return reply.type('text/html; charset=utf-8').send(mail.html);
-  });
-
-  // FreeNotes ist da: alle auf der Warteliste benachrichtigen
-  api.post('/api/admin/freenotes/announce', { preHandler: requireOwner }, async () => {
-    try { return { ok: true, ...(await announceFreenotes()) }; } catch (err) { throw new HttpError(400, (err as Error).message); }
   });
 
   // Abos: schenken, Limits ändern (ohne Deploy), Zahlen für das Dashboard

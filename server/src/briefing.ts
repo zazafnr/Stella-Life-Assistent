@@ -9,6 +9,7 @@ import { timeIn, weekdayName, weekdayOf, type Briefing, type BriefingSection } f
 import { buildLagebild, isoWeekday, toHhmm, toMin, type Lagebild } from './context.ts';
 import { addMessage, db, getUser, notifyOnce, type User } from './db.ts';
 import { goalBriefingLines } from './goals.ts';
+import { pluginBriefingDone, pluginBriefingSections } from './editions/registry.ts';
 import { deliverHint, findHints, isDelivered } from './hints.ts';
 import { notify } from './channels/deliver.ts';
 import { tr, userLocale, voiceOf } from './locale.ts';
@@ -46,15 +47,8 @@ export function buildBriefing(user: User, lb: Lagebild = buildLagebild(user, 3))
     sections.push({ id: 'news', title: tr(user, 'briefing.section.news'), lines: news.map((n) => `${n.sentence} ([${n.source}](${n.url}), ${hhmm(n.publishedAt)})`) });
   }
 
-  // Schule
-  const lessons = today.lessons;
-  if (lessons.length) {
-    const held = lessons.filter((l) => l.status !== 'cancelled');
-    const lines = held.length ? [`${held[0]!.start}–${held.at(-1)!.end} · ${tr(user, 'briefing.lessons', { count: held.length })}`] : [tr(user, 'briefing.allCancelled')];
-    for (const l of lessons.filter((x) => x.status === 'cancelled')) lines.push(tr(user, 'briefing.cancelled', { subject: String(l.subject ?? l.code), start: l.start }));
-    for (const l of lessons.filter((x) => x.status === 'irregular' && x.info)) lines.push(`${l.subject ?? l.code}: ${l.info}`);
-    sections.push({ id: 'school', title: tr(user, 'briefing.section.school'), lines });
-  }
+  // Abschnitte des Edition-Plugins (z. B. Schule mit Entfall)
+  sections.push(...pluginBriefingSections(user, lb));
 
   // Heute fällig (Tests zuerst)
   const due = today.items.filter((i) => i.status === 'open' && i.kind !== 'study')
@@ -91,12 +85,10 @@ export function buildBriefing(user: User, lb: Lagebild = buildLagebild(user, 3))
   const since = new Date(Date.now() - 14 * 3600_000).toISOString();
   const done = (db.prepare(`SELECT summary FROM actions WHERE user_id = ? AND source = 'auto' AND status = 'done' AND created_at > ?
     AND type != 'memory.add' ORDER BY created_at`).all(user.id, since) as { summary: string }[]).map((r) => r.summary);
-  const solvedCount = (db.prepare(`SELECT COUNT(*) AS n FROM items WHERE user_id = ? AND kind = 'homework' AND status = 'done'
-    AND updated_at > ? AND attachments LIKE '%Lösung%'`).get(user.id, since) as { n: number }).n;
   const trashed = (db.prepare(`SELECT COUNT(*) AS n FROM inbox_events WHERE user_id = ? AND created_at > ? AND json_extract(payload, '$.action') = 'trash'`)
     .get(user.id, since) as { n: number }).n;
   const doneLines = [...done.map((d) => d.charAt(0).toUpperCase() + d.slice(1))];
-  if (solvedCount) doneLines.push(tr(user, 'briefing.solved', { count: solvedCount }));
+  doneLines.push(...pluginBriefingDone(user, since));
   if (trashed) doneLines.push(tr(user, 'briefing.trashed', { count: trashed }));
   if (doneLines.length) sections.push({ id: 'done', title: tr(user, 'briefing.section.done'), lines: doneLines.slice(0, 5) });
 

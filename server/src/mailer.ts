@@ -5,6 +5,8 @@ import nodemailer, { type Transporter } from 'nodemailer';
 import { smtpKey, type SmtpKey } from './keys.ts';
 import { logMail } from './maillog.ts';
 import type { Locale } from '@stella/shared';
+import { config } from './config.ts';
+import { editionOfUser, EDITION_PRODUCT } from './editions/registry.ts';
 import { renderTemplate, type TemplateData, type TemplateName } from './email/templates.ts';
 
 let factory: (smtp: SmtpKey) => Pick<Transporter, 'sendMail'> = (smtp) => nodemailer.createTransport({
@@ -32,11 +34,11 @@ export function senderDomain(from: string | undefined): string | null {
  */
 export type MailKind = 'noreply' | 'stella';
 
-export function systemSender(from: string | undefined, kind: MailKind): { from?: string; replyTo?: string } {
+export function systemSender(from: string | undefined, kind: MailKind, product = 'Stella'): { from?: string; replyTo?: string } {
   const domain = senderDomain(from);
   if (!domain) return from ? { from } : {};
-  if (kind === 'stella') return { from: `Stella <stella@${domain}>`, replyTo: `stella@${domain}` };
-  return { from: from!, replyTo: `support@${domain}` };
+  if (kind === 'stella') return { from: `${product} <stella@${domain}>`, replyTo: `stella@${domain}` };
+  return { from: product === 'Stella' ? from! : `${product} <noreply@${domain}>`, replyTo: `support@${domain}` };
 }
 
 export interface MailExtra {
@@ -46,16 +48,18 @@ export interface MailExtra {
   /** Antwort in einem Verlauf */
   inReplyTo?: string;
   references?: string[];
+  /** Produktname der Edition für den Absendernamen (Standard „Stella“) */
+  product?: string;
 }
 
 export async function sendSystemMail(to: string, subject: string, text: string, kind: MailKind = 'noreply', extra: MailExtra & { html?: string } = {}): Promise<void> {
   const smtp = smtpKey();
   const purpose = extra.purpose ?? (kind === 'stella' ? 'stella_reply' : 'system');
   if (!smtp) { logMail('out', purpose, 'failed', { to, userId: extra.userId, detail: 'kein Absender eingerichtet' }); throw new Error('Kein Mail-Absender eingerichtet'); }
-  const who = systemSender(smtp.from, kind);
+  const who = systemSender(smtp.from, kind, extra.product);
   try {
     await factory(smtp).sendMail({
-      from: who.from ?? `Stella <${smtp.user}>`, ...(who.replyTo ? { replyTo: who.replyTo } : {}), to, subject, text,
+      from: who.from ?? `${extra.product ?? 'Stella'} <${smtp.user}>`, ...(who.replyTo ? { replyTo: who.replyTo } : {}), to, subject, text,
       ...(extra.html ? { html: extra.html } : {}),
       ...(extra.inReplyTo ? { inReplyTo: extra.inReplyTo, references: extra.references?.length ? extra.references : [extra.inReplyTo] } : {}),
     });
@@ -72,6 +76,10 @@ export async function sendSystemMail(to: string, subject: string, text: string, 
  */
 export async function sendTemplateMail(to: string, locale: Locale, template: TemplateName, data: TemplateData = {}, kind: MailKind = 'noreply',
   extra: MailExtra & { subject?: string } = {}): Promise<void> {
-  const { subject, html, text } = renderTemplate(template, locale, data);
-  await sendSystemMail(to, extra.subject ?? subject, text, kind, { ...extra, html, purpose: extra.purpose ?? template });
+  // Produktname und App-Adresse richten sich nach der Edition des Kontos (ohne Konto: „Stella“)
+  const edition = extra.userId ? editionOfUser(extra.userId) : 'life';
+  const product = EDITION_PRODUCT[edition];
+  const branded: TemplateData = { ...data, product, ...(edition === 'students' && (!data.appUrl || data.appUrl === config.publicUrl) ? { appUrl: config.studentsUrl } : {}) };
+  const { subject, html, text } = renderTemplate(template, locale, branded);
+  await sendSystemMail(to, extra.subject ?? subject, text, kind, { ...extra, html, purpose: extra.purpose ?? template, product });
 }

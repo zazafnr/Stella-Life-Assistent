@@ -12,7 +12,10 @@ import type { FastifyInstance } from 'fastify';
 import { addMessage, db, getUser, newId, now, updateUserSettings, type User } from './db.ts';
 import { config } from './config.ts';
 import { createSession, hashPassword, HttpError, register as registerFirst, userCount, verifyPassword } from './auth.ts';
-import { isCountry, isLocale, matchLocale, type Locale } from '@stella/shared';
+import { isCountry, isLocale, matchLocale, type Edition, type Locale } from '@stella/shared';
+import { requestEdition } from './editions/registry.ts';
+import { editionUrl } from './editions/access.ts';
+import { tr } from './locale.ts';
 import { checkResend, claimByCode, createLoginRequest, pendingCookie, sendLinkMail } from './loginlink.ts';
 import { mailerConfigured } from './mailer.ts';
 import { filePath } from './files.ts';
@@ -68,12 +71,13 @@ function claimInvite(code: string): string {
 // ---------- Registrieren und bestätigen ----------
 // Die Bestätigung läuft über einen Link in der Mail (loginlink.ts). Der 6-stellige Code bleibt für „anderes Gerät“ und ältere Apps.
 
-export async function startSignup(b: { name: string; email: string; password: string; timeZone: string; device?: string; invite?: string; locale?: Locale; country?: string; ip?: string; userAgent?: string; deviceSecret?: string }) {
+export async function startSignup(b: { name: string; email: string; password: string; timeZone: string; device?: string; invite?: string; locale?: Locale; country?: string; ip?: string; userAgent?: string; deviceSecret?: string; edition?: Edition }) {
+  const edition: Edition = b.edition ?? 'life';
   const base = { locale: b.locale ?? matchLocale(undefined), ...(isCountry(b.country) ? { country: b.country } : {}) };
   const email = b.email.trim().toLowerCase();
   // das erste Konto ist der Owner: ohne Einladung, ohne Bestätigung
   if (userCount() === 0) {
-    const { token, user } = registerFirst(b.name || 'Du', email, b.password, b.timeZone, b.device);
+    const { token, user } = registerFirst(b.name || 'Du', email, b.password, b.timeZone, b.device, edition);
     updateUserSettings(user.id, { onboarding: 'pending', ...base });
     const created = getUser(user.id)!;
     addMessage(user.id, 'assistant', voiceOf(created).welcome(created.name));
@@ -88,12 +92,17 @@ export async function startSignup(b: { name: string; email: string; password: st
 
   // eine nicht bestätigte Anmeldung mit derselben Adresse wird ersetzt (z. B. Tippfehler im Passwort, Mail nie angekommen)
   const old = db.prepare('SELECT id, verified FROM users WHERE email = ?').get(email) as { id: string; verified: number } | undefined;
-  if (old?.verified) throw new HttpError(409, 'Diese E-Mail ist schon registriert.');
+  if (old?.verified) {
+    // gehört das Konto zur anderen App, sagen wir das (mit Link) statt „schon registriert“
+    const other = getUser(old.id)!;
+    if (other.edition !== edition) throw new HttpError(409, tr(other, `auth.wrongEdition.${other.edition}`), { code: 'wrong_edition', edition: other.edition, url: editionUrl(other.edition) });
+    throw new HttpError(409, 'Diese E-Mail ist schon registriert.');
+  }
   if (old) db.prepare('DELETE FROM users WHERE id = ?').run(old.id); // Einladung wird dabei wieder frei (ON DELETE SET NULL)
 
   const id = newId();
-  db.prepare('INSERT INTO users (id, name, email, password_hash, time_zone, ingest_token, created_at, role, verified, settings) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)')
-    .run(id, b.name.trim().slice(0, 80) || 'Du', email, hashPassword(b.password), b.timeZone || config.defaultTimeZone, randomBytes(24).toString('base64url'), now(), 'user', JSON.stringify({ onboarding: 'pending', ...base }));
+  db.prepare('INSERT INTO users (id, name, email, password_hash, time_zone, ingest_token, created_at, role, verified, settings, edition) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)')
+    .run(id, b.name.trim().slice(0, 80) || 'Du', email, hashPassword(b.password), b.timeZone || config.defaultTimeZone, randomBytes(24).toString('base64url'), now(), 'user', JSON.stringify({ onboarding: 'pending', ...base }), edition);
   if (invite) db.prepare('UPDATE invites SET used_by = ? WHERE code = ?').run(id, invite);
   const user = getUser(id)!;
   try {
@@ -159,7 +168,7 @@ export function registerSignupRoutes(app: FastifyInstance, publicUser: (u: User)
     // Sprache: ausdrücklich gewählt, sonst aus dem Browser (Accept-Language), sonst Englisch
     const locale = isLocale(b.locale) ? b.locale : matchLocale(req.headers['accept-language']);
     const res = await startSignup({ name: str(b.name, 80), email: str(b.email), password: typeof b.password === 'string' ? b.password.slice(0, 200) : '', timeZone: str(b.timeZone, 60), device: str(b.device, 80), invite: str(b.invite, 40), locale, country: str(b.country, 10),
-      ip: req.ip, userAgent: String(req.headers['user-agent'] ?? ''), deviceSecret: str(b.deviceSecret, 80) });
+      ip: req.ip, userAgent: String(req.headers['user-agent'] ?? ''), deviceSecret: str(b.deviceSecret, 80), edition: requestEdition(req) });
     if (!res.needsVerification) return { token: res.token, user: publicUser(res.user) };
     // Das Cookie hilft dem Link auf login.stella.evolsior.com, dieses Gerät wiederzuerkennen
     reply.header('Set-Cookie', pendingCookie(res.deviceSecret));

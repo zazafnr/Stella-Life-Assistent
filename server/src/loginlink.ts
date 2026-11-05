@@ -12,6 +12,7 @@ import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { matchLocale, t, type Locale } from '@stella/shared';
 import { config } from './config.ts';
+import { requestEdition } from './editions/registry.ts';
 import { createSession, hashPassword, HttpError } from './auth.ts';
 import { addMessage, db, getUser, newId, now, type User } from './db.ts';
 import { sendTemplateMail, mailerConfigured } from './mailer.ts';
@@ -255,7 +256,8 @@ export function registerLoginApi(app: FastifyInstance) {
     const row = db.prepare('SELECT id FROM users WHERE email = ? AND verified = 1').get(email) as { id: string } | undefined;
     // Gerätegeheimnis immer ausstellen, auch wenn es das Konto nicht gibt – gleiche Antwort in jedem Fall
     const fake = { requestId: newId(), deviceSecret: str(b.deviceSecret, 80) || randomBytes(24).toString('base64url') };
-    if (row && mailerConfigured()) {
+    // Konto der anderen App: keine Mail (und keine Antwort, die verrät, dass es das Konto gibt)
+    if (row && mailerConfigured() && getUser(row.id)!.edition === requestEdition(req)) {
       const user = getUser(row.id)!;
       checkResend(user.id, purpose);
       const created = createLoginRequest(user, purpose, { ip: req.ip, userAgent: String(req.headers['user-agent'] ?? ''), deviceSecret: str(b.deviceSecret, 80) });

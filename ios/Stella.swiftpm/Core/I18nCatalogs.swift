@@ -675,7 +675,9 @@ enum I18nCatalogs {
  "planner.viewWeek": "Woche",
  "planner.viewDay": "Tag",
  "planner.studyTitle": "Lernen: {title}",
- "planner.doTitle": "Erledigen: {title}"
+ "planner.doTitle": "Erledigen: {title}",
+ "auth.wrongEdition.students": "Dieses Konto gehört zu Stella for Students. Bitte melde dich dort an.",
+ "auth.wrongEdition.life": "Dieses Konto gehört zu Stella, nicht zu Stella for Students. Bitte melde dich dort an."
 }
 """#,
         "en": #"""
@@ -1350,7 +1352,9 @@ enum I18nCatalogs {
  "planner.viewWeek": "Week",
  "planner.viewDay": "Day",
  "planner.studyTitle": "Study: {title}",
- "planner.doTitle": "Do: {title}"
+ "planner.doTitle": "Do: {title}",
+ "auth.wrongEdition.students": "This account belongs to Stella for Students. Please sign in there.",
+ "auth.wrongEdition.life": "This account belongs to Stella, not to Stella for Students. Please sign in there."
 }
 """#,
         "es": #"""
@@ -2025,7 +2029,9 @@ enum I18nCatalogs {
  "planner.viewWeek": "Semana",
  "planner.viewDay": "Día",
  "planner.studyTitle": "Estudiar: {title}",
- "planner.doTitle": "Hacer: {title}"
+ "planner.doTitle": "Hacer: {title}",
+ "auth.wrongEdition.students": "Esta cuenta pertenece a Stella for Students. Inicia sesión allí.",
+ "auth.wrongEdition.life": "Esta cuenta pertenece a Stella, no a Stella for Students. Inicia sesión allí."
 }
 """#,
         "fr": #"""
@@ -2700,7 +2706,9 @@ enum I18nCatalogs {
  "planner.viewWeek": "Semaine",
  "planner.viewDay": "Jour",
  "planner.studyTitle": "Réviser : {title}",
- "planner.doTitle": "Faire : {title}"
+ "planner.doTitle": "Faire : {title}",
+ "auth.wrongEdition.students": "Ce compte appartient à Stella for Students. Connecte-toi là-bas.",
+ "auth.wrongEdition.life": "Ce compte appartient à Stella, pas à Stella for Students. Connecte-toi là-bas."
 }
 """#,
         "it": #"""
@@ -3375,7 +3383,9 @@ enum I18nCatalogs {
  "planner.viewWeek": "Settimana",
  "planner.viewDay": "Giorno",
  "planner.studyTitle": "Studiare: {title}",
- "planner.doTitle": "Fare: {title}"
+ "planner.doTitle": "Fare: {title}",
+ "auth.wrongEdition.students": "Questo account appartiene a Stella for Students. Accedi lì.",
+ "auth.wrongEdition.life": "Questo account appartiene a Stella, non a Stella for Students. Accedi lì."
 }
 """#,
         "pl": #"""
@@ -4072,7 +4082,9 @@ enum I18nCatalogs {
  "planner.viewWeek": "Tydzień",
  "planner.viewDay": "Dzień",
  "planner.studyTitle": "Nauka: {title}",
- "planner.doTitle": "Zrób: {title}"
+ "planner.doTitle": "Zrób: {title}",
+ "auth.wrongEdition.students": "To konto należy do Stella for Students. Zaloguj się tam.",
+ "auth.wrongEdition.life": "To konto należy do Stelli, a nie do Stella for Students. Zaloguj się tam."
 }
 """#,
         "pt-BR": #"""
@@ -4747,7 +4759,9 @@ enum I18nCatalogs {
  "planner.viewWeek": "Semana",
  "planner.viewDay": "Dia",
  "planner.studyTitle": "Estudar: {title}",
- "planner.doTitle": "Fazer: {title}"
+ "planner.doTitle": "Fazer: {title}",
+ "auth.wrongEdition.students": "Esta conta pertence ao Stella for Students. Entre por lá.",
+ "auth.wrongEdition.life": "Esta conta pertence ao Stella, não ao Stella for Students. Entre por lá."
 }
 """#,
         "tr": #"""
@@ -5422,7 +5436,9 @@ enum I18nCatalogs {
  "planner.viewWeek": "Hafta",
  "planner.viewDay": "Gün",
  "planner.studyTitle": "Çalış: {title}",
- "planner.doTitle": "Yap: {title}"
+ "planner.doTitle": "Yap: {title}",
+ "auth.wrongEdition.students": "Bu hesap Stella for Students'a ait. Lütfen oradan giriş yap.",
+ "auth.wrongEdition.life": "Bu hesap Stella'ya ait, Stella for Students'a değil. Lütfen oradan giriş yap."
 }
 """#,
     ]

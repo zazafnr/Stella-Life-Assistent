@@ -17,7 +17,8 @@ function fold(line: string): string {
   return parts.join('\r\n ');
 }
 
-export function toICalendar(items: Item[], timeZone: string): string {
+/** `extra`: fertige VEVENT-Blöcke (Zeilen) von Edition-Plugins */
+export function toICalendar(items: Item[], timeZone: string, extra: string[] = []): string {
   const lines = [
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Stella Life Assistant//DE', 'CALSCALE:GREGORIAN',
     'X-WR-CALNAME:Stella', 'X-PUBLISHED-TTL:PT15M', 'REFRESH-INTERVAL;VALUE=DURATION:PT15M',
@@ -38,6 +39,6 @@ export function toICalendar(items: Item[], timeZone: string): string {
     if (desc) lines.push(`DESCRIPTION:${escape(desc)}`);
     lines.push('END:VEVENT');
   }
-  lines.push('END:VCALENDAR');
+  lines.push(...extra, 'END:VCALENDAR');
   return lines.map(fold).join('\r\n') + '\r\n';
 }

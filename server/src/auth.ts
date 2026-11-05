@@ -2,6 +2,8 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync, 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { config } from './config.ts';
 import { db, getUser, newId, now, type User } from './db.ts';
+import { assertEdition } from './editions/access.ts';
+import type { Edition } from '@stella/shared';
 
 // ---------- Passwörter ----------
 
@@ -33,15 +35,15 @@ export function userCount(): number {
   return (db.prepare('SELECT COUNT(*) AS n FROM users').get() as { n: number }).n;
 }
 
-export function register(name: string, email: string, password: string, timeZone: string, device?: string) {
+export function register(name: string, email: string, password: string, timeZone: string, device?: string, edition: Edition = 'life') {
   if (userCount() > 0 && !config.allowRegistration) throw new HttpError(403, 'Registrierung ist geschlossen.');
   if (password.length < 8) throw new HttpError(400, 'Passwort muss mindestens 8 Zeichen haben.');
   const id = newId();
   const role = userCount() === 0 ? 'owner' : 'user';
   try {
-    db.prepare('INSERT INTO users (id, name, email, password_hash, time_zone, ingest_token, created_at, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    db.prepare('INSERT INTO users (id, name, email, password_hash, time_zone, ingest_token, created_at, role, edition) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
       .run(id, name.trim(), email.trim().toLowerCase(), hashPassword(password), timeZone || config.defaultTimeZone,
-        randomBytes(24).toString('base64url'), now(), role);
+        randomBytes(24).toString('base64url'), now(), role, edition);
   } catch {
     throw new HttpError(409, 'Diese E-Mail ist schon registriert.');
   }
@@ -72,7 +74,8 @@ function noteFailure(keys: string[]) {
   if (failures.size > 10_000) for (const [k, f] of failures) if (f.until <= now) failures.delete(k);
 }
 
-export function login(email: string, password: string, device?: string, ip = '') {
+/** `edition`: auf welcher Oberfläche sich die Person anmeldet; gehört das Konto zu einer anderen, gibt es 409 statt eines Zugangs. */
+export function login(email: string, password: string, device?: string, ip = '', edition?: Edition) {
   const mail = email.trim().toLowerCase();
   const keys = [`mail:${mail}`, ...(ip ? [`ip:${ip}`] : [])];
   checkLocked(keys);
@@ -84,7 +87,9 @@ export function login(email: string, password: string, device?: string, ip = '')
   }
   keys.forEach((k) => failures.delete(k));
   if (!getUser(row.id)!.verified) throw new HttpError(403, 'Bitte bestätige zuerst deine E-Mail-Adresse – der Code steht in der Mail von Stella.', { needsVerification: true, email: mail });
-  return { token: createSession(row.id, device), user: getUser(row.id)! };
+  const user = getUser(row.id)!;
+  if (edition) assertEdition(user, edition);
+  return { token: createSession(row.id, device), user };
 }
 
 export function logout(token: string) {

@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import path from 'node:path';
-import { todayIn, type Locale, type UserProfile, type ActionGroup, type Attachment, type ChatMessage, type Item, type ItemKind, type ItemStatus, type PermissionLevel, type Tone } from '@stella/shared';
+import { isEdition, todayIn, type Edition, type Locale, type UserProfile, type ActionGroup, type Attachment, type ChatMessage, type Item, type ItemKind, type ItemStatus, type PermissionLevel, type Tone } from '@stella/shared';
 import { config } from './config.ts';
 
 export const db = new Database(path.join(config.dataDir, 'stella.db'));
@@ -555,6 +555,8 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX screentime_events_user_day ON screentime_events(user_id, day);
   `,
+  // Editionen: jedes Konto gehört zu genau einer Edition ('life' oder 'students'); bestehende Konten bleiben 'life'
+  `ALTER TABLE users ADD COLUMN edition TEXT NOT NULL DEFAULT 'life';`,
 ];
 
 function migrate() {
@@ -633,9 +635,11 @@ export interface User {
   role: 'owner' | 'user';
   /** E-Mail per Code bestätigt */
   verified: boolean;
+  /** zu welcher App das Konto gehört */
+  edition: Edition;
 }
 
-type UserRow = { id: string; name: string; email: string; time_zone: string; settings: string; ingest_token: string; role: string; verified: number };
+type UserRow = { id: string; name: string; email: string; time_zone: string; settings: string; ingest_token: string; role: string; verified: number; edition?: string };
 function readSettings(json: string): UserSettings {
   const s = JSON.parse(json) as UserSettings;
   if (!s.books && s.digi4schoolBooks) s.books = s.digi4schoolBooks.map((b) => ({ ...b, provider: 'digi4school' }));
@@ -648,6 +652,7 @@ const toUser = (r: UserRow): User => ({
   settings: readSettings(r.settings), ingestToken: r.ingest_token,
   role: r.role === 'owner' ? 'owner' : 'user',
   verified: r.verified !== 0,
+  edition: isEdition(r.edition) ? r.edition : 'life',
 });
 
 export function allUserIds(): string[] {

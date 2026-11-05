@@ -19,6 +19,8 @@ export function Login() {
   const [registration, setRegistration] = useState<'closed' | 'invite' | 'open'>('invite');
   const [hasUsers, setHasUsers] = useState(true);
   const [error, setError] = useState('');
+  /** Konto gehört zur anderen App (409): Link dorthin */
+  const [otherApp, setOtherApp] = useState('');
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
   const [wait, setWait] = useState(0);
@@ -62,7 +64,7 @@ export function Login() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    setBusy(true); setError(''); setInfo('');
+    setBusy(true); setError(''); setInfo(''); setOtherApp('');
     try {
       if (mode === 'wait') {
         const done = await submitLoginCode(pending, form.email, form.code);
@@ -80,7 +82,10 @@ export function Login() {
       if (err instanceof ApiError && err.data.needsVerification) {
         const email = String(err.data.email ?? form.email);
         try { toWait(pendingLogin.get() ?? { requestId: '', deviceSecret: '', email, purpose: 'signup' }, t('auth.notConfirmed')); } catch { /* egal */ }
-      } else setError((err as Error).message);
+      } else {
+        setError((err as Error).message);
+        if (err instanceof ApiError && err.data.code === 'wrong_edition' && typeof err.data.url === 'string') setOtherApp(err.data.url);
+      }
     } finally { setBusy(false); }
   }
 
@@ -144,6 +149,7 @@ export function Login() {
         )}
 
         {error && <p className="error-text" style={{ margin: 0 }}>{error}</p>}
+        {otherApp && <a className="btn ghost block" href={otherApp}>{new URL(otherApp).host}</a>}
         {info && <p className="muted small" style={{ margin: 0 }}>{info}</p>}
         <button type="submit" className="btn block" disabled={busy || (mode === 'wait' && form.code.replace(/\D/g, '').length < 6)}>
           {mode === 'login' ? t('auth.login') : mode === 'register' ? t('auth.createAccount') : mode === 'wait' ? t('auth.confirm')

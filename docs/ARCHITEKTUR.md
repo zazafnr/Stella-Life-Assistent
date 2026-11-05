@@ -52,7 +52,22 @@ Entscheidungen:
 5. Normales Stella: Kalender statt Stundenplan; Prüfungen und Lernpläne bleiben mit erwachsenem Vokabular.
 6. Keine Gamification, auch nicht bei Lernkarten.
 
-Details (Submodul, Spiegel, Einhängepunkte) kommen mit den Paketen 1 und 2 in die Abschnitte unten.
+### Edition-Schnittstelle (Paket 1)
+
+- **`server/src/plugin-api.ts`** bündelt, was ein Plugin benutzen darf (`db`, `getUser`, `perform`, `record`, `notify`, `complete`, `getSecret`/`setSecret`, `tr`, `enqueueJob`, `config`, Typen).
+  Ein Plugin importiert vom Kern **nur Typen**; die Laufzeit-Teile reicht der Server beim Laden herein: `export default (api: PluginApi) => EditionPlugin`.
+  So gibt es genau eine Datenbank und einen Scheduler, auch wenn das Plugin als Submodul aus einem anderen Ordner kommt.
+- **`server/src/editions/registry.ts`** definiert die Einhängepunkte und die Sammel-Funktionen, über die der Kern sie aufruft (`pluginLessons`, `pluginHints`, `pluginTools` …):
+  `migrations` (eigener Zähler in `edition_migrations`, `PRAGMA user_version` bleibt dem Kern) · `routes` · `tools` · `prompt` · `parser` ·
+  `context` (Stunden, geschätzte Belegung, nächste Stunde) · `hints` · `briefing` · `stellaPlan` · `quickActions` · `scheduler` (Jobs, periodische Abgleiche) ·
+  `catalog` (eigene i18n-Schlüssel) · `settings` · `onboarding` · `ical` · `integrations` · `onItemCreated`.
+- **Laden** (`editions/load.ts`): `STELLA_EDITION_STUDENTS=off` → kein Plugin; Pfad → dieses Plugin; nicht gesetzt → `editions/students/server-plugin`, wenn vorhanden,
+  sonst das **eingebaute Schul-Plugin** (`editions/school.ts`, bis Paket 3 – die Module liegen noch in diesem Repo). Ohne Plugin läuft das normale Stella vollständig (Test in `editions.test.ts`).
+- **Konten**: `users.edition` (`life` | `students`, bestehende Konten bleiben `life`). Die Oberfläche einer Anfrage kommt aus dem Host (`students.…`), dem Feld `edition` oder dem Header `x-stella-edition`.
+  Anmeldung auf der falschen Oberfläche → `409` mit `code: 'wrong_edition'`, `edition` und `url` (nie eine Sitzung); Anmelde-Links für Konten der anderen App werden nicht verschickt (ohne zu verraten, dass es das Konto gibt).
+  `GET /api/me` liefert `edition` und `editionUrl`; `GET /api/edition` beschreibt, was die Plugins an Einstellungen und Einführung beisteuern.
+- **Mails**: Absendername, Betreff, Kopf und Fuß nennen das Produkt der Edition (`Stella` / `Stella for Students`); die Kataloge sagen weiter nur „Stella“, `brandText()` ersetzt es.
+- **Grenze**: eine E-Mail-Adresse gehört zu einem Konto (`users.email` ist eindeutig). Wer beide Apps nutzen will, braucht zwei Adressen; der Hinweis „gehört zu Stella for Students“ kommt dann bei Anmeldung und Registrierung.
 
 ## 1. KI-Modell: OpenRouter, automatisch das beste kostenlose (Notfall bzw. ohne Claude-Schlüssel)
 

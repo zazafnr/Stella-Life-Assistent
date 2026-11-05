@@ -16,6 +16,10 @@ export interface Me {
   id: string; name: string; email: string; timeZone: string; ingestUrl: string;
   /** der erste Nutzer ist 'owner' und sieht „Server“ in den Einstellungen */
   role?: 'owner' | 'user';
+  /** zu welcher App das Konto gehört */
+  edition?: 'life' | 'students';
+  /** Adresse der App, zu der das Konto gehört */
+  editionUrl?: string;
   /** serverweite Funktions-Schalter (z. B. Finanzen ausgeblendet) */
   flags?: { finance?: boolean; freenotesUrl?: string | null; telegram?: boolean };
   settings: {
@@ -201,8 +205,18 @@ export async function logout() {
   logoutLocal();
 }
 
+/** Diese Web-App ist das normale Stella; ein Students-Konto gehört in die andere App. */
+export const APP_EDITION: 'life' | 'students' = 'life';
+
 export async function refreshMe() {
-  set({ me: await api<Me>('/api/me') });
+  const me = await api<Me>('/api/me');
+  if (me.edition && me.edition !== APP_EDITION) {
+    // falsche Oberfläche (z. B. alter Token): abmelden, freundlicher Hinweis mit Link auf der Anmeldeseite
+    const url = me.editionUrl ?? '';
+    logoutLocal();
+    throw new ApiError(409, 'This account belongs to Stella for Students.', { code: 'wrong_edition', edition: me.edition, url });
+  }
+  set({ me });
 }
 
 // ---------- Abgleich ----------

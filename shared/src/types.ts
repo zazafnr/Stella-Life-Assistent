@@ -439,3 +439,9 @@ export interface StellaPlanEntry {
   enabled: boolean;
   controls: StellaPlanControl[];
 }
+
+// ---------- Editionen ----------
+// Stella gibt es in zwei Apps mit einem Server: `life` (Alltag, Beruf) und `students` (Schule, Lehre, Studium).
+export const EDITIONS = ['life', 'students'] as const;
+export type Edition = (typeof EDITIONS)[number];
+export const isEdition = (v: unknown): v is Edition => EDITIONS.includes(v as Edition);

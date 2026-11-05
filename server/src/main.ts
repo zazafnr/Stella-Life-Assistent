@@ -4,6 +4,9 @@ import Fastify, { type FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { addDays, isCountry, isLocale, isLocationPermission, isTone, todayIn, voice, type Item } from '@stella/shared';
 import { userLocale } from './locale.ts';
+import { pluginIcal, pluginIntegrations, pluginRoutes, pluginSettings, pluginOnboarding, editions, requestEdition } from './editions/registry.ts';
+import { loadEditions } from './editions/load.ts';
+import { editionUrl } from './editions/access.ts';
 import { registerUndoRoutes } from './email/undo.ts';
 import { currentPlanId, maxMailboxes, registerBillingRoutes, registerBillingWebhook } from './billing.ts';
 import { tr } from './locale.ts';
@@ -22,13 +25,9 @@ import { modelStatus } from './llm.ts';
 import { pushToUser, saveSubscription, vapidPublicKey } from './push.ts';
 import { startScheduler } from './scheduler.ts';
 import { toICalendar } from './ical.ts';
-import { getBookCredentials, listShelf, LOGIN_PAGES, normalizeCookies, PROVIDERS, saveBookCredentials, screenshotPage, secretName } from './books.ts';
-import { deleteUserFont, renderHandwriting, saveUserFont, userFontPath } from './handwriting.ts';
 import { checkAllMail, draftReply, getMailBody, getMailEvent, isMailCategory, listAccounts, moveMail, PRESETS, publicAccounts, restoreMail, saveAccounts, setEventField, testAccount, type MailAccount } from './mail.ts';
-import { lessonsFor, syncUntis, testUntis, type UntisCredentials } from './untis.ts';
 import { FILE_TYPES, filePath, saveDataUrl, saveFile } from './files.ts';
 import type { BookProvider } from './db.ts';
-import { ackNotesEntry, notesInbox, usesFreeNotes } from './notes.ts';
 import { finishGoogle, finishGoogleLink, finishTarget, googleAuthUrl, googleConfigured, readState, type OAuthClient } from './oauth.ts';
 import { approve, GROUPS, isGroup, isLevel, levelFor, listActions, perform, reject, undo } from './actions.ts';
 import { LlmUnavailable } from './llm.ts';
@@ -66,6 +65,9 @@ app.setErrorHandler((err, _req, reply) => {
   return reply.code(500).send({ error: 'Interner Fehler' });
 });
 
+// Edition-Plugins laden, bevor Routen und Scheduler gebaut werden
+await loadEditions();
+
 const str = (v: unknown, max = 4000) => (typeof v === 'string' ? v.slice(0, max) : '');
 
 /** Das Profil ohne serverseitig abgeschaltete Funktionen – so blenden alle Oberflächen sie ohne eigenen Code aus. */
@@ -77,19 +79,13 @@ function visibleSettings(settings: User['settings']): User['settings'] {
 
 function publicUser(user: User) {
   return {
-    id: user.id, name: user.name, email: user.email, timeZone: user.timeZone, settings: visibleSettings(user.settings), role: user.role,
+    id: user.id, name: user.name, email: user.email, timeZone: user.timeZone, settings: visibleSettings(user.settings), role: user.role, edition: user.edition, editionUrl: editionUrl(user.edition),
     /** Serverweite Funktions-Schalter für die Oberflächen (z. B. Einführung ohne „Ausgaben“) */
     flags: { finance: config.features.finance, freenotesUrl: config.freenotesUrl || null, telegram: telegramConfigured() },
     ingestUrl: `${config.publicUrl}/api/ingest/${user.ingestToken}`,
     integrations: {
-      books: Object.fromEntries((Object.keys(PROVIDERS) as BookProvider[]).map((p) => {
-        const c = getBookCredentials(user.id, p);
-        return [p, { connected: !!c, cookies: !!c?.cookies?.length, email: c?.email ?? null }];
-      })),
-      webuntis: hasSecret(user.id, 'webuntis'),
+      ...pluginIntegrations(user),
       mailAccounts: listAccounts(user.id).length,
-      handwritingFont: !!userFontPath(user.id),
-      freeNotes: usesFreeNotes(user.id),
       /** Server kann "Mit Google anmelden" (GOOGLE_CLIENT_ID gesetzt) */
       googleSignIn: googleConfigured(),
     },
@@ -123,7 +119,7 @@ app.addHook('onRequest', async (req, reply) => {
 
 app.post('/api/auth/login', async (req) => {
   const b = req.body as Record<string, unknown>;
-  const { token, user } = login(str(b.email, 200), str(b.password, 200), str(b.device, 80), req.ip);
+  const { token, user } = login(str(b.email, 200), str(b.password, 200), str(b.device, 80), req.ip, requestEdition(req));
   return { token, user: publicUser(user) };
 });
 
@@ -172,7 +168,7 @@ app.register(async (ingest) => {
   // Kalender-Abo: iPhone → Einstellungen → Kalender → Accounts → Kalenderabo hinzufügen
   ingest.get('/api/ingest/:token/calendar.ics', async (req, reply) => {
     const items = listItems(req.user.id, { from: addDays(todayIn(req.user.timeZone), -30), includeDone: true });
-    return reply.type('text/calendar; charset=utf-8').send(toICalendar(items, req.user.timeZone));
+    return reply.type('text/calendar; charset=utf-8').send(toICalendar(items, req.user.timeZone, pluginIcal(req.user)));
   });
 
   // Apple-Kurzbefehl "Gesundheit an Stella" – z. B. täglich um 21:00
@@ -226,6 +222,7 @@ app.register(async (api) => {
   });
 
   registerAdminRoutes(api);
+  pluginRoutes(api);
   registerOverviewRoutes(api);
   registerAddressRoutes(api);
   registerListRoutes(api);
@@ -241,6 +238,14 @@ app.register(async (api) => {
 
   api.get('/api/me', async (req) => publicUser(req.user));
 
+  // Welche Edition-Plugins laufen und was sie an Einstellungen/Einführung beisteuern (die Web-App rendert es)
+  api.get('/api/edition', async (req) => ({
+    edition: req.user.edition,
+    plugins: editions().map((p) => p.id),
+    settings: pluginSettings(req.user),
+    onboarding: pluginOnboarding(),
+  }));
+
   api.patch('/api/settings', async (req) => {
     const b = req.body as Record<string, unknown>;
     const patch: Partial<UserSettings> = {};
@@ -250,7 +255,7 @@ app.register(async (api) => {
     if (b.stepGoal !== undefined) patch.stepGoal = Math.max(0, Number(b.stepGoal) || 0);
     if (Array.isArray(b.books)) {
       patch.books = b.books.slice(0, 40).map((x: any) => ({
-        subject: str(x.subject, 60).trim(), provider: (x.provider in PROVIDERS ? x.provider : 'digi4school') as BookProvider,
+        subject: str(x.subject, 60).trim(), provider: (x.provider === 'scook' ? 'scook' : 'digi4school') as BookProvider,
         url: str(x.url, 500).trim(), pageOffset: Number(x.pageOffset) || 0,
         pageUrlTemplate: str(x.pageUrlTemplate, 500) || undefined,
       })).filter((x) => x.subject && x.url.startsWith('https://'));
@@ -431,88 +436,6 @@ app.register(async (api) => {
       FROM health_days WHERE user_id = ? AND date >= ? ORDER BY date`).all(req.user.id, from);
   });
 
-  // ----- Schulbücher (digi4school, scook) -----
-  const provider = (p: string): BookProvider => {
-    if (!(p in PROVIDERS)) throw new HttpError(404, 'Unbekannter Anbieter');
-    return p as BookProvider;
-  };
-  api.put('/api/integrations/books/:provider', async (req: FastifyRequest<{ Params: { provider: string } }>) => {
-    const b = req.body as Record<string, unknown>;
-    const p = provider(req.params.provider);
-    let cookies: unknown[] | undefined;
-    if (b.cookies) {
-      try { cookies = typeof b.cookies === 'string' ? JSON.parse(b.cookies) : b.cookies as unknown[]; } catch { throw new HttpError(400, 'Cookies sind kein gültiges JSON'); }
-      if (!Array.isArray(cookies) || !normalizeCookies(cookies).length) throw new HttpError(400, 'Keine gültigen Cookies gefunden');
-    }
-    if (!cookies && (!str(b.email) || !str(b.password))) throw new HttpError(400, 'E-Mail und Passwort (oder Cookies) nötig');
-    saveBookCredentials(req.user.id, p, {
-      ...(str(b.email) ? { email: str(b.email, 200), password: str(b.password, 200) } : {}),
-      ...(cookies ? { cookies } : {}),
-    });
-    // aus dem Login-Fenster der Apps: gleich prüfen, ob die Anmeldung trägt, und das Regal mitschicken
-    if (b.verify === true) {
-      try {
-        return { ok: true, shelf: await listShelf(req.user.id, p) };
-      } catch (err) {
-        throw new HttpError(400, `Anmeldung nicht erkannt – bitte im Fenster fertig einloggen und dann erst schließen. (${(err as Error).message})`);
-      }
-    }
-    return { ok: true };
-  });
-  api.delete('/api/integrations/books/:provider', async (req: FastifyRequest<{ Params: { provider: string } }>) => {
-    const p = provider(req.params.provider);
-    deleteSecret(req.user.id, secretName(p));
-    if (p === 'digi4school') deleteSecret(req.user.id, 'digi4school');
-    return { ok: true };
-  });
-  // Wo die Apps das Login-Fenster öffnen und welche Cookies sie übernehmen
-  api.get('/api/integrations/books/login-pages', async () =>
-    Object.fromEntries(Object.entries(LOGIN_PAGES).map(([p, v]) => [p, { url: v.url, domains: v.domains.source }])));
-  api.get('/api/integrations/books/:provider/shelf', async (req: FastifyRequest<{ Params: { provider: string } }>) => {
-    try { return await listShelf(req.user.id, provider(req.params.provider)); } catch (err) { throw new HttpError(502, (err as Error).message); }
-  });
-  // Probe-Screenshot zum Kalibrieren (Seitenversatz)
-  api.post('/api/integrations/books/preview', async (req) => {
-    const b = req.body as Record<string, unknown>;
-    const book = req.user.settings.books?.find((x) => x.subject === str(b.subject));
-    if (!book) throw new HttpError(404, 'Kein Buch für dieses Fach');
-    const printed = Number(b.page) || 1;
-    try {
-      const png = await screenshotPage(req.user.id, book.provider, book.url, printed + (book.pageOffset ?? 0), book.pageUrlTemplate);
-      const id = saveFile(png, 'png');
-      db.prepare('INSERT OR IGNORE INTO notified (user_id, key, created_at) VALUES (?, ?, ?)').run(req.user.id, `file:${id}`, now());
-      return { fileId: id };
-    } catch (err) {
-      throw new HttpError(502, (err as Error).message);
-    }
-  });
-
-  // ----- WebUntis -----
-  api.put('/api/integrations/webuntis', async (req) => {
-    const b = req.body as Record<string, unknown>;
-    const creds: UntisCredentials = str(b.qr)
-      ? { qr: str(b.qr, 1000) }
-      : { server: str(b.server, 200), school: str(b.school, 200), username: str(b.username, 200), password: str(b.password, 200) };
-    try { await testUntis(creds); } catch (err) { throw new HttpError(400, `WebUntis-Login fehlgeschlagen: ${(err as Error).message}`); }
-    setSecret(req.user.id, 'webuntis', creds);
-    void syncUntis(req.user.id).catch((err) => app.log.warn(err));
-    return { ok: true };
-  });
-  api.delete('/api/integrations/webuntis', async (req) => {
-    deleteSecret(req.user.id, 'webuntis');
-    db.prepare('DELETE FROM lessons WHERE user_id = ?').run(req.user.id);
-    return { ok: true };
-  });
-  api.post('/api/integrations/webuntis/sync', async (req) => {
-    try { await syncUntis(req.user.id); } catch (err) { throw new HttpError(502, (err as Error).message); }
-    return { ok: true };
-  });
-  api.get('/api/timetable', async (req) => {
-    const q = req.query as Record<string, string>;
-    const today = todayIn(req.user.timeZone);
-    return lessonsFor(req.user.id, q.from || today, q.to || addDays(today, 6));
-  });
-
   // ----- E-Mail -----
   api.get('/api/mail/accounts', async (req) => publicAccounts(req.user.id));
   api.post('/api/oauth/google/start', async (req) => {
@@ -634,37 +557,6 @@ app.register(async (api) => {
   api.post('/api/inbox/:id/restore', async (req: FastifyRequest<{ Params: { id: string } }>) => {
     try { await restoreMail(req.user.id, req.params.id); } catch (err) { throw new HttpError(400, (err as Error).message); }
     return { ok: true };
-  });
-
-  // ----- FreeNotes (iPad-Heft): gelöste HÜs abholen -----
-  api.get('/api/notes/inbox', async (req) => notesInbox(req.user.id));
-  api.post('/api/notes/inbox/:id/ack', async (req: FastifyRequest<{ Params: { id: string } }>) => {
-    const b = (req.body ?? {}) as Record<string, unknown>;
-    if (!ackNotesEntry(req.user.id, req.params.id, str(b.notebook, 200) || null, Number.isFinite(Number(b.page)) ? Number(b.page) : null)) {
-      throw new HttpError(404, 'Nicht gefunden');
-    }
-    return { ok: true };
-  });
-
-  // ----- Handschrift -----
-  api.put('/api/handwriting/font', async (req) => {
-    const ext = str(req.headers['x-filename']).split('.').pop()?.toLowerCase() ?? '';
-    if (!Buffer.isBuffer(req.body) || !req.body.length) throw new HttpError(400, 'Keine Datei');
-    try { saveUserFont(req.user.id, req.body, ext); } catch (err) { throw new HttpError(400, (err as Error).message); }
-    return { ok: true };
-  });
-  api.delete('/api/handwriting/font', async (req) => {
-    deleteUserFont(req.user.id);
-    return { ok: true };
-  });
-  api.post('/api/handwriting/preview', async (req) => {
-    const png = await renderHandwriting(req.user.id, {
-      date: 'Fr, 30.10.',
-      text: '__S. 45 Nr. 16__\n\n1) Oui, elle y va en avion.\n2) Non, je ne m\'y intéresse pas.\n3) 3 · 4 + 2 = ==14==\nÄpfel, Übung, Größe',
-    });
-    const id = saveFile(png, 'png');
-    db.prepare('INSERT OR IGNORE INTO notified (user_id, key, created_at) VALUES (?, ?, ?)').run(req.user.id, `file:${id}`, now());
-    return { fileId: id };
   });
 
   // Kosten aller Nutzer sieht nur der Owner

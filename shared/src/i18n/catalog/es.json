@@ -669,5 +669,7 @@
  "planner.viewWeek": "Semana",
  "planner.viewDay": "Día",
  "planner.studyTitle": "Estudiar: {title}",
- "planner.doTitle": "Hacer: {title}"
+ "planner.doTitle": "Hacer: {title}",
+ "auth.wrongEdition.students": "Esta cuenta pertenece a Stella for Students. Inicia sesión allí.",
+ "auth.wrongEdition.life": "Esta cuenta pertenece a Stella, no a Stella for Students. Inicia sesión allí."
 }

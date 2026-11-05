@@ -6,13 +6,10 @@
 import { addDays, formatDateDe, timeIn, todayIn, WEEKDAYS_DE, weekdayOf, type Item, type Memory, type Ymd } from '@stella/shared';
 import { db, listItems, type User } from './db.ts';
 import { listMemories, MEMORY_CATEGORIES } from './memory.ts';
-import { lessonsFor } from './untis.ts';
-import { isSchool } from './profile.ts';
+import { pluginDaySummary, pluginEstimatedBusy, pluginLessons, type Lesson } from './editions/registry.ts';
 
 export interface Interval { start: string; end: string }
 export interface Busy extends Interval { label: string }
-
-type Lesson = ReturnType<typeof lessonsFor>[number];
 
 export interface DayContext {
   date: Ymd;
@@ -88,8 +85,9 @@ function dayContext(user: User, date: Ymd, today: Ymd, nowHhmm: string, lessons:
     if (!i.time || i.status !== 'open') continue;
     busy.push({ start: i.time, end: toHhmm(Math.min(toMin(i.time) + (DEFAULT_MINUTES[i.kind] ?? 30), 24 * 60 - 1)), label: i.title });
   }
-  // Schule ohne WebUntis: Vormittag an Schultagen als belegt annehmen
-  if (!weekend && !lessons.length && isSchool(user) && hasNoTimetable(user.id)) busy.push({ start: '07:30', end: '13:30', label: 'Schule (geschätzt)' });
+  // Edition-Plugin: geschätzte Belegung, wenn nichts bekannt ist (z. B. Schule ohne WebUntis)
+  const estimated = pluginEstimatedBusy(user, date, weekend, lessons);
+  if (estimated) busy.push(estimated);
 
   const window = { ...(weekend ? WEEKEND_WINDOW : DAY_WINDOW) };
   if (date === today && toMin(nowHhmm) > toMin(window.start)) window.start = nowHhmm;
@@ -100,14 +98,12 @@ function dayContext(user: User, date: Ymd, today: Ymd, nowHhmm: string, lessons:
   };
 }
 
-const hasNoTimetable = (userId: string) => !(db.prepare('SELECT 1 FROM lessons WHERE user_id = ? LIMIT 1').get(userId));
-
 export function buildLagebild(user: User, days = 7): Lagebild {
   const today = todayIn(user.timeZone);
   const now = timeIn(user.timeZone);
   const to = addDays(today, days - 1);
   const memories = listMemories(user.id);
-  const allLessons = lessonsFor(user.id, today, to);
+  const allLessons = pluginLessons(user.id, today, to);
   const items = listItems(user.id, { from: addDays(today, -14), includeDone: true });
 
   const dayList: DayContext[] = [];
@@ -154,13 +150,11 @@ export function lagebildPrompt(lb: Lagebild): string {
   const lines: string[] = [];
   for (const d of lb.days) {
     const head = `${WEEKDAYS_DE[weekdayOf(d.date)]} ${formatDateDe(d.date, lb.today)} (${d.date})`;
-    const school = d.lessons.length
-      ? `Schule ${d.lessons[0]!.start}–${d.lessons.at(-1)!.end}${d.lessons.some((l) => l.status === 'cancelled') ? `, entfällt: ${d.lessons.filter((l) => l.status === 'cancelled').map((l) => `${l.subject ?? l.code} ${l.start}`).join(', ')}` : ''}`
-      : 'keine Stunden bekannt';
+    const school = pluginDaySummary(d.lessons);
     const items = d.items.filter((i) => i.status !== 'cancelled')
       .map((i) => `[${i.id}] ${ICON[i.kind] ?? i.kind} ${i.title}${i.detail ? ` (${i.detail})` : ''}${i.time ? ` ${i.time}` : ''}${i.status === 'done' ? ' ✓' : ''}`);
     const free = d.free.map((f) => `${f.start}–${f.end}`).join(', ') || 'keine';
-    lines.push(`${head}: ${school}. Frei: ${free}.${items.length ? `\n  ${items.join('\n  ')}` : ''}`);
+    lines.push(`${head}: ${school ? `${school}. ` : ''}Frei: ${free}.${items.length ? `\n  ${items.join('\n  ')}` : ''}`);
   }
   const exams = lb.exams.map((e) => `- [${e.exam.id}] ${e.exam.title} in ${e.daysLeft} Tagen – Stoff: ${e.hasMaterial ? e.exam.material : 'UNBEKANNT'}; ` +
     `Lerneinheiten ${e.sessions.done}/${e.sessions.total} erledigt${e.sessions.missed ? `, ${e.sessions.missed} verpasst` : ''}`);

@@ -11,10 +11,8 @@ import { deliverHints } from './hints.ts';
 import { maybeOfferWeek, replanMissed } from './weekplan.ts';
 import { titleOldChats } from './conversations.ts';
 import { checkAllMail, listAccounts, purgeMailBodies, sendMail } from './mail.ts';
-import { syncUntis } from './untis.ts';
-import { fetchBookPage } from './books.ts';
+import { pluginJobs, pluginPeriodic } from './editions/registry.ts';
 import { advanceRecurring } from './planner.ts';
-import { solveHomework } from './homework.ts';
 import { sendGoalCheckIns } from './goals.ts';
 import { notify } from './channels/deliver.ts';
 import { fetchAllFeeds } from './news/store.ts';
@@ -24,9 +22,6 @@ type ReminderRow = { id: string; user_id: string; item_id: string | null; messag
 type JobRow = { id: string; user_id: string; type: string; payload: string; attempts: number };
 
 const JOB_HANDLERS: Record<string, (userId: string, payload: any) => Promise<void>> = {
-  book_page: (userId, p) => fetchBookPage(userId, p.itemId, p.pageDelta ?? 0, p.thenSolveAttempt ?? 0),
-  digi4school_page: (userId, p) => fetchBookPage(userId, p.itemId),
-  solve_homework: (userId, p) => solveHomework(userId, p.itemId, p.attempt ?? 0),
   send_mail: async (userId, p) => {
     await sendMail(userId, p);
     addMessage(userId, 'assistant', `✉️ Gesendet an ${p.to}: „${p.subject}“`);
@@ -62,7 +57,7 @@ async function runJobs() {
   for (const job of jobs) {
     db.prepare(`UPDATE jobs SET status = 'running', attempts = attempts + 1 WHERE id = ?`).run(job.id);
     try {
-      const handler = JOB_HANDLERS[job.type];
+      const handler = JOB_HANDLERS[job.type] ?? pluginJobs()[job.type];
       if (!handler) throw new Error(`Unbekannter Job-Typ ${job.type}`);
       await handler(job.user_id, JSON.parse(job.payload));
       db.prepare(`UPDATE jobs SET status = 'done' WHERE id = ?`).run(job.id);
@@ -103,15 +98,7 @@ async function periodic() {
     await every(`goals:${userId}`, 2 * 60_000, () => sendGoalCheckIns(userId)).catch((err) => console.warn('Ziele:', err.message));
     await every(`replan:${userId}`, 30 * 60_000, async () => { replanMissed(userId); }).catch((err) => console.warn('Neu planen:', err.message));
     await every(`weekplan:${userId}`, 10 * 60_000, () => maybeOfferWeek(userId)).catch((err) => console.warn('Wochenplan:', err.message));
-    if (hasSecret(userId, 'webuntis')) {
-      await every(`untis:${userId}`, 2 * 3600_000, () => syncUntis(userId)).catch((err) => {
-        console.warn('WebUntis:', err.message);
-        const user = getUser(userId);
-        if (user && notifyOnce(userId, `untis-error-${todayIn(user.timeZone)}`)) {
-          addMessage(userId, 'assistant', `⚠️ WebUntis-Abgleich klappt gerade nicht: ${err.message}`);
-        }
-      });
-    }
+    await pluginPeriodic(userId, every).catch((err) => console.warn('Edition:', err.message));
   }
 }
 

@@ -4,7 +4,7 @@ import {
   addDays, buildStudyPlan, DEFAULT_PREFS, nextOccurrence, planReminders, zonedToUtc, todayIn, type Item, type ParsedEntry,
 } from '@stella/shared';
 import { tr } from './locale.ts';
-import { nextLessonDate } from './untis.ts';
+import { pluginItemCreated, pluginNextLessonDate } from './editions/registry.ts';
 import {
   addReminder, clearOpenReminders, createItem, enqueueJob, getItem, getItemRaw, listItems, type NewItem, updateItem, type User,
 } from './db.ts';
@@ -38,17 +38,15 @@ function findBook(user: User, subject: string | null) {
 export function addItem(user: User, data: NewItem): Item {
   const item = createItem(user.id, data);
   scheduleReminders(user, item);
-  // HÜ mit Seitenzahl und hinterlegtem Buch → Seite aus dem E-Book holen (danach ggf. lösen)
-  if (item.kind === 'homework' && item.page && findBook(user, item.subject)) {
-    enqueueJob(user.id, 'book_page', { itemId: item.id });
-  }
+  // Edition-Plugin (z. B. HÜ mit Seitenzahl und Buch → Seite aus dem E-Book holen)
+  pluginItemCreated(user, item);
   return item;
 }
 
 export function addParsedEntry(user: User, e: ParsedEntry): Item {
   // "Latein HÜ" ohne Datum → nächste Lateinstunde laut WebUntis (statt nächster Schultag)
   if (e.dueAssumed && e.subject) {
-    const next = nextLessonDate(user.id, e.subject, todayIn(user.timeZone));
+    const next = pluginNextLessonDate(user.id, e.subject, todayIn(user.timeZone));
     if (next) e = { ...e, due: next };
   }
   return addItem(user, {
