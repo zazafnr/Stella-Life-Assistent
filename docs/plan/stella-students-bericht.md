@@ -67,7 +67,7 @@ Texte in acht Sprachen, keine Gamification.
 ## Aufgaben für dich (Betreiber)
 
 1. **Apple-Entwicklerkonto** für die zweite App (`app.stella.students.ios` und die App-Gruppe `group.app.stella.students.ios` anlegen, Family Controls für diese ID separat beantragen, Associated Domains: `apple-app-site-association` unter `login.stella.evolsior.com` um die zweite App-ID ergänzen, GitHub-Secret `APPETIZE_API_TOKEN` im Students-Repo): Bundle `app.stella.students.ios`, Name „Stella for Students“, App-Store-Eintrag, Datenschutz-Angaben (bestehende `/privacy`-Seite gilt).
-2. **Stripe**: je Edition und Plan Preise anlegen (Students: Plus 5 €, Pro 9 €, Max 19 € je Monat, Jahr = zwei Monate gratis) und die IDs eintragen; die angenommenen Preise bitte bestätigen oder ändern (`shared/src/plans.ts`, `PLANS_BY_EDITION.students`, dazu die Website `site-src/students.body.html`).
+2. **Stripe**: nichts Neues anlegen. Der Server baut die Preise beim Bezahlen selbst aus `shared/src/plans.ts` (`price_data`), es gibt keine Preis-IDs. Derselbe Stripe-Zugang und derselbe Webhook gelten für beide Apps. Nur die angenommenen Preise (Plus 5 €, Pro 9 €, Max 19 € je Monat) bestätigen oder in `plans.ts` und `site-src/students.body.html` ändern.
 3. **DNS**: A-Record `students.stella.evolsior.com` auf die VPS-IP (HTTPS holt Caddy), danach `deploy/install-vps.sh` erneut ausführen bzw. Docker neu bauen.
 4. **Cloudflare**: Website neu veröffentlichen (Push von `site/public/` nach `main`, wenn der Branch gemergt ist); Weiterleitung `/students` → `/stella-students` ist in `_redirects`.
 5. **Auslieferung**: Branch nach `main` mergen (zuerst das Kern-Repo, danach im Students-Repo `sync:core`), `STELLA_STUDENTS_REF` auf `main` oder einen Tag setzen.
