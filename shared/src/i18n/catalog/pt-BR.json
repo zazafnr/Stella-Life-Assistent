@@ -819,5 +819,11 @@
  "hintlabel.goals": "Ver metas",
  "hintlabel.makeGoal": "Criar como meta",
  "hintlabel.spending": "Ver gastos",
- "hintlabel.someone": "Alguém"
+ "hintlabel.someone": "Alguém",
+ "study.reviewAll": "Revisar tudo",
+ "study.reviewMock": "Revisar tudo + simulado com tempo cronometrado",
+ "study.overview": "Ter uma visão geral, marcar o que não está claro",
+ "study.practice": "Praticar e rever os erros",
+ "study.hard": "Praticar de novo os temas difíceis",
+ "study.clarify": "Esclarecer a matéria, ter uma visão geral"
 }

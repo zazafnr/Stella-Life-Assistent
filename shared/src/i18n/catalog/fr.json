@@ -819,5 +819,11 @@
  "hintlabel.goals": "Voir les objectifs",
  "hintlabel.makeGoal": "Créer comme objectif",
  "hintlabel.spending": "Voir les dépenses",
- "hintlabel.someone": "Quelqu’un"
+ "hintlabel.someone": "Quelqu’un",
+ "study.reviewAll": "Tout réviser",
+ "study.reviewMock": "Tout réviser + test blanc chronométré",
+ "study.overview": "Se faire une vue d’ensemble, marquer ce qui n’est pas clair",
+ "study.practice": "S’entraîner et revoir les erreurs",
+ "study.hard": "Retravailler les sujets difficiles",
+ "study.clarify": "Clarifier le programme, se faire une vue d’ensemble"
 }

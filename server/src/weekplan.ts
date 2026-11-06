@@ -29,7 +29,6 @@ const GAP = 10;
 const DAY_CAP = { weekday: 120, weekend: 150 };
 /** Blöcke enden spätestens hier */
 const LATEST_END = '21:00';
-const REVIEW = 'Alles wiederholen';
 
 const isBigExam = (i: Item) => /schularbeit|\bsa\b|klausur|\bka\b/iu.test(`${i.title} ${i.detail ?? ''}`);
 
@@ -170,9 +169,9 @@ export function buildWeekPlan(user: User, opts: PlanOptions = {}, lb: Lagebild =
         const mine = blocks.filter((b) => b.parentId === exam.id).sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
         const review = !beyond && mine.length >= 2 && mine.at(-1)!.date === addDays(exam.due!, -1);
         const learn = review ? mine.slice(0, -1) : mine;
-        if (review) mine.at(-1)!.focus = REVIEW;
+        if (review) mine.at(-1)!.focus = tr(user, 'study.reviewAll');
         if (!exam.material?.trim()) {
-          if (learn[0]) learn[0].focus = 'Stoff klären, Überblick verschaffen';
+          if (learn[0]) learn[0].focus = tr(user, 'study.clarify');
         } else if (topics.length) {
           learn.forEach((b, i) => {
             const a = Math.floor((i * topics.length) / learn.length);
@@ -308,7 +307,7 @@ export async function planWeek(user: User, opts: PlanOptions = {}): Promise<Week
   const focuses: Record<string, string[]> = { ...opts.focuses };
   for (const parentId of new Set(draft.blocks.filter((b) => b.why === 'exam').map((b) => b.parentId))) {
     const exam = getItem(user.id, parentId);
-    const n = draft.blocks.filter((b) => b.parentId === parentId && b.focus !== REVIEW).length;
+    const n = draft.blocks.filter((b) => b.parentId === parentId && b.focus !== tr(user, 'study.reviewAll')).length;
     if (!exam?.material || n < 2 || splitTopics(exam.material).length >= n || exam.material.length < 25) continue;
     try {
       const { message } = await complete([

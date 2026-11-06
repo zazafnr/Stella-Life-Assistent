@@ -1,7 +1,9 @@
 // Regeln, wann Stella an was erinnert und wie ein Lernplan aussieht.
 // Bewusst deterministisch: funktioniert ohne KI, die KI darf die Inhalte nur verfeinern.
 
-import { addDays, diffDays, formatDateDe, weekdayOf, type Ymd } from './dates.ts';
+import { addDays, diffDays, weekdayOf, type Ymd } from './dates.ts';
+import { formatDay, t } from './i18n/t.ts';
+import type { Locale } from './i18n/locales.ts';
 import type { ItemKind } from './parser.ts';
 import { voice, type Tone } from './voice.ts';
 
@@ -85,7 +87,7 @@ export function splitTopics(material: string): string[] {
  * Verteilt Lerneinheiten zwischen morgen und dem Tag vor der Prüfung.
  * Mehr Einheiten kurz vor dem Termin, die letzte ist immer Wiederholung.
  */
-export function buildStudyPlan(examDate: Ymd, today: Ymd, material: string, maxSessions = 6): StudySession[] {
+export function buildStudyPlan(examDate: Ymd, today: Ymd, material: string, maxSessions = 6, locale: Locale = 'de'): StudySession[] {
   const available: Ymd[] = [];
   for (let d = addDays(today, 1); d < examDate; d = addDays(d, 1)) available.push(d);
   if (!available.length) return [];
@@ -104,17 +106,17 @@ export function buildStudyPlan(examDate: Ymd, today: Ymd, material: string, maxS
   const topics = splitTopics(material);
   return days.map((date, i) => {
     const last = i === days.length - 1;
-    if (last && days.length > 1) return { date, focus: 'Alles wiederholen + Probe-Test unter Zeitdruck' };
-    if (!topics.length) return { date, focus: i === 0 ? 'Überblick verschaffen, Unklares markieren' : 'Üben & Fehler wiederholen' };
+    if (last && days.length > 1) return { date, focus: t(locale, 'study.reviewMock') };
+    if (!topics.length) return { date, focus: t(locale, i === 0 ? 'study.overview' : 'study.practice') };
     const learnSlots = days.length > 1 ? days.length - 1 : 1;
     const perSlot = Math.ceil(topics.length / learnSlots);
     const chunk = topics.slice(i * perSlot, (i + 1) * perSlot);
-    return { date, focus: chunk.length ? chunk.join(', ') : 'Schwierige Themen nochmal üben' };
+    return { date, focus: chunk.length ? chunk.join(', ') : t(locale, 'study.hard') };
   });
 }
 
-export function describePlan(sessions: StudySession[], today: Ymd): string {
-  return sessions.map((s) => `• ${formatDateDe(s.date, today)}: ${s.focus}`).join('\n');
+export function describePlan(sessions: StudySession[], today: Ymd, locale: Locale = 'de'): string {
+  return sessions.map((s) => `• ${formatDay(locale, s.date, today)}: ${s.focus}`).join('\n');
 }
 
 export function daysUntil(date: Ymd, today: Ymd): number {

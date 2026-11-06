@@ -819,5 +819,11 @@
  "hintlabel.goals": "Hedefleri gör",
  "hintlabel.makeGoal": "Hedef olarak ekle",
  "hintlabel.spending": "Harcamaları gör",
- "hintlabel.someone": "Biri"
+ "hintlabel.someone": "Biri",
+ "study.reviewAll": "Hepsini tekrar et",
+ "study.reviewMock": "Hepsini tekrar et + zaman baskısı altında deneme sınavı",
+ "study.overview": "Genel bir bakış edin, anlaşılmayanları işaretle",
+ "study.practice": "Alıştırma yap ve hataları tekrar et",
+ "study.hard": "Zor konuları yeniden çalış",
+ "study.clarify": "Konuyu netleştir, genel bir bakış edin"
 }

@@ -819,5 +819,11 @@
  "hintlabel.goals": "Ver objetivos",
  "hintlabel.makeGoal": "Crear como objetivo",
  "hintlabel.spending": "Ver gastos",
- "hintlabel.someone": "Alguien"
+ "hintlabel.someone": "Alguien",
+ "study.reviewAll": "Repasar todo",
+ "study.reviewMock": "Repasar todo + simulacro de examen con tiempo limitado",
+ "study.overview": "Hacerse una idea general, marcar lo que no está claro",
+ "study.practice": "Practicar y repasar los errores",
+ "study.hard": "Volver a practicar los temas difíciles",
+ "study.clarify": "Aclarar el temario, hacerse una idea general"
 }

@@ -847,5 +847,11 @@
  "hintlabel.goals": "Zobacz cele",
  "hintlabel.makeGoal": "Dodaj jako cel",
  "hintlabel.spending": "Zobacz wydatki",
- "hintlabel.someone": "Ktoś"
+ "hintlabel.someone": "Ktoś",
+ "study.reviewAll": "Powtórzyć wszystko",
+ "study.reviewMock": "Powtórzyć wszystko + próbny sprawdzian na czas",
+ "study.practice": "Ćwiczyć i powtarzać błędy",
+ "study.hard": "Jeszcze raz poćwiczyć trudne tematy",
+ "study.clarify": "Wyjaśnić materiał, zyskać przegląd",
+ "study.overview": "Zyskać przegląd, zaznaczyć niejasności"
 }

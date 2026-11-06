@@ -819,5 +819,11 @@
  "hintlabel.goals": "Ziele ansehen",
  "hintlabel.makeGoal": "Als Ziel anlegen",
  "hintlabel.spending": "Ausgaben ansehen",
- "hintlabel.someone": "Jemand"
+ "hintlabel.someone": "Jemand",
+ "study.reviewAll": "Alles wiederholen",
+ "study.reviewMock": "Alles wiederholen + Probe-Test unter Zeitdruck",
+ "study.overview": "Überblick verschaffen, Unklares markieren",
+ "study.practice": "Üben & Fehler wiederholen",
+ "study.hard": "Schwierige Themen nochmal üben",
+ "study.clarify": "Stoff klären, Überblick verschaffen"
 }

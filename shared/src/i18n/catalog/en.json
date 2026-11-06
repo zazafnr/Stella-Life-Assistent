@@ -819,5 +819,11 @@
  "hintlabel.goals": "View goals",
  "hintlabel.makeGoal": "Create as goal",
  "hintlabel.spending": "View spending",
- "hintlabel.someone": "Someone"
+ "hintlabel.someone": "Someone",
+ "study.reviewAll": "Review everything",
+ "study.reviewMock": "Review everything + mock test under time pressure",
+ "study.overview": "Get an overview, mark what is unclear",
+ "study.practice": "Practise and revisit mistakes",
+ "study.hard": "Practise the difficult topics again",
+ "study.clarify": "Clarify the material, get an overview"
 }
