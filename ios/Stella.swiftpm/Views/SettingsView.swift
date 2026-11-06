@@ -137,7 +137,7 @@ struct SettingsView: View {
                             set: { v in Task { await save(["stepGoal": .int(v)]) } }
                         ), in: 2000...30000, step: 1000) {
                             row("Schritte-Ziel", symbol: "figure.walk", tint: Theme.greenBright,
-                                detail: (me.settings.stepGoal ?? 8000).formatted(.number.locale(Locale(identifier: "de_AT"))))
+                                detail: (me.settings.stepGoal ?? 8000).formatted(.number.locale(Day.locale)))
                         }
                     } header: {
                         Text("Zeiten & Ziele")
@@ -381,7 +381,7 @@ struct SettingsView: View {
                           displayedComponents: .hourAndMinute) {
             row(title, symbol: symbol, tint: Color(hex: 0xA78BFA), detail: nil)
         }
-        .environment(\.locale, Locale(identifier: "de_AT"))
+        .environment(\.locale, Day.locale)
     }
 
     private static func date(from hhmm: String) -> Date {
@@ -418,7 +418,7 @@ struct HealthSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     let avg = days.compactMap(\.steps).isEmpty ? 0 : days.compactMap(\.steps).reduce(0, +) / days.compactMap(\.steps).count
                     HStack(spacing: 14) {
-                        stat("Ø Schritte", avg.formatted(.number.locale(Locale(identifier: "de_AT"))))
+                        stat("Ø Schritte", avg.formatted(.number.locale(Day.locale)))
                         stat("Ziel erreicht", "\(days.filter { ($0.steps ?? 0) >= goal }.count)×")
                     }
                     StepsChart(days: days, goal: goal)
@@ -534,7 +534,7 @@ struct BriefingSetting: View {
                         Task { await save(String(format: "%02d:%02d", c.hour ?? 7, c.minute ?? 0)) }
                     }
                 ), displayedComponents: .hourAndMinute)
-                .environment(\.locale, Locale(identifier: "de_AT"))
+                .environment(\.locale, Day.locale)
             }
         }
     }

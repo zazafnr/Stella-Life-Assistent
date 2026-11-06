@@ -27,6 +27,6 @@ struct LaunchView: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Stella wird geladen")
+        .accessibilityLabel(L("ios.loading.stella"))
     }
 }

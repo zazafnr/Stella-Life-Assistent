@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { addDays, formatDateDe, todayIn, weekdayOf, type Item } from '@stella/shared';
+import { addDays, formatDay, todayIn, weekdayOf, type Item } from '@stella/shared';
 import { api, deleteItem, meIsLearner, meIsSchool, patchItem, useStore } from '@stella/web-core/store.ts';
 import { AuthImage, Lightbox } from '@stella/web-core/components/Rich.tsx';
 import { Icon } from '@stella/web-core/ui/Icon.tsx';
@@ -108,7 +108,7 @@ export function Planner() {
         {i.detail && <span className="t-detail">{i.detail}</span>}
         {isOpen && (
           <div className="t-extra">
-            <span className="small muted">{KIND_LABEL[i.kind]}{i.due ? ` · ${formatDateDe(i.due)}` : ''}</span>
+            <span className="small muted">{KIND_LABEL[i.kind]}{i.due ? ` · ${formatDay(locale, i.due)}` : ''}</span>
             {i.material && <span className="small"><strong>Stoff:</strong> {i.material}</span>}
             {i.notes && !i.notes.startsWith('__') && <span className="small">{i.notes}</span>}
             {i.attachments.map((a) => <AuthImage key={a.id} id={a.id} alt={a.caption} onOpen={setLightbox} />)}
@@ -169,7 +169,7 @@ export function Planner() {
               const its = weekItems(d);
               const ls = filter === 'all' ? lessons.filter((l) => l.date === d) : [];
               return (
-                <section key={d} className={d === today ? 'board-day today' : 'board-day'} aria-label={formatDateDe(d, today)}>
+                <section key={d} className={d === today ? 'board-day today' : 'board-day'} aria-label={formatDay(locale, d, today)}>
                   <div className="board-head"><span className="wd">{WD[weekdayOf(d)]}</span><span className="n">{Number(d.slice(8))}</span></div>
                   <div className="board-list">
                     {ls.map((l, idx) => <div key={`l${idx}`} className={l.status === 'cancelled' ? 'b-lesson off' : 'b-lesson'}><span className="b-time">{l.start}</span>{l.subject ?? l.code}</div>)}
@@ -204,7 +204,7 @@ export function Planner() {
           ))}
         </div>
 
-        <span className="eyebrow">{formatDateDe(day, today)}{formatDateDe(day, today) !== formatDateDe(day) ? ` · ${formatDateDe(day)}` : ''}</span>
+        <span className="eyebrow">{formatDay(locale, day, today)}{formatDay(locale, day, today) !== formatDay(locale, day) ? ` · ${formatDay(locale, day)}` : ''}</span>
         {rows.length === 0 ? (
           <div className="empty">
             <span className="icon-tile blue"><Icon name="cloud" size={26} /></span>
@@ -247,7 +247,7 @@ export function Planner() {
       {openItem && (
         <Sheet title={openItem.title} onClose={() => setOpen(null)}>
           <div className="t-extra" style={{ gap: 12 }}>
-            <span className="small muted">{KIND_LABEL[openItem.kind]}{openItem.due ? ` · ${formatDateDe(openItem.due)}` : ''}{openItem.time ? ` · ${openItem.time}` : ''}</span>
+            <span className="small muted">{KIND_LABEL[openItem.kind]}{openItem.due ? ` · ${formatDay(locale, openItem.due)}` : ''}{openItem.time ? ` · ${openItem.time}` : ''}</span>
             {openItem.detail && <span>{openItem.detail}</span>}
             {openItem.material && <span className="small"><strong>Stoff:</strong> {openItem.material}</span>}
             {openItem.notes && !openItem.notes.startsWith('__') && <span className="small">{openItem.notes}</span>}

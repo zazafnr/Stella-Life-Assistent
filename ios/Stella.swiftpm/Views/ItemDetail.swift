@@ -37,7 +37,7 @@ struct ItemDetail: View {
 
                     if !current.attachments.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("BILDER").eyebrow()
+                            Text(L("ios.images")).eyebrow()
                             ForEach(current.attachments) { a in
                                 Button { viewing = a.id } label: {
                                     VStack(alignment: .leading, spacing: 6) {
@@ -61,7 +61,7 @@ struct ItemDetail: View {
                             if !current.isDone { burst += 1 }
                             Task { await store.setDone(current, !current.isDone) }
                         } label: {
-                            Label(current.isDone ? "Wieder öffnen" : "Erledigt", systemImage: current.isDone ? "arrow.uturn.backward" : "checkmark")
+                            Label(current.isDone ? L("ios.reopen") : L("today.status.done"), systemImage: current.isDone ? "arrow.uturn.backward" : "checkmark")
                         }
                         .buttonStyle(PrimaryButton(tint: current.isDone ? Theme.muted : Theme.greenBright))
                         Confetti(trigger: burst)
@@ -75,12 +75,12 @@ struct ItemDetail: View {
                                 dismiss()
                             }
                         } label: {
-                            Label("Stella soll das lösen", systemImage: "sparkles")
+                            Label(L("ios.let.stella.solve.this"), systemImage: "sparkles")
                         }
                         .buttonStyle(PrimaryButton(tint: Theme.pink))
                     }
 
-                    Button("Löschen", role: .destructive) { confirmDelete = true }
+                    Button(L("common.delete"), role: .destructive) { confirmDelete = true }
                         .font(.system(size: 15, weight: .semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.top, 4)
@@ -89,10 +89,10 @@ struct ItemDetail: View {
             }
             .background(Theme.bg)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Fertig") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button(L("common.done")) { dismiss() } }
             }
-            .confirmationDialog("Eintrag löschen?", isPresented: $confirmDelete, titleVisibility: .visible) {
-                Button("Löschen", role: .destructive) {
+            .confirmationDialog(L("ios.delete.entry"), isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button(L("common.delete"), role: .destructive) {
                     Task { await store.delete(current) }
                     dismiss()
                 }

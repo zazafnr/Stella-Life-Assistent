@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { formatDateDe, type PlanBlock, type WeekPlan } from '@stella/shared';
+import { formatDay, type PlanBlock, type WeekPlan } from '@stella/shared';
 import { api, sync } from '../store.ts';
 import { Icon } from '../ui/Icon.tsx';
 import { Sheet, showToast } from '../ui/Decor.tsx';
+import { useT, useLocale } from '../i18n.ts';
 
 const WHY: Record<PlanBlock['why'], string> = { exam: 'pink', homework: 'blue', assignment: 'green', goal: 'violet' };
 
 /** „Woche planen“: Stellas Vorschlag ansehen, einzelne Blöcke abwählen, übernehmen */
 export function WeekPlanSheet({ today, onClose }: { today: string; onClose: () => void }) {
+  const locale = useLocale();
+  const t = useT();
   const [plan, setPlan] = useState<WeekPlan | null>(null);
   const [off, setOff] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -35,7 +38,7 @@ export function WeekPlanSheet({ today, onClose }: { today: string; onClose: () =
     setBusy(true);
     try {
       await api('/api/weekplan/apply', { method: 'POST', json: { blocks: chosen } });
-      showToast(`${chosen.length} ${chosen.length === 1 ? 'Block' : 'Blöcke'} eingetragen ✨`);
+      showToast(t('weekplan.entered', { count: chosen.length }));
       await sync();
       onClose();
     } catch (err) {
@@ -46,13 +49,13 @@ export function WeekPlanSheet({ today, onClose }: { today: string; onClose: () =
   }
 
   return (
-    <Sheet title="Woche planen" onClose={onClose}>
+    <Sheet title={t('quick.week.label')} onClose={onClose}>
       {!plan ? (
-        <p className="muted">Stella schaut sich deine Woche an …</p>
+        <p className="muted">{t('ui.stella.is.looking.at')}</p>
       ) : plan.blocks.length === 0 ? (
         <div className="empty">
           <span className="icon-tile blue"><Icon name="sun" size={26} /></span>
-          <p>Diese Woche gibt es nichts zu planen – keine Tests, keine offenen HÜs.</p>
+          <p>{t('ui.nothing.to.plan.this')}</p>
         </div>
       ) : (
         <>
@@ -62,7 +65,7 @@ export function WeekPlanSheet({ today, onClose }: { today: string; onClose: () =
           </p>
           {days.map(([date, blocks]) => (
             <section key={date} className="plan-day">
-              <span className="eyebrow">{formatDateDe(date, today)}</span>
+              <span className="eyebrow">{formatDay(locale, date, today)}</span>
               {blocks.map((b) => {
                 const on = !off.has(b.key);
                 return (
@@ -85,9 +88,9 @@ export function WeekPlanSheet({ today, onClose }: { today: string; onClose: () =
           )}
           <button type="button" className="btn" disabled={busy || !chosen.length} onClick={() => void apply()}>
             <Icon name="calendar" size={18} />
-            {busy ? 'Trägt ein …' : `${chosen.length} ${chosen.length === 1 ? 'Block' : 'Blöcke'} eintragen`}
+            {busy ? t('ui.adding') : t('weekplan.add', { count: chosen.length })}
           </button>
-          <span className="small muted" style={{ textAlign: 'center' }}>Lässt sich unter „Was Stella getan hat“ rückgängig machen.</span>
+          <span className="small muted" style={{ textAlign: 'center' }}>{t('ui.you.can.undo.this')}</span>
         </>
       )}
     </Sheet>

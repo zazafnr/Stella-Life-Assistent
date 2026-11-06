@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { FINANCE_CATEGORIES, formatDateDe, todayIn, type FinanceCategory, type FinanceMonth, type MessageCard, type Transaction } from '@stella/shared';
+import { FINANCE_CATEGORIES, formatDay, todayIn, type FinanceCategory, type FinanceMonth, type MessageCard, type Transaction } from '@stella/shared';
 import { api, useStore } from '../store.ts';
 import type { Tab } from '../nav.ts';
 import { Icon } from '../ui/Icon.tsx';
 import { Sheet, showToast } from '../ui/Decor.tsx';
+import { useLocale } from '../i18n.ts';
 
 export const CATEGORY_COLOR: Record<FinanceCategory, string> = {
   Lebensmittel: '#34C77B', 'Essen & Trinken': '#FF9F43', Transport: '#1F6FEB', Shopping: '#FF7EB3',
@@ -22,6 +23,7 @@ const shiftMonth = (month: string, by: number) => {
 
 /** Sicht auf die Ausgaben: Summe, Kategorien mit Budget, Abos, Buchungen. Stella sammelt sie über den Apple-Pay-Kurzbefehl. */
 export function Finance({ back, go }: { back: () => void; go: (tab: Tab) => void }) {
+  const locale = useLocale();
   const tz = useStore((s) => s.me?.timeZone) ?? 'Europe/Vienna';
   const today = todayIn(tz);
   const current = today.slice(0, 7);
@@ -100,7 +102,7 @@ export function Finance({ back, go }: { back: () => void; go: (tab: Tab) => void
             <ul className="fin-list">
               {data.subscriptions.map((s) => (
                 <li key={`${s.merchant}${s.amountCents}`}>
-                  <span className="grow"><strong>{s.merchant}</strong><span className="muted small"> · nächste Abbuchung um den {formatDateDe(s.nextDay, today)}</span></span>
+                  <span className="grow"><strong>{s.merchant}</strong><span className="muted small"> · nächste Abbuchung um den {formatDay(locale, s.nextDay, today)}</span></span>
                   <strong>{euro(s.amountCents, s.currency)}</strong>
                 </li>
               ))}
@@ -119,7 +121,7 @@ export function Finance({ back, go }: { back: () => void; go: (tab: Tab) => void
                     <i className="fin-dot" style={{ background: CATEGORY_COLOR[t.category] }} />
                     <span className="grow">
                       <strong>{t.merchant}</strong>
-                      <span className="muted small">{formatDateDe(t.day, today)} · {t.category}{t.cardLabel ? ` · ${t.cardLabel}` : ''}</span>
+                      <span className="muted small">{formatDay(locale, t.day, today)} · {t.category}{t.cardLabel ? ` · ${t.cardLabel}` : ''}</span>
                     </span>
                     <strong>{euro(t.amountCents, t.currency)}</strong>
                   </button>

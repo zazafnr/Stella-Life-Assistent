@@ -75,7 +75,7 @@ struct TodayView: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 10) {
-                    Text(Date().formatted(.dateTime.locale(Locale(identifier: "de_AT")).weekday(.wide).day().month(.wide)))
+                    Text(Date().formatted(.dateTime.locale(Day.locale).weekday(.wide).day().month(.wide)))
                     if let w = WeatherService.shared.current {
                         Label("\(w.temp)°", systemImage: Self.weatherSymbol(w))
                             .labelStyle(.titleAndIcon)
@@ -88,7 +88,7 @@ struct TodayView: View {
                     .font(Theme.display(32))
                     .foregroundStyle(Theme.text)
                 if !store.online {
-                    Label("Offline – ich gleiche ab, sobald du wieder Netz hast.", systemImage: "wifi.slash")
+                    Label(L("ios.offline.i.will.sync"), systemImage: "wifi.slash")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Theme.muted)
                         .padding(.top, 2)
@@ -103,20 +103,20 @@ struct TodayView: View {
                     .background(.white.opacity(0.85), in: Circle())
                     .shadow(color: Theme.blue.opacity(0.12), radius: 10, y: 4)
             }
-            .accessibilityLabel("Einstellungen")
+            .accessibilityLabel(L("nav.settings"))
         }
         .padding(.top, 12)
     }
 
     private var greeting: String {
         let h = Calendar.current.component(.hour, from: Date())
-        return h < 11 ? "Guten Morgen" : h < 18 ? "Hallo" : "Guten Abend"
+        return h < 11 ? L("today.greeting.morning") : h < 18 ? L("today.greeting.afternoon") : L("today.greeting.evening")
     }
 
     private var due: (label: String, items: [Item]) {
         let all = store.visibleItems
         let dueTomorrow = all.filter { $0.due == tomorrow && $0.kind != "study" && $0.kind != "exam" }
-        if !dueTomorrow.isEmpty { return ("Morgen fällig", dueTomorrow.sorted { $0.title < $1.title }) }
+        if !dueTomorrow.isEmpty { return (L("briefing.section.tomorrow"), dueTomorrow.sorted { $0.title < $1.title }) }
         let upcoming = all.filter { $0.isOpen && ($0.due ?? "") >= today && $0.kind != "study" }
             .sorted { ($0.due ?? "") < ($1.due ?? "") }
         return ("Als Nächstes", Array(upcoming.prefix(3)))
@@ -131,14 +131,14 @@ struct TodayView: View {
                     .tracking(0.6)
                     .foregroundStyle(Theme.muted)
                 Spacer()
-                Button("Planer") { go(.planner) }
+                Button(L("nav.planner")) { go(.planner) }
                     .font(.system(size: 14, weight: .semibold))
             }
             .padding(.bottom, 6)
             if d.items.isEmpty {
                 HStack(spacing: 10) {
                     StarMark(size: 16)
-                    Text("Nichts offen – genieß den Tag!")
+                    Text(L("today.allClear"))
                         .foregroundStyle(Theme.muted)
                 }
                 .padding(.vertical, 12)
@@ -146,7 +146,7 @@ struct TodayView: View {
             ForEach(Array(d.items.enumerated()), id: \.element.id) { index, item in
                 if index > 0 { Divider().overlay(Theme.border) }
                 Button { openItem = item } label: {
-                    ItemRow(item: item, busy: store.busyItems.contains(item.id), showDue: d.label != "Morgen fällig")
+                    ItemRow(item: item, busy: store.busyItems.contains(item.id), showDue: d.label != L("briefing.section.tomorrow"))
                 }
                 .buttonStyle(PressableStyle())
             }
@@ -184,10 +184,10 @@ struct TodayView: View {
                         .font(.system(size: 34))
                         .foregroundStyle(Theme.greenBright)
                         .frame(width: 58, height: 58)
-                    Text("Keine Tests")
+                    Text(L("ios.no.tests"))
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Theme.text)
-                    Text("in Sicht")
+                    Text(L("ios.in.sight"))
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.muted)
                 }
@@ -207,10 +207,10 @@ struct TodayView: View {
                 Ring(progress: Double(s) / Double(goal), color: Theme.greenBright,
                      label: steps == nil ? "–" : "\(min(100, s * 100 / max(goal, 1))) %")
                     .frame(width: 58, height: 58)
-                Text(steps.map { "\($0.formatted(.number.locale(Locale(identifier: "de_AT")))) Schritte" } ?? "Schritte")
+                Text(steps.map { "\($0.formatted(.number.locale(Day.locale))) Schritte" } ?? "Schritte")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Theme.text)
-                Text("Ziel \(goal.formatted(.number.locale(Locale(identifier: "de_AT"))))")
+                Text("Ziel \(goal.formatted(.number.locale(Day.locale)))")
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.muted)
             }
@@ -270,10 +270,10 @@ struct TodayView: View {
                     .frame(width: 40, height: 40)
                     .background(Theme.blueTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Stella etwas sagen")
+                    Text(L("today.tellStella"))
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Theme.text)
-                    Text("„Latein HÜ S. 20 Nr. 3 Freitag“ oder einfach fragen")
+                    Text(L("ios.latin.homework.p.20"))
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)
@@ -347,11 +347,11 @@ struct ItemStatusPill: View {
         if item.isDone && item.solvedInNotebook {
             Pill(text: "Im Heft", icon: "checkmark", tone: .green)
         } else if item.isDone {
-            Pill(text: "Erledigt", icon: "checkmark", tone: .green)
+            Pill(text: L("today.status.done"), icon: "checkmark", tone: .green)
         } else if busy {
             Pill(text: "Stella löst …", tone: .blue)
         } else {
-            Pill(text: "offen")
+            Pill(text: L("briefing.open"))
         }
     }
 }
@@ -418,7 +418,7 @@ struct BriefingCardView: View {
             if !sections.isEmpty || !hints.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     if !sections.isEmpty {
-                        Text("DEIN ÜBERBLICK").eyebrow()
+                        Text(L("ios.your.overview")).eyebrow()
                         ForEach(sections) { s in
                             HStack(alignment: .top, spacing: 12) {
                                 Text(icons[s.id] ?? "•").font(.system(size: 18)).frame(width: 26)
@@ -446,7 +446,7 @@ struct BriefingCardView: View {
                         }
                     }
                     if !hints.isEmpty {
-                        Text("MIR IST AUFGEFALLEN").eyebrow(color: Theme.pinkText).padding(.top, sections.isEmpty ? 0 : 4)
+                        Text(L("ios.i.noticed")).eyebrow(color: Theme.pinkText).padding(.top, sections.isEmpty ? 0 : 4)
                         ForEach(hints) { h in
                             HintRowView(hint: h, onOpen: onOpen, onGone: { withAnimation(.spring) { _ = gone.insert(h.key) } })
                                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -496,7 +496,7 @@ struct HintRowView: View {
                     onGone()
                     Task { _ = try? await API.shared.send("POST", "/api/hints/\(escaped)/dismiss", as: OK.self) }
                 } label: {
-                    Label("Passt schon", systemImage: "xmark").font(.system(size: 13, weight: .semibold))
+                    Label(L("ui.fine.as.is"), systemImage: "xmark").font(.system(size: 13, weight: .semibold))
                 }
             }
         }

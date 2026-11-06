@@ -5,7 +5,7 @@
 
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import {
-  addDays, describeRecurrence, formatDateDe, timeIn, todayIn, weekdayOf,
+  addDays, describeRecurrenceIn, formatDay, timeIn, todayIn, weekdayOf,
   type ActionGroup, type StellaPlanControl, type StellaPlanEntry,
 } from '@stella/shared';
 import { applyPlanSetting, groupDef, isGroup, levelFor, planSettingValue, record, type PlanSettingKey } from './actions.ts';
@@ -15,6 +15,7 @@ import { buildLagebild } from './context.ts';
 import { db, getItem, getUser, type User } from './db.ts';
 import { getGoal, listGoals, updateGoal } from './goals.ts';
 import { changeItem } from './planner.ts';
+import { tr, userLocale } from './locale.ts';
 import { hasFeature } from './profile.ts';
 import { pluginAutomations } from './editions/registry.ts';
 
@@ -29,7 +30,10 @@ function localParts(iso: string, timeZone: string): { date: string; time: string
   return { date: `${get('year')}-${get('month')}-${get('day')}`, time: `${get('hour')}:${get('minute')}` };
 }
 
-const whenLabel = (date: string, time: string | null, today: string) => `${capitalize(formatDateDe(date, today))}${time ? ` um ${time}` : ''}`;
+const whenLabel = (user: User, date: string, time: string | null, today: string) => {
+  const day = capitalize(formatDay(userLocale(user), date, today));
+  return time ? tr(user, 'sp.at', { when: day, time }) : day;
+};
 
 /** nächster Check-in eines Ziels („So 18:00“ oder „18:00“) als lokales Datum + Uhrzeit */
 function nextCheckIn(checkIn: string, today: string, nowHhmm: string): string | null {
@@ -45,10 +49,11 @@ function nextCheckIn(checkIn: string, today: string, nowHhmm: string): string | 
 }
 
 const toggle = (on: boolean, label: string): StellaPlanControl => ({ type: 'toggle', on, label });
-const timeControl = (value: string, label = 'Uhrzeit'): StellaPlanControl => ({ type: 'time', value, label });
-const permLink: StellaPlanControl = { type: 'link', target: 'permissions', label: 'Was Stella selbst darf' };
 
 export function buildStellaPlan(user: User): { entries: StellaPlanEntry[]; soon: StellaPlanEntry[] } {
+  const T = (key: string, vars?: Record<string, string | number>) => tr(user, key, vars);
+  const timeControl = (value: string, label = T('sp.time')): StellaPlanControl => ({ type: 'time', value, label });
+  const permLink: StellaPlanControl = { type: 'link', target: 'permissions', label: T('sp.perms') };
   const tz = user.timeZone;
   const today = todayIn(tz);
   const now = timeIn(tz);
@@ -60,7 +65,7 @@ export function buildStellaPlan(user: User): { entries: StellaPlanEntry[]; soon:
 
   // offene Vorschläge, die auf ein Ja warten
   for (const a of db.prepare(`SELECT id, summary FROM actions WHERE user_id = ? AND status = 'proposed' ORDER BY created_at DESC LIMIT 10`).all(user.id) as { id: string; summary: string }[]) {
-    week.push({ id: `proposal:${a.id}`, kind: 'proposal', group: 'week', title: capitalize(a.summary), when: 'wartet auf dein Ja', at: null, recurrence: null, enabled: true, controls: [{ type: 'decision' }] });
+    week.push({ id: `proposal:${a.id}`, kind: 'proposal', group: 'week', title: capitalize(a.summary), when: T('sp.awaitingYes'), at: null, recurrence: null, enabled: true, controls: [{ type: 'decision' }] });
   }
 
   // Lerneinheiten und Planblöcke der nächsten 7 Tage
@@ -72,8 +77,8 @@ export function buildStellaPlan(user: User): { entries: StellaPlanEntry[]; soon:
     const at = `${item.due} ${item.time ?? '09:00'}`;
     week.push({
       id: `study:${id}`, kind: 'study', group: 'week', title: item.detail && item.kind === 'study' ? `${item.title} – ${item.detail}` : item.title,
-      when: whenLabel(item.due!, item.time, today), at, recurrence: null, enabled: true,
-      controls: [timeControl(item.time ?? '09:00', 'Beginn'), { type: 'remove', label: 'Entfernen' }],
+      when: whenLabel(user, item.due!, item.time, today), at, recurrence: null, enabled: true,
+      controls: [timeControl(item.time ?? '09:00', T('sp.start')), { type: 'remove', label: T('sp.remove') }],
     });
   }
 
@@ -88,8 +93,8 @@ export function buildStellaPlan(user: User): { entries: StellaPlanEntry[]; soon:
     const at = localParts(r.fire_at, tz);
     const own = item.kind === 'reminder';
     week.push({
-      id: `item:${item.id}`, kind: 'reminder', group: 'week', title: item.title, when: whenLabel(at.date, at.time, today), at: `${at.date} ${at.time}`, recurrence: null, enabled: true,
-      controls: own ? [timeControl(item.time ?? at.time), { type: 'remove', label: 'Löschen' }] : [{ type: 'link', target: 'planner', label: 'Im Planer ansehen' }],
+      id: `item:${item.id}`, kind: 'reminder', group: 'week', title: item.title, when: whenLabel(user, at.date, at.time, today), at: `${at.date} ${at.time}`, recurrence: null, enabled: true,
+      controls: own ? [timeControl(item.time ?? at.time), { type: 'remove', label: T('common.delete') }] : [{ type: 'link', target: 'planner', label: T('sp.viewInPlanner') }],
     });
   }
   week.sort((a, b) => (a.at ?? '9999').localeCompare(b.at ?? '9999') || a.title.localeCompare(b.title));
@@ -98,27 +103,27 @@ export function buildStellaPlan(user: User): { entries: StellaPlanEntry[]; soon:
   const lb = buildLagebild(user, 3);
   const bt = briefingTime(user, lb);
   regular.push({
-    id: 'briefing', kind: 'briefing', group: 'regular', title: 'Morning Briefing',
-    when: bt ? `täglich um ${bt}${(user.settings.briefing ?? 'auto') === 'auto' ? ' (automatisch)' : ''}` : 'ausgeschaltet',
+    id: 'briefing', kind: 'briefing', group: 'regular', title: T('sp.briefing'),
+    when: bt ? `${T('sp.dailyAt', { time: bt })}${(user.settings.briefing ?? 'auto') === 'auto' ? ` (${T('sp.auto')})` : ''}` : T('sp.off'),
     at: bt ? `${bt > now ? today : addDays(today, 1)} ${bt}` : null, recurrence: 'daily', enabled: bt !== null,
-    controls: [toggle(bt !== null, 'An'), timeControl(bt ?? '07:00', 'Uhrzeit')],
+    controls: [toggle(bt !== null, T('sp.on')), timeControl(bt ?? '07:00', T('sp.time'))],
   });
   if (hasFeature(user, 'planner')) {
     const on = (user.settings.weekPlan ?? 'sunday') !== 'off';
     const daysToSunday = (7 - weekdayOf(today)) % 7;
     const sunday = daysToSunday === 0 && now >= '18:00' ? addDays(today, 7) : addDays(today, daysToSunday);
     regular.push({
-      id: 'weekplan', kind: 'weekplan', group: 'regular', title: 'Wochenplan vorschlagen', when: on ? 'sonntags am Abend – du sagst Ja oder Nein' : 'ausgeschaltet',
-      at: on ? `${sunday} 18:00` : null, recurrence: 'weekly:7', enabled: on, controls: [toggle(on, 'An')],
+      id: 'weekplan', kind: 'weekplan', group: 'regular', title: T('sp.weekplan'), when: on ? T('sp.weekplanWhen') : T('sp.off'),
+      at: on ? `${sunday} 18:00` : null, recurrence: 'weekly:7', enabled: on, controls: [toggle(on, T('sp.on'))],
     });
   }
   const automatic = (key: Extract<PlanSettingKey, `perm:${string}`>, title: string, when: string) => {
     const level = levelFor(user, key.slice(5) as ActionGroup);
-    regular.push({ id: key, kind: 'automation', group: 'regular', title, when: level === 'never' ? 'ausgeschaltet' : when, at: null, recurrence: null, enabled: level !== 'never', controls: [toggle(level !== 'never', 'An'), permLink] });
+    regular.push({ id: key, kind: 'automation', group: 'regular', title, when: level === 'never' ? T('sp.off') : when, at: null, recurrence: null, enabled: level !== 'never', controls: [toggle(level !== 'never', T('sp.on')), permLink] });
   };
-  if (hasFeature(user, 'mails')) automatic('perm:mail_sort', 'Werbung automatisch löschen', 'laufend – in der Inbox zurückholbar');
+  if (hasFeature(user, 'mails')) automatic('perm:mail_sort', T('sp.mailSort'), T('sp.mailSortWhen'));
   for (const a of pluginAutomations(user)) automatic(a.key as Extract<PlanSettingKey, `perm:${string}`>, a.title, a.when);
-  automatic('perm:memory', 'Nächtliches Lernen', 'nachts zwischen 2 und 5 Uhr');
+  automatic('perm:memory', T('sp.nightLearn'), T('sp.nightLearnWhen'));
 
   // Daueraufträge
   for (const { id } of db.prepare(`SELECT id FROM items WHERE user_id = ? AND deleted = 0 AND recurrence IS NOT NULL ORDER BY due, time`).all(user.id) as { id: string }[]) {
@@ -126,9 +131,9 @@ export function buildStellaPlan(user: User): { entries: StellaPlanEntry[]; soon:
     const paused = !!item.recurrencePaused;
     const time = item.time ?? '09:00';
     regular.push({
-      id: `recurring:${id}`, kind: 'recurring', group: 'regular', title: item.title, when: `${describeRecurrence(item.recurrence!)} um ${time}${paused ? ' – pausiert' : ''}`,
+      id: `recurring:${id}`, kind: 'recurring', group: 'regular', title: item.title, when: `${T('sp.at', { when: describeRecurrenceIn(userLocale(user), item.recurrence!), time })}${paused ? ` – ${T('sp.paused')}` : ''}`,
       at: paused || !item.due ? null : `${item.due} ${time}`, recurrence: item.recurrence!, enabled: !paused,
-      controls: [toggle(!paused, 'Aktiv'), timeControl(time), { type: 'remove', label: 'Löschen' }],
+      controls: [toggle(!paused, T('sp.active')), timeControl(time), { type: 'remove', label: T('common.delete') }],
     });
   }
 
@@ -137,9 +142,9 @@ export function buildStellaPlan(user: User): { entries: StellaPlanEntry[]; soon:
     const at = g.checkIn ? nextCheckIn(g.checkIn, today, now) : null;
     longterm.push({
       id: `goal:${g.id}`, kind: 'goal', group: 'longterm', title: g.title,
-      when: `${g.status === 'active' ? '' : 'pausiert · '}${g.cadence === 'daily' ? 'täglich' : /^weekly:(\d+)$/.test(g.cadence) ? `${g.cadence.slice(7)}× pro Woche` : `${g.target} ${g.unit} pro Woche`}${g.checkIn ? ` · Erinnerung ${g.checkIn}` : ''}`,
+      when: `${g.status === 'active' ? '' : `${T('sp.paused')} · `}${g.cadence === 'daily' ? T('rec.daily') : /^weekly:(\d+)$/.test(g.cadence) ? T('sp.perWeek', { n: g.cadence.slice(7) }) : T('sp.amountPerWeek', { target: g.target, unit: g.unit })}${g.checkIn ? ` · ${T('sp.checkin', { at: g.checkIn })}` : ''}`,
       at: g.status === 'active' ? at : null, recurrence: null, enabled: g.status === 'active',
-      controls: [toggle(g.status === 'active', 'Aktiv'), timeControl(g.checkIn?.slice(-5) ?? '18:00', 'Erinnerung'), { type: 'link', target: 'goals', label: 'Zu den Zielen' }],
+      controls: [toggle(g.status === 'active', T('sp.active')), timeControl(g.checkIn?.slice(-5) ?? '18:00', T('sp.reminder')), { type: 'link', target: 'goals', label: T('sp.toGoals') }],
     });
   }
 

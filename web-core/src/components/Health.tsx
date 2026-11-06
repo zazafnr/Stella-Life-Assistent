@@ -3,8 +3,11 @@ import { addDays, todayIn, type HealthDay } from '@stella/shared';
 import { api, useStore } from '../store.ts';
 import { Icon } from '../ui/Icon.tsx';
 import { Ring, showToast } from '../ui/Decor.tsx';
+import { useT, useLocale } from '../i18n.ts';
 
 export function Health({ back }: { back: () => void }) {
+  const t = useT();
+  const locale = useLocale();
   const me = useStore((s) => s.me);
   const [days, setDays] = useState<HealthDay[] | null>(null);
   const goal = me?.settings.stepGoal || 8000;
@@ -29,27 +32,27 @@ export function Health({ back }: { back: () => void }) {
         <section className="card row" style={{ gap: 18 }}>
           <Ring size={96} value={todaySteps / goal} color="#34C77B" label={<span style={{ fontSize: 20 }}>{Math.round((todaySteps / goal) * 100)}%</span>} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span className="display" style={{ fontSize: 28 }}>{todaySteps.toLocaleString('de-AT')}</span>
-            <span className="muted">Schritte heute · Ziel {goal.toLocaleString('de-AT')}</span>
+            <span className="display" style={{ fontSize: 28 }}>{todaySteps.toLocaleString(locale)}</span>
+            <span className="muted">{t('health.stepsToday', { goal: goal.toLocaleString(locale) })}</span>
             <span className="small" style={{ color: 'var(--green)', fontWeight: 600 }}>
-              {todaySteps >= goal ? 'Ziel geschafft – stark!' : `Noch ${(goal - todaySteps).toLocaleString('de-AT')} bis zum Ziel`}
+              {todaySteps >= goal ? t('ui.goal.reached.great.job') : t('ui.to.go', { left: (goal - todaySteps).toLocaleString(locale) })}
             </span>
           </div>
         </section>
 
         <div className="grid-2">
-          <div className="card"><span className="eyebrow">Ø 7 Tage</span><p className="display" style={{ fontSize: 24, margin: '6px 0 0' }}>{avg.toLocaleString('de-AT')}</p></div>
-          <div className="card"><span className="eyebrow">Ziel erreicht</span><p className="display" style={{ fontSize: 24, margin: '6px 0 0' }}>{reached} / 7 Tage</p></div>
+          <div className="card"><span className="eyebrow">{t('ui.7.day.average')}</span><p className="display" style={{ fontSize: 24, margin: '6px 0 0' }}>{avg.toLocaleString(locale)}</p></div>
+          <div className="card"><span className="eyebrow">{t('ui.goal.reached')}</span><p className="display" style={{ fontSize: 24, margin: '6px 0 0' }}>{t('health.daysOfSeven', { n: reached })}</p></div>
         </div>
 
         <section className="card">
-          <h2>Schritte – 14 Tage</h2>
-          <div className="bars" role="img" aria-label="Schritte der letzten 14 Tage">
+          <h2>{t('ui.steps.14.days')}</h2>
+          <div className="bars" role="img" aria-label={t('ui.steps.over.the.last')}>
             <div className="bar-area">
               {range.map((d, i) => {
                 const steps = byDate.get(d)?.steps ?? 0;
                 return (
-                  <div key={d} className="bar-col" title={`${d}: ${steps.toLocaleString('de-AT')} Schritte`}>
+                  <div key={d} className="bar-col" title={t('ui.steps', { day: d, steps: steps.toLocaleString(locale) })}>
                     <div className={`bar${steps >= goal ? ' reached' : ''}`} style={{ height: `${(steps / max) * 100}%`, animationDelay: `${i * 0.03}s` }} />
                   </div>
                 );
@@ -62,8 +65,8 @@ export function Health({ back }: { back: () => void }) {
 
         {days && days.length === 0 && (
           <section className="card">
-            <h2>Noch keine Daten</h2>
-            <p className="muted">Damit Stella deine Schritte kennt, schickt ein Apple-Kurzbefehl sie jeden Abend. Die Anleitung steht unter Einstellungen → Health &amp; SMS.</p>
+            <h2>{t('ui.no.data.yet')}</h2>
+            <p className="muted">{t('ui.so.stella.knows.your')}</p>
           </section>
         )}
       </div>

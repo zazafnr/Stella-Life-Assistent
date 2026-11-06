@@ -2,6 +2,7 @@
 // Platzhalter {name}; Mehrzahl über Intl.PluralRules mit Schlüsseln "key#one" / "key#other" und der Variable `count`.
 
 import { DEFAULT_LOCALE, type Locale } from './locales.ts';
+import { describeRecurrence, describeRecurrenceEn, parseRecurrence, type Recurrence } from '../recurrence.ts';
 import en from './catalog/en.json' with { type: 'json' };
 import de from './catalog/de.json' with { type: 'json' };
 import es from './catalog/es.json' with { type: 'json' };
@@ -95,3 +96,19 @@ export const formatNumber = (locale: Locale, n: number, opts?: Intl.NumberFormat
 
 export const formatMoney = (locale: Locale, amount: number, currency = 'EUR') =>
   new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount);
+
+// ---------- Wiederholungen in der Sprache der Person ----------
+
+/** „every Monday and Thursday“, „werktags“ … in jeder der acht Sprachen (Deutsch und Englisch behalten ihre gewohnten Sätze) */
+export function describeRecurrenceIn(locale: Locale, rec: Recurrence | string): string {
+  if (locale === 'de') return describeRecurrence(rec);
+  if (locale === 'en') return describeRecurrenceEn(rec);
+  const r = typeof rec === 'string' ? parseRecurrence(rec) : rec;
+  if (!r) return '';
+  if (r.kind === 'daily') return t(locale, 'rec.daily');
+  if (r.kind === 'monthly') return t(locale, 'rec.monthly', { day: r.day });
+  if (r.days.join(',') === '1,2,3,4,5') return t(locale, 'rec.weekdays');
+  if (r.days.join(',') === '6,7') return t(locale, 'rec.weekends');
+  const names = r.days.map((d) => weekdayName(locale, d % 7));
+  return t(locale, 'rec.every', { days: new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(names) });
+}

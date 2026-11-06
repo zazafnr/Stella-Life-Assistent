@@ -26,6 +26,14 @@ struct PlannerView: View {
     enum Filter: String, CaseIterable, Identifiable {
         case all = "Alles", homework = "HÜs", exams = "Tests", other = "Termine"
         var id: String { rawValue }
+        @MainActor var title: String {
+            switch self {
+            case .all: return L("ios.filter.all")
+            case .homework: return L("ios.filter.homework")
+            case .exams: return L("ios.filter.exams")
+            case .other: return L("ios.filter.events")
+            }
+        }
         func matches(_ i: Item) -> Bool {
             switch self {
             case .all: return true
@@ -63,8 +71,8 @@ struct PlannerView: View {
                                     .frame(width: 40, height: 40)
                                     .background(Theme.pinkTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Woche planen").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
-                                    Text("Stella verteilt Lernen und HÜs auf deine freien Zeiten")
+                                    Text(L("quick.week.label")).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
+                                    Text(L("ios.stella.spreads.studying.and"))
                                         .font(.system(size: 13)).foregroundStyle(Theme.muted)
                                         .multilineTextAlignment(.leading)
                                 }
@@ -74,13 +82,13 @@ struct PlannerView: View {
                             .card(padding: 14)
                         }
                         .buttonStyle(PressableStyle())
-                        Picker("Filter", selection: $filter) {
-                            ForEach(availableFilters) { Text($0.rawValue).tag($0) }
+                        Picker(L("ios.filter"), selection: $filter) {
+                            ForEach(availableFilters) { Text($0.title).tag($0) }
                         }
                         .pickerStyle(.segmented)
 
                         if !overdue.isEmpty {
-                            Text("ÜBERFÄLLIG").eyebrow(color: Theme.pinkText)
+                            Text(L("ios.overdue")).eyebrow(color: Theme.pinkText)
                             ForEach(overdue) { card($0, showDue: true) }
                         }
 
@@ -110,11 +118,11 @@ struct PlannerView: View {
 
     private var header: some View {
         HStack {
-            Text("Planer").font(Theme.display(32)).foregroundStyle(Theme.text)
+            Text(L("nav.planner")).font(Theme.display(32)).foregroundStyle(Theme.text)
             Spacer()
             HStack(spacing: 4) {
                 circleButton("chevron.left") { day = Day.add(-7, to: day) }
-                Button("KW \(kw)") { day = today }
+                Button(L("ios.week", ["kw": kw])) { day = today }
                     .font(.system(size: 14, weight: .semibold))
                     .padding(.horizontal, 12)
                     .frame(height: 36)
@@ -145,7 +153,7 @@ struct PlannerView: View {
                 let selected = d == day
                 Button { day = d } label: {
                     VStack(spacing: 4) {
-                        Text(Day.parse(d)?.formatted(.dateTime.locale(Locale(identifier: "de_AT")).weekday(.abbreviated)) ?? "")
+                        Text(Day.parse(d)?.formatted(.dateTime.locale(Day.locale).weekday(.abbreviated)) ?? "")
                             .font(.system(size: 11, weight: .semibold))
                         Text(String(Int(d.suffix(2)) ?? 0))
                             .font(.system(size: 18, weight: .bold, design: .rounded))
@@ -228,7 +236,7 @@ struct PlannerView: View {
         if list.isEmpty {
             VStack(spacing: 12) {
                 Cloud(width: 90).opacity(0.9)
-                Text("Nichts geplant. Sag Stella im Chat, was ansteht.")
+                Text(L("ios.nothing.planned.tell.stella"))
                     .font(.system(size: 15))
                     .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
@@ -333,7 +341,7 @@ struct PlannerCard: View {
                 .animation(.spring(response: 0.35, dampingFraction: 0.6), value: item.isDone)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(item.isDone ? "Wieder öffnen" : "Erledigt")
+            .accessibilityLabel(item.isDone ? L("ios.reopen") : L("today.status.done"))
 
             Button(action: onOpen) {
                 ItemRow(item: item, busy: busy, showDue: showDue)
@@ -357,16 +365,16 @@ struct QuickAdd: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Neu eintragen").font(.system(size: 20, weight: .bold)).foregroundStyle(Theme.text)
-            TextField("z. B. Latein HÜ S. 20 Nr. 3 Freitag", text: $text)
+            Text(L("ios.new.entry")).font(.system(size: 20, weight: .bold)).foregroundStyle(Theme.text)
+            TextField(L("ios.e.g.latin.homework"), text: $text)
                 .focused($focused)
                 .submitLabel(.done)
                 .onSubmit(save)
                 .modifier(InputStyle())
-            Text("Stella versteht Kurzschrift: HÜ, SA, Test, Referat, Datum oder Wochentag.")
+            Text(L("ios.stella.understands.shorthand.homewor"))
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.muted)
-            Button("Eintragen", action: save)
+            Button(L("ios.add"), action: save)
                 .buttonStyle(PrimaryButton())
                 .disabled(text.trimmingCharacters(in: .whitespaces).isEmpty)
         }

@@ -20,7 +20,7 @@ struct ShoppingListSheet: View {
             List {
                 Section {
                     HStack(spacing: 10) {
-                        TextField("Was brauchst du? z. B. 2 Liter Milch", text: $text)
+                        TextField(L("ui.what.do.you.need"), text: $text)
                             .focused($focused)
                             .submitLabel(.done)
                             .onSubmit { Task { await add() } }
@@ -28,12 +28,12 @@ struct ShoppingListSheet: View {
                             Image(systemName: "plus.circle.fill").font(.system(size: 24)).foregroundStyle(Theme.blue)
                         }
                         .disabled(text.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .accessibilityLabel("Hinzufügen")
+                        .accessibilityLabel(L("ui.add"))
                     }
                 }
                 if list != nil && open.isEmpty && done.isEmpty {
                     Section {
-                        Text("Nichts auf der Liste. Sag Stella einfach „wir brauchen Eier und Butter“.")
+                        Text(L("ui.nothing.on.the.list"))
                             .font(.system(size: 14)).foregroundStyle(Theme.muted)
                     }
                 }
@@ -51,9 +51,9 @@ struct ShoppingListSheet: View {
                         ForEach(done) { entry in row(entry) }
                     } header: {
                         HStack {
-                            Text("Erledigt (\(done.count))")
+                            Text(L("ios.done", ["count": done.count]))
                             Spacer()
-                            Button("Aufräumen") { Task { await tidy() } }
+                            Button(L("ui.tidy.up")) { Task { await tidy() } }
                                 .font(.system(size: 13, weight: .semibold))
                                 .textCase(nil)
                         }
@@ -63,9 +63,9 @@ struct ShoppingListSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.bg)
-            .navigationTitle("Einkaufsliste")
+            .navigationTitle(L("today.shopping"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Fertig") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button(L("common.done")) { dismiss() } } }
             .refreshable { await load() }
             .task {
                 await load()
@@ -165,7 +165,7 @@ struct ShoppingCardView: View {
                     .frame(width: 40, height: 40)
                     .background(Theme.blueTint, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Einkaufsliste").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
+                    Text(L("today.shopping")).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
                     Text(subtitle).font(.system(size: 13)).foregroundStyle(Theme.muted)
                 }
                 Spacer(minLength: 0)
@@ -212,21 +212,21 @@ struct PlacesCardView: View {
                 .foregroundStyle(Theme.muted)
             switch phase {
             case .idle:
-                Button { Task { await find() } } label: { Label("Läden in der Nähe zeigen", systemImage: "location.fill") }
+                Button { Task { await find() } } label: { Label(L("ui.show.shops.nearby"), systemImage: "location.fill") }
                     .buttonStyle(SoftButton(filled: true))
             case .locating, .loading:
                 HStack(spacing: 8) { ProgressView(); Text(phase == .locating ? "Standort wird bestimmt …" : "Ich suche …").font(.system(size: 13)).foregroundStyle(Theme.muted) }
             case .failed:
                 Text(error ?? "Das hat nicht geklappt.").font(.system(size: 13)).foregroundStyle(Theme.pinkText)
-                Button("Nochmal versuchen") { Task { await find() } }.buttonStyle(SoftButton(filled: false))
+                Button(L("common.retry")) { Task { await find() } }.buttonStyle(SoftButton(filled: false))
             case .done:
                 if let data, data.places.isEmpty {
-                    Text("Im Umkreis von 3 km habe ich nichts gefunden.").font(.system(size: 13)).foregroundStyle(Theme.muted)
+                    Text(L("ui.i.found.nothing.within")).font(.system(size: 13)).foregroundStyle(Theme.muted)
                 }
                 ForEach(data?.places ?? []) { p in placeRow(p) }
                 if let shopping, shopping.items.contains(where: { !$0.done }) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("🛒 EINKAUFSLISTE").font(.system(size: 12, weight: .bold)).tracking(0.8).foregroundStyle(Theme.muted)
+                        Text(L("ios.shopping.list")).font(.system(size: 12, weight: .bold)).tracking(0.8).foregroundStyle(Theme.muted)
                         ForEach(shopping.items.filter { !$0.done }.prefix(8)) { i in
                             Text(bullet(i)).font(.system(size: 14)).foregroundStyle(Theme.text)
                         }
@@ -247,10 +247,10 @@ struct PlacesCardView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(p.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
                 Text(distance(p.distanceM) + (p.address.map { " · \($0)" } ?? "")).font(.system(size: 13)).foregroundStyle(Theme.muted)
-                if let open = p.openNow { Pill(text: open ? "offen" : "geschlossen", tone: open ? .green : .pink) }
+                if let open = p.openNow { Pill(text: open ? L("briefing.open") : L("ios.closed"), tone: open ? .green : .pink) }
             }
             Spacer(minLength: 0)
-            Button("Route") { if let url = URL(string: p.appleMapsUrl) { openURL(url) } }
+            Button(L("errand.route")) { if let url = URL(string: p.appleMapsUrl) { openURL(url) } }
                 .buttonStyle(SoftButton(filled: false))
         }
         .padding(10)

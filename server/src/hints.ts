@@ -58,13 +58,13 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
       out.push({
         key: `exam_no_material:${e.exam.id}`, priority: e.daysLeft <= 5 ? 'high' : 'normal', itemId: e.exam.id,
         text: v.hintNoMaterial(e.exam.title, e.daysLeft), pending: { type: 'exam_material', itemId: e.exam.id },
-        open: { tab: 'chat', label: 'Stoff sagen' },
+        open: { tab: 'chat', label: tr(user, 'hintlabel.material') },
       });
     } else if (e.hasMaterial && e.sessions.total === 0 && e.daysLeft >= 2 && e.daysLeft <= 14) {
       out.push({
         key: `exam_no_plan:${e.exam.id}`, priority: e.daysLeft <= 5 ? 'high' : 'normal', itemId: e.exam.id,
         text: v.hintNoPlan(e.exam.title, e.daysLeft),
-        action: { type: 'study_plan.create', params: { examId: e.exam.id, material: e.exam.material! }, label: 'Lernplan machen' },
+        action: { type: 'study_plan.create', params: { examId: e.exam.id, material: e.exam.material! }, label: tr(user, 'hintlabel.studyplan') },
       });
     }
   }
@@ -91,7 +91,7 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
     out.push({
       key: `overdue:${i.id}`, priority: 'normal', itemId: i.id,
       text: v.hintOverdue(i.title, formatDateDe(i.due!, lb.today)),
-      action: { type: 'item.update', params: { id: i.id, patch: { status: 'done' } }, label: 'Abhaken' },
+      action: { type: 'item.update', params: { id: i.id, patch: { status: 'done' } }, label: tr(user, 'hintlabel.checkoff') },
     });
   }
 
@@ -112,7 +112,7 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
   const halfDay = Date.now() - 12 * 3600_000;
   for (const m of hasFeature(user, 'mails') ? lb.importantInbox : []) {
     if (!m.needsReply || m.source !== 'email' || Date.parse(m.createdAt) > halfDay) continue;
-    out.push({ key: `reply:${m.id}`, priority: 'normal', text: v.hintReply(m.sender ?? 'Jemand', m.summary), open: { tab: 'inbox', label: 'Antwort schreiben' } });
+    out.push({ key: `reply:${m.id}`, priority: 'normal', text: v.hintReply(m.sender ?? tr(user, 'hintlabel.someone'), m.summary), open: { tab: 'inbox', label: tr(user, 'hintlabel.reply') } });
   }
 
   // Bildschirmzeit: das Limit war an mindestens 3 der letzten 4 Tage erreicht (einmal pro Woche und Ziel, im Ton der Person)
@@ -122,7 +122,7 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
 
   // Ziele ohne Eintrag seit zwei Wochen (höchstens einmal im Monat je Ziel)
   for (const { goal, weeks } of hasFeature(user, 'goals') ? staleGoals(user, lb.today) : []) {
-    out.push({ key: `goal_stale:${goal.id}:${lb.today.slice(0, 7)}`, priority: 'normal', text: v.goalStale(goal.title, weeks), open: { tab: 'goals', label: 'Ziele ansehen' } });
+    out.push({ key: `goal_stale:${goal.id}:${lb.today.slice(0, 7)}`, priority: 'normal', text: v.goalStale(goal.title, weeks), open: { tab: 'goals', label: tr(user, 'hintlabel.goals') } });
   }
 
   // Gedächtnis-Einträge der Kategorie „Ziel“: einmal anbieten, sie als echtes Ziel anzulegen
@@ -134,7 +134,7 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
     if (title.length < 3 || haveGoal.has(title.toLowerCase())) continue;
     out.push({
       key: `goal_memory:${m.id}`, priority: 'normal', text: v.goalFromMemory(title),
-      action: { type: 'goal.create', params: { ...parsed, title: title.charAt(0).toUpperCase() + title.slice(1) }, label: 'Als Ziel anlegen' },
+      action: { type: 'goal.create', params: { ...parsed, title: title.charAt(0).toUpperCase() + title.slice(1) }, label: tr(user, 'hintlabel.makeGoal') },
     });
     break;
   }
@@ -147,7 +147,7 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
       if (percent < 80) continue;
       out.push({
         key: `budget:${b.category}:${month}:${percent >= 100 ? 100 : 80}`, priority: 'normal',
-        text: v.hintBudget(b.category, percent, euro(b.spentCents), euro(b.limitCents)), open: { tab: 'finance', label: 'Ausgaben ansehen' },
+        text: v.hintBudget(b.category, percent, euro(b.spentCents), euro(b.limitCents)), open: { tab: 'finance', label: tr(user, 'hintlabel.spending') },
       });
     }
   }

@@ -12,8 +12,8 @@ import path from 'node:path';
 const ROOTS = ['web/src', 'web-core/src'].map((r) => path.resolve(import.meta.dirname, '../../..', r));
 const OPEN = new Set([
   'components/Inbox.tsx', 'components/Goals.tsx', 'components/Planner.tsx', 'components/Finance.tsx',
-  'components/StellaPlan.tsx', 'components/PlacesCard.tsx', 'components/WeekPlanSheet.tsx', 'components/Lists.tsx', 'components/Rich.tsx',
-  'components/ActionCard.tsx', 'components/BriefingCard.tsx', 'components/Health.tsx', 'components/Settings.tsx',
+  
+  'components/Settings.tsx',
   'components/settings/Server.tsx', 'components/settings/Books.tsx', 'components/settings/Mail.tsx', 'components/settings/Assistant.tsx',
   'components/settings/Addresses.tsx', 'components/settings/Finance.tsx', 'components/settings/Untis.tsx', 'components/settings/Handwriting.tsx',
   

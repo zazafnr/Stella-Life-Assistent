@@ -3,9 +3,11 @@ import type { StellaList } from '@stella/shared';
 import { api } from '../store.ts';
 import { Icon } from '../ui/Icon.tsx';
 import { Sheet, showToast } from '../ui/Decor.tsx';
+import { useT } from '../i18n.ts';
 
 /** Die Einkaufsliste (und weitere Listen) zum Abhaken. Änderungen sind sofort da, Stella ergänzt im Chat („schreib Milch auf die Einkaufsliste“). */
 export function ListsSheet({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const [lists, setLists] = useState<StellaList[] | null>(null);
   const [text, setText] = useState('');
 
@@ -50,21 +52,21 @@ export function ListsSheet({ onClose }: { onClose: () => void }) {
   const done = shopping?.items.filter((i) => i.done) ?? [];
 
   return (
-    <Sheet title="Einkaufsliste" onClose={onClose}>
+    <Sheet title={t('today.shopping')} onClose={onClose}>
       <form className="row" style={{ gap: 8, marginBottom: 12 }} onSubmit={(e) => void add(e)}>
-        <input className="grow" value={text} onChange={(e) => setText(e.target.value)} placeholder="Was brauchst du? z. B. 2 Liter Milch" aria-label="Neuer Eintrag" />
-        <button type="submit" className="btn" disabled={!text.trim()}><Icon name="plus" size={16} />Hinzufügen</button>
+        <input className="grow" value={text} onChange={(e) => setText(e.target.value)} placeholder={t('ui.what.do.you.need')} aria-label={t('ui.new.item')} />
+        <button type="submit" className="btn" disabled={!text.trim()}><Icon name="plus" size={16} />{t('ui.add')}</button>
       </form>
-      {!lists && <p className="muted">⏳ Einen Moment …</p>}
+      {!lists && <p className="muted">{t('ui.one.moment')}</p>}
       {shopping && open.length === 0 && done.length === 0 && (
-        <div className="empty"><span className="icon-tile blue"><Icon name="plus" size={26} /></span><p>Nichts auf der Liste. Sag Stella einfach „wir brauchen Eier und Butter“.</p></div>
+        <div className="empty"><span className="icon-tile blue"><Icon name="plus" size={26} /></span><p>{t('ui.nothing.on.the.list')}</p></div>
       )}
       <ul className="shop-list">
         {open.map((i) => (
           <li key={i.id} className="shop-row">
-            <button type="button" className="shop-check" aria-label={`${i.text} abhaken`} onClick={() => void toggle(i.id, true)} />
+            <button type="button" className="shop-check" aria-label={t('ui.check.off', { text: i.text })} onClick={() => void toggle(i.id, true)} />
             <span className="grow">{i.text}{i.qty && <span className="muted small"> · {i.qty}</span>}</span>
-            <button type="button" className="icon-btn danger" aria-label={`${i.text} löschen`} onClick={() => void remove(i.id)}><Icon name="close" size={16} /></button>
+            <button type="button" className="icon-btn danger" aria-label={t('ui.delete', { text: i.text })} onClick={() => void remove(i.id)}><Icon name="close" size={16} /></button>
           </li>
         ))}
       </ul>
@@ -72,12 +74,12 @@ export function ListsSheet({ onClose }: { onClose: () => void }) {
         <>
           <div className="row" style={{ justifyContent: 'space-between', margin: '14px 0 6px' }}>
             <span className="eyebrow">Erledigt ({done.length})</span>
-            <button type="button" className="link small" onClick={() => void tidy()}>Aufräumen</button>
+            <button type="button" className="link small" onClick={() => void tidy()}>{t('ui.tidy.up')}</button>
           </div>
           <ul className="shop-list">
             {done.map((i) => (
               <li key={i.id} className="shop-row done">
-                <button type="button" className="shop-check on" aria-label={`${i.text} wieder öffnen`} onClick={() => void toggle(i.id, false)}><Icon name="check" size={14} stroke={3} /></button>
+                <button type="button" className="shop-check on" aria-label={t('ui.reopen', { text: i.text })} onClick={() => void toggle(i.id, false)}><Icon name="check" size={14} stroke={3} /></button>
                 <span className="grow">{i.text}{i.qty && <span className="muted small"> · {i.qty}</span>}</span>
               </li>
             ))}

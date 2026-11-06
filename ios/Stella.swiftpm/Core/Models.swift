@@ -824,10 +824,21 @@ enum ISO {
 enum Day {
     static var calendar: Calendar {
         var c = Calendar(identifier: .gregorian)
-        c.locale = Locale(identifier: "de_AT")
+        c.locale = locale
         c.firstWeekday = 2
         return c
     }
+
+    /** Sprache der App (I18n legt sie unter "stella.locale" ab); so lesbar aus jedem Kontext */
+    static var locale: Locale { Locale(identifier: UserDefaults.standard.string(forKey: "stella.locale") ?? "de") }
+
+    /** heute, morgen, übermorgen, gestern je Sprache */
+    private static let relativeWords: [String: [String]] = [
+        "de": ["heute", "morgen", "übermorgen", "gestern"], "en": ["today", "tomorrow", "the day after tomorrow", "yesterday"],
+        "es": ["hoy", "mañana", "pasado mañana", "ayer"], "fr": ["aujourd’hui", "demain", "après-demain", "hier"],
+        "it": ["oggi", "domani", "dopodomani", "ieri"], "pt-BR": ["hoje", "amanhã", "depois de amanhã", "ontem"],
+        "tr": ["bugün", "yarın", "öbür gün", "dün"], "pl": ["dzisiaj", "jutro", "pojutrze", "wczoraj"],
+    ]
 
     private static let fmt: DateFormatter = {
         let f = DateFormatter()
@@ -852,20 +863,21 @@ enum Day {
     /** "Freitag, 30.10." */
     static func long(_ s: String) -> String {
         guard let d = parse(s) else { return s }
-        return d.formatted(.dateTime.locale(Locale(identifier: "de_AT")).weekday(.wide).day().month(.twoDigits))
+        return d.formatted(.dateTime.locale(locale).weekday(.wide).day().month(.twoDigits))
     }
 
     /** "morgen", "heute", "Fr, 30.10." */
     static func relative(_ s: String) -> String {
         let n = diff(from: today, to: s)
+        let words = relativeWords[UserDefaults.standard.string(forKey: "stella.locale") ?? "de"] ?? relativeWords["de"]!
         switch n {
-        case 0: return "heute"
-        case 1: return "morgen"
-        case 2: return "übermorgen"
-        case -1: return "gestern"
+        case 0: return words[0]
+        case 1: return words[1]
+        case 2: return words[2]
+        case -1: return words[3]
         default:
             guard let d = parse(s) else { return s }
-            return d.formatted(.dateTime.locale(Locale(identifier: "de_AT")).weekday(.abbreviated).day().month(.twoDigits))
+            return d.formatted(.dateTime.locale(locale).weekday(.abbreviated).day().month(.twoDigits))
         }
     }
 }

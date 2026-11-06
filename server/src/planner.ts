@@ -3,7 +3,7 @@
 import {
   addDays, buildStudyPlan, DEFAULT_PREFS, nextOccurrence, planReminders, zonedToUtc, todayIn, type Item, type ParsedEntry,
 } from '@stella/shared';
-import { tr } from './locale.ts';
+import { tr, userLocale } from './locale.ts';
 import { pluginItemCreated, pluginNextLessonDate, pluginReminders } from './editions/registry.ts';
 import {
   addReminder, clearOpenReminders, createItem, enqueueJob, getItem, getItemRaw, listItems, type NewItem, updateItem, type User,
@@ -81,7 +81,7 @@ export function createStudyPlan(user: User, examId: string, focuses?: string[]):
   const exam = getItem(user.id, examId);
   if (!exam?.due) return [];
   const today = todayIn(user.timeZone);
-  const plan = buildStudyPlan(exam.due, today, exam.material ?? '');
+  const plan = buildStudyPlan(exam.due, today, exam.material ?? '', 6, userLocale(user));
   return plan.map((s, i) => addItem(user, {
     kind: 'study',
     subject: exam.subject,

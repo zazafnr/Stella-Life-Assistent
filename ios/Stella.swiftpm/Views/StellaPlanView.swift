@@ -31,10 +31,10 @@ struct StellaPlanView: View {
     var body: some View {
         List {
             Section {
-                Text("Alles, was Stella von selbst tut. Jeder Punkt lässt sich ändern oder abstellen – und mit „Rückgängig“ wieder zurückholen.")
+                Text(L("ui.everything.stella.does.on"))
                     .font(.system(size: 14)).foregroundStyle(Theme.muted)
             }
-            if data == nil && error == nil { Section { Text("Einen Moment …").foregroundStyle(Theme.muted) } }
+            if data == nil && error == nil { Section { Text(L("onboarding.wait")).foregroundStyle(Theme.muted) } }
             if let error { Section { Text(error).foregroundStyle(Theme.pinkText) } }
             if let data {
                 ForEach(groups) { group in
@@ -49,7 +49,7 @@ struct StellaPlanView: View {
                         }
                     } else if group.id == "week" {
                         Section(group.title) {
-                            Text("In den nächsten 7 Tagen hat Stella nichts Einzelnes vor.").font(.system(size: 14)).foregroundStyle(Theme.muted)
+                            Text(L("ui.stella.has.nothing.specific")).font(.system(size: 14)).foregroundStyle(Theme.muted)
                         }
                     }
                 }
@@ -57,7 +57,7 @@ struct StellaPlanView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Theme.bg)
-        .navigationTitle("Was Stella vorhat")
+        .navigationTitle(L("settings.plan"))
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
         .task { await load() }
@@ -66,7 +66,7 @@ struct StellaPlanView: View {
                 HStack {
                     Text(undoable.text).font(.system(size: 14)).foregroundStyle(.white).lineLimit(2)
                     Spacer(minLength: 8)
-                    Button { Task { await undoLast() } } label: { Label("Rückgängig", systemImage: "arrow.uturn.backward") }
+                    Button { Task { await undoLast() } } label: { Label(L("telegram.undo"), systemImage: "arrow.uturn.backward") }
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Color(hex: 0xBFD9FF))
                 }
@@ -80,8 +80,8 @@ struct StellaPlanView: View {
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: undoable)
         .confirmationDialog(removing.map { "„\($0.title)“ entfernen?" } ?? "", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }), titleVisibility: .visible, presenting: removing) { entry in
-            Button("Entfernen", role: .destructive) { Task { await change(entry, ChangeBody(on: nil, time: nil, remove: true), "„\(entry.title)“ entfernt") } }
-            Button("Abbrechen", role: .cancel) {}
+            Button(L("settings.news.remove"), role: .destructive) { Task { await change(entry, ChangeBody(on: nil, time: nil, remove: true), "„\(entry.title)“ entfernt") } }
+            Button(L("common.cancel"), role: .cancel) {}
         }
     }
 
@@ -121,13 +121,13 @@ struct StellaPlanView: View {
             .font(.system(size: 14))
             .foregroundStyle(Theme.muted)
         case "remove":
-            Button(role: .destructive) { removing = entry } label: { Label(c.label ?? "Löschen", systemImage: "trash") }
+            Button(role: .destructive) { removing = entry } label: { Label(c.label ?? L("common.delete"), systemImage: "trash") }
                 .font(.system(size: 14, weight: .semibold))
                 .buttonStyle(.borderless)
         case "decision":
             HStack(spacing: 8) {
-                Button("Ja") { Task { await decide(entry, "approve") } }.buttonStyle(SoftButton(filled: true))
-                Button("Nein") { Task { await decide(entry, "reject") } }.buttonStyle(SoftButton(filled: false))
+                Button(L("common.yes")) { Task { await decide(entry, "approve") } }.buttonStyle(SoftButton(filled: true))
+                Button(L("common.no")) { Task { await decide(entry, "reject") } }.buttonStyle(SoftButton(filled: false))
             }
         case "link":
             link(c)
@@ -222,12 +222,12 @@ struct StellaPlanCardView: View {
         Button { open() } label: {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text("Stella diese Woche").font(.system(size: 17, weight: .bold)).foregroundStyle(Theme.text)
+                    Text(L("ui.stella.this.week")).font(.system(size: 17, weight: .bold)).foregroundStyle(Theme.text)
                     Spacer()
-                    Text("Alle ansehen").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.blue)
+                    Text(L("ui.view.all")).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.blue)
                 }
                 if let soon, soon.isEmpty {
-                    Text("Gerade ist nichts geplant. Sag Stella z. B. „erinnere mich jeden Montag an den Müll“.")
+                    Text(L("ui.nothing.is.planned.right"))
                         .font(.system(size: 13)).foregroundStyle(Theme.muted).multilineTextAlignment(.leading)
                 }
                 ForEach(soon ?? []) { entry in

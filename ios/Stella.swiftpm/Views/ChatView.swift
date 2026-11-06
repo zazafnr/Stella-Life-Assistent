@@ -58,13 +58,13 @@ struct ChatView: View {
         .onChange(of: recorder.denied) { _, denied in
             if denied { showMicDenied = true; recorder.denied = false }
         }
-        .alert("Mikrofon nicht erlaubt", isPresented: $showMicDenied) {
-            Button("Einstellungen") {
+        .alert(L("ios.microphone.not.allowed"), isPresented: $showMicDenied) {
+            Button(L("nav.settings")) {
                 if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
             }
-            Button("Abbrechen", role: .cancel) {}
+            Button(L("common.cancel"), role: .cancel) {}
         } message: {
-            Text("Für Sprachnachrichten braucht Stella das Mikrofon. Du kannst es in den iOS-Einstellungen erlauben.")
+            Text(L("ios.stella.needs.the.microphone"))
         }
         .sheet(isPresented: $showCamera) {
             CameraPicker { image in images.append(image) }
@@ -114,11 +114,11 @@ struct ChatView: View {
                     .background(.white, in: Circle())
                     .shadow(color: Theme.blue.opacity(0.1), radius: 6, y: 2)
             }
-            .accessibilityLabel("Alle Chats")
+            .accessibilityLabel(L("chat.allChats"))
             Button {
                 Task { await store.newConversation() }
             } label: {
-                Label("Neuer Chat", systemImage: "plus")
+                Label(L("chat.newChat"), systemImage: "plus")
                     .font(.system(size: 14, weight: .semibold))
                     .padding(.horizontal, 14)
                     .frame(height: 40)
@@ -232,10 +232,10 @@ struct ChatView: View {
                 } else {
                     Menu {
                         PhotosPicker(selection: $photos, maxSelectionCount: 4, matching: .images) {
-                            Label("Fotos", systemImage: "photo.on.rectangle")
+                            Label(L("ios.photos"), systemImage: "photo.on.rectangle")
                         }
                         if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                            Button { showCamera = true } label: { Label("Kamera", systemImage: "camera") }
+                            Button { showCamera = true } label: { Label(L("ios.camera"), systemImage: "camera") }
                         }
                     } label: {
                         Image(systemName: "camera.fill")
@@ -244,9 +244,9 @@ struct ChatView: View {
                             .frame(width: 40, height: 40)
                             .background(Theme.blueTint, in: Circle())
                     }
-                    .accessibilityLabel("Foto anhängen")
+                    .accessibilityLabel(L("ios.attach.photo"))
 
-                    TextField("Schreib Stella …", text: $text, axis: .vertical)
+                    TextField(L("chat.placeholder"), text: $text, axis: .vertical)
                         .lineLimit(1...5)
                         .focused($focused)
                         .font(.system(size: 16))
@@ -263,7 +263,7 @@ struct ChatView: View {
                             .frame(width: 40, height: 40)
                             .background(Theme.blue, in: Circle())
                     }
-                    .accessibilityLabel("Senden")
+                    .accessibilityLabel(L("chat.send"))
                 } else {
                     micButton
                 }
@@ -287,7 +287,7 @@ struct ChatView: View {
             Text("Hi\(store.me.map { ", \($0.firstName)" } ?? "")!")
                 .font(Theme.display(26))
                 .foregroundStyle(Theme.text)
-            Text("Wobei kann ich dir helfen? Tipp etwas an – oder sprich einfach los.")
+            Text(L("chat.empty"))
                 .font(.system(size: 15))
                 .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
@@ -367,7 +367,7 @@ struct ChatView: View {
                         cancelling = false
                     }
             )
-            .accessibilityLabel("Sprachnachricht – gedrückt halten zum Aufnehmen")
+            .accessibilityLabel(L("ios.voice.message.hold.to"))
             .accessibilityAddTraits(.isButton)
     }
 
@@ -457,7 +457,7 @@ struct Bubble: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .fixedSize(horizontal: false, vertical: true)
                         if message.failedAudioId != nil {
-                            Button("Nochmal versuchen") { Task { await store.retryVoice(message.id) } }
+                            Button(L("common.retry")) { Task { await store.retryVoice(message.id) } }
                                 .buttonStyle(SoftButton(filled: false))
                                 .disabled(store.thinking)
                         }
@@ -583,7 +583,7 @@ struct ActionCardView: View {
                 if action.proposed {
                     HStack(spacing: 8) {
                         Button { run("approve") } label: {
-                            Label("Ja, mach das", systemImage: "checkmark")
+                            Label(L("ui.yes.do.it"), systemImage: "checkmark")
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 14)
@@ -591,7 +591,7 @@ struct ActionCardView: View {
                                 .background(Theme.blue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
                         Button { run("reject") } label: {
-                            Text("Nein")
+                            Text(L("common.no"))
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(Theme.blue)
                                 .padding(.horizontal, 14)
@@ -607,7 +607,7 @@ struct ActionCardView: View {
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(action.status == "done" ? Theme.green : action.status == "failed" ? Theme.pinkText : Theme.muted)
                         if action.canUndo {
-                            Button("Rückgängig") { run("undo") }
+                            Button(L("telegram.undo")) { run("undo") }
                                 .font(.system(size: 13, weight: .semibold))
                                 .disabled(busy)
                         }
@@ -622,7 +622,7 @@ struct ActionCardView: View {
 
     static func label(_ status: String) -> String {
         switch status {
-        case "done": return "Erledigt"
+        case "done": return L("today.status.done")
         case "rejected": return "Abgelehnt"
         case "undone": return "Rückgängig gemacht"
         case "failed": return "Hat nicht geklappt"
