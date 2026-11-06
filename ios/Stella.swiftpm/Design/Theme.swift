@@ -19,8 +19,10 @@ enum Theme {
     static let muted = Color(hex: 0x5B7190)
     static let faint = Color(hex: 0x8DA0BA)
     static let border = Color(hex: 0xDCE7F5)
-    static let blue = Color(hex: 0x1F6FEB)
-    static let blueTint = Color(hex: 0xE6F0FF)
+    /** Stella for Students hat Violett als Akzent (wie die Web-App), Stella Blau */
+    static let isStudents = API.edition == "students"
+    static let blue = isStudents ? Color(hex: 0x6D4AFF) : Color(hex: 0x1F6FEB)
+    static let blueTint = isStudents ? Color(hex: 0xEFEAFF) : Color(hex: 0xE6F0FF)
     static let pink = Color(hex: 0xFF7EB3)
     static let pinkText = Color(hex: 0xC0306E)
     static let pinkTint = Color(hex: 0xFFE8F1)

@@ -16,33 +16,17 @@ const { addDays, todayIn } = await import('@stella/shared');
 const { user } = register('Lukas', 'lukas@example.com', 'supergeheim', 'Europe/Vienna');
 const today = todayIn('Europe/Vienna');
 
-test('HÜ per Kurznotiz → Eintrag, Erinnerung am Vorabend, Buchseiten-Job', async () => {
-  updateUserSettings(user.id, { books: [{ subject: 'Latein', provider: 'digi4school', url: 'https://digi4school.at/ebook/abc' }] });
-  const u = getUser(user.id)!;
-  const res = await handleChat(u, 'Latein Hü Seite 45 nr 3 in 5 tagen', 'c1');
-  assert.equal(res.items.length, 1);
-  const item = res.items[0];
-  assert.equal(item.title, 'Latein HÜ');
-  assert.equal(item.due, addDays(today, 5));
-  assert.match(res.messages[0].text, /Notiert.*Latein HÜ.*S\. 45 Nr\. 3/);
-  assert.match(res.messages[0].text, /digi4school, lös die Aufgabe und schreib sie dir ins Heft/);
-
-  const reminders = db.prepare('SELECT * FROM reminders WHERE item_id = ?').all(item.id) as { fire_at: string; with_attachments: number }[];
-  assert.equal(reminders.length, 1);
-  assert.equal(reminders[0].with_attachments, 1);
-  const jobs = db.prepare(`SELECT * FROM jobs WHERE type = 'book_page'`).all();
-  assert.equal(jobs.length, 1);
-});
-
 test('gleiche clientId (offline erneut gesendet) wird nur einmal verarbeitet', async () => {
-  const res = await handleChat(getUser(user.id)!, 'Latein Hü Seite 45 nr 3 in 5 tagen', 'c1');
+  const first = await handleChat(getUser(user.id)!, 'Zahnarzt in 5 tagen um 14 uhr', 'c1');
+  assert.equal(first.items.length, 1);
+  const res = await handleChat(getUser(user.id)!, 'Zahnarzt in 5 tagen um 14 uhr', 'c1');
   assert.equal(res.items.length, 0);
-  assert.equal(listItems(user.id).filter((i) => i.subject === 'Latein').length, 1);
+  assert.equal(listItems(user.id).filter((i) => /Zahnarzt/i.test(i.title)).length, 1);
 });
 
 test('Test → Rückfrage nach Stoff → Lernplan', async () => {
   const u = getUser(user.id)!;
-  const res = await handleChat(u, 'Mathe SA in 10 tagen', 'c2');
+  const res = await handleChat(u, 'Klausur in 10 tagen', 'c2');
   assert.match(res.messages.at(-1)!.text, /Welcher Stoff/);
   const plan = await handleChat(u, 'Quadratische Gleichungen, Funktionen und Textaufgaben', 'c3');
   const sessions = plan.items.filter((i) => i.kind === 'study');
@@ -52,13 +36,14 @@ test('Test → Rückfrage nach Stoff → Lernplan', async () => {
 });
 
 test('erledigt markieren', async () => {
-  const res = await handleChat(getUser(user.id)!, 'Latein HÜ erledigt', 'c4');
+  await handleChat(getUser(user.id)!, 'Bericht Abgabe Freitag', 'c4a');
+  const res = await handleChat(getUser(user.id)!, 'Abgabe erledigt', 'c4');
   assert.equal(res.items[0].status, 'done');
 });
 
 test('Agenda', async () => {
   const res = await handleChat(getUser(user.id)!, 'was steht an?', 'c5');
-  assert.match(res.messages[0].text, /📝 Mathe Schularbeit/);
+  assert.match(res.messages[0].text, /📝 Klausur/);
 });
 
 test('ohne KI: freundlicher Hinweis statt Absturz', async () => {
@@ -77,7 +62,7 @@ test('Kalender-Abo enthält Einträge', async () => {
   const { toICalendar } = await import('./ical.ts');
   const ics = toICalendar(listItems(user.id, { includeDone: true }), 'Europe/Vienna');
   assert.match(ics, /BEGIN:VCALENDAR/);
-  assert.match(ics, /SUMMARY:📝 Mathe Schularbeit/);
+  assert.match(ics, /SUMMARY:📝 Klausur/);
   assert.match(ics, /DTSTART;VALUE=DATE:\d{8}/);
   assert.ok(ics.split('\r\n').every((l) => [...l].length <= 75));
 });

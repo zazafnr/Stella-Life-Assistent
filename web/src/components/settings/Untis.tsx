@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { api, refreshMe, type Me } from '../../store.ts';
-import { Section, useAction } from './ui.tsx';
+import { api, refreshMe, type Me } from '@stella/web-core/store.ts';
+import { Section, useAction } from '@stella/web-core/components/settings/ui.tsx';
 
 export function Untis({ me }: { me: Me }) {
   const [run, view] = useAction();

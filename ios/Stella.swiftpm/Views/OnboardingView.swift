@@ -66,7 +66,9 @@ struct OnboardingView: View {
         let symbol: String
     }
 
-    private let situations = [
+    /** Schule und Studium gibt es nur in Stella for Students */
+    private var situations: [SituationInfo] { API.edition == "students" ? allSituations : allSituations.filter { $0.id != "school" && $0.id != "university" } }
+    private let allSituations = [
         SituationInfo(id: "school", symbol: "graduationcap.fill"), SituationInfo(id: "university", symbol: "books.vertical.fill"),
         SituationInfo(id: "work", symbol: "briefcase.fill"), SituationInfo(id: "apprenticeship", symbol: "wrench.and.screwdriver.fill"),
         SituationInfo(id: "other", symbol: "sparkles"),

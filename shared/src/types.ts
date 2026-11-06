@@ -39,6 +39,10 @@ export interface Item {
   recurrence?: string | null;
   /** Dauerauftrag pausiert: keine Erinnerungen, bis er wieder eingeschaltet wird */
   recurrencePaused?: boolean;
+  /** Dauer in Minuten (Kalender: Länge des Blocks); fehlt sie, gilt ein Standard je Art */
+  duration?: number | null;
+  /** Ort eines Termins (Freitext) */
+  location?: string | null;
 }
 
 /** Ein Vorschlag auf der Restaurant-Karte */
@@ -115,7 +119,7 @@ export interface ChatMessage {
 export type PermissionLevel = 'auto' | 'notify' | 'ask' | 'never';
 
 /** Bereiche, für die man Stella Rechte gibt */
-export type ActionGroup = 'planner' | 'delete' | 'homework' | 'mail_sort' | 'mail_send' | 'memory';
+export type ActionGroup = 'planner' | 'delete' | 'homework' | 'mail_sort' | 'mail_send' | 'memory' | 'learning';
 
 export type ActionStatus = 'proposed' | 'done' | 'rejected' | 'undone' | 'failed';
 
@@ -439,3 +443,9 @@ export interface StellaPlanEntry {
   enabled: boolean;
   controls: StellaPlanControl[];
 }
+
+// ---------- Editionen ----------
+// Stella gibt es in zwei Apps mit einem Server: `life` (Alltag, Beruf) und `students` (Schule, Lehre, Studium).
+export const EDITIONS = ['life', 'students'] as const;
+export type Edition = (typeof EDITIONS)[number];
+export const isEdition = (v: unknown): v is Edition => EDITIONS.includes(v as Edition);

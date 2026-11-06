@@ -1,0 +1,17 @@
+{
+  "name": "@stella/web-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Gemeinsame Oberflächen-Bausteine der Web-Apps (Stella und Stella for Students): Speicher, Sprache, Chat, Inbox, Ziele, Listen … Das Aussehen kommt aus den CSS-Variablen der jeweiligen App.",
+  "dependencies": {
+    "@stella/shared": "*",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "^5.9.3"
+  }
+}

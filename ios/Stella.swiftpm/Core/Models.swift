@@ -664,13 +664,13 @@ struct Me: Codable, Hashable {
         // Finanzen ist serverseitig ausgeblendet, solange der Schalter aus ist (der Server entfernt sie auch aus dem Profil)
         if feature == "finance" && flags?.finance != true { return false }
         guard let p = settings.profile else { return feature != "finance" }
-        if feature == "homework" && p.situation != "school" { return false }
+        if feature == "homework" && (API.edition != "students" || p.situation != "school") { return false }
         return p.features.contains(feature)
     }
-    /** Schulbücher, HÜ-Autopilot, WebUntis – ohne Profil wie bisher */
-    var isSchool: Bool { settings.profile.map { $0.situation == "school" } ?? true }
-    /** Tests, Lerneinheiten, Lernpläne: Schule oder Studium */
-    var isLearner: Bool { settings.profile.map { $0.situation == "school" || $0.situation == "university" } ?? true }
+    /** Schulbücher, HÜ-Autopilot, WebUntis – gibt es nur in Stella for Students (im normalen Stella ersetzt der Kalender den Stundenplan) */
+    var isSchool: Bool { API.edition == "students" && (settings.profile.map { $0.situation == "school" } ?? true) }
+    /** Tests, Lerneinheiten, Lernpläne: in Stella for Students Schule oder Studium, im normalen Stella für alle */
+    var isLearner: Bool { API.edition != "students" || (settings.profile.map { $0.situation == "school" || $0.situation == "university" } ?? true) }
 }
 
 struct AuthResponse: Codable {

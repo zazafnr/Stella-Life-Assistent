@@ -8,6 +8,7 @@ struct PlannerView: View {
     @State private var lessons: [Lesson] = []
     @State private var openItem: Item?
     @State private var showAdd = false
+    @State private var showCalendar = false
     @State private var planning = Demo.opens("weekplan")
 
     /** HÜs nur in der Schule, Tests und Lernplan in Schule und Studium */
@@ -15,7 +16,7 @@ struct PlannerView: View {
         let me = store.me
         return Filter.allCases.filter { f in
             switch f {
-            case .homework: return me?.isSchool ?? true
+            case .homework: return me?.isSchool ?? false
             case .exams: return me?.isLearner ?? true
             default: return true
             }
@@ -98,6 +99,7 @@ struct PlannerView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(item: $openItem) { ItemDetail(item: $0) }
+            .sheet(isPresented: $showCalendar) { CalendarView() }
             .sheet(isPresented: $showAdd) { QuickAdd().presentationDetents([.height(260)]) }
             .sheet(isPresented: $planning) { WeekPlanSheet() }
             .task(id: monday) { await load() }
@@ -118,6 +120,7 @@ struct PlannerView: View {
                     .frame(height: 36)
                     .background(.white, in: Capsule())
                 circleButton("chevron.right") { day = Day.add(7, to: day) }
+                circleButton("calendar") { showCalendar = true }
                 circleButton("plus", filled: true) { showAdd = true }
                     .padding(.leading, 6)
             }

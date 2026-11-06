@@ -21,7 +21,7 @@ Wiederholung), `server/src/router.ts` (`pickTier`, `resolveTier`, Kontingent-Stu
 Acht Sprachen (`shared/src/i18n/locales.ts`: en, de, es, fr, it, pt-BR, tr, pl), Englisch ist Standard. Texte stehen in
 **einer** Quelle: `shared/src/i18n/catalog/<locale>.json` (flache Schlüssel, Platzhalter `{name}`, Mehrzahl `key#one/#other`).
 
-- **Web:** `useT()` aus `web/src/i18n.ts`. **iOS:** `L("schlüssel")`; `scripts/gen-i18n.ts` erzeugt daraus `Core/I18nCatalogs.swift`
+- **Web:** `useT()` aus `web-core/src/i18n.ts`. **iOS:** `L("schlüssel")`; `scripts/gen-i18n.ts` erzeugt daraus `Core/I18nCatalogs.swift`
   (die CI prüft mit `--check`, dass sie aktuell ist). **Server:** `tr(user, key)`, `voiceOf(user)`, `dayFor(user, ymd)` aus `server/src/locale.ts`.
 - `voice(tone, locale)` bleibt als typisierter Code (Funktionen mit Varianten): `voice.de.ts` und `voice.en.ts` sind vollständig,
   die übrigen Sprachen überschreiben in `voice.more.ts` nur, was sie haben (Rest: Englisch).
@@ -30,6 +30,67 @@ Acht Sprachen (`shared/src/i18n/locales.ts`: en, de, es, fr, it, pt-BR, tr, pl),
 - Der System-Prompt der KI ist englisch und enthält die Regel „Always reply in {Sprache}“; Whisper bekommt die Sprache als Hinweis.
 - **Kurznotizen ohne KI:** Deutsch (`parser.ts`) und Englisch (`parser.en.ts`). Für alle anderen Sprachen geht die Nachricht an Haiku.
 - Noch nicht umgestellt: die Dateien in `OPEN` in `shared/src/i18n/jsx.test.ts` (Web) und die meisten iOS-Views.
+
+## 0d. Zwei Editionen (Plan: `docs/plan/stella-students.md`)
+
+Stella gibt es in zwei Apps mit **einem** Server, **einer** Datenbank, **einem** Stripe und **einem** VPS:
+
+| Edition | App | Adresse | Repo |
+|---|---|---|---|
+| `life` | Stella (Alltag, Beruf, Haushalt) | `stella.evolsior.com` | dieses Repo |
+| `students` | Stella for Students (Schule, Lehre, Studium) | `students.stella.evolsior.com` | `zazafnr/Stella-for-Students` |
+
+Begriffe (überall gleich benutzen): **Edition**, **Edition-Plugin** (Code der Students-Edition, den der Server lädt),
+**Kern-Spiegel** (`core/` im Students-Repo, eine eingecheckte Kopie dieses Repos).
+
+Entscheidungen:
+1. Konten sind getrennt und gehören zu genau einer Edition (`users.edition`). Anmeldung auf der falschen Oberfläche wird abgelehnt.
+2. Der Server ist ein Prozess. Die Students-Funktionen kommen als **Edition-Plugin** über feste Einhängepunkte
+   (`server/src/plugin-api.ts`, `server/src/editions/registry.ts`). Fehlt das Plugin, läuft das normale Stella vollständig.
+3. Der Schul-Code zieht in das Students-Repo (`server-plugin/`). Dieses Repo bleibt der Kern und das normale Stella.
+4. Änderungen am Kern passieren nur hier; das Students-Repo spiegelt sie mit `npm run sync:core`.
+5. Normales Stella: Kalender statt Stundenplan; Prüfungen und Lernpläne bleiben mit erwachsenem Vokabular.
+6. Keine Gamification, auch nicht bei Lernkarten.
+
+### Edition-Schnittstelle (Paket 1)
+
+- **`server/src/plugin-api.ts`** bündelt, was ein Plugin benutzen darf (`db`, `getUser`, `perform`, `record`, `notify`, `complete`, `getSecret`/`setSecret`, `tr`, `enqueueJob`, `config`, Typen).
+  Ein Plugin importiert vom Kern **nur Typen**; die Laufzeit-Teile reicht der Server beim Laden herein: `export default (api: PluginApi) => EditionPlugin`.
+  So gibt es genau eine Datenbank und einen Scheduler, auch wenn das Plugin als Submodul aus einem anderen Ordner kommt.
+- **`server/src/editions/registry.ts`** definiert die Einhängepunkte und die Sammel-Funktionen, über die der Kern sie aufruft (`pluginLessons`, `pluginHints`, `pluginTools` …):
+  `migrations` (eigener Zähler in `edition_migrations`, `PRAGMA user_version` bleibt dem Kern) · `routes` · `tools` · `prompt` · `parser` ·
+  `context` (Stunden, geschätzte Belegung, nächste Stunde) · `hints` · `briefing` · `stellaPlan` · `quickActions` · `scheduler` (Jobs, periodische Abgleiche) ·
+  `catalog` (eigene i18n-Schlüssel) · `settings` · `onboarding` · `ical` · `integrations` · `onItemCreated`.
+- **Laden** (`editions/load.ts`): `STELLA_EDITION_STUDENTS=off` → kein Plugin; Pfad → dieses Plugin; nicht gesetzt → `editions/students/server-plugin`, wenn vorhanden,
+  sonst das **eingebaute Schul-Plugin** (`editions/school.ts`, bis Paket 3 – die Module liegen noch in diesem Repo). Ohne Plugin läuft das normale Stella vollständig (Test in `editions.test.ts`).
+- **Konten**: `users.edition` (`life` | `students`, bestehende Konten bleiben `life`). Die Oberfläche einer Anfrage kommt aus dem Host (`students.…`), dem Feld `edition` oder dem Header `x-stella-edition`.
+  Anmeldung auf der falschen Oberfläche → `409` mit `code: 'wrong_edition'`, `edition` und `url` (nie eine Sitzung); Anmelde-Links für Konten der anderen App werden nicht verschickt (ohne zu verraten, dass es das Konto gibt).
+  `GET /api/me` liefert `edition` und `editionUrl`; `GET /api/edition` beschreibt, was die Plugins an Einstellungen und Einführung beisteuern.
+- **Mails**: Absendername, Betreff, Kopf und Fuß nennen das Produkt der Edition (`Stella` / `Stella for Students`); die Kataloge sagen weiter nur „Stella“, `brandText()` ersetzt es.
+### Stand der Students-Pakete (Endstand dieser Runde)
+
+- **Kalender** (Paket 7, Kern): `shared/src/calendar.ts` (reine Logik), `GET /api/calendar`, Oberfläche in `web-core/src/calendar/` (Monat, Woche, Tag; Ziehen, Dehnen, Rückgängig). Ersetzt im normalen Stella den Stundenplan.
+- **Abos je Edition** (Paket 14): `PLANS_BY_EDITION`, Überschreibungen je Edition gespeichert, Mengen `flashcards` und `notes` neben `ai_message` und `pro_task` (`quotaFor`, `consumeQuota`). Stripe-Preise je Edition und Plan.
+- **Uni** (Paket 11, Plugin): Semester, Kurse, Stundenplan per ICS (Zeitzone der Quelle, wiederkehrende Serien über Sommerzeit), Noten mit gewichtetem Schnitt.
+- **Lernkarten** (Paket 12, Plugin): Stapel und Karten, Wiederholung in Stufen 1/3/7/16/35 Tage (falsch → Stufe 1), Erzeugen mit KI (höchstens 40 Karten je Aufruf, privat, Quote erst nach Erfolg), Abfrage im Chat, Anstoß in der Lernzeit, Zeile im Briefing.
+- **Mitschriften aus Fotos** (Paket 13, Plugin): Tabelle `notes_summaries`, Seiten nacheinander lesen, eine Zusammenfassung, eine Profi-Aufgabe je Mitschrift, Abbrechen räumt auf; weiter als Karten, Prüfungsstoff (Aktion `study_plan.create`) oder über die FreeNotes-Abholung ins Heft.
+- **Website** (Paket 15): zwei Karten auf der Startseite, `/stella`, `/stella-students` (siehe `docs/WEBSITE.md`).
+
+### Zwei Repos, ein Server (Paket 2)
+
+- **Kein Git-Submodul.** `git archive` (in `scripts/deploy-vps.sh`) nimmt Submodule nicht mit, und ein gepinnter Stand hinkt der Arbeit am Plugin hinterher.
+  Stattdessen klont `scripts/fetch-edition.sh` das Repo `Stella-for-Students` nach `editions/students` (ignoriert in `.gitignore`).
+  `STELLA_STUDENTS_REF` wählt Branch, Tag oder Commit (Standard `main`). Das Dockerfile (`--build-arg STUDENTS_REF=…`, `off` = ohne), `deploy/install-vps.sh`
+  (holt es, wenn es fehlt) und `scripts/deploy-vps.sh` (packt es in das Archiv) rufen es auf.
+- **Kern-Spiegel**: Im Students-Repo liegt unter `core/` eine eingecheckte, schreibgeschützte Kopie von `shared/`, `server/`, (`web-core/` ab Paket 4) und iOS `Core/` + `Design/`.
+  `npm run sync:core` (im Students-Repo) erzeugt sie und schreibt `core/CORE_COMMIT`; `--check` schlägt fehl, wenn jemand im Spiegel gearbeitet hat.
+  **Änderungen am Kern passieren nur hier.** Danach: hier committen und pushen, im Students-Repo `npm run sync:core`, committen.
+- **CI**: `.github/workflows/ci.yml` prüft den Kern (Typen, Tests, iOS-Kataloge) und in einem zweiten Job das Zusammenspiel
+  (`STELLA_EDITION_STUDENTS=editions/students/server-plugin npm test` mit dem geholten Plugin).
+- Das Plugin darf `null` liefern („noch nichts beizutragen“): dann gilt das eingebaute Schul-Plugin. So bleibt der Server in den Paketen 2 und 3 mit jedem Stand des Plugins lauffähig.
+- Laufzeit-Abhängigkeiten des Plugins (z. B. `webuntis`, `otplib`, `playwright`) bleiben in `server/package.json` dieses Repos, bis das Plugin sie selbst mitbringt.
+
+- **Grenze**: eine E-Mail-Adresse gehört zu einem Konto (`users.email` ist eindeutig). Wer beide Apps nutzen will, braucht zwei Adressen; der Hinweis „gehört zu Stella for Students“ kommt dann bei Anmeldung und Registrierung.
 
 ## 1. KI-Modell: OpenRouter, automatisch das beste kostenlose (Notfall bzw. ohne Claude-Schlüssel)
 

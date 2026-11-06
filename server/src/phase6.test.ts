@@ -43,13 +43,14 @@ applyProfile(getUser(school.id)!, { situation: 'school', features: ['planner', '
 
 const ids = (u: { id: string }, hour: number) => quickActions(getUser(u.id)!, hour).actions.map((a) => a.id);
 
-test('Schnellaktionen nach Profil: Schule sieht HÜ und Foto, Job sieht Einkauf, Ziele, Ausgaben', () => {
+test('Schnellaktionen nach Profil: Job sieht Einkauf, Ziele, Ausgaben – und ohne Plugin keine Schul-Chips', () => {
   const s = ids(school, 14);
-  assert.ok(s.includes('photo') && s.includes('homework') && s.includes('voice') && s.includes('week') && s.includes('mail'));
+  assert.ok(s.includes('voice') && s.includes('week') && s.includes('mail'));
   assert.ok(!s.includes('shopping') && !s.includes('spending') && !s.includes('goal'));
   const j = ids(job, 14);
   assert.ok(j.includes('shopping') && j.includes('goal') && j.includes('spending') && j.includes('mail') && j.includes('voice'));
   assert.ok(!j.includes('photo') && !j.includes('homework'), 'keine Schul-Chips im Job');
+  assert.ok(!s.includes('photo') && !s.includes('homework'), 'der Kern allein kennt keine Schul-Chips');
 });
 
 test('Schnellaktionen nach Tageszeit: morgens Briefing zuerst, abends „Hab ich was vergessen?“, tagsüber kein Briefing vorn', () => {
@@ -81,8 +82,7 @@ test('Antwortstil: der System-Prompt enthält die Regeln – und passt zum Profi
   assert.match(jobPrompt!, /Mia works \(09:00–17:00\)/);
   assert.ok(!/goes to school/.test(jobPrompt!) && !/solve_homework/.test(jobPrompt!), 'im Job keine Schule');
   assert.match(schoolPrompt!, /Lukas goes to school in Austria/);
-  assert.match(schoolPrompt!, /homework = "Hausübung"/, 'Schulwort je Land');
-  assert.match(schoolPrompt!, /solve_homework/);
+  assert.ok(!/solve_homework/.test(schoolPrompt!) && !/School words/.test(schoolPrompt!), 'Schulvokabular und Hausaufgaben-Werkzeug kommen nur über das Plugin');
 });
 
 test('„Was ist neu in der Mail?“: Überblick über die wichtigen Mails als kurze Liste', async () => {

@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import path from 'node:path';
-import { todayIn, type Locale, type UserProfile, type ActionGroup, type Attachment, type ChatMessage, type Item, type ItemKind, type ItemStatus, type PermissionLevel, type Tone } from '@stella/shared';
+import { isEdition, todayIn, type Edition, type Locale, type UserProfile, type ActionGroup, type Attachment, type ChatMessage, type Item, type ItemKind, type ItemStatus, type PermissionLevel, type Tone } from '@stella/shared';
 import { config } from './config.ts';
 
 export const db = new Database(path.join(config.dataDir, 'stella.db'));
@@ -555,6 +555,11 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX screentime_events_user_day ON screentime_events(user_id, day);
   `,
+  // Editionen: jedes Konto gehört zu genau einer Edition ('life' oder 'students'); bestehende Konten bleiben 'life'
+  `ALTER TABLE users ADD COLUMN edition TEXT NOT NULL DEFAULT 'life';`,
+  // Kalender: Dauer (Minuten) und Ort eines Eintrags
+  `ALTER TABLE items ADD COLUMN duration INTEGER;
+   ALTER TABLE items ADD COLUMN location TEXT;`,
 ];
 
 function migrate() {
@@ -633,9 +638,11 @@ export interface User {
   role: 'owner' | 'user';
   /** E-Mail per Code bestätigt */
   verified: boolean;
+  /** zu welcher App das Konto gehört */
+  edition: Edition;
 }
 
-type UserRow = { id: string; name: string; email: string; time_zone: string; settings: string; ingest_token: string; role: string; verified: number };
+type UserRow = { id: string; name: string; email: string; time_zone: string; settings: string; ingest_token: string; role: string; verified: number; edition?: string };
 function readSettings(json: string): UserSettings {
   const s = JSON.parse(json) as UserSettings;
   if (!s.books && s.digi4schoolBooks) s.books = s.digi4schoolBooks.map((b) => ({ ...b, provider: 'digi4school' }));
@@ -648,6 +655,7 @@ const toUser = (r: UserRow): User => ({
   settings: readSettings(r.settings), ingestToken: r.ingest_token,
   role: r.role === 'owner' ? 'owner' : 'user',
   verified: r.verified !== 0,
+  edition: isEdition(r.edition) ? r.edition : 'life',
 });
 
 export function allUserIds(): string[] {
@@ -671,7 +679,7 @@ export function updateUserSettings(id: string, patch: Partial<UserSettings>, tim
 type ItemRow = {
   id: string; kind: string; subject: string | null; title: string; detail: string | null; notes: string | null;
   page: string | null; exercises: string | null; book: string | null; due: string | null; time: string | null; status: string;
-  material: string | null; parent_id: string | null; attachments: string; updated_at: string; deleted: number; place?: string | null; recurrence?: string | null; recurrence_paused?: number;
+  material: string | null; parent_id: string | null; attachments: string; updated_at: string; deleted: number; place?: string | null; recurrence?: string | null; recurrence_paused?: number; duration?: number | null; location?: string | null;
 };
 
 export const toItem = (r: ItemRow): Item => ({
@@ -681,6 +689,8 @@ export const toItem = (r: ItemRow): Item => ({
   updatedAt: r.updated_at, deleted: !!r.deleted,
   ...(r.place ? { place: JSON.parse(r.place) as Item['place'] } : {}),
   ...(r.recurrence ? { recurrence: r.recurrence, recurrencePaused: !!r.recurrence_paused } : {}),
+  ...(r.duration ? { duration: r.duration } : {}),
+  ...(r.location ? { location: r.location } : {}),
 });
 
 export interface NewItem {
@@ -689,17 +699,19 @@ export interface NewItem {
   material?: string | null; parentId?: string | null; source?: string; externalId?: string | null;
   place?: { category: string; label: string } | null;
   recurrence?: string | null;
+  duration?: number | null;
+  location?: string | null;
 }
 
 export function createItem(userId: string, n: NewItem): Item {
   const id = newId();
   const ts = now();
   db.prepare(`INSERT INTO items (id, user_id, kind, subject, title, detail, notes, page, exercises, book, due, time,
-      material, parent_id, source, external_id, created_at, updated_at, place, recurrence)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      material, parent_id, source, external_id, created_at, updated_at, place, recurrence, duration, location)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(id, userId, n.kind, n.subject ?? null, n.title, n.detail ?? null, n.notes ?? null, n.page ?? null,
       n.exercises ?? null, n.book ?? null, n.due ?? null, n.time ?? null, n.material ?? null, n.parentId ?? null,
-      n.source ?? 'chat', n.externalId ?? null, ts, ts, n.place ? JSON.stringify(n.place) : null, n.recurrence ?? null);
+      n.source ?? 'chat', n.externalId ?? null, ts, ts, n.place ? JSON.stringify(n.place) : null, n.recurrence ?? null, n.duration ?? null, n.location ?? null);
   return getItem(userId, id)!;
 }
 
@@ -720,7 +732,7 @@ export function getItemRaw(userId: string, id: string) {
 const ITEM_COLUMNS: Record<string, string> = {
   kind: 'kind', subject: 'subject', title: 'title', detail: 'detail', notes: 'notes', page: 'page',
   exercises: 'exercises', due: 'due', time: 'time', status: 'status', material: 'material', deleted: 'deleted',
-  recurrence: 'recurrence', recurrencePaused: 'recurrence_paused',
+  recurrence: 'recurrence', recurrencePaused: 'recurrence_paused', duration: 'duration', location: 'location',
 };
 
 export function updateItem(userId: string, id: string, patch: Partial<Item>): Item | null {

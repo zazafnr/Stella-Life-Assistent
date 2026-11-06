@@ -7,23 +7,6 @@ const TODAY = '2026-11-04';
 const en = (text: string, now = '12:00') => interpret(text, TODAY, now, { locale: 'en' });
 const create = (text: string) => { const i = en(text); assert.equal(i?.type, 'create', text); return (i as Extract<Intent, { type: 'create' }>).entry; };
 
-test('Hausaufgabe mit Seite, Aufgabe und Wochentag', () => {
-  const e = create('math homework p. 45 no. 3 friday');
-  assert.equal(e.kind, 'homework');
-  assert.equal(e.title, 'Math Homework');
-  assert.equal(e.page, '45');
-  assert.equal(e.exercises, '3');
-  assert.equal(e.due, '2026-11-06');
-  assert.equal(e.detail, 'p. 45 no. 3');
-});
-
-test('Hausaufgabe ohne Datum: nächster Schultag', () => {
-  const e = create('French hw page 20-21 ex 1, 2');
-  assert.equal(e.dueAssumed, true);
-  assert.equal(e.page, '20–21');
-  assert.equal(e.exercises, '1, 2');
-});
-
 test('Test mit Datum in drei Schreibweisen', () => {
   assert.equal(create('history test 12.11.').due, '2026-11-12');
   assert.equal(create('chemistry exam on 12 Nov').due, '2026-11-12');
@@ -57,16 +40,6 @@ test('Daueraufträge', () => {
   assert.equal((en('remind me on the 15th of every month at 9 to pay rent') as { recurrence: string }).recurrence, 'monthly:15');
 });
 
-test('Einkaufsliste', () => {
-  assert.deepEqual(en('add milk and 2 liters of juice to the shopping list'), { type: 'list_add', items: [{ text: 'Milk', qty: null }, { text: 'Juice', qty: '2 liters' }] });
-  assert.deepEqual(en('we need eggs, butter'), { type: 'list_add', items: [{ text: 'Eggs', qty: null }, { text: 'Butter', qty: null }] });
-  assert.equal(en('we need help'), null, 'kein Einkauf');
-  assert.deepEqual(en("what's on the shopping list?"), { type: 'list_show' });
-  assert.deepEqual(en('I got everything'), { type: 'list_done', items: 'all' });
-  assert.deepEqual(en('bought the milk'), { type: 'list_done', items: ['Milk'] });
-  assert.equal(en('math homework done')?.type, 'done', 'Schulwort schlägt Einkaufsliste');
-});
-
 test('Erledigungen mit Ort', () => {
   const i = en('after work buy flowers for my wife') as Extract<Intent, { type: 'errand' }>;
   assert.equal(i.type, 'errand');
@@ -75,21 +48,6 @@ test('Erledigungen mit Ort', () => {
   const j = en('pick up my prescription tonight') as Extract<Intent, { type: 'errand' }>;
   assert.equal(j.place?.category, 'pharmacy');
   assert.equal(j.when, 'evening');
-});
-
-test('Agenda, erledigt, verschieben, absagen, Korrektur, merken', () => {
-  assert.deepEqual(en("what's up?"), { type: 'agenda', days: 14 });
-  assert.deepEqual(en('what do I have this week'), { type: 'agenda', days: 7 });
-  assert.deepEqual(en('finished the math homework'), { type: 'done', subject: 'Mathe', kind: 'homework' });
-  const move = en('move the dentist to monday at 4pm') as Extract<Intent, { type: 'move' }>;
-  assert.equal(move.type, 'move');
-  assert.deepEqual([move.query.words, move.due, move.time], [['dentist'], '2026-11-09', '16:00']);
-  const del = en('cancel the english homework') as Extract<Intent, { type: 'delete' }>;
-  assert.equal(del.type, 'delete');
-  assert.equal(del.query.subject, 'Englisch');
-  assert.deepEqual(en('no, thursday'), { type: 'correct', due: '2026-11-05', time: null });
-  assert.deepEqual(en('make it 6pm'), { type: 'correct', due: null, time: '18:00' });
-  assert.deepEqual(en('remember that Mia is my best friend'), { type: 'remember', text: 'Mia is my best friend' });
 });
 
 test('alles andere geht an die KI, andere Sprachen haben keinen Schnellweg', () => {

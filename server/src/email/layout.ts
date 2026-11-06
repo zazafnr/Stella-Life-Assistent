@@ -17,6 +17,8 @@ export interface EmailCard { title: string; text: string; icon?: string }
 
 export interface EmailParts {
   locale: Locale;
+  /** Produktname im Kopf und Fuß (Standard „Stella“) */
+  product?: string;
   /** unsichtbarer Vorschautext in der Postfach-Liste */
   preheader: string;
   /** Name der Bilddatei ohne Endung (web/public/mail/<name>.png) und Alt-Text */
@@ -117,7 +119,7 @@ export function renderEmail(p: EmailParts): { html: string; text: string } {
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" class="container" style="width:600px;max-width:600px">
   <tr><td bgcolor="#09090B" style="background:#09090B;border-radius:18px 18px 0 0;padding:16px 24px" class="pad">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-      <td valign="middle" style="font:600 18px/28px ${FONT};color:#FFFFFF"><img src="${escapeHtml(mailAssetUrl('star-white'))}" width="24" height="24" alt="" style="display:inline-block;vertical-align:middle;border:0;margin-right:8px">Stella</td>
+      <td valign="middle" style="font:600 18px/28px ${FONT};color:#FFFFFF"><img src="${escapeHtml(mailAssetUrl('star-white'))}" width="24" height="24" alt="" style="display:inline-block;vertical-align:middle;border:0;margin-right:8px">${escapeHtml(p.product ?? 'Stella')}</td>
       <td align="right" valign="middle" style="font:500 10px/28px ${FONT};letter-spacing:.38em;color:#A1A1AA">EVOLSIOR</td>
     </tr></table>
   </td></tr>
@@ -133,7 +135,7 @@ export function renderEmail(p: EmailParts): { html: string; text: string } {
     ${p.note ? `<p class="muted" style="margin:18px 0 0;font:400 14px/1.5 ${FONT};color:#71717A">${inlineBold(p.note)}</p>` : ''}
   </td></tr>
   <tr><td class="pad" style="padding:20px 24px 8px;text-align:center">
-    <p class="muted" style="margin:0 0 6px;font:500 12px/1.5 ${FONT};color:#71717A;letter-spacing:.02em">Stella by EVOLSIOR · Built to become</p>
+    <p class="muted" style="margin:0 0 6px;font:500 12px/1.5 ${FONT};color:#71717A;letter-spacing:.02em">${escapeHtml(p.product ?? 'Stella')} by EVOLSIOR · Built to become</p>
     <p class="muted" style="margin:0 0 6px;font:400 12px/1.5 ${FONT};color:#71717A">${escapeHtml(config.mail.company)}</p>
     <p class="muted" style="margin:0 0 6px;font:400 12px/1.5 ${FONT};color:#71717A">${legal}</p>
     <p class="muted" style="margin:0;font:400 12px/1.5 ${FONT};color:#A1A1AA">${escapeHtml(p.reason)}</p>
@@ -152,7 +154,7 @@ export function renderEmail(p: EmailParts): { html: string; text: string } {
     ...(p.button ? [`${p.button.label}: ${p.button.url}`, ''] : []),
     ...(p.secondary ? [`${p.secondary.label}: ${p.secondary.url}`, ...(p.secondary.note ? [p.secondary.note] : []), ''] : []),
     ...(p.note ? [stripBold(p.note), ''] : []),
-    '--', 'Stella by EVOLSIOR · Built to become', config.mail.company,
+    '--', `${p.product ?? 'Stella'} by EVOLSIOR · Built to become`, config.mail.company,
     `${t(lang, 'email.footer.imprint')}: ${config.mail.imprintUrl} · ${t(lang, 'email.footer.privacy')}: ${config.mail.privacyUrl}`, p.reason,
   ].join('\n').replace(/\n{3,}/g, '\n\n');
 

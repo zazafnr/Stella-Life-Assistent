@@ -5,7 +5,8 @@
 import { addDays, makeYmd, nextSchoolDay, nextWeekday, weekdayNextWeek, type Ymd } from './dates.ts';
 import { placeFor } from './places.ts';
 import { formatRecurrence, type Recurrence } from './recurrence.ts';
-import { SUBJECTS, type Intent, type ItemKind, type ItemQuery, type ParsedEntry } from './parser.ts';
+import { vocabulary } from './parser.vocab.ts';
+import { type Intent, type ItemKind, type ItemQuery, type ParsedEntry } from './parser.ts';
 
 const B = '(?<![\\p{L}\\p{N}])';
 const E = '(?![\\p{L}\\p{N}])';
@@ -19,22 +20,6 @@ const WD: Record<string, number> = {
 };
 const WD_RE = '(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tues?|wed|thu(?:rs?)?|fri|sat|sun)';
 const WORD_NUM: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, ten: 10, half: 0.5 };
-
-const KINDS_EN: [ItemKind, string, string[]][] = [
-  ['homework', 'Homework', ['homework', 'hw', 'hws']],
-  ['exam', 'Exam', ['exam', 'exams', 'midterm', 'final', 'finals']],
-  ['exam', 'Test', ['test', 'tests', 'quiz', 'quizzes']],
-  ['assignment', 'Presentation', ['presentation', 'talk']],
-  ['assignment', 'Assignment', ['assignment', 'project', 'essay', 'report', 'paper']],
-];
-
-/** Anzeigenamen der Fächer auf Englisch (intern bleibt der Fachname aus der Tabelle SUBJECTS) */
-export const SUBJECT_EN: Record<string, string> = {
-  Mathe: 'Math', Deutsch: 'German', Englisch: 'English', Latein: 'Latin', Französisch: 'French', Spanisch: 'Spanish', Italienisch: 'Italian',
-  Griechisch: 'Greek', Physik: 'Physics', Chemie: 'Chemistry', Biologie: 'Biology', Geschichte: 'History', Geografie: 'Geography',
-  Informatik: 'Computer Science', Musik: 'Music', Kunst: 'Art', Religion: 'Religion', Ethik: 'Ethics', 'Psychologie & Philosophie': 'Psychology & Philosophy',
-  Sport: 'PE', Wirtschaft: 'Economics',
-};
 
 interface Ctx { text: string; today: Ymd }
 
@@ -167,8 +152,8 @@ function itemQuery(raw: string): ItemQuery {
   let kind: ItemKind | null = null;
   const words: string[] = [];
   for (const w of raw.toLowerCase().split(/[\s,.!?:;-]+/u).filter(Boolean)) {
-    const k = KINDS_EN.find(([, , ws]) => ws.includes(w));
-    const s = SUBJECTS.find(([, ws]) => ws.includes(w));
+    const k = vocabulary().kindsEn.find(([, , ws]) => ws.includes(w));
+    const s = vocabulary().subjects.find(([, ws]) => ws.includes(w));
     if (k && !kind) { kind = k[0]; continue; }
     if (s && !subject) { subject = s[0]; continue; }
     if (!STOP.has(w) && w.length > 1 && !/^\d+$/.test(w)) words.push(w);
@@ -191,20 +176,20 @@ function parseEntry(input: string, today: Ymd): ParsedEntry | null {
   const rest: string[] = [];
   for (const raw of ctx.text.split(/\s+/).filter(Boolean)) {
     const word = raw.toLowerCase().replace(/[.,:;!?]+$/u, '');
-    const k = KINDS_EN.find(([, , ws]) => ws.includes(word));
-    const s = SUBJECTS.find(([, ws]) => ws.includes(word));
+    const k = vocabulary().kindsEn.find(([, , ws]) => ws.includes(word));
+    const s = vocabulary().subjects.find(([, ws]) => ws.includes(word));
     if (k && !kind) { kind = k[0]; kindLabel = k[1]; continue; }
     if (s && !subject) { subject = s[0]; continue; }
     if (STOP.has(word) && !rest.length) continue;
     rest.push(raw);
   }
-  if (!kind && (page || exercises) && (subject || due)) { kind = 'homework'; kindLabel = 'Homework'; }
+  if (!kind && vocabulary().homework && (page || exercises) && (subject || due)) { kind = 'homework'; kindLabel = 'Homework'; }
   if (!kind) return null;
   if (!subject && !page && !exercises && !due) return null;
 
   let dueAssumed = false;
   if (!due && kind === 'homework') { due = nextSchoolDay(today); dueAssumed = true; }
-  const shown = subject ? (SUBJECT_EN[subject] ?? subject) : null;
+  const shown = subject ? (vocabulary().subjectNamesEn[subject] ?? subject) : null;
   const restText = rest.join(' ').trim();
   return {
     kind, kindLabel, subject: shown, page, exercises, book: null, due, dueAssumed, time, rest: restText,
@@ -270,7 +255,7 @@ function listIntent(text: string): Intent | null {
   if (LIST_ALL_DONE_RE.test(text)) return { type: 'list_done', items: 'all' };
   m = LIST_DONE_RE.exec(text);
   const words = text.toLowerCase().split(/\s+/).map((w) => w.replace(/[.,!?]+$/u, ''));
-  const schoolish = SUBJECTS.some(([, ws]) => words.some((w) => ws.includes(w))) || KINDS_EN.some(([, , ws]) => words.some((w) => ws.includes(w)));
+  const schoolish = vocabulary().subjects.some(([, ws]) => words.some((w) => ws.includes(w))) || vocabulary().kindsEn.some(([, , ws]) => words.some((w) => ws.includes(w)));
   const what = (m?.[1] ?? m?.[2] ?? '').trim();
   if (m && what && !schoolish && what.split(/\s+/).length <= 6 && !/^(it|that|this|everything|all|homework|the homework)$/iu.test(what)) {
     const items = splitListItems(what).map((i) => i.text);

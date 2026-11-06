@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { addDays, formatDateDe, todayIn, weekdayOf, type Item } from '@stella/shared';
-import { api, deleteItem, meIsLearner, meIsSchool, patchItem, useStore } from '../store.ts';
-import { AuthImage, Lightbox } from './Rich.tsx';
-import { Icon } from '../ui/Icon.tsx';
-import { useLocale, useT } from '../i18n.ts';
-import { Confetti, Sheet, showToast } from '../ui/Decor.tsx';
-import { WeekPlanSheet } from './WeekPlanSheet.tsx';
+import { api, deleteItem, meIsLearner, meIsSchool, patchItem, useStore } from '@stella/web-core/store.ts';
+import { AuthImage, Lightbox } from '@stella/web-core/components/Rich.tsx';
+import { Icon } from '@stella/web-core/ui/Icon.tsx';
+import { useLocale, useT } from '@stella/web-core/i18n.ts';
+import { Confetti, Sheet, showToast } from '@stella/web-core/ui/Decor.tsx';
+import { WeekPlanSheet } from '@stella/web-core/components/WeekPlanSheet.tsx';
 
 interface Lesson { date: string; start: string; end: string; subject: string | null; code: string | null; status: string; info: string | null }
 

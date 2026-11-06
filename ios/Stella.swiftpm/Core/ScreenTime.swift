@@ -65,7 +65,12 @@ struct ScreenEvent: Codable, Hashable {
 
 /// Gemeinsamer Speicher von App und Erweiterungen (App Group). Ohne App Group (z. B. in Swift Playgrounds) gibt es nichts zu tun.
 enum ScreenTimeShared {
-    static let group = "group.app.stella.ios"
+    /** App-Gruppe der App; die Erweiterungen heißen "<Bundle-ID>.activity-monitor" usw. und teilen dieselbe Gruppe */
+    static let group: String = {
+        var id = Bundle.main.bundleIdentifier ?? "app.stella.ios"
+        for suffix in [".activity-monitor", ".activity-report", ".tests"] where id.hasSuffix(suffix) { id = String(id.dropLast(suffix.count)) }
+        return "group." + id
+    }()
     static var defaults: UserDefaults? { UserDefaults(suiteName: group) }
 
     private static let goalsKey = "screentime.goals"

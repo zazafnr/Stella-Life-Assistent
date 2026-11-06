@@ -4,7 +4,7 @@ import SwiftUI
 struct TodayView: View {
     var go: (Tab) -> Void
     @Environment(Store.self) private var store
-    @State private var lessons: [Lesson]?
+    @State private var showCalendar = false
     @State private var steps: Int?
     @State private var inbox: [InboxEntry] = []
     @State private var showSettings = Demo.opens("settings")
@@ -38,7 +38,7 @@ struct TodayView: View {
                             stepsCard
                         }
                         .rise(2)
-                        lessonStrip.rise(3)
+                        calendarRow.rise(3)
                         inboxRow.rise(4)
                         chatRow.rise(5)
                     }
@@ -220,29 +220,23 @@ struct TodayView: View {
         .buttonStyle(PressableStyle())
     }
 
-    @ViewBuilder private var lessonStrip: some View {
-        if let lessons, !lessons.isEmpty {
-            let homework = Set(store.items(on: tomorrow).filter { $0.kind == "homework" }.compactMap(\.subject))
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("Morgen in der Schule")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(Theme.text)
-                    Spacer()
-                    Text(Day.long(tomorrow))
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.muted)
-                }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(lessons) { l in
-                            LessonChip(lesson: l, hasHomework: homework.contains(l.name))
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
+    /** Kalender (Monat → Tag) statt Stundenplan */
+    private var calendarRow: some View {
+        Button { showCalendar = true } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Theme.blue)
+                    .frame(width: 40, height: 40)
+                    .background(Theme.blueTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                Text(L("calendar.calendarView")).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.faint)
             }
+            .card(padding: 14)
         }
+        .buttonStyle(PressableStyle())
+        .sheet(isPresented: $showCalendar) { CalendarView() }
     }
 
     private var inboxRow: some View {
@@ -296,10 +290,8 @@ struct TodayView: View {
 
     private func reload() async {
         await store.sync()
-        async let l: [Lesson]? = try? API.shared.get("/api/timetable?from=\(tomorrow)&to=\(tomorrow)")
         async let i: [InboxEntry]? = try? API.shared.get("/api/inbox?limit=150")
         async let h: [HealthDay]? = try? API.shared.get("/api/health?days=1")
-        lessons = await l ?? lessons ?? []
         inbox = await i ?? inbox
         let serverSteps = await h?.first { $0.date == today }?.steps
         // iPhone: Schritte direkt vom Sensor und gleich an Stella melden
@@ -404,29 +396,6 @@ struct ShimmerBar: View {
                 .clipShape(Capsule())
         }
         .onAppear { withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: false)) { phase = 1 } }
-    }
-}
-
-struct LessonChip: View {
-    var lesson: Lesson
-    var hasHomework: Bool
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(lesson.cancelled ? "\(lesson.start) · entfällt" : hasHomework ? "\(lesson.start) · HÜ" : lesson.start)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(hasHomework ? Theme.pinkText : Theme.muted)
-            Text(lesson.name)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(lesson.cancelled ? Theme.faint : Theme.text)
-                .strikethrough(lesson.cancelled)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(hasHomework ? Theme.pinkTint : Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(hasHomework ? Theme.pink.opacity(0.4) : Theme.border, style: StrokeStyle(lineWidth: 1, dash: lesson.cancelled ? [4, 3] : []))
-        )
     }
 }
 

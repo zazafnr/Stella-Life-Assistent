@@ -1,5 +1,7 @@
 # Stella v3: Arbeitsplan
 
+> **Hinweis:** Schulische Teile sind seit der Runde „Stella for Students“ in [`zazafnr/Stella-for-Students`](https://github.com/zazafnr/Stella-for-Students) (siehe `docs/plan/stella-students.md`).
+
 > **So benutzt du diese Datei:** Öffne eine neue Session mit dem Repo `zazafnr/Stella-Life-Assistent`, füge diese Datei ein und schreib dazu: „Arbeite diesen Plan ab, Paket für Paket.“
 > In Paket 0 legt die Session die Datei zusätzlich als `docs/plan/stella-v3.md` ins Repo, damit spätere Sessions sie finden.
 > Die Pakete werden **der Reihe nach** abgearbeitet. Jedes Paket ist für sich lieferbar.

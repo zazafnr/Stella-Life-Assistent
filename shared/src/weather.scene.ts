@@ -1,5 +1,5 @@
 // Regeln für die Wetter-Szenen (Web und iOS gleich): Himmelsfarben, Lesbarkeit, Blitze, Mondphase, Dämmerung, Teilchenzahlen.
-// Gezeichnet wird in web/src/weather/ (Canvas) und ios/…/Design/Weather/ (SwiftUI Canvas); hier steht, was getestet werden kann.
+// Gezeichnet wird in web-core/src/weather/ (Canvas) und ios/…/Design/Weather/ (SwiftUI Canvas); hier steht, was getestet werden kann.
 
 import type { WeatherState, WeatherType } from './weather.ts';
 
@@ -47,7 +47,7 @@ export const mix = (fg: [number, number, number], bg: [number, number, number], 
   [0, 1, 2].map((i) => Math.round(fg[i]! * alpha + bg[i]! * (1 - alpha))) as [number, number, number];
 
 /**
- * Farben im Chat je Szenen-Art. Die Werte stehen auch in web/src/styles.css (`[data-scene='dark']`);
+ * Farben im Chat je Szenen-Art. Die Werte stehen auch in web-core/src/core.css (`[data-scene='dark']`);
  * ein Test vergleicht beides und prüft den Kontrast (≥ 4,5:1) gegen jede Szene, auch beim stärksten Blitz.
  */
 export const READABLE = {

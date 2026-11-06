@@ -14,7 +14,7 @@ import { hasFeature, isLearner, isSchool } from './profile.ts';
 import { addMessage, db, getUser, now, setPending, type PendingType, type User } from './db.ts';
 import { bookFor } from './planner.ts';
 import { notify } from './channels/deliver.ts';
-import { nextLessonDate } from './untis.ts';
+import { pluginHints } from './editions/registry.ts';
 import { budgetStatus, euro } from './finance.ts';
 import { activeGoals, parseGoalQuick, staleGoals } from './goals.ts';
 import { tr, voiceOf } from './locale.ts';
@@ -98,30 +98,8 @@ export function findHints(user: User, lb: Lagebild = buildLagebild(user, 8)): Fo
   if (tomorrowDay) {
     const dueTomorrow = tomorrowDay.items.filter((i) => i.status === 'open');
 
-    // Stunde entfällt, die HÜ dafür ist aber noch für morgen eingetragen
-    const cancelled = !isSchool(user) ? [] : tomorrowDay.lessons.filter((l) => l.status === 'cancelled' && l.subject);
-    for (const l of cancelled) {
-      const stillThere = tomorrowDay.lessons.some((x) => x.subject === l.subject && x.status !== 'cancelled');
-      if (stillThere) continue;
-      for (const hw of dueTomorrow.filter((i) => i.kind === 'homework' && i.subject === l.subject)) {
-        const next = nextLessonDate(user.id, l.subject!, tomorrow);
-        if (!next) continue;
-        out.push({
-          key: `cancelled:${hw.id}:${tomorrow}`, priority: 'high', itemId: hw.id,
-          text: v.hintCancelled(l.subject!, hw.title, formatDateDe(next, lb.today)),
-          action: { type: 'item.update', params: { id: hw.id, patch: { due: next } }, label: `Auf ${formatDateDe(next, lb.today)}` },
-        });
-      }
-    }
-
-    // HÜ für morgen, aber weder Foto noch Buchseite – Autopilot kann nichts tun
-    const afternoon = toMin(lb.now) >= toMin('14:00');
-    if (afternoon && isSchool(user) && levelFor(user, 'homework') !== 'never') {
-      for (const hw of dueTomorrow.filter((i) => i.kind === 'homework')) {
-        if (hw.attachments.length || (hw.page && bookFor(user, hw.subject))) continue;
-        out.push({ key: `no_source:${hw.id}`, priority: 'high', itemId: hw.id, text: v.hintNoSource(hw.title), open: { tab: 'chat', label: 'Foto schicken' } });
-      }
-    }
+    // Hinweise des Edition-Plugins (z. B. Entfall mit offener HÜ, HÜ ohne Foto oder Buchseite)
+    out.push(...pluginHints(user, lb));
 
     // Morgen viel fällig, heute kaum Zeit
     const heavy = dueTomorrow.filter((i) => ['homework', 'assignment', 'exam'].includes(i.kind) && !solved(i));

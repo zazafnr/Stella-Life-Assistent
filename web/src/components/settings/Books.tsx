@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { SUBJECTS } from '@stella/shared';
-import { api, refreshMe, type BookConfig, type BookProvider, type Me } from '../../store.ts';
-import { AuthImage } from '../Rich.tsx';
-import { Section, Toggle, useAction } from './ui.tsx';
+/** Fächer zur Auswahl (die Schul-Einstellungen ziehen mit Paket 5/7 in die Students-App um) */
+const SUBJECTS: [string][] = ['Mathe', 'Deutsch', 'Englisch', 'Latein', 'Französisch', 'Spanisch', 'Italienisch', 'Griechisch', 'Physik', 'Chemie', 'Biologie', 'Geschichte', 'Geografie', 'Informatik', 'Musik', 'Kunst', 'Religion', 'Ethik', 'Psychologie & Philosophie', 'Sport', 'Wirtschaft'].map((s) => [s]);
+import { api, refreshMe, type BookConfig, type BookProvider, type Me } from '@stella/web-core/store.ts';
+import { AuthImage } from '@stella/web-core/components/Rich.tsx';
+import { Section, Toggle, useAction } from '@stella/web-core/components/settings/ui.tsx';
 
 const PROVIDERS: [BookProvider, string][] = [['digi4school', 'digi4school'], ['scook', 'scook']];
 

@@ -5,10 +5,9 @@ import { HttpError, requireOwner } from './auth.ts';
 import { rotateInboundSecret, inboundSecretSet } from './inbound.ts';
 import { isKeyName, keyStatus, serverAiSettings, setKey, setServerAiSettings, testKey } from './keys.ts';
 import { createInvite, deleteInvite, listInvites, registrationMode } from './signup.ts';
-import { isLocale, isPlanId, LOCALES, DEFAULT_LOCALE, PLAN_IDS, PLANS } from '@stella/shared';
+import { isEdition, isLocale, isPlanId, LOCALES, DEFAULT_LOCALE, PLAN_IDS, PLANS_BY_EDITION } from '@stella/shared';
 import { billingOverview, giftPlan, planFor, planOverrides, setPlanOverrides, subscriptionOf } from './billing.ts';
 import { db } from './db.ts';
-import { announceFreenotes } from './notes.ts';
 import { registerWebhook, unregisterWebhook } from './channels/telegram.ts';
 import { renderTemplate, SAMPLE, TEMPLATE_NAMES, type TemplateName } from './email/templates.ts';
 
@@ -42,11 +41,6 @@ export function registerAdminRoutes(api: FastifyInstance) {
     return reply.type('text/html; charset=utf-8').send(mail.html);
   });
 
-  // FreeNotes ist da: alle auf der Warteliste benachrichtigen
-  api.post('/api/admin/freenotes/announce', { preHandler: requireOwner }, async () => {
-    try { return { ok: true, ...(await announceFreenotes()) }; } catch (err) { throw new HttpError(400, (err as Error).message); }
-  });
-
   // Abos: schenken, Limits ändern (ohne Deploy), Zahlen für das Dashboard
   api.post('/api/admin/billing/gift', { preHandler: requireOwner }, async (req) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
@@ -59,10 +53,16 @@ export function registerAdminRoutes(api: FastifyInstance) {
     giftPlan(row.id, b.plan, days);
     return { ok: true, subscription: subscriptionOf(row.id) };
   });
-  api.get('/api/admin/plans', { preHandler: requireOwner }, async () => ({ defaults: PLANS, overrides: planOverrides(), effective: PLAN_IDS.map((id) => planFor(id)) }));
-  api.put('/api/admin/plans', { preHandler: requireOwner }, async (req) => {
-    const overrides = setPlanOverrides(req.body);
-    return { overrides, effective: PLAN_IDS.map((id) => planFor(id)) };
+  // Abos und Limits je Edition (?edition=life|students, Standard life); Überschreibungen gelten nur für diese Edition
+  const editionOf = (q: { edition?: string }) => (isEdition(q.edition) ? q.edition : 'life');
+  api.get<{ Querystring: { edition?: string } }>('/api/admin/plans', { preHandler: requireOwner }, async (req) => {
+    const edition = editionOf(req.query);
+    return { edition, defaults: PLANS_BY_EDITION[edition], overrides: planOverrides(edition), effective: PLAN_IDS.map((id) => planFor(id, edition)) };
+  });
+  api.put<{ Querystring: { edition?: string } }>('/api/admin/plans', { preHandler: requireOwner }, async (req) => {
+    const edition = editionOf(req.query);
+    const overrides = setPlanOverrides(req.body, edition);
+    return { edition, overrides, effective: PLAN_IDS.map((id) => planFor(id, edition)) };
   });
   api.get<{ Querystring: { days?: string } }>('/api/admin/billing-overview', { preHandler: requireOwner }, async (req) =>
     billingOverview(Math.min(Math.max(Number(req.query.days) || 30, 1), 365)));

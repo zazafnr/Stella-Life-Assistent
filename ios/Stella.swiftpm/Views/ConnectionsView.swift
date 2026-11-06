@@ -43,8 +43,10 @@ struct ConnectionsView: View {
             }
 
             mailSection
-            booksSection
-            untisSection
+            if API.edition == "students" {
+                booksSection
+                untisSection
+            }
         }
         .scrollContentBackground(.hidden)
         .background(Theme.bg)

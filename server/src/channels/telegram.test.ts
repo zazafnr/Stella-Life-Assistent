@@ -35,12 +35,12 @@ const tgServer = createServer((req, res) => {
 await new Promise<void>((r) => tgServer.listen(0, r));
 
 // ---- Whisper-Mock (Groq) und Claude-Mock (Aufräumen) ----
-let spoken = 'ähm also Mathe HÜ Seite 45 Nummer 3 bis Freitag';
+let spoken = 'ähm also Steuer Abgabe bis Freitag';
 const groq = createServer((req, res) => { req.on('data', () => {}); req.on('end', () => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ text: ` ${spoken} ` })); }); });
 await new Promise<void>((r) => groq.listen(0, r));
 const claude = await startMockClaude((req) => {
   const sys = JSON.stringify(req.body.system ?? '');
-  if (sys.includes('You clean up') || sys.includes('You add punctuation')) return text('Mathe-HÜ, Seite 45, Nummer 3, bis Freitag.');
+  if (sys.includes('You clean up') || sys.includes('You add punctuation')) return text('Steuer-Abgabe bis Freitag.');
   return text('Alles klar.');
 });
 after(() => { tgServer.close(); groq.close(); return claude.close(); });
@@ -145,10 +145,10 @@ test('Unbekannte Chats bekommen eine kurze Erklärung, höchstens 3 pro Stunde',
 });
 
 test('Text landet im Chat (via Telegram) und Stella antwortet dort, mit HTML und Ja/Rückgängig-Knöpfen', async () => {
-  await send(777, { text: 'Mathe HÜ S. 45 Nr. 3 Freitag' });
-  assert.ok(listItems(mia.user.id, { kind: 'homework' }).some((i) => i.subject === 'Mathe'), 'normal verarbeitet');
+  await send(777, { text: 'Steuer Abgabe Freitag' });
+  assert.ok(listItems(mia.user.id, { kind: 'assignment' }).some((i) => i.title === 'Abgabe'), 'normal verarbeitet');
   const msgs = recentMessages(mia.user.id, 10);
-  assert.equal(msgs.find((m) => m.role === 'user' && m.text.startsWith('Mathe HÜ'))!.via, 'telegram');
+  assert.equal(msgs.find((m) => m.role === 'user' && m.text.startsWith('Steuer Abgabe'))!.via, 'telegram');
   assert.ok(msgs.filter((m) => m.role === 'assistant').some((m) => m.via === 'telegram'));
   const out = sentTo('777').at(-1)!.body;
   assert.equal(out.parse_mode, 'HTML');
@@ -178,7 +178,7 @@ test('Sprachnachricht (OGG) → getFile → Abschrift, aufgeräumt wie in der Ap
   await send(777, { voice: { file_id: 'voice1', duration: 9, mime_type: 'audio/ogg' } });
   assert.ok(calls.some((c) => c.method === 'getFile' && c.body.file_id === 'voice1'));
   const user = recentMessages(mia.user.id, 50).filter((m) => m.role === 'user').at(-1)!;
-  assert.equal(user.text, 'Mathe-HÜ, Seite 45, Nummer 3, bis Freitag.');
+  assert.equal(user.text, 'Steuer-Abgabe bis Freitag.');
   const att = user.attachments.find((a) => a.kind === 'audio')!;
   assert.equal(att.transcriptRaw, spoken);
   assert.equal(att.duration, 9);

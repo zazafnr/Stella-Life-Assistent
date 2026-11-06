@@ -93,9 +93,9 @@ const es = make((by) => ({
     cool: busy ? 'Lo tienes. ✌️' : 'Relax. ✌️',
   }),
   welcome: (name: string) => by({
-    nett: `¡Hola, ${name}! 👋 Soy Stella. Cuéntame lo que tienes pendiente, por ejemplo:\n• «Deberes de latín pág. 45 n.º 3 viernes»\n• «Examen de mates 12/11»\n• «¿qué tengo pendiente?»\nLo apunto, te aviso a tiempo y te preparo planes de estudio. 💫`,
-    frech: `¿Qué tal, ${name}? 😏 Soy Stella y desde hoy me acuerdo yo de lo que tú olvidas. Escribe, por ejemplo:\n• «Deberes de latín pág. 45 n.º 3 viernes»\n• «Examen de mates 12/11»\n• «¿qué tengo pendiente?»\nDel resto me encargo yo. Como siempre. 💅`,
-    cool: `Ey ${name} ✌️ Stella por aquí. Escribe lo que tengas pendiente:\n• «Deberes de latín pág. 45 n.º 3 viernes»\n• «Examen de mates 12/11»\n• «¿qué tengo pendiente?»\nYo lo apunto y te aviso. Fácil.`,
+    nett: `¡Hola, ${name}! 👋 Soy Stella. Cuéntame lo que tienes pendiente, por ejemplo:\n• «Dentista viernes 15:00»\n• «Entrega del informe 12/11»\n• «¿qué tengo pendiente?»\nLo apunto, te aviso a tiempo y te preparo planes de estudio. 💫`,
+    frech: `¿Qué tal, ${name}? 😏 Soy Stella y desde hoy me acuerdo yo de lo que tú olvidas. Escribe, por ejemplo:\n• «Dentista viernes 15:00»\n• «Entrega del informe 12/11»\n• «¿qué tengo pendiente?»\nDel resto me encargo yo. Como siempre. 💅`,
+    cool: `Ey ${name} ✌️ Stella por aquí. Escribe lo que tengas pendiente:\n• «Dentista viernes 15:00»\n• «Entrega del informe 12/11»\n• «¿qué tengo pendiente?»\nYo lo apunto y te aviso. Fácil.`,
   }),
   toneChanged: () => by({
     nett: 'Vale. A partir de ahora seré dulce contigo otra vez. 🌸',
@@ -182,9 +182,9 @@ const fr = make((by) => ({
     cool: busy ? 'Tu gères. ✌️' : 'Chill. ✌️',
   }),
   welcome: (name: string) => by({
-    nett: `Salut ${name} ! 👋 Moi, c'est Stella. Écris-moi simplement ce qui t'attend, par exemple :\n• « Devoirs de latin p. 45 n° 3 vendredi »\n• « Contrôle de maths 12/11 »\n• « qu'est-ce que j'ai à faire ? »\nJe note tout, je te préviens à temps et je te prépare des plans de révision. 💫`,
-    frech: `Alors, ${name} ? 😏 Je suis Stella, et à partir de maintenant je retiens tout ce que tu oublies. Écris par exemple :\n• « Devoirs de latin p. 45 n° 3 vendredi »\n• « Contrôle de maths 12/11 »\n• « qu'est-ce que j'ai à faire ? »\nLe reste, c'est moi. Comme d'habitude. 💅`,
-    cool: `Hey ${name} ✌️ Stella ici. Écris ce qui t'attend :\n• « Devoirs de latin p. 45 n° 3 vendredi »\n• « Contrôle de maths 12/11 »\n• « qu'est-ce que j'ai à faire ? »\nJe note et je te rappelle. Easy.`,
+    nett: `Salut ${name} ! 👋 Moi, c'est Stella. Écris-moi simplement ce qui t'attend, par exemple :\n• « Dentiste vendredi 15 h »\n• « Rendu du rapport 12/11 »\n• « qu'est-ce que j'ai à faire ? »\nJe note tout, je te préviens à temps et je te prépare des plans de révision. 💫`,
+    frech: `Alors, ${name} ? 😏 Je suis Stella, et à partir de maintenant je retiens tout ce que tu oublies. Écris par exemple :\n• « Dentiste vendredi 15 h »\n• « Rendu du rapport 12/11 »\n• « qu'est-ce que j'ai à faire ? »\nLe reste, c'est moi. Comme d'habitude. 💅`,
+    cool: `Hey ${name} ✌️ Stella ici. Écris ce qui t'attend :\n• « Dentiste vendredi 15 h »\n• « Rendu du rapport 12/11 »\n• « qu'est-ce que j'ai à faire ? »\nJe note et je te rappelle. Easy.`,
   }),
   toneChanged: () => by({
     nett: 'D\'accord ! À partir de maintenant, je suis de nouveau toute douce. 🌸',
@@ -271,9 +271,9 @@ const it = make((by) => ({
     cool: busy ? 'Ce l\'hai. ✌️' : 'Relax. ✌️',
   }),
   welcome: (name: string) => by({
-    nett: `Ciao ${name}! 👋 Sono Stella. Scrivimi cosa hai in programma, per esempio:\n• «Compiti di latino p. 45 n. 3 venerdì»\n• «Verifica di matematica 12/11»\n• «cosa ho da fare?»\nLo segno, ti avviso in tempo e ti preparo i piani di studio. 💫`,
-    frech: `Allora, ${name}? 😏 Sono Stella e da adesso mi ricordo io tutto quello che dimentichi tu. Scrivi per esempio:\n• «Compiti di latino p. 45 n. 3 venerdì»\n• «Verifica di matematica 12/11»\n• «cosa ho da fare?»\nAl resto penso io. Come sempre. 💅`,
-    cool: `Ehi ${name} ✌️ Qui Stella. Scrivi cosa hai in programma:\n• «Compiti di latino p. 45 n. 3 venerdì»\n• «Verifica di matematica 12/11»\n• «cosa ho da fare?»\nLo segno e ti avviso. Facile.`,
+    nett: `Ciao ${name}! 👋 Sono Stella. Scrivimi cosa hai in programma, per esempio:\n• «Dentista venerdì 15:00»\n• «Consegna relazione 12/11»\n• «cosa ho da fare?»\nLo segno, ti avviso in tempo e ti preparo i piani di studio. 💫`,
+    frech: `Allora, ${name}? 😏 Sono Stella e da adesso mi ricordo io tutto quello che dimentichi tu. Scrivi per esempio:\n• «Dentista venerdì 15:00»\n• «Consegna relazione 12/11»\n• «cosa ho da fare?»\nAl resto penso io. Come sempre. 💅`,
+    cool: `Ehi ${name} ✌️ Qui Stella. Scrivi cosa hai in programma:\n• «Dentista venerdì 15:00»\n• «Consegna relazione 12/11»\n• «cosa ho da fare?»\nLo segno e ti avviso. Facile.`,
   }),
   toneChanged: () => by({
     nett: 'Va bene! Da adesso sono di nuovo dolcissima con te. 🌸',
@@ -360,9 +360,9 @@ const ptBR = make((by) => ({
     cool: busy ? 'Tira de letra. ✌️' : 'Relax. ✌️',
   }),
   welcome: (name: string) => by({
-    nett: `Oi, ${name}! 👋 Eu sou a Stella. É só me contar o que vem por aí, por exemplo:\n• «Lição de latim p. 45 n.º 3 sexta»\n• «Prova de matemática 12/11»\n• «o que tenho para fazer?»\nEu anoto, te aviso a tempo e monto planos de estudo. 💫`,
-    frech: `E aí, ${name}? 😏 Eu sou a Stella e, a partir de agora, lembro de tudo que você esquece. Escreve, por exemplo:\n• «Lição de latim p. 45 n.º 3 sexta»\n• «Prova de matemática 12/11»\n• «o que tenho para fazer?»\nO resto é comigo. Como sempre. 💅`,
-    cool: `Fala, ${name} ✌️ Stella aqui. Escreve o que vem por aí:\n• «Lição de latim p. 45 n.º 3 sexta»\n• «Prova de matemática 12/11»\n• «o que tenho para fazer?»\nEu anoto e te lembro. Simples.`,
+    nett: `Oi, ${name}! 👋 Eu sou a Stella. É só me contar o que vem por aí, por exemplo:\n• «Dentista sexta 15h»\n• «Entrega do relatório 12/11»\n• «o que tenho para fazer?»\nEu anoto, te aviso a tempo e monto planos de estudo. 💫`,
+    frech: `E aí, ${name}? 😏 Eu sou a Stella e, a partir de agora, lembro de tudo que você esquece. Escreve, por exemplo:\n• «Dentista sexta 15h»\n• «Entrega do relatório 12/11»\n• «o que tenho para fazer?»\nO resto é comigo. Como sempre. 💅`,
+    cool: `Fala, ${name} ✌️ Stella aqui. Escreve o que vem por aí:\n• «Dentista sexta 15h»\n• «Entrega do relatório 12/11»\n• «o que tenho para fazer?»\nEu anoto e te lembro. Simples.`,
   }),
   toneChanged: () => by({
     nett: 'Certo! A partir de agora volto a ser toda fofa com você. 🌸',
@@ -449,9 +449,9 @@ const tr = make((by) => ({
     cool: busy ? 'Hallederesin. ✌️' : 'Rahat ol. ✌️',
   }),
   welcome: (name: string) => by({
-    nett: `Merhaba ${name}! 👋 Ben Stella. Önünde ne var, kısaca yaz; örneğin:\n• "Latince ödevi s. 45 no. 3 cuma"\n• "Matematik sınavı 12.11."\n• "neler var?"\nBen yazarım, zamanında hatırlatırım, çalışma planları çıkarırım. 💫`,
-    frech: `Eee, ${name}? 😏 Ben Stella; bundan sonra senin unuttuğun her şeyi ben hatırlarım. Şöyle yaz:\n• "Latince ödevi s. 45 no. 3 cuma"\n• "Matematik sınavı 12.11."\n• "neler var?"\nGerisini ben hallederim. Her zamanki gibi. 💅`,
-    cool: `Selam ${name} ✌️ Stella burada. Önünde ne varsa yaz:\n• "Latince ödevi s. 45 no. 3 cuma"\n• "Matematik sınavı 12.11."\n• "neler var?"\nBen eklerim, hatırlatırım. Kolay.`,
+    nett: `Merhaba ${name}! 👋 Ben Stella. Önünde ne var, kısaca yaz; örneğin:\n• "Cuma 15:00 diş hekimi"\n• "Rapor teslimi 12.11."\n• "neler var?"\nBen yazarım, zamanında hatırlatırım, çalışma planları çıkarırım. 💫`,
+    frech: `Eee, ${name}? 😏 Ben Stella; bundan sonra senin unuttuğun her şeyi ben hatırlarım. Şöyle yaz:\n• "Cuma 15:00 diş hekimi"\n• "Rapor teslimi 12.11."\n• "neler var?"\nGerisini ben hallederim. Her zamanki gibi. 💅`,
+    cool: `Selam ${name} ✌️ Stella burada. Önünde ne varsa yaz:\n• "Cuma 15:00 diş hekimi"\n• "Rapor teslimi 12.11."\n• "neler var?"\nBen eklerim, hatırlatırım. Kolay.`,
   }),
   toneChanged: () => by({
     nett: 'Tamam! Bundan sonra yine çok tatlı olacağım. 🌸',
@@ -538,9 +538,9 @@ const pl = make((by) => ({
     cool: busy ? 'Ogarniesz. ✌️' : 'Luz. ✌️',
   }),
   welcome: (name: string) => by({
-    nett: `Cześć ${name}! 👋 Jestem Stella. Napisz mi po prostu, co masz do zrobienia, na przykład:\n• „Zadanie z łaciny s. 45 nr 3 piątek”\n• „Sprawdzian z matmy 12.11.”\n• „co mam do zrobienia?”\nZapiszę to, przypomnę w porę i ułożę plan nauki. 💫`,
-    frech: `No i co, ${name}? 😏 Jestem Stella i od teraz pamiętam wszystko, o czym Ty zapominasz. Napisz na przykład:\n• „Zadanie z łaciny s. 45 nr 3 piątek”\n• „Sprawdzian z matmy 12.11.”\n• „co mam do zrobienia?”\nResztą zajmę się ja. Jak zawsze. 💅`,
-    cool: `Hej ${name} ✌️ Tu Stella. Napisz, co masz na głowie:\n• „Zadanie z łaciny s. 45 nr 3 piątek”\n• „Sprawdzian z matmy 12.11.”\n• „co mam do zrobienia?”\nJa zapiszę i przypomnę. Proste.`,
+    nett: `Cześć ${name}! 👋 Jestem Stella. Napisz mi po prostu, co masz do zrobienia, na przykład:\n• „Dentysta piątek 15:00”\n• „Raport do 12.11.”\n• „co mam do zrobienia?”\nZapiszę to, przypomnę w porę i ułożę plan nauki. 💫`,
+    frech: `No i co, ${name}? 😏 Jestem Stella i od teraz pamiętam wszystko, o czym Ty zapominasz. Napisz na przykład:\n• „Dentysta piątek 15:00”\n• „Raport do 12.11.”\n• „co mam do zrobienia?”\nResztą zajmę się ja. Jak zawsze. 💅`,
+    cool: `Hej ${name} ✌️ Tu Stella. Napisz, co masz na głowie:\n• „Dentysta piątek 15:00”\n• „Raport do 12.11.”\n• „co mam do zrobienia?”\nJa zapiszę i przypomnę. Proste.`,
   }),
   toneChanged: () => by({
     nett: 'Dobrze! Od teraz znowu jestem dla Ciebie bardzo miła. 🌸',

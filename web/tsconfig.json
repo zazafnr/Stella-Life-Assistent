@@ -1,5 +1,24 @@
 {
   "extends": "../tsconfig.base.json",
-  "compilerOptions": { "jsx": "react-jsx", "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"], "types": [] },
-  "include": ["src"]
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable",
+      "WebWorker"
+    ],
+    "types": [],
+    "baseUrl": ".",
+    "paths": {
+      "@stella/web-core/*": [
+        "../web-core/src/*"
+      ]
+    }
+  },
+  "include": [
+    "src",
+    "../web-core/src/vite-env.d.ts",
+    "../web-core/src/desktop.d.ts"
+  ]
 }

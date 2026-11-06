@@ -3,6 +3,7 @@
 import type { FastifyInstance } from 'fastify';
 import { timeIn } from '@stella/shared';
 import { hasFeature } from './profile.ts';
+import { pluginQuickActions } from './editions/registry.ts';
 import { tr, userTerms } from './locale.ts';
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -24,8 +25,6 @@ export interface QuickAction {
 // Liste, hasFeature blendet sie aus, solange der Schalter aus ist.
 const ALL: (Omit<QuickAction, 'label' | 'text'> & { needs?: Parameters<typeof hasFeature>[1]; hasText?: boolean })[] = [
   { id: 'briefing', icon: 'sun', symbol: 'sun.max.fill', kind: 'send', hasText: true, needs: 'planner' },
-  { id: 'photo', icon: 'camera', symbol: 'camera.fill', kind: 'camera', needs: 'homework' },
-  { id: 'homework', icon: 'book', symbol: 'book.fill', kind: 'text', hasText: true, needs: 'homework' },
   { id: 'voice', icon: 'mic', symbol: 'mic.fill', kind: 'mic' },
   { id: 'shopping', icon: 'plus', symbol: 'cart.fill', kind: 'list', needs: 'shopping' },
   { id: 'week', icon: 'calendar', symbol: 'calendar.badge.clock', kind: 'send', hasText: true, needs: 'planner' },
@@ -41,7 +40,13 @@ const ALL: (Omit<QuickAction, 'label' | 'text'> & { needs?: Parameters<typeof ha
  */
 export function quickActions(user: User, hour: number): { actions: QuickAction[]; cards: QuickAction[] } {
   const terms = userTerms(user);
-  const actions: QuickAction[] = ALL.filter((a) => !a.needs || hasFeature(user, a.needs)).map(({ needs: _n, hasText, ...a }) => ({
+  // Einträge des Edition-Plugins (z. B. „Foto“, „Hausübung“) an die gewünschte Stelle setzen
+  const all = [...ALL];
+  for (const { after, ...extra } of pluginQuickActions(user)) {
+    const at = after ? all.findIndex((x) => x.id === after) : -1;
+    all.splice(at >= 0 ? at + 1 : all.length, 0, extra as (typeof ALL)[number]);
+  }
+  const actions: QuickAction[] = all.filter((a) => !a.needs || hasFeature(user, a.needs)).map(({ needs: _n, hasText, ...a }) => ({
     ...a, label: tr(user, `quick.${a.id}.label`),
     ...(hasText ? { text: tr(user, `quick.${a.id}.text`, { homework: capitalize(terms.homework) }) } : {}),
   }));

@@ -12,10 +12,12 @@ import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { matchLocale, t, type Locale } from '@stella/shared';
 import { config } from './config.ts';
+import { editionOfUser, requestEdition } from './editions/registry.ts';
+import { editionUrl } from './editions/access.ts';
 import { createSession, hashPassword, HttpError } from './auth.ts';
 import { addMessage, db, getUser, newId, now, type User } from './db.ts';
 import { sendTemplateMail, mailerConfigured } from './mailer.ts';
-import { userLocale, voiceOf } from './locale.ts';
+import { userLocale, voiceOf, welcomeText } from './locale.ts';
 import { simplePage } from './email/pages.ts';
 
 export type LinkPurpose = 'signup' | 'login' | 'reset' | 'address';
@@ -147,10 +149,10 @@ function finish(r: Row, device?: string): Claimed {
   if (!user.verified && r.purpose === 'signup') {
     db.prepare('UPDATE users SET verified = 1 WHERE id = ?').run(user.id);
     const verified = getUser(user.id)!;
-    addMessage(verified.id, 'assistant', voiceOf(verified).welcome(verified.name));
+    addMessage(verified.id, 'assistant', welcomeText(verified));
     // Willkommens-Mail mit drei Schritten (nach der Bestätigung)
     if (mailerConfigured()) {
-      void sendTemplateMail(verified.email, userLocale(verified), 'welcome', { name: verified.name, appUrl: config.publicUrl }, 'noreply', { purpose: 'welcome', userId: verified.id }).catch(() => {});
+      void sendTemplateMail(verified.email, userLocale(verified), 'welcome', { name: verified.name, appUrl: editionUrl(verified.edition) }, 'noreply', { purpose: 'welcome', userId: verified.id }).catch(() => {});
     }
   }
   return { token: createSession(user.id, device), user: getUser(user.id)!, purpose: r.purpose };
@@ -190,12 +192,19 @@ function describeDevice(ua: string | null): string {
   return [browser, os].filter(Boolean).join(' · ');
 }
 
+/** Adresse der App, zu der das Konto hinter diesem Link gehört (Stella oder Stella for Students) */
+function appUrlForToken(token: string): string {
+  const r = rowByToken(token);
+  return r ? editionUrl(editionOfUser(r.user_id)) : config.publicUrl;
+}
+
 function linkPage(locale: Locale, token: string, view: LinkView): string {
+  const appUrl = appUrlForToken(token);
   const tt = (k: string, v?: Record<string, string | number>) => t(locale, `login.${k}`, v);
   switch (view.kind) {
     case 'invalid': return simplePage({ locale, tone: 'warn', title: tt('invalidTitle'), text: tt('invalidText') });
-    case 'expired': return simplePage({ locale, tone: 'warn', title: tt('expiredTitle'), text: tt('expiredText'), link: { href: config.publicUrl, label: tt('openStella') } });
-    case 'done': return simplePage({ locale, title: tt('doneTitle'), text: tt('doneText'), link: { href: config.publicUrl, label: tt('openStella') } });
+    case 'expired': return simplePage({ locale, tone: 'warn', title: tt('expiredTitle'), text: tt('expiredText'), link: { href: appUrl, label: tt('openStella') } });
+    case 'done': return simplePage({ locale, title: tt('doneTitle'), text: tt('doneText'), link: { href: appUrl, label: tt('openStella') } });
     case 'same-device':
       // Mit JavaScript sofort abschließen, ohne JavaScript über den Knopf (Formular)
       return simplePage({ locale, title: tt('sameTitle'), text: tt('sameText'), form: { action: `/v/${token}`, button: tt('finish') } })
@@ -255,7 +264,8 @@ export function registerLoginApi(app: FastifyInstance) {
     const row = db.prepare('SELECT id FROM users WHERE email = ? AND verified = 1').get(email) as { id: string } | undefined;
     // Gerätegeheimnis immer ausstellen, auch wenn es das Konto nicht gibt – gleiche Antwort in jedem Fall
     const fake = { requestId: newId(), deviceSecret: str(b.deviceSecret, 80) || randomBytes(24).toString('base64url') };
-    if (row && mailerConfigured()) {
+    // Konto der anderen App: keine Mail (und keine Antwort, die verrät, dass es das Konto gibt)
+    if (row && mailerConfigured() && getUser(row.id)!.edition === requestEdition(req)) {
       const user = getUser(row.id)!;
       checkResend(user.id, purpose);
       const created = createLoginRequest(user, purpose, { ip: req.ip, userAgent: String(req.headers['user-agent'] ?? ''), deviceSecret: str(b.deviceSecret, 80) });

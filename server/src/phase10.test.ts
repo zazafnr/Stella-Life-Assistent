@@ -142,7 +142,7 @@ test('Die Plan-Liste enthält alle Quellen, in Gruppen und mit Steuerung', async
   const byId = new Map(p.entries.map((e) => [e.id, e]));
   const must: [string, string, string][] = [
     ['briefing', 'briefing', 'regular'], ['weekplan', 'weekplan', 'regular'],
-    ['perm:mail_sort', 'automation', 'regular'], ['perm:homework', 'automation', 'regular'], ['perm:memory', 'automation', 'regular'],
+    ['perm:mail_sort', 'automation', 'regular'], ['perm:memory', 'automation', 'regular'],
     [`recurring:${müll.id}`, 'recurring', 'regular'],
     [`item:${remind.id}`, 'reminder', 'week'], [`study:${study.id}`, 'study', 'week'],
     [`proposal:${(proposed as { actionId: string }).actionId}`, 'proposal', 'week'],

@@ -1,5 +1,7 @@
 # Stella v2 – Arbeitsplan für Sonnet 5.5
 
+> **Hinweis:** Schulische Teile sind seit der Runde „Stella for Students“ in [`zazafnr/Stella-for-Students`](https://github.com/zazafnr/Stella-for-Students) (siehe `docs/plan/stella-students.md`).
+
 > **So benutzt du diese Datei:** Lade sie herunter und füge sie in einer neuen Session mit dem Repo
 > `zazafnr/Stella-Life-Assistent` ein, zusammen mit dem Satz „Arbeite diesen Plan ab, Paket für Paket“.
 > Sonnet legt sie in Paket 0 zusätzlich als `docs/plan/stella-v2.md` ins Repo, damit spätere Sessions sie finden.

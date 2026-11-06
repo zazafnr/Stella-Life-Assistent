@@ -1,37 +1,39 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { startWeatherOnce } from './weather.ts';
-import { meHas, meIsSchool, newConversation, refreshMe, startBackgroundSync, useStore } from './store.ts';
+import { startWeatherOnce } from '@stella/web-core/weather.ts';
+import { meHas, meIsSchool, newConversation, refreshMe, startBackgroundSync, useStore } from '@stella/web-core/store.ts';
 import { Today } from './components/Today.tsx';
-import { Chat } from './components/Chat.tsx';
-import { Planner } from './components/Planner.tsx';
-import { Inbox } from './components/Inbox.tsx';
-import { Goals } from './components/Goals.tsx';
-import { Finance } from './components/Finance.tsx';
-import { StellaPlan } from './components/StellaPlan.tsx';
-import { Health } from './components/Health.tsx';
+import { Chat } from '@stella/web-core/components/Chat.tsx';
+import { CalendarTab } from './components/CalendarTab.tsx';
+import { Inbox } from '@stella/web-core/components/Inbox.tsx';
+import { Goals } from '@stella/web-core/components/Goals.tsx';
+import { Finance } from '@stella/web-core/components/Finance.tsx';
+import { StellaPlan } from '@stella/web-core/components/StellaPlan.tsx';
+import { Health } from '@stella/web-core/components/Health.tsx';
 import { Settings } from './components/Settings.tsx';
 import { Intro, dismissBoot, introShown } from './components/Intro.tsx';
-import { Onboarding } from './components/Onboarding.tsx';
-import { Login } from './components/Login.tsx';
-import { Icon, type IconName } from './ui/Icon.tsx';
-import { StarMark, showToast } from './ui/Decor.tsx';
-import { CommandPalette, Topbar, type PaletteEntry } from './ui/Shell.tsx';
-import { isDesktopApp } from './platform.ts';
-import { useHtmlLang, useT } from './i18n.ts';
+import { Onboarding } from '@stella/web-core/components/Onboarding.tsx';
+import { Login } from '@stella/web-core/components/Login.tsx';
+import { Icon, type IconName } from '@stella/web-core/ui/Icon.tsx';
+import { StarMark, showToast } from '@stella/web-core/ui/Decor.tsx';
+import { CommandPalette, Topbar, type PaletteEntry } from '@stella/web-core/ui/Shell.tsx';
+import { isDesktopApp } from '@stella/web-core/platform.ts';
+import { useHtmlLang, useT } from '@stella/web-core/i18n.ts';
 
-export type Tab = 'today' | 'chat' | 'planner' | 'goals' | 'inbox' | 'health' | 'finance' | 'plan' | 'settings';
+export type { Tab } from '@stella/web-core/nav.ts';
+import type { Tab } from '@stella/web-core/nav.ts';
 
 const TABS: [Tab, IconName, string][] = [
   ['today', 'sparkle', 'nav.today'],
   ['chat', 'chat', 'nav.chat'],
-  ['planner', 'calendar', 'nav.planner'],
+  ['calendar', 'calendar', 'nav.calendar'],
   ['goals', 'target', 'nav.goals'],
   ['inbox', 'inbox', 'nav.inbox'],
 ];
-const ALL: Tab[] = ['today', 'chat', 'planner', 'goals', 'inbox', 'health', 'finance', 'plan', 'settings'];
+const ALL: Tab[] = ['today', 'chat', 'calendar', 'goals', 'inbox', 'health', 'finance', 'plan', 'settings'];
 
 function initialTab(): Tab {
-  const hash = location.hash.slice(1) as Tab;
+  const hash = location.hash.slice(1).split('/')[0] as Tab;
+  if ((hash as string) === 'planner') return 'calendar'; // der Planer lebt jetzt als Listenansicht im Kalender
   return ALL.includes(hash) ? hash : 'today';
 }
 
@@ -44,7 +46,9 @@ export function App() {
   const token = useStore((s) => s.token);
   const online = useStore((s) => s.online);
   const items = useStore((s) => s.items);
-  const [tab, setTab] = useState<Tab>(initialTab);
+  const [tab, setTabRaw] = useState<Tab>(initialTab);
+  /** „Planer“ gibt es nicht mehr als eigenen Tab: Sprünge dorthin landen im Kalender */
+  const setTab = useCallback((id: Tab) => setTabRaw(id === 'planner' ? 'calendar' : id), []);
   const me = useStore((s) => s.me);
   /** Einführung: beim ersten Mal von selbst (onboarding = pending), später aus den Einstellungen */
   const [onboarding, setOnboarding] = useState<{ startAt: 'language' | 'situation' } | null>(null);
@@ -61,7 +65,9 @@ export function App() {
   useEffect(() => { if (token) startBackgroundSync(); }, [token]);
   useEffect(() => { if (token && hasMe) startWeatherOnce(); }, [token, hasMe]);
   useEffect(() => { if (token && !hasMe) void refreshMe().catch(() => {}); }, [token, hasMe]);
-  useEffect(() => { history.replaceState(null, '', tab === 'today' ? location.pathname : `#${tab}`); }, [tab]);
+  useEffect(() => { if (!(tab === 'calendar' && location.hash.startsWith('#calendar/'))) history.replaceState(null, '', tab === 'today' ? location.pathname : `#${tab}`); }, [tab]);
+  // Sprunglinks (#calendar/JJJJ-MM-TT) wechseln auch bei laufender App in den Kalender
+  useEffect(() => { const on = () => { if (location.hash.startsWith('#calendar')) setTab('calendar'); }; window.addEventListener('hashchange', on); return () => window.removeEventListener('hashchange', on); }, [setTab]);
   useEffect(() => { document.documentElement.classList.toggle('is-desktop', isDesktopApp); }, []);
   // zurück von "Mit Google anmelden": ?provider=gmail&ok=1&message=…#settings
   useEffect(() => {
@@ -114,14 +120,14 @@ export function App() {
   const link = ([id, icon, label]: [Tab, IconName, string]) => (
     <button key={id} type="button" className={tab === id ? 'side-link active' : 'side-link'} onClick={() => setTab(id)} aria-current={tab === id ? 'page' : undefined} title={collapsed ? t(label) : undefined}>
       <Icon name={icon} size={18} /><span className="label">{t(label)}</span>
-      {id === 'planner' && openHomework > 0 && <span className="side-badge">{openHomework}</span>}
+      {id === 'calendar' && openHomework > 0 && <span className="side-badge">{openHomework}</span>}
     </button>
   );
 
   return (
     <>
     {introLayer}
-    {showOnboarding && <Onboarding startAt={showOnboarding.startAt} onDone={(after) => { setOnboarding(null); if (after === 'settings') setTab('settings'); }} />}
+    {showOnboarding && <Onboarding situations={['work', 'apprenticeship', 'other']} studentsHint={me?.flags?.studentsUrl} startAt={showOnboarding.startAt} onDone={(after) => { setOnboarding(null); if (after === 'settings') setTab('settings'); }} />}
     {palette && <CommandPalette entries={entries} onClose={() => setPalette(false)} />}
     <div className={collapsed ? 'app collapsed' : 'app'}>
       <nav className="sidebar" aria-label={t('nav.navigation')}>
@@ -141,7 +147,7 @@ export function App() {
         <Topbar title={titleOf(tab)} onSearch={() => setPalette(true)} />
         {tab === 'today' && <Today go={setTab} />}
         {tab === 'chat' && <Chat />}
-        {tab === 'planner' && <Planner />}
+        {tab === 'calendar' && <CalendarTab go={setTab} />}
         {tab === 'goals' && <Goals />}
         {tab === 'inbox' && <Inbox />}
         {tab === 'health' && <Health back={() => setTab('today')} />}

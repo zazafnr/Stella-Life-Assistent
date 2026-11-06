@@ -1,5 +1,5 @@
-import { api, type Me } from '../../store.ts';
-import { Copy, Section, useAction } from './ui.tsx';
+import { api, type Me } from '@stella/web-core/store.ts';
+import { Copy, Section, useAction } from '@stella/web-core/components/settings/ui.tsx';
 
 /** Anleitung: Apple-Kurzbefehl, der jede Kartenzahlung an Stella meldet */
 export function FinanceSetup({ me }: { me: Me }) {

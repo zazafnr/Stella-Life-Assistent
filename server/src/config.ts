@@ -9,6 +9,8 @@ export const config = {
   dataDir: path.resolve(env.STELLA_DATA_DIR ?? path.join(import.meta.dirname, '../../data')),
   /** Öffentliche Adresse, z. B. https://stella.deinedomain.at – für Push & Shortcuts-Links */
   publicUrl: env.STELLA_PUBLIC_URL ?? `http://localhost:${env.PORT ?? 8787}`,
+  /** Adresse der Students-Oberfläche (Stella for Students); Standard: „students.“ vor die öffentliche Adresse */
+  studentsUrl: env.STELLA_STUDENTS_URL ?? (env.STELLA_PUBLIC_URL ? env.STELLA_PUBLIC_URL.replace(/^(https?:\/\/)/, '$1students.') : `http://localhost:${env.PORT ?? 8787}`),
   /** Schlüssel zum Verschlüsseln gespeicherter Passwörter (digi4school, E-Mail …) */
   secret: env.STELLA_SECRET ?? '',
   /** Nach dem ersten Konto weitere Registrierungen erlauben? */
@@ -127,6 +129,8 @@ export const config = {
     finance: env.STELLA_FEATURE_FINANCE === 'true',
   },
   webDist: path.resolve(import.meta.dirname, '../../web/dist'),
+  /** gebaute Studenten-Web-App (Host students.*); STELLA_STUDENTS_WEB_DIR überschreibt den Pfad */
+  studentsWebDist: env.STELLA_STUDENTS_WEB_DIR ? path.resolve(env.STELLA_STUDENTS_WEB_DIR) : path.resolve(import.meta.dirname, '../../editions/students/web/dist'),
 };
 
 mkdirSync(path.join(config.dataDir, 'files'), { recursive: true });

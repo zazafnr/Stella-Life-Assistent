@@ -279,13 +279,13 @@ export function voiceDe(tone: Tone | undefined) {
     }),
     welcome: (name: string) => by({
       nett: `Hi ${name}! 👋 Ich bin Stella. Schreib mir einfach kurz, was ansteht – zum Beispiel:\n` +
-        '• „Latein HÜ S. 45 Nr. 3 Freitag“\n• „Mathe SA 12.11.“\n• „was steht an?“\n' +
+        '• „Zahnarzt Freitag 15 Uhr“\n• „Abgabe Bericht 12.11.“\n• „was steht an?“\n' +
         'Ich trag\'s ein, erinnere dich rechtzeitig und mach dir Lernpläne. 💫',
       frech: `Na ${name}? 😏 Ich bin Stella und ab jetzt merk ich mir alles, was du vergisst. Schreib einfach:\n` +
-        '• „Latein HÜ S. 45 Nr. 3 Freitag“\n• „Mathe SA 12.11.“\n• „was steht an?“\n' +
+        '• „Zahnarzt Freitag 15 Uhr“\n• „Abgabe Bericht 12.11.“\n• „was steht an?“\n' +
         'Den Rest mach ich. Wie immer. 💅',
       cool: `Hey ${name} ✌️ Stella hier. Schreib einfach, was ansteht:\n` +
-        '• „Latein HÜ S. 45 Nr. 3 Freitag“\n• „Mathe SA 12.11.“\n• „was steht an?“\n' +
+        '• „Zahnarzt Freitag 15 Uhr“\n• „Abgabe Bericht 12.11.“\n• „was steht an?“\n' +
         'Ich trag\'s ein und erinner dich. Easy.',
     }),
     // ----- Hinweise: „Was hast du vergessen?“ -----

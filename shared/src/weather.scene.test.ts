@@ -30,7 +30,7 @@ test('Kontrast: Schrift im Chat ist in jeder Szene lesbar (≥ 4,5:1), auch beim
 });
 
 test('Die Chat-Farben in styles.css sind die aus READABLE', () => {
-  const css = readFileSync(new URL('../../web/src/styles.css', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../../web-core/src/core.css', import.meta.url), 'utf8');
   const block = /\[data-scene='dark'\][^{]*\{[^}]*\}[\s\S]*?(?=\n\/\*|$)/.exec(css)?.[0] ?? '';
   for (const hex of [READABLE.dark.headText, READABLE.dark.assistantBg, READABLE.dark.assistantText]) {
     assert.ok(css.toLowerCase().includes(hex.toLowerCase()), `${hex} fehlt in styles.css`);

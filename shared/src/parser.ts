@@ -58,72 +58,29 @@ export type Intent =
 import { placeFor, type PlaceRef } from './places.ts';
 import { interpretEn } from './parser.en.ts';
 import type { Locale } from './i18n/locales.ts';
+import { vocabulary, withVocabulary, type ParserExtension } from './parser.vocab.ts';
 
 // Muss mit 'u'-Flag benutzt werden: \b kennt kein ü/ä/ö.
 const B = '(?<![\\p{L}\\p{N}])';
 const E = '(?![\\p{L}\\p{N}])';
 
-export const SUBJECTS: [string, string[]][] = [
-  ['Mathe', ['mathe', 'mathematik', 'ma', 'math', 'maths', 'mathematics']],
-  ['Deutsch', ['deutsch', 'de', 'dt', 'german']],
-  ['Englisch', ['englisch', 'english', 'engl', 'en']],
-  ['Latein', ['latein', 'lat', 'la', 'latin']],
-  ['Französisch', ['französisch', 'franzoesisch', 'franz', 'frz', 'french']],
-  ['Spanisch', ['spanisch', 'spa', 'span', 'spanish']],
-  ['Italienisch', ['italienisch', 'ita', 'ital', 'italian']],
-  ['Griechisch', ['griechisch', 'gr', 'greek']],
-  ['Physik', ['physik', 'ph', 'physics']],
-  ['Chemie', ['chemie', 'ch', 'chemistry']],
-  ['Biologie', ['biologie', 'bio', 'bu', 'biology']],
-  ['Geschichte', ['geschichte', 'gsk', 'gs', 'ge', 'history']],
-  ['Geografie', ['geografie', 'geographie', 'geo', 'gwk', 'gw', 'geography']],
-  ['Informatik', ['informatik', 'info', 'inf', 'computing', 'cs']],
-  ['Musik', ['musik', 'mu', 'me', 'music']],
-  ['Kunst', ['kunst', 'be', 'bildnerische', 'art']],
-  ['Religion', ['religion', 'reli', 'rk', 'rel']],
-  ['Ethik', ['ethik', 'eth', 'ethics']],
-  ['Psychologie & Philosophie', ['psychologie', 'philosophie', 'psy', 'philo', 'pup', 'pp', 'psychology', 'philosophy']],
-  ['Sport', ['sport', 'bsp', 'turnen', 'pe', 'gym']],
-  ['Wirtschaft', ['wirtschaft', 'bwl', 'rw', 'rechnungswesen', 'economics', 'business']],
-];
-
-/** Kürzel aus WebUntis o. Ä. (oft nur ein Buchstabe) → Fachname wie im Planer */
-const SINGLE_LETTER: Record<string, string> = {
-  m: 'Mathe', d: 'Deutsch', e: 'Englisch', l: 'Latein', f: 'Französisch', s: 'Spanisch', i: 'Italienisch',
-};
-
-export function normalizeSubject(raw: string | null | undefined): string | null {
+export function normalizeSubject(raw: string | null | undefined, extra?: ParserExtension): string | null {
+  if (extra) return withVocabulary(extra, () => normalizeSubject(raw));
   if (!raw) return null;
   const clean = raw.trim().toLowerCase();
   if (!clean) return null;
   const words = clean.split(/[\s_\-/.]+/u);
   for (const w of [clean, ...words]) {
-    const hit = SUBJECTS.find(([name, aliases]) => name.toLowerCase() === w || aliases.includes(w));
+    const hit = vocabulary().subjects.find(([name, aliases]) => name.toLowerCase() === w || aliases.includes(w));
     if (hit) return hit[0];
   }
-  if (SINGLE_LETTER[words[0]]) return SINGLE_LETTER[words[0]];
+  if (vocabulary().singleLetters[words[0]]) return vocabulary().singleLetters[words[0]];
   // Präfix-Treffer, z. B. "MAM" (Mathematik), "BSPK" (Bewegung und Sport)
   const prefix = clean.length <= 5 && /^[a-zäöü]+$/u.test(clean)
-    ? SUBJECTS.find(([, aliases]) => aliases.some((a) => a.length >= 2 && clean.startsWith(a)))
+    ? vocabulary().subjects.find(([, aliases]) => aliases.some((a) => a.length >= 2 && clean.startsWith(a)))
     : undefined;
   return prefix ? prefix[0] : raw.trim();
 }
-
-const KINDS: [ItemKind, string, string[]][] = [
-  ['homework', 'HÜ', ['hü', 'hue', 'hüs', 'hausübung', 'hausuebung', 'hausaufgabe', 'hausaufgaben', 'ha', 'hausi', 'hausis']],
-  ['exam', 'Schularbeit', ['sa', 'schularbeit', 'klausur', 'ka']],
-  ['exam', 'Test', ['test', 'vokabeltest', 'quiz', 'lzk', 'lernzielkontrolle']],
-  ['exam', 'Prüfung', ['prüfung', 'pruefung', 'mündliche', 'mü', 'swh', 'stundenwiederholung']],
-  ['assignment', 'Referat', ['referat', 'präsentation', 'praesentation', 'präsi']],
-  ['assignment', 'Abgabe', ['abgabe', 'projekt', 'portfolio']],
-];
-
-/** Spezifischere Bezeichnung behalten, z. B. "Vokabeltest" statt nur "Test" */
-const LABEL_OVERRIDE: Record<string, string> = {
-  vokabeltest: 'Vokabeltest', quiz: 'Quiz', swh: 'Stundenwiederholung', stundenwiederholung: 'Stundenwiederholung',
-  mü: 'Mitarbeitsüberprüfung', mündliche: 'Mündliche Prüfung', präsentation: 'Präsentation', praesentation: 'Präsentation',
-  präsi: 'Präsentation', projekt: 'Projekt', portfolio: 'Portfolio', klausur: 'Klausur',
-};
 
 const WEEKDAY_WORDS: [number, string[]][] = [
   [1, ['montag', 'mo']],
@@ -206,7 +163,8 @@ function normalizeNumbers(raw: string): string {
     .trim();
 }
 
-export function parseEntry(input: string, today: Ymd): ParsedEntry | null {
+export function parseEntry(input: string, today: Ymd, extra?: ParserExtension): ParsedEntry | null {
+  if (extra) return withVocabulary(extra, () => parseEntry(input, today));
   const ctx: Ctx = { text: ` ${input.trim()} `, today };
 
   const pageM = take(ctx, `${B}(?:seiten?|s\\.?)\\s*(\\d+)(?:\\s*(?:-|–|bis)\\s*(\\d+))?${E}`);
@@ -230,15 +188,15 @@ export function parseEntry(input: string, today: Ymd): ParsedEntry | null {
   const restWords: string[] = [];
   for (const raw of ctx.text.split(/\s+/).filter(Boolean)) {
     const word = raw.toLowerCase().replace(/[.,:;!?]+$/u, '');
-    const k = KINDS.find(([, , words]) => words.includes(word));
-    const s = SUBJECTS.find(([, words]) => words.includes(word));
-    if (k && !kind) { kind = k[0]; kindLabel = LABEL_OVERRIDE[word] ?? k[1]; continue; }
+    const k = vocabulary().kinds.find(([, , words]) => words.includes(word));
+    const s = vocabulary().subjects.find(([, words]) => words.includes(word));
+    if (k && !kind) { kind = k[0]; kindLabel = vocabulary().labels[word] ?? k[1]; continue; }
     if (s && !subject) { subject = s[0]; continue; }
     if (['bis', 'für', 'fuer', 'am', 'zum', 'zur', 'die', 'der', 'das', 'in'].includes(word) && !restWords.length) continue;
     restWords.push(raw);
   }
 
-  if (!kind && (page || exercises) && (subject || due)) { kind = 'homework'; kindLabel = 'HÜ'; }
+  if (!kind && vocabulary().homework && (page || exercises) && (subject || due)) { kind = 'homework'; kindLabel = 'HÜ'; }
   if (!kind) return null;
   if (!subject && !page && !exercises && !due) return null;
 
@@ -271,8 +229,8 @@ export function itemQuery(raw: string): ItemQuery {
   let kind: ItemKind | null = null;
   const words: string[] = [];
   for (const w0 of raw.toLowerCase().split(/[\s,.!?:;-]+/u).filter(Boolean)) {
-    const k = KINDS.find(([, , ws]) => ws.includes(w0));
-    const subj = SUBJECTS.find(([, ws]) => ws.includes(w0));
+    const k = vocabulary().kinds.find(([, , ws]) => ws.includes(w0));
+    const subj = vocabulary().subjects.find(([, ws]) => ws.includes(w0));
     if (k && !kind) { kind = k[0]; continue; }
     if (subj && !subject) { subject = subj[0]; continue; }
     if (!STOP.has(w0) && w0.length > 1 && !/^\d+$/.test(w0)) words.push(w0);
@@ -432,7 +390,7 @@ function listIntent(text: string): Intent | null {
   m = LIST_DONE_RE.exec(text);
   // „Latein HÜ hab ich“ ist eine Hausübung, keine Einkaufsliste – das übernimmt der „done“-Schnellweg
   const lowered = text.toLowerCase().split(/\s+/).map((w) => w.replace(/[.,!?]+$/u, ''));
-  const schoolish = SUBJECTS.some(([, ws]) => lowered.some((w) => ws.includes(w))) || KINDS.some(([, , ws]) => lowered.some((w) => ws.includes(w)));
+  const schoolish = vocabulary().subjects.some(([, ws]) => lowered.some((w) => ws.includes(w))) || vocabulary().kinds.some(([, , ws]) => lowered.some((w) => ws.includes(w)));
   if (m && !schoolish && m[1]!.split(/\s+/).length <= 6 && !/^(das|es|ich|er|sie|wir|alles|die hü|hü|hausübung)$/iu.test(m[1]!.trim())) {
     const items = splitListItems(m[1]!).map((i) => i.text);
     if (items.length) return { type: 'list_done', items };
@@ -444,7 +402,11 @@ function listIntent(text: string): Intent | null {
  * Deutsch und Englisch verstehen die Kurznotizen ohne KI. Für alle anderen Sprachen gibt es keinen Schnellweg:
  * die Nachricht geht an die KI (Haiku – billig und schon im Kostenplan eingerechnet).
  */
-export function interpret(input: string, today: Ymd, now = '12:00', opts: { locale?: Locale } = {}): Intent | null {
+export function interpret(input: string, today: Ymd, now = '12:00', opts: { locale?: Locale; extra?: ParserExtension } = {}): Intent | null {
+  return withVocabulary(opts.extra, () => interpretIn(input, today, now, opts));
+}
+
+function interpretIn(input: string, today: Ymd, now: string, opts: { locale?: Locale }): Intent | null {
   const locale = opts.locale ?? 'de';
   if (locale === 'en') return interpretEn(input, today, now);
   if (locale !== 'de') return null;
@@ -505,8 +467,8 @@ export function interpret(input: string, today: Ymd, now = '12:00', opts: { loca
 
   if (DONE_RE.test(text) && text.split(/\s+/).length <= 6) {
     const words = text.toLowerCase().split(/\s+/).map((w) => w.replace(/[.,!?]+$/u, ''));
-    const subject = SUBJECTS.find(([, ws]) => words.some((w) => ws.includes(w)))?.[0] ?? null;
-    const kind = KINDS.find(([, , ws]) => words.some((w) => ws.includes(w)))?.[0] ?? null;
+    const subject = vocabulary().subjects.find(([, ws]) => words.some((w) => ws.includes(w)))?.[0] ?? null;
+    const kind = vocabulary().kinds.find(([, , ws]) => words.some((w) => ws.includes(w)))?.[0] ?? null;
     if (subject || kind) return { type: 'done', subject, kind };
   }
 
