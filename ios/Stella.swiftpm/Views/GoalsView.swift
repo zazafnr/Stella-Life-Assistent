@@ -25,7 +25,7 @@ struct GoalsView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         header.rise(0)
                         if goals == nil {
-                            Text("Einen Moment …").foregroundStyle(Theme.muted)
+                            Text(L("onboarding.wait")).foregroundStyle(Theme.muted)
                         }
                         if let list = goals, list.isEmpty {
                             emptyCard.rise(1)
@@ -280,7 +280,7 @@ struct GoalCard: View {
                             .buttonStyle(SoftButton(filled: true))
                         Button("Mehr eintragen") { onMore() }.buttonStyle(SoftButton(filled: false))
                     } else {
-                        Button { onMore() } label: { Label("Eintragen", systemImage: "plus") }
+                        Button { onMore() } label: { Label(L("ios.add"), systemImage: "plus") }
                             .buttonStyle(SoftButton(filled: true))
                     }
                 }
@@ -317,7 +317,7 @@ struct GoalCard: View {
                 }
                 HStack(spacing: 8) {
                     if goal.status != "done" { Button("Erreicht") { onStatus("done") }.buttonStyle(SoftButton(filled: false)) }
-                    Button("Löschen") { confirmDelete = true }.foregroundStyle(Theme.pinkText).font(.system(size: 14, weight: .semibold))
+                    Button(L("common.delete")) { confirmDelete = true }.foregroundStyle(Theme.pinkText).font(.system(size: 14, weight: .semibold))
                 }
             }
         }
@@ -325,8 +325,8 @@ struct GoalCard: View {
         .card(padding: 16)
         .opacity(goal.isActive ? 1 : 0.75)
         .confirmationDialog("„\(goal.title)“ mit allen Einträgen löschen?", isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("Löschen", role: .destructive) { onDelete() }
-            Button("Abbrechen", role: .cancel) {}
+            Button(L("common.delete"), role: .destructive) { onDelete() }
+            Button(L("common.cancel"), role: .cancel) {}
         }
     }
 
@@ -480,8 +480,8 @@ struct GoalFormSheet: View {
             .navigationTitle(goal == nil ? "Neues Ziel" : "Ziel bearbeiten")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Abbrechen") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button(goal == nil ? "Anlegen" : "Speichern") { Task { await save() } }.disabled(!canSave) }
+                ToolbarItem(placement: .cancellationAction) { Button(L("common.cancel")) { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button(goal == nil ? "Anlegen" : L("common.save")) { Task { await save() } }.disabled(!canSave) }
             }
         }
     }
@@ -555,8 +555,8 @@ struct GoalLogSheet: View {
             .navigationTitle(goal.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Abbrechen") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Eintragen") { Task { await save() } }.disabled((amount ?? 0) <= 0 || busy) }
+                ToolbarItem(placement: .cancellationAction) { Button(L("common.cancel")) { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button(L("ios.add")) { Task { await save() } }.disabled((amount ?? 0) <= 0 || busy) }
             }
             .onAppear { if value.isEmpty && goal.unit == "x" { value = "1" } }
         }
@@ -590,7 +590,7 @@ struct GoalsCardView: View {
             Button { go() } label: {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("Deine Ziele").font(.system(size: 17, weight: .bold)).foregroundStyle(Theme.text)
+                        Text(L("today.yourGoals")).font(.system(size: 17, weight: .bold)).foregroundStyle(Theme.text)
                         Spacer()
                         Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.faint)
                     }

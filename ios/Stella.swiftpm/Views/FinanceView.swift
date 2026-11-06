@@ -5,7 +5,7 @@ enum Money {
         let f = NumberFormatter()
         f.numberStyle = .currency
         f.currencyCode = currency
-        f.locale = Locale(identifier: "de_AT")
+        f.locale = Day.locale
         return f.string(from: NSNumber(value: Double(cents) / 100)) ?? "\(cents / 100) \(currency)"
     }
 
@@ -138,7 +138,7 @@ struct FinanceSheet: View {
     private var monthLabel: String {
         guard let date = Day.parse("\(month)-15") else { return month }
         let f = DateFormatter()
-        f.locale = Locale(identifier: "de_AT")
+        f.locale = Day.locale
         f.dateFormat = "LLLL yyyy"
         return f.string(from: date)
     }

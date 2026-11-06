@@ -29,7 +29,7 @@ struct WeekPlanSheet: View {
                     if plan.blocks.isEmpty {
                         VStack(spacing: 12) {
                             Cloud(width: 90)
-                            Text("Diese Woche gibt es nichts zu planen – keine Tests, keine offenen HÜs.")
+                            Text(L("ui.nothing.to.plan.this"))
                                 .multilineTextAlignment(.center)
                                 .foregroundStyle(Theme.muted)
                         }
@@ -40,14 +40,14 @@ struct WeekPlanSheet: View {
                 } else {
                     VStack(spacing: 10) {
                         ProgressView()
-                        Text("Stella schaut sich deine Woche an …").foregroundStyle(Theme.muted)
+                        Text(L("ui.stella.is.looking.at")).foregroundStyle(Theme.muted)
                     }
                 }
             }
-            .navigationTitle("Woche planen")
+            .navigationTitle(L("quick.week.label"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Abbrechen") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(L("common.cancel")) { dismiss() } }
             }
         }
         .task { await load() }
@@ -82,7 +82,7 @@ struct WeekPlanSheet: View {
                 }
                 .buttonStyle(PrimaryButton())
                 .disabled(busy || chosen.isEmpty)
-                Text("Lässt sich unter „Was Stella getan hat“ rückgängig machen.")
+                Text(L("ui.you.can.undo.this"))
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.faint)
                     .frame(maxWidth: .infinity)

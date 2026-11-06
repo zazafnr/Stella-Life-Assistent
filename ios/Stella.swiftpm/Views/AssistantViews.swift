@@ -210,7 +210,7 @@ struct ActionLogView: View {
     private var groupedDays: [DayGroup] {
         var out: [DayGroup] = []
         for a in list {
-            let day = ISO.parse(a.createdAt)?.formatted(.dateTime.locale(Locale(identifier: "de_AT")).weekday(.wide).day().month(.wide)) ?? ""
+            let day = ISO.parse(a.createdAt)?.formatted(.dateTime.locale(Day.locale).weekday(.wide).day().month(.wide)) ?? ""
             if out.last?.day == day { out[out.count - 1].entries.append(a) } else { out.append(DayGroup(day: day, entries: [a])) }
         }
         return out

@@ -117,21 +117,21 @@ struct LoginView: View {
                 Task { try? await store.setPassword(pw) }
             }
         }
-        .alert("Server-Adresse", isPresented: $showServer) {
+        .alert(L("ios.server.address"), isPresented: $showServer) {
             TextField("stella.example.at", text: $server)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-            Button("Speichern") {
+            Button(L("common.save")) {
                 API.shared.server = server
                 server = API.shared.server
             }
-            Button("Standard") {
+            Button(L("ios.default")) {
                 API.shared.server = API.defaultServer
                 server = API.defaultServer
             }
-            Button("Abbrechen", role: .cancel) { server = API.shared.server }
+            Button(L("common.cancel"), role: .cancel) { server = API.shared.server }
         } message: {
-            Text("Normalerweise musst du hier nichts ändern.")
+            Text(L("ios.normally.you.do.not"))
         }
         .task {
             if let s: ServerStatus = try? await API.shared.get("/api/status") {
