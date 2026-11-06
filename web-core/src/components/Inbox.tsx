@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, sync } from '../store.ts';
-import { formatDateDe } from '@stella/shared';
+import { formatDay } from '@stella/shared';
 import { Icon, type IconName } from '../ui/Icon.tsx';
 import { Sheet, Sky, showToast } from '../ui/Decor.tsx';
+import { useLocale } from '../i18n.ts';
 
 interface InboxEntry {
   id: string;
@@ -214,6 +215,7 @@ function ReplyEditor({ entry: e, writeFirst, onDone }: { entry: InboxEntry; writ
 
 /** Lesebildschirm: Volltext, Antworten (selbst oder von Stella), Verschieben, Erledigt */
 function MailReader({ entry: e, onClose, onChange }: { entry: InboxEntry; onClose: () => void; onChange: () => void }) {
+  const locale = useLocale();
   const [text, setText] = useState<{ body: string; truncated: boolean; partial?: boolean } | null>(null);
   const [error, setError] = useState('');
   const [mode, setMode] = useState<'read' | 'own' | 'stella' | 'move'>('read');
@@ -244,7 +246,7 @@ function MailReader({ entry: e, onClose, onChange }: { entry: InboxEntry; onClos
           {e.account && <span className="pill gray">{e.account}</span>}
           <span className="pill gray">{when(e.createdAt)}</span>
           {e.reason && <span className="pill blue">{e.reason}</span>}
-          {e.deadline && <span className="pill pink">Frist {formatDateDe(e.deadline.date)}{e.deadline.time ? ` ${e.deadline.time}` : ''}</span>}
+          {e.deadline && <span className="pill pink">Frist {formatDay(locale, e.deadline.date)}{e.deadline.time ? ` ${e.deadline.time}` : ''}</span>}
           {e.replied && <span className="pill green">beantwortet</span>}
         </div>
         {e.summary && e.summary !== e.text && <p className="muted small" style={{ margin: 0 }}>Stella: {e.summary}</p>}
@@ -277,6 +279,7 @@ function MailReader({ entry: e, onClose, onChange }: { entry: InboxEntry; onClos
 
 /** Eine wichtige Mail: warum, Frist, Antwort – mit Knöpfen zum Erledigen */
 function FocusCard({ entry: e, onChange }: { entry: InboxEntry; onChange: () => void }) {
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<'' | 'deadline'>('');
   const [bg, fg] = colorFor(e.sender ?? '?');
@@ -307,7 +310,7 @@ function FocusCard({ entry: e, onChange }: { entry: InboxEntry; onChange: () => 
           <span style={{ fontSize: 15, fontWeight: 600 }}>{e.summary || e.text}</span>
           <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
             {e.reason && <span className="pill blue">{e.reason}</span>}
-            {e.deadline && <span className="pill pink">Frist {formatDateDe(e.deadline.date)}{e.deadline.time ? ` ${e.deadline.time}` : ''}</span>}
+            {e.deadline && <span className="pill pink">Frist {formatDay(locale, e.deadline.date)}{e.deadline.time ? ` ${e.deadline.time}` : ''}</span>}
             {e.needsReply && !e.replied && <span className="pill pink">Antwort nötig</span>}
             {e.replied && <span className="pill green">beantwortet</span>}
           </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addDays, diffDays, formatDateDe, todayIn, type FinanceMonth, type GoalProgress, type Item } from '@stella/shared';
+import { addDays, diffDays, formatDay, todayIn, type FinanceMonth, type GoalProgress, type Item } from '@stella/shared';
 import { api, meHas, useStore } from '@stella/web-core/store.ts';
 import { useLocale, useT } from '@stella/web-core/i18n.ts';
 import type { Tab } from '@stella/web-core/nav.ts';
@@ -128,7 +128,7 @@ export function Today({ go }: { go: (t: Tab) => void }) {
                       <span style={{ fontWeight: 600 }}>{i.title}</span>
                       {isBusy && i.status === 'open'
                         ? <div className="progress"><div className="shimmer" style={{ width: '64%' }} /></div>
-                        : <span className="small muted">{[i.detail, i.due !== tomorrow && i.due ? formatDateDe(i.due, today) : null].filter(Boolean).join(' · ')}</span>}
+                        : <span className="small muted">{[i.detail, i.due !== tomorrow && i.due ? formatDay(locale, i.due, today) : null].filter(Boolean).join(' · ')}</span>}
                     </div>
                     <ItemStatus item={i} busy={isBusy} />
                   </div>
@@ -165,7 +165,7 @@ export function Today({ go }: { go: (t: Tab) => void }) {
               <section className="card" aria-label={t('today.tomorrowAtSchool')}>
                 <div className="panel-head">
                   <h2 className="eyebrow">{t('today.tomorrowAtSchool')}</h2>
-                  <span className="small muted">{formatDateDe(tomorrow)}</span>
+                  <span className="small muted">{formatDay(locale, tomorrow)}</span>
                 </div>
                 <div className="lesson-strip">
                   {lessons.map((l, idx) => {

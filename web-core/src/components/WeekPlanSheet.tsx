@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { formatDateDe, type PlanBlock, type WeekPlan } from '@stella/shared';
+import { formatDay, type PlanBlock, type WeekPlan } from '@stella/shared';
 import { api, sync } from '../store.ts';
 import { Icon } from '../ui/Icon.tsx';
 import { Sheet, showToast } from '../ui/Decor.tsx';
-import { useT } from '../i18n.ts';
+import { useT, useLocale } from '../i18n.ts';
 
 const WHY: Record<PlanBlock['why'], string> = { exam: 'pink', homework: 'blue', assignment: 'green', goal: 'violet' };
 
 /** „Woche planen“: Stellas Vorschlag ansehen, einzelne Blöcke abwählen, übernehmen */
 export function WeekPlanSheet({ today, onClose }: { today: string; onClose: () => void }) {
+  const locale = useLocale();
   const t = useT();
   const [plan, setPlan] = useState<WeekPlan | null>(null);
   const [off, setOff] = useState<Set<string>>(new Set());
@@ -64,7 +65,7 @@ export function WeekPlanSheet({ today, onClose }: { today: string; onClose: () =
           </p>
           {days.map(([date, blocks]) => (
             <section key={date} className="plan-day">
-              <span className="eyebrow">{formatDateDe(date, today)}</span>
+              <span className="eyebrow">{formatDay(locale, date, today)}</span>
               {blocks.map((b) => {
                 const on = !off.has(b.key);
                 return (

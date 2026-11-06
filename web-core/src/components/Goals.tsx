@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { ScreenTimeCard } from './ScreenTime.tsx';
-import { formatDateDe, todayIn, type GoalProgress } from '@stella/shared';
+import { formatDay, todayIn, type GoalProgress } from '@stella/shared';
 import { api, useStore } from '../store.ts';
 import { Icon } from '../ui/Icon.tsx';
 import { Sheet, Sky, showToast } from '../ui/Decor.tsx';
+import { useLocale } from '../i18n.ts';
 
 const num = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 /** „3×“ bei Einheiten, sonst „12 km“ */
@@ -158,6 +159,7 @@ function LogSheet({ goal, onSaved, onClose }: { goal: GoalProgress; onSaved: (g:
 }
 
 function GoalCard({ goal, tz, onChange, onRemoved }: { goal: GoalProgress; tz: string; onChange: (g: GoalProgress) => void; onRemoved: (id: string) => void }) {
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [logging, setLogging] = useState(false);
@@ -214,7 +216,7 @@ function GoalCard({ goal, tz, onChange, onRemoved }: { goal: GoalProgress; tz: s
               <ul className="goal-log">
                 {goal.recent.slice(0, 6).map((r) => (
                   <li key={r.id}>
-                    <span className="grow"><strong>{amount(goal, r.value)}</strong> <span className="muted small">· {formatDateDe(r.date, today)}{r.note ? ` · ${r.note}` : ''}</span></span>
+                    <span className="grow"><strong>{amount(goal, r.value)}</strong> <span className="muted small">· {formatDay(locale, r.date, today)}{r.note ? ` · ${r.note}` : ''}</span></span>
                     <button type="button" className="icon-btn danger" aria-label="Eintrag löschen" onClick={() => void dropLog(r.id)}><Icon name="close" size={14} /></button>
                   </li>
                 ))}
