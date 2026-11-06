@@ -43,6 +43,8 @@ for f in "$work"/part-*; do
   "$OPS" put "$UPLOAD/$(basename "$f")" --from "$f" >/dev/null
   n=$((n + 1))
   (( n % 10 == 0 )) && echo "    $n/$parts"
+  # der Ops-Agent erlaubt höchstens 120 Anfragen pro Minute
+  sleep "${PUT_DELAY:-0.7}"
 done
 
 echo "==> Zusammensetzen und prüfen"
