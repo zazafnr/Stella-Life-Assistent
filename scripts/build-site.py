@@ -6,12 +6,14 @@
 Cloudflare (Workers mit statischen Dateien) liefert site/public/ aus, Konfiguration: site/wrangler.jsonc. Quellen: site-src/.
 Bilder der App liegen in site/assets/stella/ (siehe docs/WEBSITE.md).
 """
-import os, re, sys
+import hashlib, os, re, sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 SRC, OUT = os.path.join(ROOT, 'site-src'), os.path.join(ROOT, 'site', 'public')
 BASE = 'https://evolsior.com'
 MARK = '<svg viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><rect x="10" y="5" width="18" height="5" rx="2.5"/><rect x="4" y="13.5" width="18" height="5" rx="2.5"/><rect x="10" y="22" width="18" height="5" rx="2.5"/></svg>'
+# /assets/* wird ein Jahr lang gecacht (siehe _headers): Die Version im Link sorgt dafür, dass geänderte CSS/JS neu geladen werden
+VERSION = {'css': '', 'js': ''}
 LINKS = {'__HOME__': '/', '__STELLA__': '/stella', '__STUDENTS__': '/stella-students', '__IMPRINT__': '/imprint', '__PRIVACY__': '/privacy'}
 
 def read(name):
@@ -50,8 +52,8 @@ def page(path, title, description, body, og='/assets/og.png', noindex=False):
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css">
-<script src="/assets/site.js" defer></script>
+<link rel="stylesheet" href="/assets/site.css?v={VERSION['css']}">
+<script src="/assets/site.js?v={VERSION['js']}" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -64,6 +66,8 @@ def main():
     imgs = ':root { ' + ' '.join(f'--img-{n}: url(/assets/stella/{n}.jpg);' for n in ['goals', 'plan', 'plans']) + ' ' + ' '.join(f'--img-s-{n}: url(/assets/students/{n}.jpg);' for n in ['today', 'planner', 'learn', 'cards']) + ' }'
     write('assets/site.css', '\n'.join([read('common.css'), imgs, read('index.css'), read('stella.css'), read('students.css'), read('legal.css')]))
     write('assets/site.js', read('common.js') + '\n' + read('stella.js'))
+    for kind in ('css', 'js'):
+        with open(os.path.join(OUT, 'assets', f'site.{kind}'), 'rb') as f: VERSION[kind] = hashlib.sha1(f.read()).hexdigest()[:10]
 
     write('index.html', page('/index', 'EVOLSIOR – Built to become', 'EVOLSIOR builds calm, precise apps that grow with the people who use them. Home of Stella, a personal assistant for your whole life.', read('index.body.html')))
     write('stella/index.html', page('/stella', 'Stella – Let Stella handle it | EVOLSIOR', 'Stella is an AI personal assistant for your whole day. Plans, homework, reminders, mail, restaurants, news and goals, handled in one conversation on iPhone, desktop, web and Telegram.', read('stella.body.html')))
