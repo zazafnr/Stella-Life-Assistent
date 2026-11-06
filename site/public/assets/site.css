@@ -122,7 +122,7 @@ footer a:hover { color: #fff; }
 .skip { position: absolute; left: -999px; top: 8px; z-index: 100; padding: 10px 16px; border-radius: 10px; background: #fff; color: #09090B; font-weight: 600; }
 .skip:focus { left: 8px; }
 
-:root { --img-goals: url(/assets/stella/goals.jpg); --img-plan: url(/assets/stella/plan.jpg); --img-plans: url(/assets/stella/plans.jpg); }
+:root { --img-goals: url(/assets/stella/goals.jpg); --img-plan: url(/assets/stella/plan.jpg); --img-plans: url(/assets/stella/plans.jpg); --img-s-today: url(/assets/students/today.jpg); --img-s-planner: url(/assets/students/planner.jpg); --img-s-learn: url(/assets/students/learn.jpg); --img-s-cards: url(/assets/students/cards.jpg); }
 .feature { display: grid; grid-template-columns: 1.05fr .95fr; min-height: 560px; background: radial-gradient(90% 120% at 100% 100%, #1f1f26, var(--ink-2) 60%); }
 .feature-copy { padding: clamp(28px, 5vw, 64px); display: grid; gap: 24px; align-content: center; }
 .feature-name { font-size: clamp(54px, 9vw, 132px); letter-spacing: -.055em; line-height: .9; font-weight: 600; }
@@ -238,7 +238,10 @@ footer a:hover { color: #fff; }
 
 /* Stella for Students: eigene Akzentfarbe (Blau statt Rosa), sonst dieselben Bausteine wie /stella */
 .students .halo, .students .cta-halo { background: radial-gradient(circle, rgba(99,152,255,.34), rgba(99,152,255,0) 65%); }
-.feature.students { margin-top: 20px; grid-template-columns: 1fr; min-height: 0; background: radial-gradient(90% 120% at 0% 100%, #1a2233, var(--ink-2) 60%); }
+.feature.students { margin-top: 20px; background: radial-gradient(90% 120% at 0% 100%, #1d1a33, var(--ink-2) 60%); }
+.feature.students .feature-name { font-size: clamp(44px, 7vw, 100px); }
+.feature.students .feature-visual .glow { background: radial-gradient(circle, rgba(109,74,255,.34), rgba(109,74,255,0) 65%); }
+html, body { overflow-x: clip; }
 
 .legal { padding-block: clamp(48px, 8vw, 100px) clamp(64px, 10vw, 140px); display: grid; gap: clamp(56px, 8vw, 110px); }
 .doc { max-width: 720px; display: grid; gap: 16px; scroll-margin-top: 100px; }
