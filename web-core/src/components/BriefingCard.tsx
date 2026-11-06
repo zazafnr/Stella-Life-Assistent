@@ -27,10 +27,10 @@ export function BriefingCard({ onOpen }: { onOpen: (tab: 'chat' | 'inbox' | 'goa
   if (!sections.length && !hints.length) return null;
 
   return (
-    <section className="card briefing" aria-label="Dein Überblick">
+    <section className="card briefing" aria-label={t('ui.your.overview')}>
       {sections.length > 0 && (
         <>
-          <span className="eyebrow" style={{ display: 'flex', justifyContent: 'space-between' }}>Dein Überblick <a className="link small" href={`#calendar/${b.date}`}>{t('nav.calendar')} →</a></span>
+          <span className="eyebrow" style={{ display: 'flex', justifyContent: 'space-between' }}>{t('ui.your.overview')} <a className="link small" href={`#calendar/${b.date}`}>{t('nav.calendar')} →</a></span>
           <div className="briefing-sections">
             {sections.map((s) => (
               <div key={s.id} className="briefing-section">
@@ -46,7 +46,7 @@ export function BriefingCard({ onOpen }: { onOpen: (tab: 'chat' | 'inbox' | 'goa
       )}
       {hints.length > 0 && (
         <>
-          <span className="eyebrow" style={{ color: 'var(--pink-text)', marginTop: sections.length ? 6 : 0 }}>Mir ist aufgefallen</span>
+          <span className="eyebrow" style={{ color: 'var(--pink-text)', marginTop: sections.length ? 6 : 0 }}>{t('briefing.noticed')}</span>
           {hints.map((h) => <HintRow key={h.key} hint={h} onOpen={onOpen} onGone={() => setGone((g) => [...g, h.key])} />)}
         </>
       )}
@@ -55,6 +55,7 @@ export function BriefingCard({ onOpen }: { onOpen: (tab: 'chat' | 'inbox' | 'goa
 }
 
 function HintRow({ hint, onGone, onOpen }: { hint: Hint; onGone: () => void; onOpen: (tab: 'chat' | 'inbox' | 'goals' | 'finance') => void }) {
+  const t = useT();
   const action = useStore((s) => (hint.actionId ? s.actions[hint.actionId] : undefined));
   const [busy, setBusy] = useState(false);
 
@@ -62,7 +63,7 @@ function HintRow({ hint, onGone, onOpen }: { hint: Hint; onGone: () => void; onO
     setBusy(true);
     try {
       const r = await api<{ status: string }>(`/api/hints/${encodeURIComponent(hint.key)}/accept`, { method: 'POST' });
-      showToast(r.status === 'proposed' ? 'Gemerkt' : 'Erledigt');
+      showToast(r.status === 'proposed' ? 'Gemerkt' : t('today.status.done'));
       onGone();
       void sync();
     } catch (err) {
@@ -84,7 +85,7 @@ function HintRow({ hint, onGone, onOpen }: { hint: Hint; onGone: () => void; onO
           : hint.actionLabel ? <button type="button" className="btn small" disabled={busy} onClick={() => void accept()}>{hint.actionLabel}</button>
             : hint.open
               ? <button type="button" className="btn small" onClick={() => { void api(`/api/hints/${encodeURIComponent(hint.key)}/accept`, { method: 'POST' }).catch(() => {}); onOpen(hint.open!.tab); }}>{hint.open.label}</button> : null}
-        <button type="button" className="link small muted" onClick={() => void dismiss()} aria-label="Hinweis ausblenden"><Icon name="close" size={14} /> Passt schon</button>
+        <button type="button" className="link small muted" onClick={() => void dismiss()} aria-label={t('ui.hide.this.tip')}><Icon name="close" size={14} /> {t('ui.fine.as.is')}</button>
       </div>
     </div>
   );

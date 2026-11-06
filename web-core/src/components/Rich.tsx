@@ -20,6 +20,7 @@ export function Rich({ text }: { text: string }) {
 
 /** Lädt Bilder mit Login-Token (Bilder sind privat). */
 export function AuthImage({ id, alt, onOpen }: { id: string; alt?: string; onOpen?: (url: string) => void }) {
+  const t = useT();
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -34,8 +35,8 @@ export function AuthImage({ id, alt, onOpen }: { id: string; alt?: string; onOpe
       .catch(() => setFailed(true));
     return () => { revoked = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [id]);
-  if (failed) return <div className="img-placeholder">Bild offline nicht verfügbar</div>;
-  if (!url) return <div className="img-placeholder">Lädt…</div>;
+  if (failed) return <div className="img-placeholder">{t('ui.image.not.available.offline')}</div>;
+  if (!url) return <div className="img-placeholder">{t('ui.loading')}</div>;
   return (
     <button className="img-button" onClick={() => onOpen?.(url)} type="button">
       <img src={url} alt={alt ?? ''} />
@@ -44,10 +45,11 @@ export function AuthImage({ id, alt, onOpen }: { id: string; alt?: string; onOpe
 }
 
 export function Lightbox({ url, onClose }: { url: string; onClose: () => void }) {
+  const t = useT();
   return (
     <div className="lightbox" onClick={onClose} role="dialog">
       <img src={url} alt="" />
-      <a className="lightbox-save btn" href={url} download="stella-aufgabe.png" onClick={(e) => e.stopPropagation()}>Sichern</a>
+      <a className="lightbox-save btn" href={url} download="stella-aufgabe.png" onClick={(e) => e.stopPropagation()}>{t('ui.save')}</a>
     </div>
   );
 }
