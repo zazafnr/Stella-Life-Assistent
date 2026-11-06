@@ -26,7 +26,7 @@ struct PlannerView: View {
     enum Filter: String, CaseIterable, Identifiable {
         case all = "Alles", homework = "HÜs", exams = "Tests", other = "Termine"
         var id: String { rawValue }
-        var title: String {
+        @MainActor var title: String {
             switch self {
             case .all: return L("ios.filter.all")
             case .homework: return L("ios.filter.homework")
