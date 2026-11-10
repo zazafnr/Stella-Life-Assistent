@@ -145,3 +145,4 @@ footer.pf { display: flex; justify-content: space-between; gap: 12px; flex-wrap:
 .connect-form .btn { width: auto; padding: 0 20px; justify-self: start; }
 #web-countries + #web-refs { margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
 td.path { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+#web-tiles .tile:last-child .num { font-size: 22px; line-height: 1.2; overflow-wrap: anywhere; }
