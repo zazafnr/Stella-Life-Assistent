@@ -45,24 +45,16 @@ Die Stella-Seite zeigt direkt nach dem Hero die Sektion „Film“ (`#film`; Que
 
 ## Besucherzahlen (Website)
 
-Zwei Quellen, beide im Dashboard unter **Website** (`dashboard.evolsior.com`):
+Gezählt wird nur mit **Cloudflare Web Analytics**: ohne Cookies, nichts auf dem Gerät, daher kein Cookie-Hinweis nötig. Eingeschaltet in Cloudflare →
+Web Analytics → `evolsior.com` („Automatic setup“, Cloudflare fügt das Skript selbst ein). Alternativ `CF_BEACON_TOKEN` in `scripts/build-site.py`.
+Google Analytics und der Cookie-Hinweis wurden wieder entfernt (verunsicherte nur). Datenschutzerklärung: `/privacy#web-analytics`.
 
-| Quelle | Zählt | Einwilligung | Einbau |
-|---|---|---|---|
-| **Cloudflare Web Analytics** | fast alle Besuche, auch mit Brave und Werbeblockern meist | nein (keine Cookies, nichts auf dem Gerät) | `CF_BEACON_TOKEN` in `scripts/build-site.py`, oder „Automatic setup“ in Cloudflare |
-| **Google Analytics 4** (`G-ZSN7YRXJV6`) | nur, wer im Cookie-Hinweis „Allow“ klickt | ja, Hinweis unten auf jeder Seite (`common.js`), Widerruf über „Cookie settings“ im Fuß | `common.js` |
+**Zahlen im Dashboard** (Bereich **Website**) holt der Stella-Server (`server/src/webanalytics.ts`, `GET /api/admin/web-analytics`, nur Owner,
+10 Minuten zwischengespeichert) über die GraphQL Analytics API. Zugangsdaten trägt der Owner im Dashboard unter **Connect Cloudflare** ein
+(verschlüsselt im Server gespeichert, nie zurückgegeben), oder in `/etc/stella/stella.env`: `STELLA_CF_API_TOKEN`, `STELLA_CF_SITE_TAG`, `STELLA_CF_ACCOUNT_ID`.
 
-Datenschutzerklärung: `/privacy#web-analytics` und `/privacy#analytics` (`site-src/legal.body.html`).
-
-**Zahlen im Dashboard** holt der Stella-Server (`server/src/webanalytics.ts`, `GET /api/admin/web-analytics`, nur Owner, 10 Minuten zwischengespeichert).
-Zugangsdaten trägt der Owner im Dashboard unter **Website → Connect sources** ein (verschlüsselt im Server gespeichert, nie zurückgegeben),
-oder in `/etc/stella/stella.env`: `STELLA_CF_API_TOKEN`, `STELLA_CF_SITE_TAG`, `STELLA_CF_ACCOUNT_ID`, `STELLA_GA_PROPERTY_ID`, `STELLA_GA_SERVICE_ACCOUNT` (JSON oder Pfad zur JSON-Datei).
-
-- **Cloudflare:** My Profile → API Tokens → Create token → Custom: *Account → Account Analytics → Read*. Der **Site tag** steht in der Adresse
-  der Seite unter Web Analytics (32 Zeichen). Account-ID ist vorausgefüllt.
-- **Google:** Google Cloud Console → neues Projekt → „Google Analytics Data API“ aktivieren → IAM → Dienstkonten → Konto anlegen → Schlüssel → JSON.
-  In Google Analytics → Verwaltung → Property-Zugriffsverwaltung die `client_email` des Dienstkontos als **Betrachter** hinzufügen.
-  Property-ID `562989593` ist vorausgefüllt.
+- **API-Token:** My Profile → API Tokens → Create token → Custom: *Account → Account Analytics → Read*.
+- **Site tag:** steht in der Adresse der Seite unter Web Analytics (32 Zeichen). Die Account-ID ist vorausgefüllt.
 
 ## Dashboard als PC-App
 

@@ -118,36 +118,32 @@
     <div class="status" id="web-status" aria-label="Website sources"></div>
     <div class="tiles" id="web-tiles"></div>
     <div class="card">
-      <div><h3>Page views per day</h3><p class="hint">Cloudflare counts almost every visit. Google Analytics only counts visitors who clicked “Allow”.</p></div>
-      <div class="legend"><span><i class="k1"></i>Cloudflare</span><span><i class="k2"></i>Google Analytics</span></div>
-      <svg class="chart" id="webchart" viewBox="0 0 640 180" role="img" aria-label="Line chart: page views per day"></svg>
+      <div><h3>Per day</h3><p class="hint">Cloudflare Web Analytics, without cookies</p></div>
+      <div class="legend"><span><i class="k1"></i>Page views</span><span><i class="k2"></i>Visitors</span></div>
+      <svg class="chart" id="webchart" viewBox="0 0 640 180" role="img" aria-label="Line chart: page views and visitors per day"></svg>
     </div>
     <div class="grid two">
       <div class="card">
         <div><h3>Top pages</h3><p class="hint">Page views</p></div>
         <table>
-          <thead><tr><th>Page</th><th class="n">Cloudflare</th><th class="n">Google</th></tr></thead>
+          <thead><tr><th>Page</th><th class="n">Views</th></tr></thead>
           <tbody id="web-pages"></tbody>
         </table>
       </div>
       <div class="card">
-        <div><h3>Where visitors come from</h3><p class="hint" id="web-src-hint">Countries and referring sites (Cloudflare)</p></div>
+        <div><h3>Where visitors come from</h3><p class="hint">Countries and referring sites</p></div>
         <div class="list" id="web-countries"></div>
         <div class="list" id="web-refs"></div>
       </div>
     </div>
     <details class="card connect" id="web-connect">
-      <summary><h3>Connect sources</h3><span class="hint" id="web-conf-hint"></span></summary>
+      <summary><h3>Connect Cloudflare</h3><span class="hint" id="web-conf-hint"></span></summary>
       <form id="web-form" class="connect-form" novalidate>
         <p class="hint">Saved encrypted on the Stella server. Leave a field empty to keep what is saved, type <b class="mono">-</b> to remove it.</p>
         <fieldset><legend>Cloudflare Web Analytics</legend>
           <div class="field"><label for="cf-token">API token <span class="hint">(permission “Account Analytics: Read”)</span></label><input id="cf-token" type="password" autocomplete="off" spellcheck="false"></div>
           <div class="field"><label for="cf-site">Site tag <span class="hint">(32 characters, from the address of the site in Web Analytics)</span></label><input id="cf-site" autocomplete="off" spellcheck="false"></div>
           <div class="field"><label for="cf-account">Account ID</label><input id="cf-account" autocomplete="off" spellcheck="false"></div>
-        </fieldset>
-        <fieldset><legend>Google Analytics 4</legend>
-          <div class="field"><label for="ga-prop">Property ID</label><input id="ga-prop" inputmode="numeric" autocomplete="off"></div>
-          <div class="field"><label for="ga-sa">Service account key <span class="hint">(paste the whole JSON file)</span></label><textarea id="ga-sa" rows="4" spellcheck="false" autocomplete="off"></textarea></div>
         </fieldset>
         <p class="err" id="web-form-err" role="alert"></p>
         <button class="btn" id="web-save" type="submit">Save and load numbers</button>
