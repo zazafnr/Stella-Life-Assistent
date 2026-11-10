@@ -2,6 +2,8 @@
   // Cloudflare: dashboard.evolsior.com als Workers-Projekt mit statischen Dateien (nur dashboard/public/)
   "name": "evolsior-dashboard",
   "compatibility_date": "2025-09-01",
+  // Vorschau-Adressen für PR-Branches (Cloudflare Workers Builds ruft dort `wrangler preview` auf, das diesen Block verlangt)
+  "previews": {},
   "assets": {
     "directory": "./public",
     "not_found_handling": "single-page-application"

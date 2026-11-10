@@ -2,6 +2,8 @@
   "name": "stella-mail",
   "main": "src/index.js",
   "compatibility_date": "2025-09-01",
+  // Vorschau-Adressen für PR-Branches (Cloudflare Workers Builds ruft dort `wrangler preview` auf, das diesen Block verlangt)
+  "previews": {},
   "vars": {
     "STELLA_URL": "https://stella.evolsior.com"
   }
