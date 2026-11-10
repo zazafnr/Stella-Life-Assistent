@@ -1,6 +1,6 @@
 # Website evolsior.com
 
-Statische Seite (kein Framework). Quellen in `site-src/`, gebaut nach `site/public/` (liegt im Repo), Cloudflare-Konfiguration in `site/wrangler.jsonc`.
+Statische Seite (kein Framework). Quellen in `site-src/`, gebaut nach `site/public/` (liegt im Repo), Cloudflare-Konfiguration in `site/wrangler.jsonc`. Ein kleiner Worker (`site/worker.js`) läuft nur für die Videos (siehe „Film“).
 
 | Adresse | Inhalt |
 |---|---|
@@ -21,6 +21,26 @@ Die Seite von Stella for Students hat noch keine iPhone-Bilder (sie kommen mit d
 
 Die iPhone-Bilder (`site/public/assets/stella/*.jpg`, 1179×2556, mit Statusleiste) entstehen aus der Web-App mit Demo-Daten
 (`server/scripts/demo-seed.ts`). Die App spricht Deutsch, die Bilder sind für die englische Seite übersetzt.
+
+## Film
+
+Die Stella-Seite zeigt direkt nach dem Hero die Sektion „Film“ (`#film`; Quellen `stella.body.html`, `stella.css`, `stella.js`).
+
+- **Dateien:** `site/public/assets/video/stella-film-1.mp4` (1920×1080, H.264 + AAC, faststart, nur Soundeffekte) und `stella-film-1.jpg` (Vorschaubild).
+  Liegen direkt in `site/public/` (nicht in `site-src/`), der Build lässt sie unberührt.
+- **Versionierung:** `/assets/*` wird ein Jahr gecacht (`_headers`, `immutable`). Ein neuer Schnitt bekommt deshalb einen neuen Namen
+  (`stella-film-2.mp4` / `.jpg`), dann die beiden Pfade in `stella.body.html` (`poster` und `<source>`) anpassen. Alte Datei danach löschen.
+- **Verhalten:** stumme Vorschau in Schleife, solange der Rahmen zu ≥ 50 % sichtbar ist; „Watch with sound“ startet mit Ton von vorn.
+  Bei `prefers-reduced-motion` oder Datensparmodus kein Autoplay, nur Vorschaubild mit Play-Knopf. `preload="none"`: Das Video lädt erst beim Abspielen.
+  Ohne JS bleibt der normale Browser-Player.
+- **Worker für Byte-Ranges:** Workers Static Assets beantworten Range-Anfragen mit 200 und der ganzen Datei, Safari spielt so kein Video ab.
+  Darum läuft `site/worker.js` vor den statischen Dateien, aber nur für `/assets/video/*` (`assets.run_worker_first` in `site/wrangler.jsonc`):
+  Er holt die Datei über das Binding `ASSETS` und liefert genau einen Bereich als `206` mit `Content-Range` und `Accept-Ranges: bytes`
+  (ungültige Range: `416`, HEAD geht). Alle anderen Adressen kommen weiter direkt als statische Datei, ohne den Worker.
+- **Limit:** Im Free-Plan zählt jede Video-Anfrage (auch jede einzelne Range-Anfrage beim Spulen) zum Worker-Limit von 100 000 Anfragen pro Tag.
+  Statische Dateien zählen nicht dazu.
+- **Lokal prüfen:** in `site/` `npx wrangler dev`, dann
+  `curl -sI -H "Range: bytes=0-1" http://localhost:8787/assets/video/stella-film-1.mp4` → `206`, `Content-Range: bytes 0-1/…`.
 
 ## Cloudflare (einmalig)
 

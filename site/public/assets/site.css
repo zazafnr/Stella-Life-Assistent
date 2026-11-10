@@ -236,6 +236,69 @@ footer a:hover { color: #fff; }
 @media (max-width: 1000px) { .plans { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .plans { grid-template-columns: 1fr; } }
 
+/* Film: 16:9-Bühne direkt nach dem Hero */
+.film { padding-top: clamp(40px, 6vw, 88px); }
+.film-stage { position: relative; isolation: isolate; }
+.film-halo { left: 0; top: 0; width: 100%; height: 100%; transform: scale(1.06, 1.14); border-radius: 40px; opacity: .5; z-index: -1; filter: blur(70px);
+  background: radial-gradient(60% 75% at 12% 88%, rgba(156,203,255,.75), rgba(156,203,255,0) 70%), radial-gradient(60% 75% at 88% 12%, rgba(255,126,179,.6), rgba(255,126,179,0) 70%); }
+.film-frame { --r: 28px; aspect-ratio: 16 / 9; width: 100%; border-radius: var(--r); background: #0d0d10; transform-origin: 50% 30%; will-change: transform;
+  box-shadow: inset 0 0 0 1px var(--line), 0 70px 140px -40px rgba(0,0,0,.95), 0 30px 60px -30px rgba(0,0,0,.7); }
+.film-frame video { position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: cover; border-radius: inherit; background: #0d0d10; }
+.film-frame .film-line { position: absolute; inset: 0; z-index: 2; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--line); pointer-events: none; }
+.film-frame [hidden] { display: none !important; }
+.film-frame button { -webkit-tap-highlight-color: transparent; cursor: pointer; border: 0; font-family: inherit; }
+.film-frame svg { flex: none; }
+.film-frame.js video { cursor: pointer; }
+.film-frame.js.playing:not(.ui) video { cursor: none; }
+
+/* großer Play-Knopf (ohne Autoplay) */
+.film-big { position: absolute; z-index: 4; left: 50%; top: 50%; width: clamp(64px, 9vw, 96px); aspect-ratio: 1; margin: 0; padding: 0; border-radius: 50%; display: grid; place-items: center; background: #fff; color: #09090B;
+  transform: translate(-50%, -50%); box-shadow: 0 20px 60px rgba(9,9,11,.35), 0 0 0 10px rgba(255,255,255,.18); transition: transform .3s var(--ease), opacity .4s var(--ease), visibility 0s linear .4s; opacity: 0; visibility: hidden; }
+.film-big svg { width: 38%; height: 38%; margin-left: 7%; }
+.film-big:hover { transform: translate(-50%, -50%) scale(1.06); }
+.film-frame[data-state="idle"] .film-big { opacity: 1; visibility: visible; transition-delay: 0s; }
+
+/* „Watch with sound“ / „Replay“: gleiche Stelle, mittig unten */
+.film-cta { position: absolute; z-index: 4; left: 50%; bottom: 24px; gap: 10px; padding: 0 22px 0 18px; box-shadow: 0 14px 40px rgba(9,9,11,.32);
+  transform: translate(-50%, 8px); opacity: 0; visibility: hidden; transition: transform .45s var(--ease), opacity .45s var(--ease), visibility 0s linear .45s, box-shadow .25s var(--ease); }
+.film-cta svg { width: 18px; height: 18px; }
+.film-cta:hover { transform: translate(-50%, -2px); box-shadow: 0 14px 44px rgba(255,255,255,.3); }
+.film-frame[data-state="preview"] .film-watch, .film-frame[data-state="ended"] .film-replay { opacity: 1; visibility: visible; transform: translate(-50%, 0); transition-delay: 0s; }
+.film-frame[data-state="preview"].ui .film-watch, .film-frame[data-state="ended"].ui .film-replay { transform: translate(-50%, -64px); }
+
+/* eigene Leiste */
+.film-bar { position: absolute; z-index: 5; left: 14px; right: 14px; bottom: 14px; display: flex; align-items: center; gap: 4px; padding: 0 6px; height: 52px; border-radius: 999px;
+  background: rgba(9,9,11,.55); box-shadow: inset 0 0 0 1px var(--line); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity .35s var(--ease), transform .35s var(--ease); }
+.film-frame.ui .film-bar, .film-bar:has(:focus-visible) { opacity: 1; transform: none; pointer-events: auto; }
+.film-frame[data-state="idle"] .film-bar { visibility: hidden; }
+.film-btn { flex: none; width: 44px; height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: transparent; color: #fff; transition: background .2s; }
+.film-btn:hover { background: rgba(255,255,255,.12); }
+.film-btn svg { width: 20px; height: 20px; grid-area: 1 / 1; }
+.film-btn .i-pause, .film-frame.playing .film-btn .i-play, .film-btn .i-on, .film-frame.sound .film-btn .i-off { display: none; }
+.film-frame.playing .film-btn .i-pause, .film-frame.sound .film-btn .i-on { display: block; }
+.film-seek { flex: 1; min-width: 0; height: 44px; margin: 0 10px; display: flex; align-items: center; cursor: pointer; touch-action: none; border-radius: 8px; }
+.film-seek:focus-visible { outline-offset: 0; }
+.film-track { position: relative; width: 100%; height: 3px; border-radius: 3px; background: rgba(255,255,255,.22); overflow: hidden; transition: height .2s var(--ease); }
+.film-seek:hover .film-track, .film-seek.drag .film-track, .film-seek:focus-visible .film-track { height: 5px; }
+.film-fill { position: absolute; inset: 0; background: #fff; border-radius: inherit; transform-origin: 0 50%; transform: scaleX(0); }
+.film-time { flex: none; padding: 0 10px 0 2px; font: 500 12px/1 var(--mono); letter-spacing: .04em; color: rgba(255,255,255,.82); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.film-time .film-dur { color: rgba(255,255,255,.5); }
+
+@media (max-width: 700px) {
+  .film-frame { --r: 18px; }
+  .film-halo { border-radius: 24px; filter: blur(44px); }
+  .film-time { display: none; }
+  .film-bar { left: 8px; right: 8px; bottom: 8px; height: 46px; padding: 0 1px; }
+  .film-seek { margin: 0 6px; }
+  .film-cta { bottom: 14px; min-height: 44px; font-size: 14px; padding: 0 18px 0 14px; }
+  .film-frame[data-state="preview"].ui .film-watch, .film-frame[data-state="ended"].ui .film-replay { transform: translate(-50%, -54px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .film-frame { transform: none !important; will-change: auto; }
+  .film-big, .film-cta, .film-bar, .film-track { transition: none; }
+}
+
 /* Stella for Students: eigene Akzentfarbe (Blau statt Rosa), sonst dieselben Bausteine wie /stella */
 .students .halo, .students .cta-halo { background: radial-gradient(circle, rgba(99,152,255,.34), rgba(99,152,255,0) 65%); }
 .feature.students { margin-top: 20px; background: radial-gradient(90% 120% at 0% 100%, #1d1a33, var(--ink-2) 60%); }
