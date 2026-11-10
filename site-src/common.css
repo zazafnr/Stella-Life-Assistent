@@ -121,3 +121,13 @@ footer a:hover { color: #fff; }
 }
 .skip { position: absolute; left: -999px; top: 8px; z-index: 100; padding: 10px 16px; border-radius: 10px; background: #fff; color: #09090B; font-weight: 600; }
 .skip:focus { left: 8px; }
+
+/* Einwilligung für Analytics */
+.consent { position: fixed; z-index: 80; left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); margin-inline: auto; max-width: 560px; display: grid; gap: 14px; padding: 18px 20px; border-radius: 20px;
+  background: rgba(16,16,19,.86); box-shadow: inset 0 0 0 1px var(--line-2), 0 24px 60px rgba(0,0,0,.55); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); font-size: 15px; line-height: 1.5; color: var(--fg); }
+.consent[hidden] { display: none; }
+.consent .link { font-size: 14px; margin-left: 4px; }
+.consent-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.consent-actions .btn { min-height: 44px; cursor: pointer; border: 0; font-family: inherit; }
+.foot-btn { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.foot-btn:hover { color: #fff; }

@@ -100,6 +100,56 @@
   }
 })();
 
+// Google Analytics 4: lädt erst nach Einwilligung (DSGVO/TKG). Wahl in localStorage, Widerruf über „Cookie settings“ im Fuß.
+(function () {
+  var GA = 'G-ZSN7YRXJV6', KEY = 'evolsior-analytics';
+  var get = function () { try { return localStorage.getItem(KEY); } catch (e) { return null; } };
+  var set = function (v) { try { localStorage.setItem(KEY, v); } catch (e) {} };
+  var load = function () {
+    if (window.__evGA) return; window.__evGA = true;
+    window['ga-disable-' + GA] = false;
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { window.dataLayer.push(arguments); };
+    window.gtag('js', new Date());
+    window.gtag('config', GA);
+    var s = document.createElement('script'); s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA;
+    document.head.appendChild(s);
+  };
+  var wipe = function () {
+    window['ga-disable-' + GA] = true;
+    var host = location.hostname.replace(/^www\./, '');
+    document.cookie.split(';').forEach(function (c) {
+      var n = c.split('=')[0].trim();
+      if (/^_ga/.test(n)) ['', host, '.' + host].forEach(function (d) {
+        document.cookie = n + '=; Max-Age=0; path=/' + (d ? '; domain=' + d : '');
+      });
+    });
+  };
+  var bar;
+  var ask = function () {
+    if (bar) { bar.hidden = false; bar.querySelector('button').focus(); return; }
+    bar = document.createElement('div');
+    bar.className = 'consent'; bar.setAttribute('role', 'dialog'); bar.setAttribute('aria-label', 'Analytics consent');
+    bar.innerHTML = '<p>May we count visits with Google Analytics? It shows us which pages help. Cookies are only set if you agree. <a class="link" href="/privacy#analytics">Privacy policy</a></p>' +
+      '<div class="consent-actions"><button type="button" class="btn sm" data-v="granted">Allow</button><button type="button" class="btn sm ghost" data-v="denied">No thanks</button></div>';
+    bar.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      var v = b.getAttribute('data-v'); set(v); bar.hidden = true;
+      if (v === 'granted') load(); else wipe();
+    });
+    document.body.appendChild(bar);
+  };
+  var c = get();
+  if (c === 'granted') load(); else if (c !== 'denied') ask();
+  // Fuß: Wahl jederzeit ändern
+  var nav = document.querySelector('footer nav');
+  if (nav) {
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'foot-btn'; b.textContent = 'Cookie settings';
+    b.addEventListener('click', ask); nav.appendChild(b);
+  }
+})();
+
 (function () {
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
