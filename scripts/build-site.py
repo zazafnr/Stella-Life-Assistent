@@ -14,6 +14,9 @@ BASE = 'https://evolsior.com'
 MARK = '<svg viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><rect x="10" y="5" width="18" height="5" rx="2.5"/><rect x="4" y="13.5" width="18" height="5" rx="2.5"/><rect x="10" y="22" width="18" height="5" rx="2.5"/></svg>'
 # /assets/* wird ein Jahr lang gecacht (siehe _headers): Die Version im Link sorgt dafür, dass geänderte CSS/JS neu geladen werden
 VERSION = {'css': '', 'js': ''}
+# Cloudflare Web Analytics (ohne Cookies, kein Hinweis nötig): Token aus Cloudflare → Web Analytics → evolsior.com → „Manage site“.
+# Leer = kein Skript (z. B. wenn Cloudflare das Skript per „Automatic setup“ selbst einfügt).
+CF_BEACON_TOKEN = ''
 LINKS = {'__HOME__': '/', '__STELLA__': '/stella', '__STUDENTS__': '/stella-students', '__IMPRINT__': '/imprint', '__PRIVACY__': '/privacy'}
 
 def read(name):
@@ -29,8 +32,15 @@ def fill(body):
     for k, v in LINKS.items(): body = body.replace(k, v)
     return body
 
+def beacon():
+    if not CF_BEACON_TOKEN or noindex_page[0]: return ''
+    return f'\n<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon=\'{{"token": "{CF_BEACON_TOKEN}"}}\'></script>'
+
+noindex_page = [False]
+
 def page(path, title, description, body, og='/assets/og.png', noindex=False):
     url = BASE + (path if path != '/index' else '/')
+    noindex_page[0] = noindex
     return f'''<!doctype html>
 <html lang="en">
 <head>
@@ -53,7 +63,7 @@ def page(path, title, description, body, og='/assets/og.png', noindex=False):
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css?v={VERSION['css']}">
-<script src="/assets/site.js?v={VERSION['js']}" defer></script>
+<script src="/assets/site.js?v={VERSION['js']}" defer></script>{beacon()}
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>

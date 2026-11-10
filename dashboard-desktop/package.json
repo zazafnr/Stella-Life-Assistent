@@ -1,0 +1,34 @@
+{
+  "name": "evolsior-dashboard-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "EVOLSIOR Dashboard als eigenes Programm für Windows, macOS und Linux",
+  "author": "EVOLSIOR",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron scripts/smoke.js",
+    "dist:win": "electron-builder --win nsis zip --x64",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:linux": "electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "^45.1.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.evolsior.dashboard",
+    "productName": "EVOLSIOR Dashboard",
+    "directories": { "output": "release", "buildResources": "build" },
+    "files": ["src/**/*", "build/icon.png", "package.json"],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }, { "target": "zip", "arch": ["x64"] }],
+      "icon": "build/icon.ico",
+      "artifactName": "EVOLSIOR-Dashboard-${version}-Windows.${ext}"
+    },
+    "nsis": { "oneClick": true, "perMachine": false, "createDesktopShortcut": true, "createStartMenuShortcut": true, "shortcutName": "EVOLSIOR Dashboard" },
+    "mac": { "target": ["dmg"], "icon": "build/icon.png", "category": "public.app-category.business", "artifactName": "EVOLSIOR-Dashboard-${version}-Mac.${ext}" },
+    "linux": { "target": ["AppImage"], "icon": "build/icon.png", "category": "Office", "artifactName": "EVOLSIOR-Dashboard-${version}-Linux.${ext}" },
+    "publish": null
+  }
+}

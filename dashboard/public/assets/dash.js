@@ -10,8 +10,10 @@
   var PROVIDER = { groq: 'Groq', openrouter: 'OpenRouter' };
   var OUTCOME = { replied: 'Answered', unknown_sender: 'Sender had no account (notice sent)', unknown_sender_silent: 'Sender had no account (no notice)', ignored_automated: 'Automatic mail ignored', ignored_recipient: 'Other address ignored', rejected_auth: 'Rejected, failed sender check', rate_limited: 'Rate limit', error: 'Error' };
 
-  function token() { try { return sessionStorage.getItem(KEY) || ''; } catch (e) { return ''; } }
-  function keep(t) { try { if (t) sessionStorage.setItem(KEY, t); else sessionStorage.removeItem(KEY); } catch (e) { /* ohne Speicher: Anmeldung gilt nur bis zum Neuladen */ } }
+  // Im Browser verfällt die Anmeldung mit dem Tab; in der Desktop-App (window.evolsiorDesktop) bleibt sie bis „Sign out“
+  function store() { return window.evolsiorDesktop ? localStorage : sessionStorage; }
+  function token() { try { return store().getItem(KEY) || ''; } catch (e) { return ''; } }
+  function keep(t) { try { if (t) store().setItem(KEY, t); else store().removeItem(KEY); } catch (e) { /* ohne Speicher: Anmeldung gilt nur bis zum Neuladen */ } }
   var memory = '';
   function currentToken() { return token() || memory; }
 
@@ -80,6 +82,7 @@
     document.body.classList.add('busy');
     mailUi();
     subsUi();
+    webUi();
     fetch(API + '/api/admin/overview?days=' + days, { headers: { authorization: 'Bearer ' + t } })
       .then(function (r) {
         if (r.status === 401 || r.status === 403) { signOut('Your session has ended. Please sign in again.'); return null; }
@@ -309,6 +312,102 @@
       });
   }
   mailUi();
+
+
+  // ---------- Website (Cloudflare Web Analytics + Google Analytics 4) ----------
+
+  function webGet(path) {
+    return fetch(API + path, { headers: { authorization: 'Bearer ' + currentToken() } }).then(function (r) { return r.ok ? r.json() : null; });
+  }
+  function webUi() {
+    if (!currentToken()) return;
+    webGet('/api/admin/web-analytics/config').then(function (c) { if (c) webConf(c); }).catch(function () {});
+    webGet('/api/admin/web-analytics?days=' + days).then(function (w) { if (w) webRender(w); }).catch(function () {
+      var st = $('web-status'); clear(st); st.appendChild(statusItem(false, 'Website numbers could not be loaded'));
+    });
+  }
+  function webConf(c) {
+    $('cf-account').placeholder = c.cloudflare.accountId || '';
+    $('cf-site').placeholder = c.cloudflare.siteTag || 'not set';
+    $('cf-token').placeholder = c.cloudflare.apiToken ? 'saved' : 'not set';
+    $('ga-prop').placeholder = c.google.propertyId || '';
+    $('ga-sa').placeholder = c.google.serviceAccount ? 'saved: ' + c.google.serviceAccount : '{ "type": "service_account", … }';
+    var ok = c.cloudflare.apiToken && c.cloudflare.siteTag, gok = !!c.google.serviceAccount;
+    $('web-conf-hint').textContent = (ok ? 'Cloudflare connected' : 'Cloudflare not connected') + ' · ' + (gok ? 'Google connected' : 'Google not connected');
+    if (!ok && !gok) $('web-connect').open = true;
+  }
+  function srcStatus(name, s) {
+    if (!s.configured) { var x = el('span'); x.appendChild(el('i', null, 'dot miss')); x.appendChild(document.createTextNode(name + ' not connected')); return x; }
+    return statusItem(s.ok, s.ok ? name + ' connected' : name + ': ' + (s.error || 'error'));
+  }
+  function webRender(w) {
+    var cf = w.cloudflare, ga = w.google;
+    var st = $('web-status'); clear(st);
+    st.appendChild(srcStatus('Cloudflare Web Analytics', cf));
+    st.appendChild(srcStatus('Google Analytics', ga));
+    var tiles = $('web-tiles'); clear(tiles);
+    var dash = '–';
+    tiles.appendChild(tile('Visitors', cf.ok ? fmt(cf.totals.visitors) : dash, ['Cloudflare · last ' + w.days + ' days']));
+    tiles.appendChild(tile('Page views', cf.ok ? fmt(cf.totals.pageviews) : dash, ['Cloudflare · all visitors']));
+    tiles.appendChild(tile('Users (consented)', ga.ok ? fmt(ga.totals.visitors) : dash, ga.ok ? [fmt(ga.totals.sessions) + ' sessions'] : ['Google Analytics']));
+    tiles.appendChild(tile('Consent rate', cf.ok && ga.ok && cf.totals.visitors ? Math.min(100, Math.round(ga.totals.visitors / cf.totals.visitors * 100)) + ' %' : dash, ['Google users vs. Cloudflare visitors']));
+    drawWeb(cf.ok ? cf.perDay : null, ga.ok ? ga.perDay : null);
+
+    var pages = {}, order = [];
+    function addPages(list, k) { (list || []).forEach(function (p) { if (!pages[p.key]) { pages[p.key] = { cf: null, ga: null }; order.push(p.key); } pages[p.key][k] = p.n; }); }
+    addPages(cf.ok && cf.pages, 'cf'); addPages(ga.ok && ga.pages, 'ga');
+    order.sort(function (a, b) { return ((pages[b].cf || 0) + (pages[b].ga || 0)) - ((pages[a].cf || 0) + (pages[a].ga || 0)); });
+    var tb = $('web-pages'); clear(tb);
+    if (!order.length) { var r0 = el('tr'), c0 = el('td', 'No page views yet.', 'empty'); c0.colSpan = 3; r0.appendChild(c0); tb.appendChild(r0); }
+    order.slice(0, 10).forEach(function (k) {
+      var tr = el('tr'); tr.appendChild(el('td', k, 'path'));
+      tr.appendChild(el('td', pages[k].cf == null ? '–' : fmt(pages[k].cf), 'n'));
+      tr.appendChild(el('td', pages[k].ga == null ? '–' : fmt(pages[k].ga), 'n'));
+      tb.appendChild(tr);
+    });
+    var src = cf.ok ? cf : ga.ok ? ga : null;
+    $('web-src-hint').textContent = src === ga ? 'Countries and sources (Google Analytics)' : 'Countries and referring sites (Cloudflare)';
+    [['web-countries', src && src.countries], ['web-refs', src && src.referrers]].forEach(function (x) {
+      var host = $(x[0]); clear(host);
+      var list = x[1] || [], max = 0; list.forEach(function (c) { max = Math.max(max, c.n); });
+      if (!list.length) host.appendChild(el('p', src ? 'No data yet.' : 'Connect a source below.', 'empty'));
+      list.forEach(function (c) { host.appendChild(barRow(c.key, c.n, max, '')); });
+    });
+  }
+  function drawWeb(a, b) {
+    var c = $('webchart'); clear(c);
+    var series = a || b;
+    if (!series) { c.appendChild(svg('text', { x: 320, y: 98, 'text-anchor': 'middle', fill: 'var(--muted)', style: 'font-size:22px' }, 'No source connected yet')); return; }
+    var W = 640, H = 180, L = 34, B = 22, T = 8, n = series.length, peak = 0;
+    [a, b].forEach(function (s) { (s || []).forEach(function (d) { peak = Math.max(peak, d.pageviews); }); });
+    var max = niceMax(Math.max(peak, 4));
+    grid(c, L, W, T, H - B, max, 2);
+    var step = (W - L) / Math.max(1, n - 1);
+    [[a, 'var(--c1)'], [b, 'var(--c2)']].forEach(function (x) {
+      if (!x[0]) return;
+      var pts = x[0].map(function (d, i) { return [L + i * step, T + (H - B - T) * (1 - d.pageviews / max)]; });
+      var path = pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ');
+      if (x[0] === a) c.appendChild(svg('path', { d: path + ' L' + W + ' ' + (H - B) + ' L' + L + ' ' + (H - B) + ' Z', fill: x[1], opacity: '0.07' }));
+      c.appendChild(svg('path', { d: path, fill: 'none', stroke: x[1], 'stroke-width': '1.75', 'stroke-linejoin': 'round' }));
+      var last = pts[pts.length - 1]; c.appendChild(svg('circle', { cx: last[0], cy: last[1], r: 4, fill: x[1] }));
+    });
+    ticks(c, series, L, W - step, H, n);
+  }
+  $('web-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var body = { cfApiToken: $('cf-token').value, cfSiteTag: $('cf-site').value, cfAccountId: $('cf-account').value, gaPropertyId: $('ga-prop').value, gaServiceAccount: $('ga-sa').value };
+    var err = $('web-form-err'), btn = $('web-save');
+    err.textContent = ''; btn.disabled = true;
+    fetch(API + '/api/admin/web-analytics/config', { method: 'POST', headers: { authorization: 'Bearer ' + currentToken(), 'content-type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (r) {
+        if (!r.ok) { err.textContent = r.body.error || 'Could not save.'; return; }
+        ['cf-token', 'cf-site', 'cf-account', 'ga-prop', 'ga-sa'].forEach(function (id) { $(id).value = ''; });
+        webConf(r.body); webUi();
+      })
+      .catch(function () { err.textContent = 'We could not reach the server. Please try again.'; })
+      .then(function () { btn.disabled = false; });
+  });
 
   // Beim Neuladen: gespeicherte Sitzung weiterverwenden, sonst Anmeldung
   if (token()) { view('dash'); load(); } else { view('login'); }
