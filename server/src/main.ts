@@ -44,6 +44,7 @@ import { acceptHint, dismissHint } from './hints.ts';
 import { registerAdminRoutes } from './admin.ts';
 import { linkVerifiedAddress, registerAddressRoutes, registerInboundRoute } from './inbound.ts';
 import { registerOverviewRoutes } from './overview.ts';
+import { registerWebAnalyticsRoutes } from './webanalytics.ts';
 import { registerCalendarRoutes } from './calendar.ts';
 import { registerFinanceRoutes, recordPayment } from './finance.ts';
 import { registerGoalRoutes } from './goals.ts';
@@ -226,6 +227,7 @@ app.register(async (api) => {
   registerAdminRoutes(api);
   pluginRoutes(api);
   registerOverviewRoutes(api);
+  registerWebAnalyticsRoutes(api);
   registerCalendarRoutes(api);
   registerAddressRoutes(api);
   registerListRoutes(api);

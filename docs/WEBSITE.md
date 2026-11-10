@@ -43,6 +43,33 @@ Die Stella-Seite zeigt direkt nach dem Hero die Sektion „Film“ (`#film`; Que
 - **Lokal prüfen:** in `site/` `npx wrangler dev`, dann
   `curl -sI -H "Range: bytes=0-1" http://localhost:8787/assets/video/stella-film-2.mp4` → `206`, `Content-Range: bytes 0-1/…`.
 
+## Besucherzahlen (Website)
+
+Zwei Quellen, beide im Dashboard unter **Website** (`dashboard.evolsior.com`):
+
+| Quelle | Zählt | Einwilligung | Einbau |
+|---|---|---|---|
+| **Cloudflare Web Analytics** | fast alle Besuche, auch mit Brave und Werbeblockern meist | nein (keine Cookies, nichts auf dem Gerät) | `CF_BEACON_TOKEN` in `scripts/build-site.py`, oder „Automatic setup“ in Cloudflare |
+| **Google Analytics 4** (`G-ZSN7YRXJV6`) | nur, wer im Cookie-Hinweis „Allow“ klickt | ja, Hinweis unten auf jeder Seite (`common.js`), Widerruf über „Cookie settings“ im Fuß | `common.js` |
+
+Datenschutzerklärung: `/privacy#web-analytics` und `/privacy#analytics` (`site-src/legal.body.html`).
+
+**Zahlen im Dashboard** holt der Stella-Server (`server/src/webanalytics.ts`, `GET /api/admin/web-analytics`, nur Owner, 10 Minuten zwischengespeichert).
+Zugangsdaten trägt der Owner im Dashboard unter **Website → Connect sources** ein (verschlüsselt im Server gespeichert, nie zurückgegeben),
+oder in `/etc/stella/stella.env`: `STELLA_CF_API_TOKEN`, `STELLA_CF_SITE_TAG`, `STELLA_CF_ACCOUNT_ID`, `STELLA_GA_PROPERTY_ID`, `STELLA_GA_SERVICE_ACCOUNT` (JSON oder Pfad zur JSON-Datei).
+
+- **Cloudflare:** My Profile → API Tokens → Create token → Custom: *Account → Account Analytics → Read*. Der **Site tag** steht in der Adresse
+  der Seite unter Web Analytics (32 Zeichen). Account-ID ist vorausgefüllt.
+- **Google:** Google Cloud Console → neues Projekt → „Google Analytics Data API“ aktivieren → IAM → Dienstkonten → Konto anlegen → Schlüssel → JSON.
+  In Google Analytics → Verwaltung → Property-Zugriffsverwaltung die `client_email` des Dienstkontos als **Betrachter** hinzufügen.
+  Property-ID `562989593` ist vorausgefüllt.
+
+## Dashboard als PC-App
+
+`dashboard-desktop/` ist ein Electron-Fenster um `dashboard.evolsior.com` (wie `desktop/` für Stella). GitHub Actions (*Dashboard-App*) baut bei Änderungen
+den Windows-Installer; von `main` aus landet er unter Releases → „EVOLSIOR Dashboard für Windows“ (Tag `dashboard-app`). In der App bleibt die Anmeldung
+bis „Sign out“ erhalten (im Browser nur bis der Tab zugeht). Neue Funktionen im Dashboard brauchen keine neue App-Version.
+
 ## Cloudflare (einmalig)
 
 Workers & Pages → Create → Import a repository → `Stella-Life-Assistent`, Production branch `main`.

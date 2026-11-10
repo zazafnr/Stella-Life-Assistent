@@ -6,3 +6,4 @@ data/
 .DS_Store
 /editions/students/
 .wrangler/
+dashboard-desktop/release/

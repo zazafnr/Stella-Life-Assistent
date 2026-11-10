@@ -1,0 +1,64 @@
+name: Dashboard-App
+
+# Baut die PC-App des EVOLSIOR Dashboards auf einem echten Windows-Rechner
+# (Installer und Programm-Icon brauchen NSIS und rcedit, die es nur dort ohne Wine gibt).
+on:
+  push:
+    paths: ['dashboard-desktop/**', '.github/workflows/dashboard-desktop.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dashboard-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard-desktop/package-lock.json
+
+      - name: Installieren
+        working-directory: dashboard-desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: Rauchtest in echtem Electron
+        working-directory: dashboard-desktop
+        timeout-minutes: 5
+        run: npm run smoke
+
+      - name: Installer und ZIP bauen
+        working-directory: dashboard-desktop
+        # Ohne Code-Signing-Zertifikat – Windows SmartScreen warnt beim ersten Start einmal.
+        run: npx electron-builder --win nsis zip --x64 --publish never
+
+      # Feste Download-Adresse nur für main: immer die neueste Version unter dem Tag "dashboard-app"
+      - name: Download-Seite aktualisieren
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete dashboard-app --yes --cleanup-tag 2>/dev/null || true
+          gh release create dashboard-app dashboard-desktop/release/*.exe dashboard-desktop/release/*.zip \
+            --target "${{ github.sha }}" --prerelease \
+            --title "EVOLSIOR Dashboard für Windows" \
+            --notes "Die .exe herunterladen und doppelklicken. Windows fragt beim ersten Start einmal nach („Weitere Informationen“ → „Trotzdem ausführen“). Anmeldung mit dem Owner-Konto von Stella."
+
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: EVOLSIOR-Dashboard-Windows
+          path: |
+            dashboard-desktop/release/*.exe
+            dashboard-desktop/release/*.zip
+          retention-days: 7
+          if-no-files-found: error

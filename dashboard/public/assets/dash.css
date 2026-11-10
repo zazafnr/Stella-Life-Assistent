@@ -129,3 +129,19 @@ footer.pf { display: flex; justify-content: space-between; gap: 12px; flex-wrap:
 .mail-grid iframe { width: 100%; border: 1px solid rgba(127, 127, 127, .3); border-radius: 14px; background: #fff; height: 780px; }
 #mails .range { flex-wrap: wrap; margin-top: 10px; }
 @media (max-width: 900px) { .mail-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Website ---------- */
+#web > * + * { margin-top: 16px; }
+.status .dot.miss { background: var(--c3); }
+.connect summary { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; cursor: pointer; list-style: none; }
+.connect summary::-webkit-details-marker { display: none; }
+.connect summary h3::before { content: "+ "; color: var(--muted); }
+.connect[open] summary h3::before { content: "– "; }
+.connect-form { display: grid; gap: 16px; max-width: 640px; margin-top: 16px; }
+.connect-form fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px 16px; display: grid; gap: 12px; margin: 0; min-width: 0; }
+.connect-form legend { padding: 0 6px; font-weight: 500; }
+.connect-form textarea { border-radius: 10px; border: 1px solid var(--line); background: var(--panel); padding: 10px 14px; font: 12px/1.4 var(--mono); color: var(--fg); resize: vertical; width: 100%; }
+.connect-form textarea:focus { outline: 2px solid var(--fg); outline-offset: 0; border-color: transparent; }
+.connect-form .btn { width: auto; padding: 0 20px; justify-self: start; }
+#web-countries + #web-refs { margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+td.path { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
