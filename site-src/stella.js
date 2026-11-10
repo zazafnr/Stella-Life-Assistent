@@ -58,3 +58,149 @@
   new IntersectionObserver(function (es) { if (es[0].isIntersecting && !started) { started = true; play(0); } }, { threshold: 0.35 }).observe(document.getElementById('demo'));
   showStatic(0);
 })();
+
+// Film: stumme Vorschau im Bild, mit Ton von vorn auf Knopfdruck, eigene Leiste. Ohne JS bleibt der normale Player.
+(function () {
+  var frame = document.getElementById('film-frame'), v = document.getElementById('film-video');
+  if (!frame || !v) return;
+  var mq = function (q) { return window.matchMedia && matchMedia(q).matches; };
+  var reduce = mq('(prefers-reduced-motion: reduce)');
+  var save = !!(navigator.connection && navigator.connection.saveData);
+  var auto = !reduce && !save && 'IntersectionObserver' in window;
+  var q = function (s) { return frame.querySelector(s); };
+  var bar = q('.film-bar'), seek = q('.film-seek'), fill = q('.film-fill'), now = q('.film-now'), dur = q('.film-dur');
+  var bToggle = q('[data-act="toggle"]'), bMute = q('[data-act="mute"]');
+  var state, visible = false, userPaused = false, hideT = 0, raf = 0, dragging = false, lastPointer = 'mouse', uiAtDown = false;
+
+  v.removeAttribute('controls'); v.controls = false;
+  v.setAttribute('tabindex', '0');
+  frame.classList.add('js');
+  Array.prototype.forEach.call(frame.querySelectorAll('[hidden]'), function (el) { el.hidden = false; });
+
+  var D = function () { return isFinite(v.duration) && v.duration > 0 ? v.duration : 29.6; };
+  var fmt = function (s) { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2); };
+  var setState = function (s) { state = s; frame.setAttribute('data-state', s); };
+  var paint = function () {
+    var d = D(), t = Math.min(v.currentTime || 0, d);
+    fill.style.transform = 'scaleX(' + (t / d) + ')';
+    now.textContent = fmt(t); dur.textContent = fmt(d);
+    seek.setAttribute('aria-valuemax', String(Math.floor(d)));
+    seek.setAttribute('aria-valuenow', String(Math.floor(t)));
+    seek.setAttribute('aria-valuetext', fmt(t) + ' of ' + fmt(d));
+  };
+  var tick = function () { paint(); raf = v.paused ? 0 : requestAnimationFrame(tick); };
+  var sync = function () {
+    var playing = !v.paused && !v.ended;
+    frame.classList.toggle('playing', playing);
+    frame.classList.toggle('sound', !v.muted);
+    bToggle.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+    bMute.setAttribute('aria-label', v.muted ? 'Turn sound on' : 'Turn sound off');
+    if (playing && !raf) raf = requestAnimationFrame(tick);
+    if (!playing) { paint(); show(); }
+  };
+
+  // Leiste ein- und ausblenden
+  var show = function () {
+    frame.classList.add('ui'); clearTimeout(hideT);
+    hideT = setTimeout(function () { if (!v.paused && !dragging) frame.classList.remove('ui'); }, 2500);
+  };
+  var hide = function () { clearTimeout(hideT); if (!v.paused && !dragging) frame.classList.remove('ui'); };
+
+  var play = function () {
+    var p = v.play();
+    if (p && p.catch) p.catch(function () {
+      // z. B. Stromsparmodus auf iOS: kein Autoplay, dann Vorschaubild mit Play-Knopf
+      if (state === 'preview') { setState('idle'); frame.classList.remove('ui'); }
+      sync();
+    });
+  };
+  var startWithSound = function () {
+    userPaused = false; v.loop = false; v.muted = false;
+    try { v.currentTime = 0; } catch (e) {}
+    setState('sound'); play(); sync(); hide();
+  };
+  var toggle = function () {
+    if (state === 'idle' || state === 'ended') return startWithSound();
+    if (v.paused) { userPaused = false; play(); } else { userPaused = true; v.pause(); }
+  };
+
+  frame.addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+    var a = b.getAttribute('data-act');
+    if (a === 'start') { startWithSound(); bToggle.focus({ preventScroll: true }); } // der Knopf blendet aus, der Fokus bleibt in der Leiste
+    else if (a === 'toggle') toggle();
+    else if (a === 'mute') {
+      v.muted = !v.muted;
+      if (!v.muted && state === 'preview') { v.loop = false; setState('sound'); }
+    }
+    show();
+  });
+  // Zustand der Leiste beim Antippen merken: Das Tippen fokussiert das Video, und focusin blendet die Leiste schon vor dem Klick ein
+  v.addEventListener('pointerdown', function (e) { lastPointer = e.pointerType || 'mouse'; uiAtDown = frame.classList.contains('ui'); });
+  v.addEventListener('click', function () {
+    // Auf Touch-Geräten holt das erste Tippen nur die Leiste
+    if (lastPointer === 'touch' && !uiAtDown && state !== 'idle') return show();
+    toggle(); show();
+  });
+  frame.addEventListener('pointermove', function (e) { if (e.pointerType !== 'touch') show(); });
+  frame.addEventListener('pointerleave', function (e) { if (e.pointerType !== 'touch') hide(); });
+  frame.addEventListener('focusin', show);
+  frame.addEventListener('keydown', function (e) {
+    if ((e.key === ' ' || e.key === 'Spacebar') && (e.target === v || e.target === seek)) { e.preventDefault(); toggle(); show(); }
+  });
+
+  // Fortschrittsbalken: klicken, ziehen, Pfeiltasten
+  var seekTo = function (t) { var d = D(); try { v.currentTime = Math.max(0, Math.min(d - 0.05, t)); } catch (e) {} paint(); };
+  var fromX = function (x) { var r = seek.getBoundingClientRect(); return (x - r.left) / r.width * D(); };
+  seek.addEventListener('pointerdown', function (e) {
+    if (e.button) return;
+    dragging = true; seek.classList.add('drag');
+    try { seek.setPointerCapture(e.pointerId); } catch (er) {}
+    seekTo(fromX(e.clientX)); show();
+  });
+  seek.addEventListener('pointermove', function (e) { if (dragging) { seekTo(fromX(e.clientX)); show(); } });
+  var end = function () { if (!dragging) return; dragging = false; seek.classList.remove('drag'); if (state === 'ended') { setState('sound'); } show(); };
+  seek.addEventListener('pointerup', end); seek.addEventListener('pointercancel', end);
+  seek.addEventListener('keydown', function (e) {
+    var k = e.key, t = v.currentTime || 0;
+    if (k === 'ArrowRight' || k === 'ArrowUp') t += 5; else if (k === 'ArrowLeft' || k === 'ArrowDown') t -= 5;
+    else if (k === 'Home') t = 0; else if (k === 'End') t = D(); else return;
+    e.preventDefault(); if (state === 'ended') setState('sound'); seekTo(t); show();
+  });
+
+  ['play', 'pause', 'volumechange', 'loadedmetadata', 'durationchange'].forEach(function (n) { v.addEventListener(n, sync); });
+  v.addEventListener('seeked', paint);
+  v.addEventListener('ended', function () { if (!v.loop) { setState('ended'); sync(); } });
+
+  // Vorschau: läuft stumm, solange der Rahmen zu mindestens 50 % sichtbar ist
+  if (auto) {
+    setState('preview');
+    new IntersectionObserver(function (es) {
+      var e = es[es.length - 1]; visible = e.isIntersecting && e.intersectionRatio >= 0.5;
+      if (visible) { if (state === 'preview' && !userPaused && v.paused) play(); }
+      else if (!v.paused) v.pause();
+    }, { threshold: [0, 0.5] }).observe(frame);
+  } else {
+    setState('idle');
+    if ('IntersectionObserver' in window) new IntersectionObserver(function (es) {
+      if (!es[es.length - 1].isIntersecting && !v.paused) v.pause();
+    }).observe(frame);
+  }
+  sync(); frame.classList.remove('ui');
+
+  // Beim Hineinscrollen wächst der Rahmen von .94 auf 1 (nur transform)
+  if (!reduce) {
+    var pending = false;
+    var grow = function () {
+      pending = false;
+      var r = frame.getBoundingClientRect(), vh = window.innerHeight || 800;
+      if (r.bottom < 0) return; // oberhalb: bleibt, wie er ist
+      var t = Math.max(0, Math.min(1, (vh - r.top) / (vh * 0.65))); // unterhalb: .94
+      t = 1 - Math.pow(1 - t, 3);
+      frame.style.transform = 'scale(' + (0.94 + 0.06 * t).toFixed(4) + ')';
+    };
+    var req = function () { if (!pending) { pending = true; requestAnimationFrame(grow); } };
+    addEventListener('scroll', req, { passive: true }); addEventListener('resize', req); req();
+  }
+})();

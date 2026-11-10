@@ -1,9 +1,13 @@
 {
-  // Cloudflare: evolsior.com als Workers-Projekt mit statischen Dateien (kein Code, nur site/public/)
+  // Cloudflare: evolsior.com als Workers-Projekt mit statischen Dateien aus site/public/.
+  // worker.js läuft nur für /assets/video/* (Byte-Ranges für Safari), alles andere kommt direkt als statische Datei.
   "name": "evolsior",
   "compatibility_date": "2025-09-01",
+  "main": "worker.js",
   "assets": {
     "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/assets/video/*"],
     "not_found_handling": "404-page"
   }
 }
