@@ -56,6 +56,18 @@ Google Analytics und der Cookie-Hinweis wurden wieder entfernt (verunsicherte nu
 - **API-Token:** My Profile → API Tokens → Create token → Custom: *Account → Account Analytics → Read*.
 - **Site tag:** steht in der Adresse der Seite unter Web Analytics (32 Zeichen). Die Account-ID ist vorausgefüllt.
 
+## Server selbst ausliefern (automatisch)
+
+Der VPS prüft alle 5 Minuten `main` (`stella-autodeploy.timer`, Skript `deploy/autodeploy.sh`, eingerichtet von `deploy/install-vps.sh`).
+Hat sich etwas für den Server geändert (`server/`, `shared/`, `web/`, `web-core/`, `deploy/`, `scripts/`, `package*.json`) **und ist die CI für genau
+diesen Commit grün**, liefert er sich selbst aus. Rote CI → wird nicht ausgeliefert. Kein Schlüssel nötig: beide Repos sind öffentlich.
+
+- Protokoll: `journalctl -u stella-autodeploy` · laufender Stand: `/var/lib/stella-autodeploy/deployed`
+- Abschalten: `STELLA_AUTODEPLOY=off` in `/etc/stella/autodeploy.env` (bleibt bei Updates erhalten) oder `systemctl disable --now stella-autodeploy.timer`
+- Von Hand (z. B. einen Branch): weiter `scripts/deploy-vps.sh`
+
+Der Cloudflare-Token für das Dashboard ist auf die IPv4-Adresse des Servers beschränkt; der Server fragt Cloudflare deshalb immer über IPv4.
+
 ## Dashboard als PC-App
 
 `dashboard-desktop/` ist ein Electron-Fenster um `dashboard.evolsior.com` (wie `desktop/` für Stella). GitHub Actions (*Dashboard-App*) baut bei Änderungen

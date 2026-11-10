@@ -166,10 +166,43 @@ else
   exit 1
 fi
 
+log "Selbst-Ausliefern (stella-autodeploy.timer: alle 5 Minuten main prüfen, nur bei grüner CI ausliefern)"
+# Das Skript liegt außerhalb von $APP, weil die Installation $APP leert, während es läuft
+install -D -m 755 "$SRC/deploy/autodeploy.sh" /usr/local/lib/stella/autodeploy.sh
+AUTO_CONF=$ENV_DIR/autodeploy.env
+AUTO_SWITCH=$(grep -s '^STELLA_AUTODEPLOY=' "$AUTO_CONF" || echo 'STELLA_AUTODEPLOY=on')
+printf '%s\nSTELLA_DOMAIN=%s\nSTELLA_ALIASES="%s"\n' "$AUTO_SWITCH" "$DOMAIN" "$ALIASES" > "$AUTO_CONF"
+cat > /etc/systemd/system/stella-autodeploy.service <<EOF
+[Unit]
+Description=Stella: neuen Stand von main ausliefern, wenn die CI grün ist
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/stella/autodeploy.sh
+TimeoutStartSec=45min
+EOF
+cat > /etc/systemd/system/stella-autodeploy.timer <<EOF
+[Unit]
+Description=Stella: alle 5 Minuten nach einem neuen Stand schauen
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=5min
+
+[Install]
+WantedBy=timers.target
+EOF
+systemctl daemon-reload
+systemctl enable --now stella-autodeploy.timer >/dev/null
+
 log "Prüfen"
 for _ in $(seq 1 20); do
   curl -fsS "http://127.0.0.1:$PORT/api/status" >/dev/null 2>&1 && break
   sleep 1
 done
 curl -fsS "http://127.0.0.1:$PORT/api/status" && echo
+# Welcher Stand jetzt läuft (für das Selbst-Ausliefern)
+if [[ -n ${STELLA_DEPLOYED_SHA:-} ]]; then mkdir -p /var/lib/stella-autodeploy; echo "$STELLA_DEPLOYED_SHA" > /var/lib/stella-autodeploy/deployed; fi
 echo "Fertig: https://$DOMAIN"

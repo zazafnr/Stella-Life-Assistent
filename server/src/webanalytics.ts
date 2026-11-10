@@ -2,6 +2,8 @@
 // Quelle: Cloudflare Web Analytics (ohne Cookies) über die GraphQL Analytics API, Token mit „Account Analytics: Read“.
 // Zugangsdaten: Umgebung vor Eintrag im Dashboard (verschlüsselt im Bereich __system__). Sie verlassen den Server nie.
 
+import { request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
 import type { FastifyInstance } from 'fastify';
 import { getSecret, HttpError, requireOwner, setSecret } from './auth.ts';
 import { SYSTEM_SCOPE } from './keys.ts';
@@ -77,15 +79,35 @@ const CF_QUERY = `query($account: string!, $siteTag: string!, $start: Time!, $en
 
 type CfGroup = { count: number; sum?: { visits: number }; dimensions: Record<string, string> };
 
-async function cfChunk(c: WebAnalyticsConfig, from: Date, to: Date) {
-  const res = await fetch(graphqlUrl(), {
-    method: 'POST', signal: AbortSignal.timeout(15_000),
-    headers: { Authorization: `Bearer ${c.cfApiToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: CF_QUERY, variables: { account: c.cfAccountId, siteTag: c.cfSiteTag, start: from.toISOString(), end: to.toISOString() } }),
+/**
+ * POST mit JSON, fest über IPv4. Der Cloudflare-Token ist auf die IPv4-Adresse des Servers beschränkt;
+ * fetch() würde oft IPv6 wählen und dann „Authentication error“ bekommen.
+ */
+function postJsonV4(url: string, token: string, payload: unknown): Promise<{ status: number; body: unknown }> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const data = JSON.stringify(payload);
+    const req = (u.protocol === 'http:' ? httpRequest : httpsRequest)(u, {
+      method: 'POST', family: 4, timeout: 15_000,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+    }, (res) => {
+      let raw = '';
+      res.setEncoding('utf8');
+      res.on('data', (c) => { raw += c; });
+      res.on('end', () => { let body: unknown = {}; try { body = JSON.parse(raw); } catch { /* leer lassen */ } resolve({ status: res.statusCode ?? 0, body }); });
+    });
+    req.on('timeout', () => req.destroy(new Error('Cloudflare did not answer in time.')));
+    req.on('error', reject);
+    req.end(data);
   });
-  const body = (await res.json().catch(() => ({}))) as { data?: { viewer?: { accounts?: Record<string, CfGroup[]>[] } }; errors?: { message: string }[] | null };
-  if (!res.ok || body.errors?.length) {
-    throw new Error(res.status === 401 || res.status === 403 ? 'Cloudflare rejects the API token (it needs “Account Analytics: Read”).' : `Cloudflare: ${body.errors?.[0]?.message ?? `error ${res.status}`}`);
+}
+
+async function cfChunk(c: WebAnalyticsConfig, from: Date, to: Date) {
+  const res = await postJsonV4(graphqlUrl(), c.cfApiToken, { query: CF_QUERY, variables: { account: c.cfAccountId, siteTag: c.cfSiteTag, start: from.toISOString(), end: to.toISOString() } });
+  const body = res.body as { data?: { viewer?: { accounts?: Record<string, CfGroup[]>[] } }; errors?: { message: string }[] | null; success?: boolean };
+  const authError = res.status === 401 || res.status === 403 || (body.success === false && !body.data);
+  if (res.status !== 200 || body.errors?.length || authError) {
+    throw new Error(authError ? 'Cloudflare rejects the API token. It needs “Account Analytics: Read”, and its IP filter must allow this server.' : `Cloudflare: ${body.errors?.[0]?.message ?? `error ${res.status}`}`);
   }
   return body.data?.viewer?.accounts?.[0] ?? {};
 }

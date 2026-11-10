@@ -53,10 +53,17 @@ echo "==> Zusammensetzen und prüfen"
 "$OPS" exec "rm -rf $SRC && mkdir -p $SRC && tar -xf $UPLOAD/stella.tar -C $SRC && rm -rf $UPLOAD" >/dev/null
 
 echo "==> Installieren (asynchron)"
-resp=$("$OPS" exec "cd $SRC && STELLA_DOMAIN=$DOMAIN STELLA_ALIASES=\"$ALIASES\" bash deploy/install-vps.sh" --async)
+resp=$("$OPS" exec "cd $SRC && STELLA_DOMAIN=$DOMAIN STELLA_ALIASES=\"$ALIASES\" STELLA_DEPLOYED_SHA=$(git rev-parse HEAD) bash deploy/install-vps.sh" --async)
 job=$(node -e 'const d=JSON.parse(process.argv[1]);console.log(d.job_id||(d.result&&d.result.job_id)||"")' "$resp")
 [[ -n $job ]] || { echo "Keine Job-Id erhalten: $resp" >&2; exit 1; }
-"$OPS" job "$job" --wait || { echo "Installation fehlgeschlagen (Job $job)." >&2; exit 1; }
+# Selbst warten: `ops job --wait` bricht ab, sobald der Job etwas ausgibt (die Ausgabe landet dann im Status)
+for _ in $(seq 1 270); do
+  st=$("$OPS" raw GET "/jobs/$job?offset_out=999999999" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log((JSON.parse(s).result||{}).state||"?")}catch{console.log("?")}})')
+  [[ $st == running ]] || break
+  sleep 10
+done
+"$OPS" job "$job" > "$work/install.log" 2>&1 || { tail -40 "$work/install.log" >&2; echo "Installation fehlgeschlagen (Job $job)." >&2; exit 1; }
+tail -3 "$work/install.log"
 
 echo "==> Prüfen"
 state=$("$OPS" exec 'systemctl is-active stella' || true)
