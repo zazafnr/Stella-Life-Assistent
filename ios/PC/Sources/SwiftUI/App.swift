@@ -80,7 +80,9 @@ extension Scene {
             _link(app)
             return _at(2) { _withAxis(.z) { _renderAny(app.body._view()) } }
         }
-        setvbuf(stdout, nil, _IOLBF, 0)
+        setvbuf(stdout, nil, _IONBF, 0)
+        print("Stella startet …")
+        if _webFile("index.html") == nil { print("Fensterdateien fehlen (Web/index.html im Paket nicht gefunden)") }
         _registerSystemLanguage()
         let server = _Server()
         server.title = appName
@@ -94,6 +96,7 @@ extension Scene {
         }
         let url = "http://127.0.0.1:\(port)/?t=\(server.token)"
         print("Stella läuft: \(url)")
+        fflush(stdout)
         if ProcessInfo.processInfo.environment["STELLA_PC_NO_BROWSER"] == nil { _openWindow(url) }
         R.invalidate()
         RunLoop.main.run()

@@ -36,18 +36,22 @@ jobs:
         run: |
           $env:STELLA_PC_NO_BROWSER = '1'
           $env:STELLA_PC_PORT = '47900'
-          $bin = Join-Path (swift build --package-path ios/PC/.work/Stella --show-bin-path) 'Stella.exe'
-          $p = Start-Process -FilePath $bin -PassThru -RedirectStandardOutput app.log -RedirectStandardError app.err
-          try {
-            $ok = $false
-            for ($i = 0; $i -lt 30 -and -not $ok; $i++) {
-              Start-Sleep -Seconds 1
-              try { $r = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:47900/ -TimeoutSec 3; $ok = $r.Content -match 'app.js' } catch {}
-            }
-            Get-Content app.log, app.err -ErrorAction SilentlyContinue
-            if (-not $ok) { throw 'Fenster-Seite antwortet nicht' }
-            Write-Host 'Fenster-Seite antwortet.'
-          } finally { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+          $binDir = swift build --package-path ios/PC/.work/Stella --show-bin-path
+          Write-Host "Programm: $binDir"
+          Get-ChildItem $binDir -Filter '*.resources' | ForEach-Object { Write-Host "Ressourcen: $($_.Name)"; Get-ChildItem $_.FullName -Recurse | Select-Object -First 8 | ForEach-Object { Write-Host "  $($_.FullName)" } }
+          $p = Start-Process -FilePath (Join-Path $binDir 'Stella.exe') -PassThru -RedirectStandardOutput app.log -RedirectStandardError app.err
+          $ok = $false; $last = ''
+          for ($i = 0; $i -lt 30 -and -not $ok; $i++) {
+            Start-Sleep -Seconds 1
+            if ($p.HasExited) { $last = "Programm beendet, Exit-Code $($p.ExitCode)"; break }
+            try { $r = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:47900/ -TimeoutSec 3; $ok = $r.Content -match 'app.js'; $last = "HTTP $($r.StatusCode)" } catch { $last = $_.Exception.Message }
+          }
+          Write-Host "Letzter Stand: $last"
+          Write-Host '--- Ausgabe ---'; Get-Content app.log -ErrorAction SilentlyContinue
+          Write-Host '--- Fehler ---'; Get-Content app.err -ErrorAction SilentlyContinue | Select-Object -First 80
+          if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+          if (-not $ok) { throw 'Fenster-Seite antwortet nicht' }
+          Write-Host 'Fenster-Seite antwortet.'
 
   linux:
     runs-on: ubuntu-latest
