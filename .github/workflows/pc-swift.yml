@@ -1,0 +1,65 @@
+name: Stella am PC (Swift)
+
+# Baut die echte iOS-App mit der PC-Ersatzschicht (ios/PC) unter Windows und Linux
+# und prüft, dass das Fenster antwortet. So fällt auf, wenn eine App-Änderung etwas
+# braucht, das die Schicht noch nicht kann.
+on:
+  push:
+    paths:
+      - "ios/**"
+      - ".github/workflows/pc-swift.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: pc-swift-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Swift 6.1.2 für Windows
+        uses: compnerd/gha-setup-swift@main
+        with:
+          branch: swift-6.1.2-release
+          tag: 6.1.2-RELEASE
+
+      - name: Bauen
+        shell: pwsh
+        run: ./ios/PC/scripts/stella-pc.ps1 -BuildOnly
+
+      - name: Starten und Fenster abfragen
+        shell: pwsh
+        run: |
+          $env:STELLA_PC_NO_BROWSER = '1'
+          $env:STELLA_PC_PORT = '47900'
+          $bin = Join-Path (swift build --package-path ios/PC/.work/Stella --show-bin-path) 'Stella.exe'
+          $p = Start-Process -FilePath $bin -PassThru -RedirectStandardOutput app.log -RedirectStandardError app.err
+          try {
+            $ok = $false
+            for ($i = 0; $i -lt 30 -and -not $ok; $i++) {
+              Start-Sleep -Seconds 1
+              try { $r = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:47900/ -TimeoutSec 3; $ok = $r.Content -match 'app.js' } catch {}
+            }
+            Get-Content app.log, app.err -ErrorAction SilentlyContinue
+            if (-not $ok) { throw 'Fenster-Seite antwortet nicht' }
+            Write-Host 'Fenster-Seite antwortet.'
+          } finally { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container: swift:6.1.2-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bauen
+        run: ios/PC/scripts/stella-pc.sh --build-only
+      - name: Starten und Fenster abfragen
+        run: |
+          apt-get update -qq && apt-get install -y -qq curl >/dev/null
+          STELLA_PC_NO_BROWSER=1 STELLA_PC_PORT=47900 ios/PC/.work/Stella/.build/debug/Stella > app.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:47900/ | grep -q app.js && { echo "Fenster-Seite antwortet."; exit 0; }; sleep 1; done
+          cat app.log; exit 1
