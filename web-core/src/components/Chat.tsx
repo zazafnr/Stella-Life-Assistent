@@ -26,6 +26,23 @@ const fallbackActions = (t: (k: string) => string): QuickAction[] => [
   { id: 'briefing', icon: 'sun', label: t('quick.briefing.label'), kind: 'send', text: t('quick.briefing.text') },
 ];
 
+/** Blasen im Wetter-Look (Design-Auswahl „Blasen B“), wie in der iOS-App (ChatMood.swift) */
+type ChatMood = 'sun' | 'cloud' | 'rain' | 'snow' | 'night';
+function chatMood(w: { type: string; day: boolean } | null, on: boolean): ChatMood {
+  if (!w || !on) return 'cloud';
+  if (!w.day) return 'night';
+  if (w.type === 'clear' || w.type === 'partly') return 'sun';
+  if (w.type === 'snow' || w.type === 'sleet') return 'snow';
+  if (['drizzle', 'rain', 'heavy_rain', 'thunder'].includes(w.type)) return 'rain';
+  return 'cloud';
+}
+
+/** Stella schreibt wie ein Mensch: ein Gedanke pro Blase – 2 bis 4 Absätze werden einzelne Nachrichten, längere Antworten bleiben zusammen */
+function splitParts(text: string): string[] {
+  const parts = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  return parts.length >= 2 && parts.length <= 4 ? parts : [text];
+}
+
 function timeLabel(iso: string, locale: string) {
   return new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 }
@@ -152,7 +169,7 @@ export function Chat() {
   return (
     <div style={{ display: 'flex', flex: 1, minHeight: 0, minWidth: 0 }}>
       <aside className="chat-history" aria-label={t('chat.chats')}><ChatHistory onNew={() => void startNew()} /></aside>
-      <div className={showWeather ? 'chat has-weather' : 'chat'} data-scene={scene}>
+      <div className={showWeather ? 'chat has-weather' : 'chat'} data-scene={scene} data-mood={chatMood(weather, showWeather)}>
         {showWeather && <WeatherBackground />}
         <header className="chat-head">
           <span className="avatar-star"><StarMark size={19} /></span>
@@ -193,27 +210,47 @@ export function Chat() {
               return (
                 <div key={m.id}>
                   {showDay && <div className="day-sep">{day}</div>}
-                  <div className={`bubble-row ${m.role}`}>
-                    <div className={`bubble ${m.role}${m.pending ? ' pending' : ''}`}>
-                      {m.attachments.filter((a) => a.kind === 'audio').map((a) => (m.role === 'user' && m.text && !m.failedAudioId
-                        ? <VoiceLine key={a.id} att={a} text={m.text} />
-                        : <AudioPlayer key={a.id} id={a.id} />))}
-                      {m.text && <Rich text={m.text} />}
-                      {m.failedAudioId && (
-                        <button type="button" className="btn small secondary" disabled={thinking}
-                          onClick={() => void retryAudio(m.id).catch((err: Error) => setError(err.message))}>{t('chat.retry')}</button>
-                      )}
-                      {m.attachments.filter((a) => a.kind !== 'audio').map((a) => <AuthImage key={a.id} id={a.id} alt={a.caption} onOpen={setLightbox} />)}
-                      {m.actionId && <ActionCard id={m.actionId} />}
-                      {m.card?.type === 'places' && <PlacesCard card={m.card} />}
-                      {m.card?.type === 'news_ask' && <NewsAskCard />}
-                      {m.card?.type === 'restaurants' && <RestaurantsCardView card={m.card} />}
-                      {m.card?.type === 'availability' && <AvailabilityCardView card={m.card} />}
-                      {m.card?.type === 'location_ask' && <LocationAskCard />}
-                      {m.card?.type === 'spending' && <SpendingCard card={m.card} />}
-                      <span className="meta">{m.via === 'telegram' && <span title="Telegram" aria-label="Telegram" style={{ marginRight: 4 }}><Icon name="send" size={11} /></span>}{m.pending ? t('chat.sending') : timeLabel(m.createdAt, locale)}</span>
-                    </div>
-                  </div>
+                  {(() => {
+                    const parts = m.role === 'assistant' && m.text ? splitParts(m.text) : [m.text];
+                    const meta = <span className="meta">{m.via === 'telegram' && <span title="Telegram" aria-label="Telegram" style={{ marginRight: 4 }}><Icon name="send" size={11} /></span>}{m.pending ? t('chat.sending') : timeLabel(m.createdAt, locale)}</span>;
+                    return (
+                      <div className={`bubble-group ${m.role}`}>
+                        {parts.map((part, i) => {
+                          const first = i === 0, last = i === parts.length - 1;
+                          return (
+                            <div key={i} className={`bubble-row ${m.role}`}>
+                              <div className={`bubble ${m.role}${m.pending ? ' pending' : ''}${last ? '' : ' cont'}`}>
+                                {first && m.attachments.filter((a) => a.kind === 'audio').map((a) => (m.role === 'user' && m.text && !m.failedAudioId
+                                  ? <VoiceLine key={a.id} att={a} text={m.text} />
+                                  : <AudioPlayer key={a.id} id={a.id} />))}
+                                {part && <Rich text={part} />}
+                                {last && m.failedAudioId && (
+                                  <button type="button" className="btn small secondary" disabled={thinking}
+                                    onClick={() => void retryAudio(m.id).catch((err: Error) => setError(err.message))}>{t('chat.retry')}</button>
+                                )}
+                                {last && m.attachments.filter((a) => a.kind !== 'audio').map((a) => <AuthImage key={a.id} id={a.id} alt={a.caption} onOpen={setLightbox} />)}
+                                {last && meta}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {/* Was Stella getan hat oder vorschlägt, steht als kleine Karte unter der Nachricht */}
+                        {(m.actionId || m.card) && (
+                          <div className={`bubble-row ${m.role}`}>
+                            <div className="chat-cards">
+                              {m.actionId && <ActionCard id={m.actionId} />}
+                              {m.card?.type === 'places' && <div className="chat-card"><PlacesCard card={m.card} /></div>}
+                              {m.card?.type === 'news_ask' && <div className="chat-card"><NewsAskCard /></div>}
+                              {m.card?.type === 'restaurants' && <div className="chat-card"><RestaurantsCardView card={m.card} /></div>}
+                              {m.card?.type === 'availability' && <div className="chat-card"><AvailabilityCardView card={m.card} /></div>}
+                              {m.card?.type === 'location_ask' && <div className="chat-card"><LocationAskCard /></div>}
+                              {m.card?.type === 'spending' && <div className="chat-card"><SpendingCard card={m.card} /></div>}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}

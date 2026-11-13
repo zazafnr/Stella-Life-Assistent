@@ -191,7 +191,7 @@ input:focus, textarea:focus, select:focus { box-shadow: 0 0 0 3px color-mix(in s
 /* PC-App: Wetter hinter dem Chat; die Spalte der Nachrichten bleibt gut lesbar */
 .chat.has-weather .chat-scroll, .chat.has-weather .suggestions, .chat.has-weather .composer-wrap { background: transparent; }
 .chat.has-weather .chat-head { background: rgba(255, 255, 255, .78); backdrop-filter: blur(10px); }
-.chat.has-weather .chat-inner { background: rgba(255, 255, 255, .55); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, .7); padding: 16px 18px; border-radius: 16px; max-width: 880px; }
+.chat.has-weather .chat-inner { background: none; backdrop-filter: none; border: 0; padding: 12px 6px; max-width: 880px; }
 .chat.has-weather .day-sep { color: var(--text-2); }
 .chat[data-scene='dark'] .chat-head { background: rgba(14, 22, 40, .6); }
 .chat[data-scene='dark'] .composer { background: rgba(27, 39, 64, .92); }

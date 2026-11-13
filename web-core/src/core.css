@@ -753,3 +753,92 @@ textarea.cookies { min-height: 90px; font-family: ui-monospace, monospace; font-
 .st-bars { display: flex; align-items: flex-end; gap: 3px; height: 40px; margin-top: 6px; }
 .st-bar { flex: 1; border-radius: 3px; background: var(--blue); opacity: .55; min-height: 3px; }
 .st-bar.over { background: var(--pink); opacity: .9; }
+
+/* ---------- Chat: Blasen im Wetter-Look, direkt auf dem Himmel (Design-Auswahl „Blasen B“, wie iOS ChatMood) ---------- */
+.chat[data-mood] .chat-inner {
+  background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 12px 6px; border-radius: 0;
+}
+.bubble-group { display: flex; flex-direction: column; gap: 4px; }
+.bubble.assistant.cont { border-bottom-left-radius: 20px; }
+.bubble.user.cont { border-bottom-right-radius: 20px; }
+.chat.has-weather .bubble.assistant { position: relative; }
+.chat[data-mood='sun'] .bubble.assistant { background: linear-gradient(160deg, rgba(255, 252, 240, .94), rgba(255, 244, 214, .86)); border: 1px solid rgba(255, 214, 120, .85); box-shadow: 0 6px 18px rgba(255, 170, 40, .18); color: var(--text); }
+.chat[data-mood='sun'] .bubble.user { background: linear-gradient(135deg, #2E86FF, #36B6FF); }
+.chat.has-weather[data-mood='cloud'] .bubble.assistant { background: rgba(255, 255, 255, .6); -webkit-backdrop-filter: blur(14px) saturate(1.3); backdrop-filter: blur(14px) saturate(1.3); border: 1px solid rgba(255, 255, 255, .7); }
+.chat[data-mood='rain'] .bubble.assistant { background: rgba(236, 243, 250, .66); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, .6); color: #0F2A4A; }
+.chat[data-mood='rain'] .bubble.assistant::before { content: ""; position: absolute; top: 4px; right: 12px; width: 44px; height: 10px; pointer-events: none;
+  background: radial-gradient(circle at 5px 5px, rgba(255, 255, 255, .95) 2px, transparent 3px), radial-gradient(circle at 21px 7px, rgba(255, 255, 255, .8) 1.5px, transparent 2.5px), radial-gradient(circle at 37px 4px, rgba(255, 255, 255, .9) 2.2px, transparent 3.2px); }
+.chat[data-mood='rain'] .bubble.user { background: linear-gradient(135deg, #245A8F, #3B7BB8); }
+.chat[data-mood='snow'] .bubble.assistant { background: rgba(255, 255, 255, .88); border: 1.5px solid #DBE9FB; box-shadow: 0 0 0 3px rgba(255, 255, 255, .35); color: #0F2A4A; }
+.chat[data-mood='snow'] .bubble.assistant::after { content: "❄"; position: absolute; top: -8px; right: -4px; font-size: 12px; color: #8FB6E6; }
+.chat[data-mood='snow'] .bubble.user { background: linear-gradient(135deg, #7B8CFF, #5AA8FF); }
+.chat[data-mood='night'] .bubble.assistant { background: rgba(22, 34, 72, .74); border: 1px solid rgba(150, 170, 255, .35); color: #EEF3FF; box-shadow: 0 0 18px rgba(120, 140, 255, .25); }
+.chat[data-mood='night'] .bubble.assistant::after { content: "✦"; position: absolute; top: -7px; left: -3px; font-size: 11px; color: #FFD98A; }
+.chat[data-mood='night'] .bubble.user { background: linear-gradient(135deg, #6D4AFF, #A35BFF); box-shadow: 0 0 16px rgba(160, 90, 255, .4); }
+.chat[data-mood='night'] .bubble.assistant a { color: #9CC2FF; }
+.chat:not(.has-weather) .bubble.assistant::before, .chat:not(.has-weather) .bubble.assistant::after { content: none; }
+
+/* Karten unter einer Nachricht (Aktionen, Orte, Restaurants …) */
+.chat-cards { display: flex; flex-direction: column; gap: 6px; max-width: min(82%, 380px); margin-top: 2px; }
+.chat-card, .action-box { background: rgba(255, 255, 255, .96); color: #0F2A4A; border-radius: 16px; padding: 10px 12px; box-shadow: 0 6px 18px rgba(15, 42, 74, .1); animation: pop .45s cubic-bezier(.2, .9, .25, 1.1) both; }
+.action-box { display: flex; gap: 10px; align-items: flex-start; }
+.action-box .action-card { margin-top: 4px; }
+.action-ic { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; }
+.action-ic.blue { background: #E6F0FF; color: #1F6FEB; }
+.action-ic.green { background: #E3F7EC; color: #138A4B; }
+.action-ic.pink { background: #FFE8F1; color: #C0306E; }
+.action-ic.violet { background: #EFEAFF; color: #6D4AFF; }
+.action-body { display: flex; flex-direction: column; min-width: 0; }
+.action-title { font-size: 14px; font-weight: 600; line-height: 1.35; }
+.hint-actions .action-box { box-shadow: none; padding: 0; background: none; }
+
+/* ---------- Heute: Begrüßung als Wetter-Karte (Extras 1) ---------- */
+.weather-hero { position: relative; overflow: hidden; isolation: isolate; border-radius: 26px; padding: 20px 22px; min-height: 180px; color: #fff;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px;
+  box-shadow: 0 16px 36px color-mix(in srgb, #1F6FEB 26%, transparent); }
+.weather-hero .wh-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.weather-hero .wh-when { font-size: 14px; font-weight: 600; opacity: .9; }
+.weather-hero .wh-temp { font: 800 46px/1 ui-rounded, 'Nunito', system-ui, sans-serif; margin-top: 18px; }
+.weather-hero h1 { color: #fff; font-size: clamp(24px, 4vw, 32px); margin: 4px 0 0; text-wrap: balance; }
+.weather-hero .wh-type { font-size: 14px; font-weight: 500; opacity: .9; }
+.weather-hero .wh-actions { display: flex; gap: 8px; }
+.weather-hero .wh-actions .btn { background: rgba(255, 255, 255, .22); color: #fff; box-shadow: none; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.weather-hero .wh-art { position: absolute; z-index: -1; right: 14px; top: 14px; width: 120px; height: 120px; border-radius: 50%; pointer-events: none; }
+.weather-hero.art-sun .wh-art { background: radial-gradient(circle, #FFF3B8 0 30%, rgba(255, 236, 150, .45) 31% 46%, rgba(255, 236, 150, .18) 47% 66%, transparent 67%); }
+.weather-hero.art-moon .wh-art { background: radial-gradient(circle at 60% 40%, transparent 0 26%, #F4F1FF 27% 36%, transparent 37%),
+  radial-gradient(circle, rgba(255, 255, 255, .9) 1.5px, transparent 2px) 0 0 / 34px 34px; opacity: .85; }
+.weather-hero.art-cloud .wh-art, .weather-hero.art-rain .wh-art, .weather-hero.art-snow .wh-art {
+  background: radial-gradient(ellipse 40% 26% at 40% 55%, rgba(255, 255, 255, .55) 98%, transparent), radial-gradient(ellipse 34% 30% at 62% 45%, rgba(255, 255, 255, .5) 98%, transparent); }
+.weather-hero.art-rain::after, .weather-hero.art-snow::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .45; }
+.weather-hero.art-rain::after { background: repeating-linear-gradient(104deg, transparent 0 13px, rgba(255, 255, 255, .4) 13px 14px, transparent 14px 31px); }
+.weather-hero.art-snow::after { background: radial-gradient(#fff 1.6px, transparent 2.2px) 0 0 / 44px 44px, radial-gradient(#fff 1.1px, transparent 1.7px) 13px 9px / 27px 27px; }
+
+/* ---------- Heute: Ziele als Ringe (Ziele A) ---------- */
+.goal-rings { all: unset; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; width: 100%; margin-bottom: 14px; cursor: pointer; color: var(--text); }
+.goal-rings:focus-visible { outline: 3px solid var(--blue); outline-offset: 4px; border-radius: 18px; }
+.goal-rings-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.goal-ring { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px; background: var(--surface); border-radius: 18px;
+  box-shadow: var(--shadow); text-align: center; transition: transform .2s; }
+.goal-rings:hover .goal-ring { transform: translateY(-2px); }
+.goal-ring svg { color: var(--text); }
+.goal-ring-title { font-size: 12.5px; font-weight: 600; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ---------- Heute: News als Story-Karussell (News B) ---------- */
+.news-stories { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; min-width: 0; }
+.news-strip { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 2px 10px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.news-strip::-webkit-scrollbar { display: none; }
+.news-story { position: relative; flex: none; width: 220px; height: 270px; border-radius: 22px; overflow: hidden; scroll-snap-align: start; color: #fff; text-decoration: none;
+  background-size: cover; background-position: center; display: flex; align-items: flex-end; box-shadow: 0 10px 24px rgba(15, 42, 74, .18); transition: transform .2s; }
+.news-story:hover { transform: translateY(-3px); }
+.news-story:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+.news-story .ns-shade { position: absolute; inset: 0; background: linear-gradient(transparent 30%, rgba(0, 0, 0, .15) 50%, rgba(5, 15, 35, .8)); }
+.news-story .ns-body { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 14px; }
+.news-story .ns-title { font-size: 15px; font-weight: 700; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.news-story .ns-src { font-size: 12px; font-weight: 600; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ns-topic { align-self: flex-start; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 999px; }
+.ns-topic.blue { background: #E6F0FF; color: #1F6FEB; } .ns-topic.green { background: #E3F7EC; color: #138A4B; }
+.ns-topic.pink { background: #FFE8F1; color: #C0306E; } .ns-topic.gold { background: #FFF3D6; color: #A86B00; }
+@media (prefers-reduced-motion: reduce) { .news-story, .goal-ring { transition: none; } }
+/* Karten bleiben auch in dunklen Szenen hell (eigene helle Farbwerte statt der dunklen Chat-Werte) */
+.chat[data-scene='dark'] .chat-card, .chat[data-scene='dark'] .action-box {
+  --text: #0F2A4A; --text-2: #3B5170; --muted: #5B7190; --surface: #fff; --surface-2: #F5F9FF; --border: #DCE7F5; --border-strong: #C5D5EA; --tint: #E6F0FF; color: #0F2A4A; }

@@ -22,7 +22,7 @@ struct WeatherHeroCard: View {
         case "cloudy", "fog": return [Color(hex: 0x7F93AA), Color(hex: 0xA9B8C9)]
         case "drizzle", "rain": return [Color(hex: 0x5E7690), Color(hex: 0x8499AF)]
         case "heavy_rain", "thunder": return [Color(hex: 0x2F3A4C), Color(hex: 0x4C5A6E)]
-        case "snow", "sleet": return [Color(hex: 0x8FA6C4), Color(hex: 0xB9C9DD)]
+        case "snow", "sleet": return [Color(hex: 0x6F88AA), Color(hex: 0x9DB2CE)]
         default: return [Color(hex: 0x3E8FE8), Color(hex: 0x79BDFF)]
         }
     }
