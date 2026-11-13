@@ -26,7 +26,7 @@ Die iPhone-Bilder (`site/public/assets/stella/*.jpg`, 1179×2556, mit Statusleis
 
 Die Stella-Seite zeigt direkt nach dem Hero die Sektion „Film“ (`#film`; Quellen `stella.body.html`, `stella.css`, `stella.js`).
 
-- **Dateien:** `site/public/assets/video/stella-film-2.mp4` (1920×1080, H.264 + AAC, faststart, nur Soundeffekte) und `stella-film-2.jpg` (Vorschaubild).
+- **Dateien:** `site/public/assets/video/stella-film-3.mp4` (1920×1080, 60 fps – aus der 30-fps-Fassung hochgerechnet, H.264 + AAC, faststart, nur Soundeffekte; neue Fassung immer unter neuem Namen, `/assets/*` wird ein Jahr gecacht) und `stella-film-2.jpg` (Vorschaubild).
   Version 2 = gleiches Bild wie Version 1, Ton um 6 dB leiser (nur die Tonspur neu kodiert: `ffmpeg -c:v copy -af volume=0.5 -c:a aac -b:a 112k -movflags +faststart`).
   Liegen direkt in `site/public/` (nicht in `site-src/`), der Build lässt sie unberührt.
 - **Versionierung:** `/assets/*` wird ein Jahr gecacht (`_headers`, `immutable`). Ein neuer Schnitt bekommt deshalb einen neuen Namen
@@ -41,7 +41,7 @@ Die Stella-Seite zeigt direkt nach dem Hero die Sektion „Film“ (`#film`; Que
 - **Limit:** Im Free-Plan zählt jede Video-Anfrage (auch jede einzelne Range-Anfrage beim Spulen) zum Worker-Limit von 100 000 Anfragen pro Tag.
   Statische Dateien zählen nicht dazu.
 - **Lokal prüfen:** in `site/` `npx wrangler dev`, dann
-  `curl -sI -H "Range: bytes=0-1" http://localhost:8787/assets/video/stella-film-2.mp4` → `206`, `Content-Range: bytes 0-1/…`.
+  `curl -sI -H "Range: bytes=0-1" http://localhost:8787/assets/video/stella-film-3.mp4` → `206`, `Content-Range: bytes 0-1/…`.
 
 ## Besucherzahlen (Website)
 
