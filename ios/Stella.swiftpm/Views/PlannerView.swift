@@ -10,6 +10,8 @@ struct PlannerView: View {
     @State private var showAdd = false
     @State private var showCalendar = false
     @State private var planning = Demo.opens("weekplan")
+    /** Richtung des letzten Wochenwechsels (1 = vor, -1 = zurück), damit die Wochenleiste in die richtige Richtung gleitet */
+    @State private var weekDirection = 1
 
     /** HÜs nur in der Schule, Tests und Lernplan in Schule und Studium */
     private var availableFilters: [Filter] {
@@ -121,13 +123,13 @@ struct PlannerView: View {
             Text(L("nav.planner")).font(Theme.display(32)).foregroundStyle(Theme.text)
             Spacer()
             HStack(spacing: 4) {
-                circleButton("chevron.left") { day = Day.add(-7, to: day) }
+                circleButton("chevron.left") { shiftWeek(-1) }
                 Button(L("ios.week", ["kw": kw])) { day = today }
                     .font(.system(size: 14, weight: .semibold))
                     .padding(.horizontal, 12)
                     .frame(height: 36)
                     .background(.white, in: Capsule())
-                circleButton("chevron.right") { day = Day.add(7, to: day) }
+                circleButton("chevron.right") { shiftWeek(1) }
                 circleButton("calendar") { showCalendar = true }
                 circleButton("plus", filled: true) { showAdd = true }
                     .padding(.leading, 6)
@@ -176,7 +178,24 @@ struct PlannerView: View {
                 .buttonStyle(PressableStyle())
             }
         }
+        .id(monday)
+        .transition(.asymmetric(
+            insertion: .move(edge: weekDirection > 0 ? .trailing : .leading).combined(with: .opacity),
+            removal: .opacity))
+        // zwischen den Wochen wischen: nach links = nächste Woche, nach rechts = vorige
+        .contentShape(Rectangle())
+        .simultaneousGesture(DragGesture(minimumDistance: 24).onEnded { v in
+            let dx = v.translation.width
+            guard abs(dx) > 40, abs(dx) > abs(v.translation.height) * 1.5 else { return }
+            shiftWeek(dx < 0 ? 1 : -1)
+        })
         .sensoryFeedback(.selection, trigger: day)
+    }
+
+    /** eine Woche vor oder zurück; der gewählte Wochentag bleibt gleich */
+    private func shiftWeek(_ delta: Int) {
+        weekDirection = delta
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { day = Day.add(7 * delta, to: day) }
     }
 
     private var dayTitle: String {

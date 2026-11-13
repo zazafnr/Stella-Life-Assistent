@@ -2,7 +2,7 @@
 
 import type { Situation } from './types.ts';
 
-export const ONBOARDING_STEPS = ['language', 'welcome', 'name', 'situation', 'freenotes', 'age', 'details', 'features', 'location', 'mail', 'tone', 'briefing', 'done'] as const;
+export const ONBOARDING_STEPS = ['language', 'welcome', 'name', 'situation', 'freenotes', 'age', 'details', 'features', 'location', 'calendar', 'mail', 'tone', 'briefing', 'done'] as const;
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
 /** Schritte je Lebenssituation: FreeNotes nur in der Schule, Details nur, wo es etwas einzustellen gibt. */

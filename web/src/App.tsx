@@ -26,7 +26,6 @@ const TABS: [Tab, IconName, string][] = [
   ['today', 'sparkle', 'nav.today'],
   ['chat', 'chat', 'nav.chat'],
   ['calendar', 'calendar', 'nav.calendar'],
-  ['goals', 'target', 'nav.goals'],
   ['inbox', 'inbox', 'nav.inbox'],
 ];
 const ALL: Tab[] = ['today', 'chat', 'calendar', 'goals', 'inbox', 'health', 'finance', 'plan', 'settings'];
@@ -99,8 +98,10 @@ export function App() {
 
   const introLayer = intro ? <Intro onDone={() => setIntro(false)} /> : null;
 
-  const main = TABS.filter(([id]) => (id !== 'inbox' || meHas(me, 'mails')) && (id !== 'goals' || meHas(me, 'goals')));
+  const main = TABS.filter(([id]) => id !== 'inbox' || meHas(me, 'mails'));
+  // Ziele sind kein Haupt-Tab mehr (Einstieg über „Heute“), nur noch unter „Mehr“ wie in Stella for Students
   const more: [Tab, IconName, string][] = [
+    ...(meHas(me, 'goals') ? [['goals', 'target', 'nav.goals'] as [Tab, IconName, string]] : []),
     ...(meHas(me, 'health') ? [['health', 'heart', 'nav.health'] as [Tab, IconName, string]] : []),
     ...(meHas(me, 'finance') ? [['finance', 'wallet', 'nav.finance'] as [Tab, IconName, string]] : []),
     ['plan', 'star', 'settings.plan'],

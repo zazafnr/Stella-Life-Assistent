@@ -24,14 +24,16 @@ struct TodayView: View {
                 Sky()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        header.rise(0)
+                        WeatherHeroCard(greeting: "\(greeting), \(store.me?.firstName ?? "du")!", offline: !store.online, onSettings: { showSettings = true })
+                            .rise(0)
+                        // Ziele als Ringe direkt unter der Begrüßung (Design-Auswahl „Ziele A“)
+                        if store.me?.has("goals") != false { GoalsCardView(go: { go(.goals) }) }
                         BriefingCardView(onOpen: { tab in
                             if tab == "finance" { showFinance = true } else { go(tab == "inbox" ? .inbox : (tab == "goals" ? .goals : .chat)) }
                         })
                         if store.me?.has("shopping") == true { ShoppingCardView() }
                         StellaPlanCardView(open: { showPlan = true })
                         if store.me?.has("finance") == true { FinanceCardView(open: { showFinance = true }) }
-                        if store.me?.has("goals") != false { GoalsCardView(go: { go(.goals) }) }
                         dueCard.rise(1)
                         HStack(spacing: 14) {
                             examCard
@@ -64,50 +66,6 @@ struct TodayView: View {
     // MARK: Teile
 
     /// Kleine Wetteranzeige; die Szenen mit Animation kommen in Paket 8
-    private static func weatherSymbol(_ w: WeatherState) -> String {
-        switch w.type {
-        case "clear", "partly": return w.day ? "sun.max.fill" : "moon.stars.fill"
-        default: return "cloud.fill"
-        }
-    }
-
-    private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 10) {
-                    Text(Date().formatted(.dateTime.locale(Day.locale).weekday(.wide).day().month(.wide)))
-                    if let w = WeatherService.shared.current {
-                        Label("\(w.temp)°", systemImage: Self.weatherSymbol(w))
-                            .labelStyle(.titleAndIcon)
-                            .accessibilityLabel(L("weather.chip", ["type": L("weather.type.\(w.type)"), "temp": w.temp]))
-                    }
-                }
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Theme.muted)
-                Text("\(greeting), \(store.me?.firstName ?? "du")!")
-                    .font(Theme.display(32))
-                    .foregroundStyle(Theme.text)
-                if !store.online {
-                    Label(L("ios.offline.i.will.sync"), systemImage: "wifi.slash")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Theme.muted)
-                        .padding(.top, 2)
-                }
-            }
-            Spacer()
-            Button { showSettings = true } label: {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 18))
-                    .foregroundStyle(Theme.muted)
-                    .frame(width: 44, height: 44)
-                    .background(.white.opacity(0.85), in: Circle())
-                    .shadow(color: Theme.blue.opacity(0.12), radius: 10, y: 4)
-            }
-            .accessibilityLabel(L("nav.settings"))
-        }
-        .padding(.top, 12)
-    }
-
     private var greeting: String {
         let h = Calendar.current.component(.hour, from: Date())
         return h < 11 ? L("today.greeting.morning") : h < 18 ? L("today.greeting.afternoon") : L("today.greeting.evening")
@@ -414,12 +372,21 @@ struct BriefingCardView: View {
         let morning = Calendar.current.component(.hour, from: Date()) < 12
         let sections = morning ? (briefing?.sections ?? []) : []
         let hints = (briefing?.hints ?? []).filter { !gone.contains($0.key) }
-        Group {
-            if !sections.isEmpty || !hints.isEmpty {
+        let news = briefing?.news ?? []
+        VStack(alignment: .leading, spacing: 10) {
+            // News als Story-Karussell mit Bildern (Design-Auswahl „News B“), den ganzen Tag
+            if !news.isEmpty {
+                Text(L("ios.your.news")).eyebrow()
+                NewsStoriesView(news: news) { n in reading = URL(string: n.url).map(ReadingURL.init) }
+                    .rise(1)
+            }
+            if !sections.contains(where: { $0.id != "news" }) && hints.isEmpty {
+                EmptyView()
+            } else {
                 VStack(alignment: .leading, spacing: 12) {
-                    if !sections.isEmpty {
+                    if sections.contains(where: { $0.id != "news" }) {
                         Text(L("ios.your.overview")).eyebrow()
-                        ForEach(sections) { s in
+                        ForEach(sections.filter { $0.id != "news" }) { s in
                             HStack(alignment: .top, spacing: 12) {
                                 Text(icons[s.id] ?? "•").font(.system(size: 18)).frame(width: 26)
                                 VStack(alignment: .leading, spacing: 2) {
@@ -446,7 +413,7 @@ struct BriefingCardView: View {
                         }
                     }
                     if !hints.isEmpty {
-                        Text(L("ios.i.noticed")).eyebrow(color: Theme.pinkText).padding(.top, sections.isEmpty ? 0 : 4)
+                        Text(L("ios.i.noticed")).eyebrow(color: Theme.pinkText).padding(.top, sections.contains(where: { $0.id != "news" }) ? 4 : 0)
                         ForEach(hints) { h in
                             HintRowView(hint: h, onOpen: onOpen, onGone: { withAnimation(.spring) { _ = gone.insert(h.key) } })
                                 .transition(.opacity.combined(with: .move(edge: .top)))

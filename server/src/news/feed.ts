@@ -3,7 +3,7 @@
 
 import { isNewsTopic, type NewsTopic } from './sources.ts';
 
-export interface FeedItem { title: string; url: string; teaser: string; publishedAt: number; categories: string[] }
+export interface FeedItem { title: string; url: string; teaser: string; publishedAt: number; categories: string[]; image?: string }
 export interface ParsedFeed { title: string; items: FeedItem[] }
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', hellip: '…', ndash: '–', mdash: '—', laquo: '«', raquo: '»', rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”' };
@@ -48,6 +48,25 @@ function itemLink(block: string): string {
   return guid && /^https?:\/\//i.test(plain(guid, 2000)) ? plain(guid, 2000) : '';
 }
 
+/** Vorschaubild einer Meldung: media:content/media:thumbnail, ein Bild-Enclosure oder das erste <img> im Text. Nur https. */
+export function itemImage(block: string): string | undefined {
+  const attr = (tagText: string, name: string) => new RegExp(`\\b${name}=["']([^"']+)["']`, 'i').exec(tagText)?.[1];
+  const candidates: string[] = [];
+  for (const m of block.matchAll(/<media:(?:content|thumbnail)\b[^>]*>/gi)) {
+    const medium = attr(m[0], 'medium'), type = attr(m[0], 'type');
+    if ((medium && medium !== 'image') || (type && !type.startsWith('image/'))) continue;
+    const u = attr(m[0], 'url'); if (u) candidates.push(u);
+  }
+  for (const m of block.matchAll(/<enclosure\b[^>]*>/gi)) {
+    const type = attr(m[0], 'type'), u = attr(m[0], 'url');
+    if (u && (type?.startsWith('image/') || /\.(jpe?g|png|webp)(\?|$)/i.test(u))) candidates.push(u);
+  }
+  const html = decodeEntities(tag(block, 'content:encoded') ?? tag(block, 'description') ?? tag(block, 'summary') ?? tag(block, 'content') ?? '');
+  const img = /<img\b[^>]*\bsrc=["']([^"']+)["']/i.exec(html)?.[1];
+  if (img) candidates.push(img);
+  return candidates.map((u) => decodeEntities(u).trim()).find((u) => /^https:\/\//i.test(u) && u.length < 1000);
+}
+
 function parseDate(s: string | undefined): number {
   if (!s) return NaN;
   const t = Date.parse(plain(s, 100));
@@ -68,7 +87,8 @@ export function parseFeed(xml: string, now = Date.now()): ParsedFeed {
     const categories = [...allTags(b, 'category'), ...allTags(b, 'dc:subject')].map((c) => plain(c, 60)).filter(Boolean);
     // Atom-Kategorien stehen im Attribut: <category term="Politik"/>
     for (const m of b.matchAll(/<category\b[^>]*\bterm=["']([^"']+)["']/gi)) categories.push(plain(m[1], 60));
-    items.push({ title, url, teaser: teaser === title ? '' : teaser, publishedAt: Math.min(when ?? now, now + 3600_000), categories: [...new Set(categories)] });
+    const image = itemImage(b);
+    items.push({ title, url, teaser: teaser === title ? '' : teaser, publishedAt: Math.min(when ?? now, now + 3600_000), categories: [...new Set(categories)], ...(image ? { image } : {}) });
   }
   return { title: feedTitle, items };
 }
