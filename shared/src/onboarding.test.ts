@@ -4,7 +4,7 @@ import { onboardingSteps, ONBOARDING_STEPS, isLocationPermission, LOCALES, t } f
 
 test('Einführung: Sprache steht ganz vorn, FreeNotes nur in der Schule, Details nur wo nötig', () => {
   const school = onboardingSteps('school');
-  assert.deepEqual(school, ['language', 'welcome', 'name', 'situation', 'freenotes', 'age', 'details', 'features', 'location', 'mail', 'tone', 'briefing', 'done']);
+  assert.deepEqual(school, ['language', 'welcome', 'name', 'situation', 'freenotes', 'age', 'details', 'features', 'location', 'calendar', 'mail', 'tone', 'briefing', 'done']);
   assert.ok(!onboardingSteps('work').includes('freenotes'));
   assert.ok(onboardingSteps('work').includes('details'));
   assert.ok(!onboardingSteps('other').includes('details'));

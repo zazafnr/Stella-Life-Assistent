@@ -39,7 +39,7 @@ const uid = created.id;
 if (PASSWORD.length < 8) db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(PASSWORD), uid);
 const user = () => getUser(uid)!;
 const today = todayIn(TZ);
-updateUserSettings(uid, { tone: 'nett', studyTime: '16:30', eveningTime: '19:00', stepGoal: 8000, ...(EN ? { locale: 'en', country: 'GB' } : {}) });
+updateUserSettings(uid, { tone: 'nett', studyTime: '16:30', eveningTime: '19:00', stepGoal: 8000, ...(EN ? { locale: 'en', country: 'GB' } : { locale: 'de', country: 'AT' }) });
 
 // Stundenplan: diese und nächste Woche, morgen fällt Physik aus
 const PLAN: [string, string, string][][] = [

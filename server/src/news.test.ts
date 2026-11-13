@@ -166,7 +166,7 @@ test('Abruf: speichert nur Titel, Teaser, Link; ETag → 304; keine Doppelten; F
   const r1 = await store.fetchSource(SOURCES[0]!);
   assert.deepEqual(r1, { status: 200, added: 4 });
   const row = db.prepare('SELECT * FROM news_items WHERE url = ?').get('https://orf.example/budget') as Record<string, string>;
-  assert.deepEqual(Object.keys(row).sort(), ['cluster_id', 'fetched_at', 'id', 'published_at', 'source_id', 'teaser', 'title', 'topics', 'url'], 'kein Artikeltext-Feld');
+  assert.deepEqual(Object.keys(row).sort(), ['cluster_id', 'fetched_at', 'id', 'image', 'published_at', 'source_id', 'teaser', 'title', 'topics', 'url'], 'kein Artikeltext-Feld');
   const r2 = await store.fetchSource(SOURCES[0]!);
   assert.deepEqual(r2, { status: 304, added: 0 });
   assert.equal(feedHits.at(-1)!.inm, '"v1"', 'If-None-Match wird mitgeschickt');
@@ -357,4 +357,15 @@ test('Zeichensatz: ISO-8859-1 aus dem XML-Kopf oder Content-Type wird richtig ge
   assert.match(net.decode(latin, 'application/xml'), /ambição/);
   assert.match(net.decode(Buffer.from('<title>ambição</title>', 'latin1'), 'text/xml; charset=iso-8859-1'), /ambição/);
   assert.match(net.decode(Buffer.from('<title>Überraschung</title>', 'utf8'), null), /Überraschung/);
+});
+
+test('News: Vorschaubild aus dem Feed (media, Enclosure, <img>) und og:image der Seite, nur https', async () => {
+  const { itemImage } = await import('./news/feed.ts');
+  const { pageImage } = await import('./news/digest.ts');
+  assert.equal(itemImage('<title>x</title><media:content url="https://a.at/1.jpg" medium="image"/>'), 'https://a.at/1.jpg');
+  assert.equal(itemImage('<media:content url="https://a.at/v.mp4" type="video/mp4"/><enclosure url="https://a.at/2.png" type="image/png"/>'), 'https://a.at/2.png');
+  assert.equal(itemImage('<description><![CDATA[<p><img src="https://a.at/3.webp"> Text</p>]]></description>'), 'https://a.at/3.webp');
+  assert.equal(itemImage('<description>&lt;img src="http://a.at/unsicher.jpg"&gt;</description>'), undefined);
+  assert.equal(pageImage('<head><meta property="og:image" content="https://b.at/og.jpg?w=1200&amp;h=630"></head>'), 'https://b.at/og.jpg?w=1200&h=630');
+  assert.equal(pageImage('<meta name="description" content="https://nope">'), undefined);
 });

@@ -330,14 +330,14 @@ export function voiceDe(tone: Tone | undefined) {
       cool: 'Nix. Alles im Griff. 😎',
     }),
     hintReply: (from: string, about: string) => by({
-      nett: `✉️ ${from} wartet noch auf deine Antwort (${about}). Soll ich dir einen Entwurf schreiben?`,
-      frech: `✉️ ${from} wartet immer noch auf dich (${about}). Ghosting ist keine Lösung. 😏 Entwurf?`,
-      cool: `✉️ ${from} wartet auf Antwort (${about}). Entwurf?`,
+      nett: `Übrigens, ${from} wartet noch auf eine Antwort von dir.\n\nEs geht um: ${about}. Soll ich dir was vorschreiben?`,
+      frech: `${from} wartet immer noch auf dich. Ghosting ist keine Lösung. 😏\n\nEs geht um: ${about}. Soll ich was vorschreiben?`,
+      cool: `${from} wartet noch auf dich.\n\n${about}. Soll ich was vorschreiben?`,
     }),
     hintDone: (summary: string) => by({
-      nett: `✓ Hab ich gemacht: ${summary}.`,
-      frech: `✓ Erledigt, bevor du's gemerkt hast: ${summary}. 💅`,
-      cool: `✓ Gemacht: ${summary}.`,
+      nett: pick(['Erledigt, hab ich für dich gemacht 🙂', 'Ist drin. Schau kurz drüber, ob\'s passt.'], summary),
+      frech: 'Erledigt, bevor du\'s gemerkt hast. 💅',
+      cool: 'Gemacht.',
     }),
 
     // ----- Morning Briefing -----

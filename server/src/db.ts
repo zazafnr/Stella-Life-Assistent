@@ -560,6 +560,8 @@ const MIGRATIONS: string[] = [
   // Kalender: Dauer (Minuten) und Ort eines Eintrags
   `ALTER TABLE items ADD COLUMN duration INTEGER;
    ALTER TABLE items ADD COLUMN location TEXT;`,
+  // News: Vorschaubild je Meldung (aus dem Feed oder og:image der Artikelseite)
+  `ALTER TABLE news_items ADD COLUMN image TEXT;`,
 ];
 
 function migrate() {

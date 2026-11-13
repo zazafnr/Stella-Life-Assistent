@@ -48,7 +48,7 @@ test('Agenda', async () => {
 
 test('ohne KI: freundlicher Hinweis statt Absturz', async () => {
   const res = await handleChat(getUser(user.id)!, 'Kannst du mir Photosynthese erklären?', 'c6');
-  assert.match(res.messages[0].text, /kein KI-Modell/);
+  assert.match(res.messages[0].text, /KI-Kopf ist gerade offline/);
 });
 
 test('Zugangsdaten werden verschlüsselt gespeichert', () => {

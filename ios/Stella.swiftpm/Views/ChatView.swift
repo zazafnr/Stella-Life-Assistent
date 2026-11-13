@@ -155,13 +155,9 @@ struct ChatView: View {
                             .id("typing")
                     }
                 }
-                .padding(.horizontal, 12)
+                // keine Fläche dahinter: die Nachrichten liegen direkt auf dem Himmel (Blasen im Wetter-Look, ChatMood)
+                .padding(.horizontal, 14)
                 .padding(.vertical, 12)
-                // weiche, durchscheinende Spalte in Milchglas – darauf liegen die Nachrichten
-                .background(.white.opacity(0.5), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(.white.opacity(0.7), lineWidth: 1))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
                 .frame(maxWidth: 780)
                 .frame(maxWidth: .infinity)
                 .animation(.spring(response: 0.4, dampingFraction: 0.85), value: store.messages.count)
@@ -424,10 +420,20 @@ struct Bubble: View {
     var onImage: (String) -> Void
     @Environment(Store.self) private var store
 
+    private var mood: ChatMood { ChatMood.current }
+
+    /** Stella schreibt wie ein Mensch: ein Gedanke pro Blase. Absätze (Leerzeile) werden zu einzelnen Nachrichten,
+        außer bei langen Antworten mit vielen Absätzen – die bleiben zusammen. */
+    private var parts: [String] {
+        guard !message.isUser else { return [message.text] }
+        let split = message.text.components(separatedBy: "\n\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        return (2...4).contains(split.count) ? split : [message.text]
+    }
+
     var body: some View {
         HStack {
             if message.isUser { Spacer(minLength: 48) }
-            VStack(alignment: message.isUser ? .trailing : .leading, spacing: 6) {
+            VStack(alignment: message.isUser ? .trailing : .leading, spacing: 5) {
                 if message.attachments.contains(where: { $0.kind != "audio" }) {
                     HStack(spacing: 6) {
                         ForEach(message.attachments.filter { $0.kind != "audio" }) { a in
@@ -440,53 +446,72 @@ struct Bubble: View {
                     }
                 }
                 if !message.text.isEmpty {
-                    VStack(alignment: .trailing, spacing: 4) {
-                        ForEach(message.attachments.filter { $0.kind == "audio" }) { a in
-                            if message.isUser && message.failedAudioId == nil {
-                                // sieht aus wie eine getippte Nachricht, darüber eine dezente Zeile (Paket 9)
-                                VoiceLine(attachment: a, text: message.text)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            } else {
-                                VoiceBubbleButton(id: a.id, onUser: message.isUser)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
-                        Text(Self.markdown(message.text))
-                            .font(.system(size: 16))
-                            .foregroundStyle(message.isUser ? .white : Theme.text)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if message.failedAudioId != nil {
-                            Button(L("common.retry")) { Task { await store.retryVoice(message.id) } }
-                                .buttonStyle(SoftButton(filled: false))
-                                .disabled(store.thinking)
-                        }
-                        if let id = message.actionId { ActionCardView(id: id) }
-                        if let card = message.card, card.type == "places" { PlacesCardView(card: card) }
-                        if let card = message.card, card.type == "news_ask" { NewsAskCardView() }
-                        if let card = message.card, card.type == "restaurants" { RestaurantsCardView(card: card) }
-                        if let card = message.card, card.type == "availability" { AvailabilityCardView(card: card) }
-                        if let card = message.card, card.type == "location_ask" { LocationAskCardView() }
-                        if let card = message.card, card.type == "spending" { SpendingCardView(card: card) }
-                        HStack(spacing: 4) {
-                            if message.via == "telegram" { Image(systemName: "paperplane.fill").accessibilityLabel("Telegram") }
-                            Text(time)
-                            if message.pending == true { Image(systemName: "clock") }
-                        }
-                        .font(.system(size: 11))
-                        .foregroundStyle(message.isUser ? .white.opacity(0.75) : Theme.faint)
+                    let list = parts
+                    ForEach(Array(list.enumerated()), id: \.offset) { i, part in
+                        bubble(part, first: i == 0, last: i == list.count - 1)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(message.isUser ? Theme.blue : Theme.surface, in: BubbleShape(mine: message.isUser))
-                    .shadow(color: Theme.blue.opacity(message.isUser ? 0.22 : 0.07), radius: 10, y: 4)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 560, alignment: message.isUser ? .trailing : .leading)
-                    .textSelection(.enabled)
                 }
+                // Was Stella getan hat oder vorschlägt, steht als kleine Karte unter der Nachricht (Design-Auswahl „Schreibstil B + Karten“)
+                if let id = message.actionId { ActionCardView(id: id) }
+                if let card = message.card, card.type == "places" { PlacesCardView(card: card).chatCard() }
+                if let card = message.card, card.type == "news_ask" { NewsAskCardView().chatCard() }
+                if let card = message.card, card.type == "restaurants" { RestaurantsCardView(card: card).chatCard() }
+                if let card = message.card, card.type == "availability" { AvailabilityCardView(card: card).chatCard() }
+                if let card = message.card, card.type == "location_ask" { LocationAskCardView().chatCard() }
+                if let card = message.card, card.type == "spending" { SpendingCardView(card: card).chatCard() }
             }
+            .frame(maxWidth: 560, alignment: message.isUser ? .trailing : .leading)
             if !message.isUser { Spacer(minLength: 48) }
         }
+    }
+
+    @ViewBuilder private func bubble(_ text: String, first: Bool, last: Bool) -> some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            if first {
+                ForEach(message.attachments.filter { $0.kind == "audio" }) { a in
+                    if message.isUser && message.failedAudioId == nil {
+                        // sieht aus wie eine getippte Nachricht, darüber eine dezente Zeile (Paket 9)
+                        VoiceLine(attachment: a, text: message.text)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        VoiceBubbleButton(id: a.id, onUser: message.isUser)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            Text(Self.markdown(text))
+                .font(.system(size: 16))
+                .foregroundStyle(message.isUser ? .white : mood.stellaText)
+                .tint(message.isUser ? .white : (mood == .night ? Color(hex: 0x9CC2FF) : Theme.blue))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            if last {
+                if message.failedAudioId != nil {
+                    Button(L("common.retry")) { Task { await store.retryVoice(message.id) } }
+                        .buttonStyle(SoftButton(filled: false))
+                        .disabled(store.thinking)
+                }
+                HStack(spacing: 4) {
+                    if message.via == "telegram" { Image(systemName: "paperplane.fill").accessibilityLabel("Telegram") }
+                    Text(time)
+                    if message.pending == true { Image(systemName: "clock") }
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(message.isUser ? .white.opacity(0.75) : mood.stellaFaint)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background {
+            if message.isUser {
+                BubbleShape(mine: true).fill(mood.mine).shadow(color: mood.mineGlow, radius: 10, y: 4)
+            } else {
+                StellaBubbleBackground(mood: mood, shape: BubbleShape(mine: false, tail: last))
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .textSelection(.enabled)
+        .animation(.easeInOut(duration: 0.4), value: mood)
     }
 
     private var time: String {
@@ -502,8 +527,10 @@ struct Bubble: View {
 
 struct BubbleShape: Shape {
     var mine: Bool
+    /** nur die letzte Blase einer Reihe hat die kleine Ecke unten */
+    var tail = true
     func path(in rect: CGRect) -> Path {
-        let r: CGFloat = 20, small: CGFloat = 6
+        let r: CGFloat = 20, small: CGFloat = tail ? 6 : 20
         return Path(roundedRect: rect, cornerRadii: RectangleCornerRadii(
             topLeading: r, bottomLeading: mine ? r : small, bottomTrailing: mine ? small : r, topTrailing: r), style: .continuous)
     }
@@ -521,8 +548,7 @@ struct TypingDots: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .background(Theme.surface, in: BubbleShape(mine: false))
-        .shadow(color: Theme.blue.opacity(0.07), radius: 10, y: 4)
+        .background { StellaBubbleBackground(mood: ChatMood.current) }
         .onAppear { on = true }
     }
 }
@@ -577,45 +603,59 @@ struct ActionCardView: View {
     @State private var busy = false
     @State private var error: String?
 
+    /** Symbol und Farbe je Art der Aktion */
+    static func look(_ type: String) -> (symbol: String, tint: Color, bg: Color) {
+        switch type {
+        case "goal.create", "goal.log", "goal.update": return ("target", Theme.green, Theme.greenTint)
+        case "mail.send": return ("envelope.fill", Theme.blue, Theme.blueTint)
+        case "list.add", "list.check": return ("cart.fill", Theme.pinkText, Theme.pinkTint)
+        case "item.delete": return ("trash.fill", Theme.pinkText, Theme.pinkTint)
+        case "memory.add", "memory.update", "memory.delete": return ("brain.head.profile", Color(hex: 0x6D4AFF), Color(hex: 0xEFEAFF))
+        case "study_plan.create", "week_plan.apply": return ("sparkles", Theme.pinkText, Theme.pinkTint)
+        case "homework.solve": return ("pencil.and.scribble", Theme.blue, Theme.blueTint)
+        default: return ("calendar", Theme.blue, Theme.blueTint)
+        }
+    }
+
     var body: some View {
         if let action = store.actions[id] {
-            VStack(alignment: .leading, spacing: 6) {
-                if action.proposed {
-                    HStack(spacing: 8) {
-                        Button { run("approve") } label: {
-                            Label(L("ui.yes.do.it"), systemImage: "checkmark")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 9)
-                                .background(Theme.blue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            let look = Self.look(action.type)
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: look.symbol)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(look.tint)
+                    .frame(width: 34, height: 34)
+                    .background(look.bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(action.summary.prefix(1).uppercased() + action.summary.dropFirst())
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if action.proposed {
+                        HStack(spacing: 6) {
+                            Button { run("approve") } label: { Text(L("ui.yes.do.it")).chip(filled: true) }
+                            Button { run("reject") } label: { Text(L("common.no")).chip(filled: false) }
                         }
-                        Button { run("reject") } label: {
-                            Text(L("common.no"))
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Theme.blue)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 9)
-                                .background(Theme.blueTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .buttonStyle(PressableStyle())
+                        .disabled(busy)
+                        .padding(.top, 3)
+                    } else {
+                        HStack(spacing: 8) {
+                            Label(Self.label(action.status), systemImage: action.status == "done" ? "checkmark" : "circle.slash")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(action.status == "done" ? Theme.green : action.status == "failed" ? Theme.pinkText : Theme.muted)
+                            if action.canUndo {
+                                Button { run("undo") } label: { Text(L("telegram.undo")).chip(filled: false) }
+                                    .buttonStyle(PressableStyle())
+                                    .disabled(busy)
+                            }
                         }
                     }
-                    .buttonStyle(PressableStyle())
-                    .disabled(busy)
-                } else {
-                    HStack(spacing: 10) {
-                        Label(Self.label(action.status), systemImage: action.status == "done" ? "checkmark" : "circle.slash")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(action.status == "done" ? Theme.green : action.status == "failed" ? Theme.pinkText : Theme.muted)
-                        if action.canUndo {
-                            Button(L("telegram.undo")) { run("undo") }
-                                .font(.system(size: 13, weight: .semibold))
-                                .disabled(busy)
-                        }
-                    }
+                    if let error { Text(error).font(.system(size: 12)).foregroundStyle(Theme.pinkText) }
                 }
-                if let error { Text(error).font(.system(size: 12)).foregroundStyle(Theme.pinkText) }
+                Spacer(minLength: 0)
             }
-            .padding(.top, 6)
+            .chatCard()
             .transition(.opacity)
         }
     }
@@ -735,4 +775,32 @@ struct VoiceBubbleButton: View {
         .buttonStyle(.plain)
         .accessibilityLabel(playback.isPlaying ? L("voice.pause") : L("voice.play"))
     }
+}
+
+/** weiße Karte unter einer Nachricht im Chat (Aktionen, Orte, Restaurants …), schwebt auf dem Himmel */
+private struct ChatCardStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(10)
+            .frame(maxWidth: 320, alignment: .leading)
+            .background(.white.opacity(0.95), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(color: Color(hex: 0x0F2A4A).opacity(0.1), radius: 10, y: 4)
+    }
+}
+
+private struct ChipLabel: ViewModifier {
+    var filled: Bool
+    func body(content: Content) -> some View {
+        content
+            .font(.system(size: 12, weight: .bold))
+            .foregroundStyle(filled ? .white : Theme.blue)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(filled ? Theme.blue : Theme.blueTint, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+}
+
+extension View {
+    func chatCard() -> some View { modifier(ChatCardStyle()) }
+    fileprivate func chip(filled: Bool) -> some View { modifier(ChipLabel(filled: filled)) }
 }

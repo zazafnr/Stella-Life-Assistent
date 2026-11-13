@@ -9,6 +9,8 @@ import { planOf } from '../billing.ts';
 import { db, updateUserSettings, type User } from '../db.ts';
 import { complete } from '../llm.ts';
 import { userLocale } from '../locale.ts';
+import { decodeEntities } from './feed.ts';
+import { fetchText } from './net.ts';
 import { favoriteId, type NewsRow } from './store.ts';
 import { allSources, defaultCountries, isNewsTopic, type NewsTopic } from './sources.ts';
 
@@ -28,7 +30,27 @@ export interface NewsSettings {
   lastAt?: string;
 }
 
-export interface NewsEntry { sentence: string; source: string; url: string; publishedAt: string; favorite?: boolean }
+/** `image`: Vorschaubild (https) für die Bildkarten auf „Heute“, `topic`: erstes erkanntes Thema für den Farb-Chip */
+export interface NewsEntry { sentence: string; source: string; url: string; publishedAt: string; favorite?: boolean; image?: string; topic?: NewsTopic }
+
+/** og:image / twitter:image aus dem Kopf der Artikelseite – nur für die wenigen Meldungen ohne Bild im Feed */
+export function pageImage(html: string): string | undefined {
+  const head = html.slice(0, 200_000);
+  for (const m of head.matchAll(/<meta\b[^>]*>/gi)) {
+    const t = m[0];
+    if (!/(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image)["']/i.test(t)) continue;
+    const u = /\bcontent=["']([^"']+)["']/i.exec(t)?.[1];
+    if (u && /^https:\/\//i.test(decodeEntities(u).trim())) return decodeEntities(u).trim();
+  }
+  return undefined;
+}
+
+async function articleImage(url: string): Promise<string | undefined> {
+  try {
+    const r = await fetchText(url, { strict: true, timeoutMs: 5000 });
+    return r.status === 200 ? pageImage(r.body) : undefined;
+  } catch { return undefined; }
+}
 
 export const DEFAULT_TOPICS: NewsTopic[] = ['politics', 'economy', 'tech', 'science'];
 
@@ -129,8 +151,10 @@ export async function buildDigest(user: User): Promise<NewsEntry[]> {
   const picked = selectNews(user);
   if (!picked.length) return [];
   const sentences = await summarize(user, picked);
+  const images = await Promise.all(picked.map((c) => c.row.image || articleImage(c.row.url)));
   const entries: NewsEntry[] = picked.map((c, i) => ({
     sentence: sentences[i]!, source: sourceName(c.row.source_id, s.favorites), url: c.row.url, publishedAt: c.row.published_at, ...(c.favorite ? { favorite: true } : {}),
+    ...(images[i] ? { image: images[i] } : {}), ...(c.topics[0] ? { topic: c.topics[0] } : {}),
   }));
   db.prepare('INSERT OR REPLACE INTO news_digest (user_id, date, json) VALUES (?, ?, ?)').run(user.id, date, JSON.stringify(entries));
   saveNews(user, { lastAt: new Date().toISOString() });

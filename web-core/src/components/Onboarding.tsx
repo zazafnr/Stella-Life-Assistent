@@ -83,6 +83,8 @@ export function Onboarding({ onDone, startAt = 'language', situations, studentsH
     briefing: me.settings.briefing ?? 'auto',
     location: me.settings.locationPermission as LocationPermission | undefined,
     notifyFreenotes: !!me.settings.notify?.freenotes,
+    /** 'yes': Kalender-Abo geöffnet, 'no': Termine nur in Stella */
+    calendar: undefined as 'yes' | 'no' | undefined,
   });
   const set = <K extends keyof typeof d>(k: K, v: (typeof d)[K]) => setD((x) => ({ ...x, [k]: v }));
   const terms = schoolTerms(locale, d.country);
@@ -166,6 +168,7 @@ export function Onboarding({ onDone, startAt = 'language', situations, studentsH
     d.features.includes('mails') && t('onboarding.sum.mails'),
     d.features.includes('shopping') && t('onboarding.sum.shopping'),
     d.features.includes('goals') && t('onboarding.sum.goals'),
+    d.calendar === 'yes' && t('onboarding.sum.calendar'),
     d.briefing !== 'off' && t('onboarding.sum.briefing', { when: briefingWhen }),
     t('onboarding.sum.tone', { tone: t(`tone.${d.tone}`).toLowerCase() }),
     me.flags?.telegram && t('onboarding.sum.telegram'),
@@ -309,6 +312,20 @@ export function Onboarding({ onDone, startAt = 'language', situations, studentsH
               <div className="button-row">
                 <button type="button" className="btn" onClick={allowLocation}>{t('onboarding.location.allow')}</button>
                 <button type="button" className="btn secondary" onClick={() => { set('location', d.location ?? 'later'); setI(i + 1); }}>{t('onboarding.location.later')}</button>
+              </div>
+            )}
+          </>
+        )}
+        {step === 'calendar' && (
+          <>
+            <h1 className="display">{t('onboarding.calendar.title')}</h1>
+            <p className="muted">{t('onboarding.calendar.text')}</p>
+            {d.calendar === 'yes' && <p className="muted small" role="status"><Icon name="check" size={14} /> {t('onboarding.calendar.added')}</p>}
+            {d.calendar !== 'yes' && (
+              <div className="button-row">
+                {/* webcal:// öffnet auf iPhone und Mac direkt „Abonnieren“; Google und Outlook nehmen denselben Link unter Einstellungen → Kalenderabo */}
+                <a className="btn" href={`${me.ingestUrl.replace(/^https?:\/\//, 'webcal://')}/calendar.ics`} onClick={() => set('calendar', 'yes')}>{t('onboarding.calendar.yes')}</a>
+                <button type="button" className="btn secondary" onClick={() => { set('calendar', 'no'); setI(i + 1); }}>{t('onboarding.calendar.no')}</button>
               </div>
             )}
           </>

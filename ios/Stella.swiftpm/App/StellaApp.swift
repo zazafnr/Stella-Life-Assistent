@@ -36,11 +36,17 @@ struct RootView: View {
         switch Demo.tab {
         case "chat": return .chat
         case "planner": return .planner
-        case "goals": return .goals
         case "inbox": return .inbox
         default: return .today
         }
     }()
+    /** Ziele haben keinen eigenen Tab mehr, sie öffnen sich als Blatt (von „Heute“, aus dem Briefing, aus Stellas Plan) */
+    @State private var showGoals = Demo.tab == "goals"
+
+    /** Tab wechseln; `.goals` öffnet stattdessen das Ziele-Blatt */
+    private func open(_ t: Tab) {
+        if t == .goals { showGoals = true } else { tab = t }
+    }
 
     /** das EVOLSIOR-Intro läuft nur beim allerersten Start (nicht in den Screenshot-Läufen der CI) */
     private var showIntro: Bool { !introShown && Demo.token == nil }
@@ -77,7 +83,7 @@ struct RootView: View {
     @ViewBuilder private var content: some View {
         if store.loggedIn {
             TabView(selection: $tab) {
-                TodayView(go: { tab = $0 })
+                TodayView(go: { open($0) })
                     .tabItem { Label(L("nav.today"), systemImage: "sparkles") }
                     .tag(Tab.today)
                 ChatView()
@@ -87,16 +93,16 @@ struct RootView: View {
                     .tabItem { Label(L("nav.planner"), systemImage: "calendar") }
                     .tag(Tab.planner)
                     .badge(store.openHomework)
-                if store.me?.has("goals") != false {
-                    GoalsView()
-                        .tabItem { Label(L("nav.goals"), systemImage: "target") }
-                        .tag(Tab.goals)
-                }
                 if store.me?.has("mails") != false {
                     InboxView()
                         .tabItem { Label(L("nav.inbox"), systemImage: "tray") }
                         .tag(Tab.inbox)
                 }
+            }
+            .sheet(isPresented: $showGoals) {
+                GoalsView()
+                    .environment(store)
+                    .presentationDragIndicator(.visible)
             }
             .task { store.start() }
             .task(id: store.me?.id) { if store.me != nil { WeatherService.shared.start(permission: store.me?.settings.locationPermission) } }

@@ -1027,7 +1027,7 @@ async function runAgent(t: Turn, wanted?: Tier, escalated = false) {
   } catch (err) {
     if (!(err instanceof LlmUnavailable)) throw err;
     console.warn(err.message);
-    say(t, '📴 Ich erreiche gerade kein KI-Modell. Kurznotizen wie „Latein HÜ S. 45 Nr. 3 Freitag“, ' +
-      '„Mathe SA 12.11.“, „was steht an?“ oder „Latein HÜ erledigt“ verstehe ich trotzdem.');
+    say(t, 'Kleine Info: Mein KI-Kopf ist gerade offline 😅\n\nKurze Sachen wie „Latein HÜ S. 45 Freitag“, „was steht an?“ ' +
+      'oder „Latein HÜ erledigt“ versteh ich trotzdem.');
   }
 }

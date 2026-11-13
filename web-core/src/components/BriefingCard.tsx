@@ -5,7 +5,7 @@ import { Icon } from '../ui/Icon.tsx';
 import { showToast } from '../ui/Decor.tsx';
 import { ActionCard } from './ActionCard.tsx';
 import { Rich } from './Rich.tsx';
-import { NewsList } from './settings/News.tsx';
+import { NewsStories } from './TodayCards.tsx';
 import { useLocale, useT } from '../i18n.ts';
 
 const ICON: Record<string, string> = { news: '📰', school: '🏫', due: '📌', plan: '🗓️', tomorrow: '🌙', done: '✅', inbox: '✉️', goals: '🎯', finance: '💶' };
@@ -22,11 +22,16 @@ export function BriefingCard({ onOpen }: { onOpen: (tab: 'chat' | 'inbox' | 'goa
   if (!b) return null;
 
   const morning = new Date().getHours() < 12;
-  const sections = morning ? b.sections : [];
+  // Die News stehen als Story-Karussell über der Karte (den ganzen Tag), nicht mehr als Textzeilen im Überblick
+  const sections = (morning ? b.sections : []).filter((s) => s.id !== 'news');
   const hints = b.hints.filter((h) => !gone.includes(h.key));
-  if (!sections.length && !hints.length) return null;
+  const news = b.news ?? [];
+  if (!sections.length && !hints.length && !news.length) return null;
 
   return (
+    <>
+    <NewsStories items={news} />
+    {(sections.length > 0 || hints.length > 0) && (
     <section className="card briefing" aria-label={t('ui.your.overview')}>
       {sections.length > 0 && (
         <>
@@ -37,7 +42,7 @@ export function BriefingCard({ onOpen }: { onOpen: (tab: 'chat' | 'inbox' | 'goa
                 <span className="briefing-icon" aria-hidden="true">{ICON[s.id] ?? '•'}</span>
                 <div>
                   <span className="briefing-title">{s.title}</span>
-                  {s.id === 'news' && b.news?.length ? <NewsList items={b.news} locale={locale} /> : s.lines.map((l, i) => <span key={i} className="briefing-line">{l}</span>)}
+                  {s.lines.map((l, i) => <span key={i} className="briefing-line">{l}</span>)}
                 </div>
               </div>
             ))}
@@ -51,6 +56,8 @@ export function BriefingCard({ onOpen }: { onOpen: (tab: 'chat' | 'inbox' | 'goa
         </>
       )}
     </section>
+    )}
+    </>
   );
 }
 
