@@ -1,0 +1,584 @@
+<title>Stella Design-Varianten</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800;900&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: eine lange Seite, je Thema eine Reihe Handys nebeneinander (Version A, B, C …), oben ein Wetter-Schalter für alle Handys */
+:root{
+  --page:#eef3fb; --ink:#0f2a4a; --ink-2:#5b7190; --line:#d6e2f2; --chip:#ffffff; --accent:#1f6feb; --accent-2:#ff7eb3; --pick:#e6f0ff;
+  --display:"Nunito",ui-rounded,system-ui,sans-serif; --body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--page:#0b1426;--ink:#e8efff;--ink-2:#9db0cc;--line:#22314d;--chip:#14213a;--accent:#6aa6ff;--accent-2:#ff8fbe;--pick:#16294a;color-scheme:dark}}
+:root[data-theme="dark"]{--page:#0b1426;--ink:#e8efff;--ink-2:#9db0cc;--line:#22314d;--chip:#14213a;--accent:#6aa6ff;--accent-2:#ff8fbe;--pick:#16294a;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--page);color:var(--ink);font:15px/1.55 var(--body)}
+.wrap{max-width:1240px;margin:0 auto;padding-block:28px 80px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1{font:900 34px/1.1 var(--display);margin:0 0 6px;text-wrap:balance}
+h2{font:800 24px/1.2 var(--display);margin:0;text-wrap:balance}
+.lead{color:var(--ink-2);max-width:68ch;margin:0}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--page);padding:12px 0;margin:18px 0 8px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--page)}
+.bar b{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);margin-right:4px}
+.wbtn{border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:999px;padding:7px 14px;font:600 14px var(--body);cursor:pointer}
+.wbtn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.wbtn:focus-visible,.pickbtn:focus-visible{outline:3px solid var(--accent-2);outline-offset:2px}
+section.topic{margin-top:44px}
+.topic-head{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
+.tag{font:700 12px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.row{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:22px}
+.variant{display:flex;flex-direction:column;gap:10px;min-width:0}
+.vhead{display:flex;align-items:baseline;gap:10px}
+.letter{font:900 22px var(--display);color:var(--accent)}
+.vname{font-weight:700}
+.vtext{color:var(--ink-2);font-size:13.5px;margin:0}
+.pickbtn{align-self:flex-start;border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:10px;padding:6px 12px;font:600 13px var(--body);cursor:pointer}
+.pickbtn[aria-pressed="true"]{background:var(--pick);border-color:var(--accent);color:var(--accent)}
+.summary{margin-top:48px;border:1px solid var(--line);background:var(--chip);border-radius:18px;padding:18px 20px}
+.summary code{font:600 15px ui-monospace,Menlo,monospace;background:var(--pick);padding:8px 12px;border-radius:10px;display:inline-block;margin-top:6px;word-break:break-word}
+.copy{margin-left:8px}
+
+/* ---------- Handy ---------- */
+.phone{--w:290px;width:var(--w);max-width:100%;aspect-ratio:290/600;border-radius:42px;padding:9px;background:#0d1522;box-shadow:0 18px 40px rgba(15,42,74,.18);align-self:center}
+.screen{position:relative;width:100%;height:100%;border-radius:34px;overflow:hidden;font:14px/1.38 -apple-system,"SF Pro Text",system-ui,sans-serif;color:#0f2a4a;display:flex;flex-direction:column}
+.notch{position:absolute;top:8px;left:50%;transform:translateX(-50%);width:84px;height:22px;background:#0d1522;border-radius:20px;z-index:4}
+.sb{height:34px;flex:none}
+.sky{position:absolute;inset:0;z-index:0;transition:background .5s}
+.fx{position:absolute;inset:0;z-index:1;pointer-events:none}
+.ui{position:relative;z-index:2;display:flex;flex-direction:column;height:100%}
+
+/* Wetter */
+[data-w="sun"] .sky{background:radial-gradient(circle at 82% 10%,#fff6c9 0 26px,rgba(255,226,120,.55) 27px 60px,transparent 61px),linear-gradient(#6db3ee,#eaf5ff 80%)}
+[data-w="rain"] .sky{background:linear-gradient(#8a9db1,#b7c4d0)}
+[data-w="snow"] .sky{background:linear-gradient(#b6c7da,#e4ebf3)}
+[data-w="night"] .sky{background:linear-gradient(#060c24,#1b2b55)}
+[data-w="rain"] .fx{background:repeating-linear-gradient(104deg,transparent 0 13px,rgba(255,255,255,.35) 13px 14px,transparent 14px 31px);background-size:62px 62px;animation:rain .5s linear infinite;opacity:.55}
+[data-w="snow"] .fx{background-image:radial-gradient(#fff 1.6px,transparent 2.2px),radial-gradient(#fff 1.1px,transparent 1.7px);background-size:44px 44px,27px 27px;background-position:0 0,13px 9px;animation:snow 6s linear infinite}
+[data-w="night"] .fx{background-image:radial-gradient(#fff 1px,transparent 1.5px),radial-gradient(rgba(255,255,255,.7) .8px,transparent 1.3px);background-size:53px 61px,31px 37px;background-position:4px 7px,17px 22px}
+@keyframes rain{to{background-position:-14px 62px}}
+@keyframes snow{to{background-position:20px 440px,-10px 270px}}
+@media (prefers-reduced-motion:reduce){.fx{animation:none!important}}
+
+/* Kopf im Chat */
+.chead{display:flex;align-items:center;gap:9px;padding:4px 14px 8px}
+.av{width:34px;height:34px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 0 12px rgba(255,126,179,.35);flex:none}
+.av svg{width:17px;height:17px}
+.cname{font-weight:800;font-size:15px}
+.cstat{font-size:11px;opacity:.75}
+[data-w="night"] .chead,[data-w="rain"] .chead{color:#fff}
+.msgs{flex:1;display:flex;flex-direction:column;gap:7px;padding:4px 12px 10px;overflow:hidden;justify-content:flex-end}
+.b{max-width:82%;padding:8px 12px;border-radius:18px;font-size:13.2px;position:relative}
+.b small{display:block;font-size:10px;opacity:.6;margin-top:2px;text-align:right}
+.me{align-self:flex-end;border-bottom-right-radius:6px;background:#1f6feb;color:#fff}
+.st{align-self:flex-start;border-bottom-left-radius:6px}
+.compose{margin:0 10px 12px;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:22px;padding:7px 7px 7px 14px;font-size:12.5px;color:#8da0ba}
+.compose i{margin-left:auto;width:28px;height:28px;border-radius:50%;background:#1f6feb;display:block}
+[data-w="night"] .compose{background:rgba(20,30,60,.7);color:#9db0cc}
+
+/* Version A: Milchglas */
+.vA .st{background:rgba(255,255,255,.55);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);border:1px solid rgba(255,255,255,.7);box-shadow:0 4px 14px rgba(15,42,74,.08)}
+[data-w="night"] .vA .st,[data-w="night"].vA .st{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);color:#eef3ff}
+.vA .me{background:rgba(31,111,235,.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+
+/* Version B: Blasen je Wetter */
+.vB .st{transition:all .4s}
+.vB[data-w="sun"] .st{background:linear-gradient(160deg,rgba(255,252,240,.92),rgba(255,244,214,.8));border:1px solid rgba(255,214,120,.8);box-shadow:0 6px 18px rgba(255,170,40,.18)}
+.vB[data-w="sun"] .me{background:linear-gradient(135deg,#2e86ff,#36b6ff)}
+.vB[data-w="rain"] .st{background:rgba(236,243,250,.62);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.6);box-shadow:inset 0 -2px 0 rgba(255,255,255,.3)}
+.vB[data-w="rain"] .st::before{content:"";position:absolute;inset:3px 10px auto auto;width:46px;height:12px;background:radial-gradient(circle at 6px 5px,rgba(255,255,255,.95) 2px,transparent 3px),radial-gradient(circle at 22px 8px,rgba(255,255,255,.8) 1.5px,transparent 2.5px),radial-gradient(circle at 38px 4px,rgba(255,255,255,.9) 2.2px,transparent 3.2px)}
+.vB[data-w="rain"] .me{background:linear-gradient(135deg,#245a8f,#3b7bb8)}
+.vB[data-w="snow"] .st{background:rgba(255,255,255,.85);border:1.5px solid #dbe9fb;box-shadow:0 0 0 3px rgba(255,255,255,.35)}
+.vB[data-w="snow"] .st::after{content:"❄";position:absolute;top:-7px;right:-4px;font-size:12px;color:#8fb6e6}
+.vB[data-w="snow"] .me{background:linear-gradient(135deg,#7b8cff,#5aa8ff)}
+.vB[data-w="night"] .st{background:rgba(22,34,72,.72);border:1px solid rgba(150,170,255,.35);color:#eef3ff;box-shadow:0 0 18px rgba(120,140,255,.25)}
+.vB[data-w="night"] .st::after{content:"✦";position:absolute;top:-6px;left:-3px;font-size:11px;color:#ffd98a}
+.vB[data-w="night"] .me{background:linear-gradient(135deg,#6d4aff,#a35bff);box-shadow:0 0 16px rgba(160,90,255,.4)}
+
+/* Version C: frei schwebend */
+.vC .st{background:none;padding:2px 4px;max-width:88%;font-size:14px;font-weight:500;text-shadow:0 1px 10px rgba(255,255,255,.9)}
+.vC[data-w="night"] .st,.vC[data-w="rain"] .st{color:#fff;text-shadow:0 1px 8px rgba(0,10,40,.6)}
+.vC .grp{display:flex;gap:7px;align-items:flex-end}
+.vC .grp .av{width:22px;height:22px}
+.vC .grp .av svg{width:11px;height:11px}
+.vC .grp .col{display:flex;flex-direction:column;gap:3px}
+.vC .me{background:rgba(255,255,255,.9);color:#0f2a4a;border-radius:16px 16px 5px 16px}
+.vC[data-w="night"] .me{background:rgba(255,255,255,.16);color:#fff}
+
+/* Aktions-Zeile */
+.done{display:flex;gap:10px;font-size:11.5px;margin-top:3px;font-weight:600}
+.done .ok{color:#138a4b}.done .undo{color:#1f6feb}
+[data-w="night"] .done .ok{color:#6fe3a5}[data-w="night"] .done .undo{color:#8ab8ff}
+
+/* ---------- Schreibstil ---------- */
+.neutral .sky{background:linear-gradient(#7db6e8,#e6f0f8)}
+.neutral .st{background:rgba(255,255,255,.6);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.7)}
+.mini{font-size:10.5px;color:#5b7190;align-self:flex-start;margin:-2px 0 0 6px;display:flex;gap:8px}
+.mini a{color:#1f6feb;text-decoration:none;font-weight:600}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-self:flex-start}
+.chips span{background:#fff;border:1px solid #cfe0f7;color:#1f6feb;border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:600}
+.typing{align-self:flex-start;display:flex;gap:4px;padding:9px 12px;border-radius:16px;background:rgba(255,255,255,.6)}
+.typing i{width:6px;height:6px;border-radius:50%;background:#1f6feb;opacity:.5;animation:dot 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes dot{50%{transform:translateY(-3px);opacity:1}}
+.seq .st,.seq .mini,.seq .chips{animation:pop .45s both}
+.seq>*:nth-child(1){animation-delay:.1s}.seq>*:nth-child(2){animation-delay:.9s}.seq>*:nth-child(3){animation-delay:1.7s}.seq>*:nth-child(4){animation-delay:2.4s}.seq>*:nth-child(5){animation-delay:3.1s}.seq>*:nth-child(6){animation-delay:3.8s}.seq>*:nth-child(7){animation-delay:4.4s}
+@keyframes pop{from{opacity:.0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.seq *{animation:none!important}}
+.acard{align-self:flex-start;width:84%;background:#fff;border-radius:16px;padding:10px;display:flex;gap:9px;box-shadow:0 6px 16px rgba(15,42,74,.1)}
+.acard .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:17px;flex:none}
+.acard b{display:block;font-size:12.5px}
+.acard span{font-size:11px;color:#5b7190}
+.acard .btns{display:flex;gap:6px;margin-top:6px}
+.acard .btns em{font-style:normal;font-size:11px;font-weight:700;padding:4px 9px;border-radius:8px;background:#e6f0ff;color:#1f6feb}
+.acard .btns em.p{background:#1f6feb;color:#fff}
+
+/* ---------- Heute / News ---------- */
+.today .sky{background:linear-gradient(#cfe6ff,#f5f9ff 55%)}
+.scroll{flex:1;overflow:hidden;padding:0 12px 10px;display:flex;flex-direction:column;gap:10px}
+.hi{font:900 22px/1.1 var(--display);margin:2px 2px 0}
+.sub{font-size:11.5px;color:#5b7190;margin:0 2px}
+.eb{font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#1f6feb;margin:4px 2px 0}
+.card{background:#fff;border-radius:18px;padding:11px;box-shadow:0 8px 18px rgba(31,111,235,.08)}
+.img{border-radius:12px;position:relative;overflow:hidden;flex:none}
+.img .lbl{position:absolute;left:6px;bottom:5px;font-size:9px;font-weight:700;color:#fff;background:rgba(0,0,0,.35);padding:1px 6px;border-radius:6px}
+.i1{background:radial-gradient(circle at 70% 30%,#ffd36b 0 14%,transparent 15%),linear-gradient(160deg,#4b8fe0,#173a6b 70%)}
+.i2{background:linear-gradient(170deg,#7bd389 0 45%,#2f7d4f 45% 60%,#9fd7ff 60%)}
+.i3{background:repeating-linear-gradient(90deg,#334 0 6px,#556 6px 14px),linear-gradient(#123,#456);background-blend-mode:overlay}
+.i4{background:radial-gradient(circle at 30% 60%,#ff8fa8 0 18%,transparent 19%),radial-gradient(circle at 65% 40%,#ffd0a0 0 22%,transparent 23%),linear-gradient(135deg,#ffe8f1,#fff4e0)}
+.i5{background:linear-gradient(200deg,#b9a7ff,#5b43d8)}
+.src{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#5b7190;font-weight:600}
+.src i{width:12px;height:12px;border-radius:3px;display:inline-block;font-style:normal;font-size:8px;color:#fff;text-align:center;line-height:12px;font-weight:800}
+.ttl{font-size:12.8px;font-weight:700;line-height:1.3;color:#0f2a4a}
+.topicchip{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:999px;display:inline-block}
+.t-tech{background:#e6f0ff;color:#1f6feb}.t-env{background:#e3f7ec;color:#138a4b}.t-sport{background:#ffe8f1;color:#c0306e}.t-world{background:#fff3d6;color:#a86b00}
+/* A: Bildkarten */
+.nA .hero .img{height:110px}
+.nA .hero .ttl{font-size:14px;margin-top:7px}
+.nA .li{display:flex;gap:9px;align-items:center;padding-top:9px;border-top:1px solid #edf2fa;margin-top:9px}
+.nA .li .img{width:52px;height:52px}
+/* B: Karussell */
+.car{display:flex;gap:9px;overflow:hidden;margin:0 -12px;padding:0 12px}
+.story{width:168px;height:208px;flex:none;border-radius:20px;position:relative;overflow:hidden;color:#fff;display:flex;flex-direction:column;justify-content:flex-end;padding:11px;box-shadow:0 10px 22px rgba(15,42,74,.18)}
+.story::after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 35%,rgba(5,15,35,.78))}
+.story>*{position:relative;z-index:1}
+.story .ttl{color:#fff;font-size:13.2px}
+.story .src{color:rgba(255,255,255,.85)}
+.dots{display:flex;gap:4px;justify-content:center}.dots i{width:6px;height:6px;border-radius:50%;background:#b8cbe6}.dots i:first-child{width:16px;border-radius:4px;background:#1f6feb}
+/* C: Stella erzählt */
+.say{font-size:13px;color:#0f2a4a;line-height:1.45}
+.say b{color:#1f6feb}
+.nC .li{display:flex;gap:9px;align-items:flex-start;margin-top:9px}
+.nC .num{font:900 20px var(--display);color:#ff7eb3;width:18px;flex:none;line-height:1}
+.nC .img{width:46px;height:46px;margin-left:auto}
+/* D: Zeitung */
+.paper{background:#fffdf8;border-radius:18px;padding:12px;box-shadow:0 8px 18px rgba(31,111,235,.08);font-family:Georgia,"Times New Roman",serif}
+.paper .mast{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #0f2a4a;padding-bottom:4px}
+.paper .mast b{font-size:17px;letter-spacing:-.01em}
+.paper .mast span{font:600 9.5px var(--body);color:#5b7190}
+.paper .lead2{display:grid;grid-template-columns:1fr 74px;gap:8px;margin-top:8px}
+.paper .lead2 .img{height:74px}
+.paper .ttl{font-family:Georgia,serif;font-size:14px}
+.paper .two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:9px;border-top:1px solid #e3e0d6;padding-top:8px}
+.paper .two .ttl{font-size:11.5px}
+
+/* Tab-Leisten */
+.tabs{display:flex;justify-content:space-around;padding:7px 6px 13px;background:rgba(255,255,255,.92);border-top:1px solid #e4ecf7;font-size:9px;color:#8da0ba;font-weight:600}
+.tabs div{display:flex;flex-direction:column;align-items:center;gap:2px}
+.tabs div i{width:18px;height:18px;border-radius:6px;background:#c9d6e8;display:block}
+.tabs div.on{color:#1f6feb}.tabs div.on i{background:#1f6feb}
+.ftabs{margin:0 14px 12px;border-radius:26px;display:flex;justify-content:space-around;padding:8px;background:rgba(255,255,255,.7);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 10px 24px rgba(15,42,74,.15);font-size:9px;font-weight:700;color:#5b7190}
+.ftabs div{display:flex;align-items:center;gap:5px;padding:6px 9px;border-radius:18px}
+.ftabs div i{width:15px;height:15px;border-radius:5px;background:#9fb3cf;display:block}
+.ftabs div.on{background:#1f6feb;color:#fff}.ftabs div.on i{background:#fff}
+
+/* Ziele */
+.rings{display:flex;gap:10px}
+.ring{flex:1;background:#fff;border-radius:16px;padding:9px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;box-shadow:0 6px 14px rgba(31,111,235,.07);font-size:10px;font-weight:700;text-align:center;line-height:1.2}
+.ring svg{width:44px;height:44px}
+.gline{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:600}
+.gline+.gline{margin-top:8px}
+.gbar{flex:1;height:7px;border-radius:5px;background:#e6f0ff;overflow:hidden}.gbar i{display:block;height:100%;background:linear-gradient(90deg,#1f6feb,#7ab6ff);border-radius:5px}
+.weekrow{display:flex;gap:5px}
+.weekrow div{flex:1;border-radius:12px;background:rgba(255,255,255,.85);text-align:center;padding:6px 0;font-size:9.5px;font-weight:700;color:#0f2a4a}
+.weekrow div b{display:block;font-size:14px}
+.weekrow div.on{background:#1f6feb;color:#fff}
+.item{display:flex;gap:9px;align-items:center;background:#fff;border-radius:14px;padding:9px;font-size:12px;box-shadow:0 4px 12px rgba(31,111,235,.06)}
+.item .ic{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;font-size:14px;flex:none}
+.swipehint{display:flex;justify-content:space-between;font-size:10px;color:#5b7190;font-weight:600;padding:0 4px}
+
+/* Heute-Kopf Ideen */
+.heroW{border-radius:22px;padding:14px;color:#fff;position:relative;overflow:hidden;min-height:128px;display:flex;flex-direction:column;justify-content:flex-end;box-shadow:0 12px 26px rgba(31,111,235,.22)}
+.heroW .big{font:900 34px var(--display);position:absolute;right:14px;top:10px}
+.heroW .hi{color:#fff}
+.timeline{display:flex;flex-direction:column;gap:0;margin-left:6px;border-left:2px dashed #c3d6f0;padding-left:12px}
+.timeline .t{position:relative;padding:5px 0;font-size:12px}
+.timeline .t::before{content:"";position:absolute;left:-18px;top:10px;width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #1f6feb}
+.timeline .t b{font-size:10.5px;color:#5b7190;display:block}
+.timeline .t.now::before{background:#ff7eb3;border-color:#ff7eb3;box-shadow:0 0 0 4px rgba(255,126,179,.25)}
+</style>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:8px">
+    <span class="tag">Stella · nur Oberfläche · noch nichts davon ist in der App</span>
+    <h1>Design-Varianten zum Aussuchen</h1>
+    <p class="lead">Tipp bei jedem Thema auf <b>„Die nehm ich“</b>. Unten steht dann deine Auswahl als eine Zeile, die du mir einfach zurückschickst (z.&nbsp;B. „Blasen B, Schreibstil B, News A“). Mischen geht auch: „News B, aber mit den Themen-Chips aus D“.</p>
+  </header>
+
+  <div class="bar" role="group" aria-label="Wetter für alle Handys">
+    <b>Wetter</b>
+    <button class="wbtn" data-set="sun" aria-pressed="true">☀️ Sonne</button>
+    <button class="wbtn" data-set="rain" aria-pressed="false">🌧️ Regen</button>
+    <button class="wbtn" data-set="snow" aria-pressed="false">❄️ Schnee</button>
+    <button class="wbtn" data-set="night" aria-pressed="false">🌙 Nacht</button>
+  </div>
+
+  <!-- ============ 1 Blasen ============ -->
+  <section class="topic" data-topic="Blasen">
+    <div class="topic-head">
+      <span class="tag">1 · Chat</span>
+      <h2>Nachrichten direkt auf dem Himmel</h2>
+      <p class="lead">Die große weiße Fläche hinter dem Chat ist bei allen drei Versionen weg. Stell oben das Wetter um, dann siehst du, wie sich die Blasen anpassen.</p>
+    </div>
+    <div class="row">
+      <div class="variant">
+        <div class="vhead"><span class="letter">A</span><span class="vname">Milchglas</span></div>
+        <p class="vtext">Durchscheinende Blasen, der Himmel schimmert durch. Ruhig und edel, bei Nacht automatisch dunkles Glas.</p>
+        <div class="phone"><div class="screen vA wx" data-w="sun"><div class="notch"></div><div class="sky"></div><div class="fx"></div><div class="ui"><div class="sb"></div>
+          <div class="chead"><div class="av"><svg viewBox="0 0 24 24"><path fill="#ff7eb3" d="M12 1l2.6 7.4L22 11l-7.4 2.6L12 21l-2.6-7.4L2 11l7.4-2.6z"/></svg></div><div><div class="cname">Stella</div><div class="cstat">online</div></div></div>
+          <div class="msgs">
+            <div class="b st">Guten Morgen Lena! Heute wird's sonnig, 18°. Perfekt für deinen Lauf um 17 Uhr ☀️<small>7:42</small></div>
+            <div class="b me">Danke! Was steht heute noch an?<small>7:43</small></div>
+            <div class="b st">Latein HÜ S. 45 bis Freitag und um 15 Uhr Zahnarzt. Soll ich dich um 14:30 erinnern?<small>7:43</small></div>
+          </div>
+          <div class="compose">Schreib Stella …<i></i></div></div></div></div>
+        <button class="pickbtn" data-pick="A">Die nehm ich</button>
+      </div>
+      <div class="variant">
+        <div class="vhead"><span class="letter">B</span><span class="vname">Blasen im Wetter-Look</span></div>
+        <p class="vtext">Jedes Wetter hat eigene Blasen: Sonne warm und golden, Regen mit Tropfen, Schnee frostig mit Flocke, Nacht dunkel mit Leuchten und Stern.</p>
+        <div class="phone"><div class="screen vB wx" data-w="sun"><div class="notch"></div><div class="sky"></div><div class="fx"></div><div class="ui"><div class="sb"></div>
+          <div class="chead"><div class="av"><svg viewBox="0 0 24 24"><path fill="#ff7eb3" d="M12 1l2.6 7.4L22 11l-7.4 2.6L12 21l-2.6-7.4L2 11l7.4-2.6z"/></svg></div><div><div class="cname">Stella</div><div class="cstat">online</div></div></div>
+          <div class="msgs">
+            <div class="b st">Guten Morgen Lena! Heute wird's sonnig, 18°. Perfekt für deinen Lauf um 17 Uhr ☀️<small>7:42</small></div>
+            <div class="b me">Danke! Was steht heute noch an?<small>7:43</small></div>
+            <div class="b st">Latein HÜ S. 45 bis Freitag und um 15 Uhr Zahnarzt. Soll ich dich um 14:30 erinnern?<small>7:43</small></div>
+          </div>
+          <div class="compose">Schreib Stella …<i></i></div></div></div></div>
+        <button class="pickbtn" data-pick="B">Die nehm ich</button>
+      </div>
+      <div class="variant">
+        <div class="vhead"><span class="letter">C</span><span class="vname">Frei schwebend</span></div>
+        <p class="vtext">Stellas Text steht ohne Blase direkt im Himmel, mit kleinem Stern daneben. Nur deine Nachrichten haben eine Blase. Sehr luftig, fast wie ein Tagebuch.</p>
+        <div class="phone"><div class="screen vC wx" data-w="sun"><div class="notch"></div><div class="sky"></div><div class="fx"></div><div class="ui"><div class="sb"></div>
+          <div class="chead"><div class="av"><svg viewBox="0 0 24 24"><path fill="#ff7eb3" d="M12 1l2.6 7.4L22 11l-7.4 2.6L12 21l-2.6-7.4L2 11l7.4-2.6z"/></svg></div><div><div class="cname">Stella</div><div class="cstat">online</div></div></div>
+          <div class="msgs">
+            <div class="grp"><div class="av"><svg viewBox="0 0 24 24"><path fill="#ff7eb3" d="M12 1l2.6 7.4L22 11l-7.4 2.6L12 21l-2.6-7.4L2 11l7.4-2.6z"/></svg></div><div class="col"><div class="b st">Guten Morgen Lena!</div><div class="b st">Heute wird's sonnig, 18°. Perfekt für deinen Lauf um 17 Uhr ☀️</div></div></div>
+            <div class="b me">Danke! Was steht heute noch an?</div>
+            <div class="grp"><div class="av"><svg viewBox="0 0 24 24"><path fill="#ff7eb3" d="M12 1l2.6 7.4L22 11l-7.4 2.6L12 21l-2.6-7.4L2 11l7.4-2.6z"/></svg></div><div class="col"><div class="b st">Latein HÜ S. 45 bis Freitag und um 15 Uhr Zahnarzt.</div><div class="b st">Soll ich dich um 14:30 erinnern?</div></div></div>
+          </div>
+          <div class="compose">Schreib Stella …<i></i></div></div></div></div>
+        <button class="pickbtn" data-pick="C">Die nehm ich</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2 Schreibstil ============ -->
+  <section class="topic" data-topic="Schreibstil">
+    <div class="topic-head">
+      <span class="tag">2 · Wie Stella schreibt</span>
+      <h2>Mehr wie ein Mensch</h2>
+      <p class="lead">Dieselbe Situation wie auf deinem Screenshot: Ziel angelegt, Herr Gruber wartet auf eine Antwort, und keine KI erreichbar. Die Blasen sind hier neutral, damit du nur auf den Text schaust. In B und C kommen die Nachrichten nacheinander, wie beim Tippen.</p>
+    </div>
+    <div class="row">
+      <div class="variant">
+        <div class="vhead"><span class="letter">A</span><span class="vname">So ist es jetzt</span></div>
+        <p class="vtext">Zum Vergleich. Klingt wie ein Protokoll: „✓ Done:“, alles in einer Blase, teils Englisch.</p>
+        <div class="phone"><div class="screen neutral"><div class="notch"></div><div class="sky"></div><div class="ui"><div class="sb"></div>
+          <div class="chead"><div class="av"><svg viewBox="0 0 24 24"><path fill="#ff7eb3" d="M12 1l2.6 7.4L22 11l-7.4 2.6L12 21l-2.6-7.4L2 11l7.4-2.6z"/></svg></div><div><div class="cname">Stella</div><div class="cstat">online</div></div></div>
+          <div class="msgs">
+            <div class="b st">✓ Done: Ziel „In Mathe auf einen Zweier kommen“ anlegen.<div class="done"><span class="ok">✓ Erledigt</span><span class="undo">Rückgängig</span></div><small>8:26</small></div>
+            <div class="b st">✉️ Herr Gruber is still waiting for your reply (Fragt, ob du dein Referat schon am Montag halten kannst). Shall I write a draft?<small>8:26</small></div>
+            <div class="b st">📴 Ich erreiche gerade kein KI-Modell. Kurznotizen wie „Latein HÜ S. 45 Nr. 3 Freitag“, „Mathe SA 12.11.“, „was steht an?“ oder „Latein HÜ erledigt“ verstehe ich trotzdem.<small>8:26</small></div>
+          </div>
+          <div class="compose">Schreib Stella …<i></i></div></div></div></div>
+        <button class="pickbtn" data-pick="A">Lieber so lassen</button>
+      </div>
+      <div class="variant">
+        <div class="vhead"><span class="letter">B</span><span class="vname">Kurze Nachrichten wie eine Freundin</span></div>
+        <p class="vtext">Ein Gedanke pro Blase, höchstens ein Emoji, eine Frage am Ende. Darunter Antwort-Knöpfe zum Antippen. „Rückgängig“ ist nur noch eine kleine graue Zeile.</p>
+        <div class="phone"><div class="screen neutral"><div class="notch"></div><div class="sky"></div><div class="ui"><div class="sb"></div>
+          <div class="chead"><div class="av"><svg viewBox="0 0 24 24"><path fill="#ff7eb3" d="M12 1l2.6 7.4L22 11l-7.4 2.6L12 21l-2.6-7.4L2 11l7.4-2.6z"/></svg></div><div><div class="cname">Stella</div><div class="cstat">schreibt …</div></div></div>
+          <div class="msgs seq">
+            <div class="b st">Ziel ist drin 💪 „In Mathe auf einen Zweier“</div>
+            <div class="mini">Ziel angelegt · <a>Rückgängig</a></div>
+            <div class="b st">Übrigens, Herr Gruber wartet noch auf dich.</div>
+            <div class="b st">Er will wissen, ob du dein Referat schon am Montag halten kannst. Soll ich dir eine Antwort vorschreiben?</div>
+            <div class="chips"><span>Ja, schreib was</span><span>Ich mach's selbst</span><span>Später</span></div>
+            <div class="b st">Kleine Info: Mein KI-Kopf ist gerade offline 😅 Kurze Sachen wie „Latein HÜ Freitag“ versteh ich trotzdem.</div>
+          </div>
+          <div class="compose">Schreib Stella …<i></i></div></div></div></div>
+        <button class="pickbtn" data-pick="B">Die nehm ich</button>
+      </div>
+      <div class="variant">
+        <div class="vhead"><span class="letter">C</span><span class="vname">Mensch plus kleine Karte</span></div>
+        <p class="vtext">Ein kurzer, lockerer Satz. Was Stella gemacht hat oder vorschlägt, steht darunter als hübsche Karte mit Symbol und Knöpfen.</p>
+        <div class="phone"><div class="screen neutral"><div class="notch"></div><div class="sky"></div><div class="ui"><div class="sb"></div>
+          <div class="chead"><div class="av"><svg viewBox="0 0 24 24"><path fill="#ff7eb3" d="M12 1l2.6 7.4L22 11l-7.4 2.6L12 21l-2.6-7.4L2 11l7.4-2.6z"/></svg></div><div><div class="cname">Stella</div><div class="cstat">online</div></div></div>
+          <div class="msgs seq">
+            <div class="b st">Hab ich dir angelegt, das schaffst du!</div>
+            <div class="acard"><div class="ic" style="background:#e3f7ec">🎯</div><div><b>In Mathe auf einen Zweier</b><span>Ziel · ich frag sonntags nach</span><div class="btns"><em>Ansehen</em><em>Rückgängig</em></div></div></div>
+            <div class="b st">Und Herr Gruber wartet noch auf eine Antwort von dir.</div>
+            <div class="acard"><div class="ic" style="background:#e6f0ff">✉️</div><div><b>Referat schon am Montag?</b><span>Mail von Herrn Gruber · gestern</span><div class="btns"><em class="p">Antwort vorschreiben</em><em>Öffnen</em></div></div></div>
+          </div>
+          <div class="compose">Schreib Stella …<i></i></div></div></div></div>
+        <button class="pickbtn" data-pick="C">Die nehm ich</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3 News ============ -->
+  <section class="topic" data-topic="News">
+    <div class="topic-head">
+      <span class="tag">3 · Heute</span>
+      <h2>News, die man gern anschaut</h2>
+      <p class="lead">Jetzt sind die News nur graue Textzeilen im Überblick. Alle Versionen nutzen das Vorschaubild aus dem Artikel (das holt der Server mit), Logo der Zeitung und Themen-Farben. Die Bilder hier sind Platzhalter.</p>
+    </div>
+    <div class="row">
+      <div class="variant">
+        <div class="vhead"><span class="letter">A</span><span class="vname">Großes Bild oben, Rest als Liste</span></div>
+        <p class="vtext">Die wichtigste Meldung mit großem Bild, darunter zwei kleinere mit Vorschaubild. Klar und aufgeräumt.</p>
+        <div class="phone"><div class="screen today nA"><div class="notch"></div><div class="sky"></div><div class="ui"><div class="sb"></div>
+          <div class="scroll">
+            <div class="hi">Guten Morgen, Lena</div><div class="sub">Freitag · 14° bewölkt</div>
+            <div class="eb">Was heute los ist</div>
+            <div class="card">
+              <div class="hero"><div class="img i1"><span class="lbl">Bild aus dem Artikel</span></div>
+                <div style="display:flex;gap:6px;align-items:center;margin-top:8px"><span class="topicchip t-tech">Technik</span><span class="src"><i style="background:#c00">ORF</i>ORF · vor 1 Std.</span></div>
+                <div class="ttl">Österreich startet eigenes Satelliten-Programm für schnelleres Internet am Land</div></div>
+              <div class="li"><div class="img i2"></div><div><span class="topicchip t-env">Umwelt</span><div class="ttl">Neuer Rekord: 80 % Ökostrom im Oktober</div><span class="src"><i style="background:#0a5">DS</i>Der Standard</span></div></div>
+              <div class="li"><div class="img i3"></div><div><span class="topicchip t-sport">Sport</span><div class="ttl">Salzburg dreht Spiel in der Nachspielzeit</div><span class="src"><i style="background:#e60">K</i>Kurier</span></div></div>
+            </div>
+          </div>
+          <div class="tabs"><div class="on"><i></i>Heute</div><div><i></i>Chat</div><div><i></i>Planer</div><div><i></i>Inbox</div></div></div></div></div>
+        <button class="pickbtn" data-pick="A">Die nehm ich</button>
+      </div>
+      <div class="variant">
+        <div class="vhead"><span class="letter">B</span><span class="vname">Story-Karussell</span></div>
+        <p class="vtext">Große Bildkarten zum Durchwischen, wie Instagram-Stories. Titel steht auf dem Bild. Am auffälligsten.</p>
+        <div class="phone"><div class="screen today"><div class="notch"></div><div class="sky"></div><div class="ui"><div class="sb"></div>
+          <div class="scroll">
+            <div class="hi">Guten Morgen, Lena</div><div class="sub">Freitag · 14° bewölkt</div>
+            <div class="eb">Deine News · zum Wischen</div>
+            <div class="car">
+              <div class="story i1"><span class="topicchip t-tech" style="align-self:flex-start;margin-bottom:6px">Technik</span><div class="ttl">Österreich startet eigenes Satelliten-Programm</div><span class="src"><i style="background:#c00">ORF</i>ORF · 1 Std.</span></div>
+              <div class="story i2"><span class="topicchip t-env" style="align-self:flex-start;margin-bottom:6px">Umwelt</span><div class="ttl">80 % Ökostrom im Oktober</div><span class="src">Der Standard</span></div>
+            </div>
+            <div class="dots"><i></i><i></i><i></i><i></i></div>
+            <div class="card" style="font-size:12px"><b>🗓️ Heute</b><br>15:00 Zahnarzt · Latein HÜ bis Freitag</div>
+          </div>
+          <div class="tabs"><div class="on"><i></i>Heute</div><div><i></i>Chat</div><div><i></i>Planer</div><div><i></i>Inbox</div></div></div></div></div>
+        <button class="pickbtn" data-pick="B">Die nehm ich</button>
+      </div>
+      <div class="variant">
+        <div class="vhead"><span class="letter">C</span><span class="vname">Stella erzählt die News</span></div>
+        <p class="vtext">Stella fasst in einem lockeren Satz zusammen, darunter die drei Meldungen nummeriert mit kleinem Bild. Persönlich, passt zum Chat.</p>
+        <div class="phone"><div class="screen today nC"><div class="notch"></div><div class="sky"></div><div class="ui"><div class="sb"></div>
+          <div class="scroll">
+            <div class="hi">Guten Morgen, Lena</div><div class="sub">Freitag · 14° bewölkt</div>
+            <div class="card">
+              <div style="display:flex;gap:8px;align-items:center"><div class="av" style="width:26px;height:26px"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><path fill="#ff7eb3" d="M12 1l2.6 7.4L22 11l-7.4 2.6L12 21l-2.6-7.4L2 11l7.4-2.6z"/></svg></div><span class="eb" style="margin:0">Stellas 3 für heute</span></div>
+              <p class="say" style="margin:8px 0 0">Heute gibt's <b>was fürs Internet am Land</b>, gute Nachrichten fürs Klima und ein Krimi in Salzburg ⚽</p>
+              <div class="li"><span class="num">1</span><div><div class="ttl">Österreich startet eigenes Satelliten-Programm</div><span class="src"><i style="background:#c00">ORF</i>ORF</span></div><div class="img i1"></div></div>
+              <div class="li"><span class="num">2</span><div><div class="ttl">Neuer Rekord: 80 % Ökostrom</div><span class="src"><i style="background:#0a5">DS</i>Der Standard</span></div><div class="img i2"></div></div>
+              <div class="li"><span class="num">3</span><div><div class="ttl">Salzburg dreht Spiel spät</div><span class="src"><i style="background:#e60">K</i>Kurier</span></div><div class="img i3"></div></div>
+            </div>
+          </div>
+          <div class="tabs"><div class="on"><i></i>Heute</div><div><i></i>Chat</div><div><i></i>Planer</div><div><i></i>Inbox</div></div></div></div></div>
+        <button class="pickbtn" data-pick="C">Die nehm ich</button>
+      </div>
+      <div class="variant">
+        <div class="vhead"><span class="letter">D</span><span class="vname">Eigene kleine Zeitung</span></div>
+        <p class="vtext">Wie eine Titelseite mit Zeitungsschrift, Kopfzeile „Stella Morgenpost“ und zwei Spalten. Mal was anderes.</p>
+        <div class="phone"><div class="screen today"><div class="notch"></div><div class="sky"></div><div class="ui"><div class="sb"></div>
+          <div class="scroll">
+            <div class="hi">Guten Morgen, Lena</div><div class="sub">Freitag · 14° bewölkt</div>
+            <div class="paper">
+              <div class="mast"><b>Stella Morgenpost</b><span>Fr, 13. Nov.</span></div>
+              <div class="lead2"><div><span class="topicchip t-tech">Technik</span><div class="ttl">Österreich startet eigenes Satelliten-Programm</div><span class="src">ORF · 1 Std.</span></div><div class="img i1"></div></div>
+              <div class="two"><div><span class="topicchip t-env">Umwelt</span><div class="ttl">80 % Ökostrom im Oktober</div></div><div><span class="topicchip t-world">Welt</span><div class="ttl">EU einigt sich auf Handy-Ladegerät 2.0</div></div></div>
+            </div>
+          </div>
+          <div class="tabs"><div class="on"><i></i>Heute</div><div><i></i>Chat</div><div><i></i>Planer</div><div><i></i>Inbox</div></div></div></div></div>
+        <button class="pickbtn" data-pick="D">Die nehm ich</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4 Ziele ============ -->
+  <section class="topic" data-topic="Ziele">
+    <div class="topic-head">
+      <span class="tag">4 · Ziele ohne eigenen Tab</span>
+      <h2>Wohin mit den Zielen?</h2>
+      <p class="lead">Der Ziele-Tab unten fällt weg, die Leiste hat dann nur noch vier Punkte. Anlegen geht wie bisher im Chat („ich will dreimal pro Woche laufen“). Antippen öffnet die Ziele als Blatt von unten.</p>
+    </div>
+    <div class="row">
+      <div class="variant">
+        <div class="vhead"><span class="letter">A</span><span class="vname">Ringe auf „Heute“</span></div>
+        <p class="vtext">Drei kleine Fortschritts-Ringe direkt unter der Begrüßung. Sieht man jeden Tag, nimmt kaum Platz.</p>
+        <div class="phone"><div class="screen today"><div class="notch"></div><div class="sky"></div><div class="ui"><div class="sb"></div>
+          <div class="scroll">
+            <div class="hi">Guten Morgen, Lena</div><div class="sub">Freitag · 14° bewölkt</div>
+            <div class="eb">Deine Woche</div>
+            <div class="rings">
+              <div class="ring"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" fill="none" stroke="#e6f0ff" stroke-width="6"/><circle cx="22" cy="22" r="18" fill="none" stroke="#1f6feb" stroke-width="6" stroke-linecap="round" stroke-dasharray="75 113" transform="rotate(-90 22 22)"/><text x="22" y="26" text-anchor="middle" font-size="11" font-weight="800" fill="#0f2a4a">2/3</text></svg>Laufen</div>
+              <div class="ring"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" fill="none" stroke="#e3f7ec" stroke-width="6"/><circle cx="22" cy="22" r="18" fill="none" stroke="#34c77b" stroke-width="6" stroke-linecap="round" stroke-dasharray="40 113" transform="rotate(-90 22 22)"/><text x="22" y="26" text-anchor="middle" font-size="11" font-weight="800" fill="#0f2a4a">1/3</text></svg>Mathe üben</div>
+              <div class="ring"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" fill="none" stroke="#ffe8f1" stroke-width="6"/><circle cx="22" cy="22" r="18" fill="none" stroke="#ff7eb3" stroke-width="6" stroke-linecap="round" stroke-dasharray="113 113" transform="rotate(-90 22 22)"/><text x="22" y="26" text-anchor="middle" font-size="12" font-weight="800" fill="#0f2a4a">✓</text></svg>Lesen</div>
+            </div>
+            <div class="card" style="font-size:12px"><b>🗓️ Heute</b><br>15:00 Zahnarzt · Latein HÜ bis Freitag</div>
+          </div>
+          <div class="tabs"><div class="on"><i></i>Heute</div><div><i></i>Chat</div><div><i></i>Planer</div><div><i></i>Inbox</div></div></div></div></div>
+        <button class="pickbtn" data-pick="A">Die nehm ich</button>
+      </div>
+      <div class="variant">
+        <div class="vhead"><span class="letter">B</span><span class="vname">Im Planer bei der Woche</span></div>
+        <p class="vtext">Ziele stehen im Planer direkt unter der Wochenleiste als „Diese Woche“. Da, wo man eh plant.</p>
+        <div class="phone"><div class="screen today"><div class="notch"></div><div class="sky"></div><div class="ui"><div class="sb"></div>
+          <div class="scroll">
+            <div class="hi">Planer</div>
+            <div class="weekrow"><div>Mo<b>9</b></div><div>Di<b>10</b></div><div>Mi<b>11</b></div><div>Do<b>12</b></div><div class="on">Fr<b>13</b></div><div>Sa<b>14</b></div><div>So<b>15</b></div></div>
+            <div class="card">
+              <div class="eb" style="margin:0 0 8px">🎯 Diese Woche</div>
+              <div class="gline">Laufen<div class="gbar"><i style="width:66%"></i></div>2/3</div>
+              <div class="gline">Mathe üben<div class="gbar"><i style="width:33%"></i></div>1/3</div>
+            </div>
+            <div class="item"><div class="ic" style="background:#ffe8f1">🦷</div><div><b>Zahnarzt</b><br><span style="color:#5b7190">15:00</span></div></div>
+            <div class="item"><div class="ic" style="background:#e6f0ff">📘</div><div><b>Latein HÜ S. 45</b><br><span style="color:#5b7190">bis Freitag</span></div></div>
+          </div>
+          <div class="tabs"><div><i></i>Heute</div><div><i></i>Chat</div><div class="on"><i></i>Planer</div><div><i></i>Inbox</div></div></div></div></div>
+        <button class="pickbtn" data-pick="B">Die nehm ich</button>
+      </div>
+      <div class="variant">
+        <div class="vhead"><span class="letter">C</span><span class="vname">Balken-Karte auf „Heute“</span></div>
+        <p class="vtext">Wie die Karte, die es schon gibt, nur weiter oben und hübscher mit Symbolen. Der kleinste Umbau.</p>
+        <div class="phone"><div class="screen today"><div class="notch"></div><div class="sky"></div><div class="ui"><div class="sb"></div>
+          <div class="scroll">
+            <div class="hi">Guten Morgen, Lena</div><div class="sub">Freitag · 14° bewölkt</div>
+            <div class="card">
+              <div style="display:flex;justify-content:space-between"><b style="font-size:13px">Deine Ziele</b><span style="color:#8da0ba">›</span></div>
+              <div class="gline" style="margin-top:9px">🏃 Laufen<div class="gbar"><i style="width:66%"></i></div>2/3</div>
+              <div class="gline">📐 Mathe<div class="gbar"><i style="width:33%"></i></div>1/3</div>
+              <div class="gline">📚 Lesen<div class="gbar"><i style="width:100%;background:linear-gradient(90deg,#34c77b,#8be3b4)"></i></div>✓</div>
+            </div>
+            <div class="card" style="font-size:12px"><b>🗓️ Heute</b><br>15:00 Zahnarzt · Latein HÜ bis Freitag</div>
+          </div>
+          <div class="tabs"><div class="on"><i></i>Heute</div><div><i></i>Chat</div><div><i></i>Planer</div><div><i></i>Inbox</div></div></div></div></div>
+        <button class="pickbtn" data-pick="C">Die nehm ich</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 5 Weitere Ideen ============ -->
+  <section class="topic" data-topic="Extras">
+    <div class="topic-head">
+      <span class="tag">5 · Was mir sonst noch langweilig vorkam</span>
+      <h2>Weitere Ideen</h2>
+      <p class="lead">Die kannst du einzeln an- oder abwählen. Bei diesem Thema kannst du mehrere nehmen.</p>
+    </div>
+    <div class="row">
+      <div class="variant">
+        <div class="vhead"><span class="letter">1</span><span class="vname">Wetter-Karte als Begrüßung</span></div>
+        <p class="vtext">Oben auf „Heute“ eine große, farbige Karte im aktuellen Wetter mit Temperatur und einem Satz von Stella, statt nur Text.</p>
+        <div class="phone"><div class="screen today"><div class="notch"></div><div class="sky"></div><div class="ui"><div class="sb"></div>
+          <div class="scroll">
+            <div class="heroW" style="background:radial-gradient(circle at 85% 18%,#fff2b0 0 22px,rgba(255,220,110,.5) 23px 46px,transparent 47px),linear-gradient(150deg,#4f9df0,#86c4ff)"><span class="big">18°</span><div class="hi">Guten Morgen, Lena</div><div style="font-size:12px;opacity:.95">Sonnig bis zum Abend. Ideal für deinen Lauf um 17 Uhr.</div></div>
+            <div class="card" style="font-size:12px"><b>🗓️ Heute</b><br>15:00 Zahnarzt · Latein HÜ bis Freitag</div>
+          </div>
+          <div class="tabs"><div class="on"><i></i>Heute</div><div><i></i>Chat</div><div><i></i>Planer</div><div><i></i>Inbox</div></div></div></div></div>
+        <button class="pickbtn multi" data-pick="1">Will ich</button>
+      </div>
+      <div class="variant">
+        <div class="vhead"><span class="letter">2</span><span class="vname">Tag als Zeitleiste</span></div>
+        <p class="vtext">Statt einer Liste: der Tag als Linie mit Punkten, „jetzt“ leuchtet pink. Man sieht sofort, was als Nächstes kommt.</p>
+        <div class="phone"><div class="screen today"><div class="notch"></div><div class="sky"></div><div class="ui"><div class="sb"></div>
+          <div class="scroll">
+            <div class="hi">Heute</div><div class="sub">noch 3 Sachen</div>
+            <div class="card"><div class="timeline">
+              <div class="t"><b>08:00</b>Schule</div>
+              <div class="t now"><b>jetzt · 13:10</b>Mittagspause, 50 Min frei</div>
+              <div class="t"><b>15:00</b>🦷 Zahnarzt</div>
+              <div class="t"><b>17:00</b>🏃 Laufen (Ziel 2/3)</div>
+              <div class="t"><b>19:30</b>📘 Latein HÜ, Stella hat 25 Min eingeplant</div>
+            </div></div>
+          </div>
+          <div class="tabs"><div class="on"><i></i>Heute</div><div><i></i>Chat</div><div><i></i>Planer</div><div><i></i>Inbox</div></div></div></div></div>
+        <button class="pickbtn multi" data-pick="2">Will ich</button>
+      </div>
+      <div class="variant">
+        <div class="vhead"><span class="letter">3</span><span class="vname">Schwebende Tab-Leiste</span></div>
+        <p class="vtext">Die Leiste unten als Glas-Kapsel, die über dem Himmel schwebt. Der aktive Tab ist eine blaue Pille mit Namen.</p>
+        <div class="phone"><div class="screen vA wx" data-w="sun"><div class="notch"></div><div class="sky"></div><div class="fx"></div><div class="ui"><div class="sb"></div>
+          <div class="chead"><div class="av"><svg viewBox="0 0 24 24"><path fill="#ff7eb3" d="M12 1l2.6 7.4L22 11l-7.4 2.6L12 21l-2.6-7.4L2 11l7.4-2.6z"/></svg></div><div><div class="cname">Stella</div><div class="cstat">online</div></div></div>
+          <div class="msgs"><div class="b st">Na, wie war die Schularbeit? 🙂</div></div>
+          <div class="compose">Schreib Stella …<i></i></div>
+          <div class="ftabs"><div><i></i></div><div class="on"><i></i>Chat</div><div><i></i></div><div><i></i></div></div></div></div></div>
+        <button class="pickbtn multi" data-pick="3">Will ich</button>
+      </div>
+      <div class="variant">
+        <div class="vhead"><span class="letter">4</span><span class="vname">Planer mit Symbolen und Farben</span></div>
+        <p class="vtext">Jeder Eintrag bekommt ein passendes Symbol und eine Farbe je Art (Termin, HÜ, Test). Dazu Wischen zwischen den Wochen, das baue ich sowieso ein.</p>
+        <div class="phone"><div class="screen today"><div class="notch"></div><div class="sky"></div><div class="ui"><div class="sb"></div>
+          <div class="scroll">
+            <div class="hi">Planer</div>
+            <div class="swipehint"><span>‹ KW 45</span><span>wischen</span><span>KW 47 ›</span></div>
+            <div class="weekrow"><div>Mo<b>9</b></div><div>Di<b>10</b></div><div>Mi<b>11</b></div><div>Do<b>12</b></div><div class="on">Fr<b>13</b></div><div>Sa<b>14</b></div><div>So<b>15</b></div></div>
+            <div class="item"><div class="ic" style="background:#ffe8f1">🦷</div><div><b>Zahnarzt</b><br><span style="color:#5b7190">15:00 · Termin</span></div></div>
+            <div class="item"><div class="ic" style="background:#e6f0ff">📘</div><div><b>Latein HÜ S. 45</b><br><span style="color:#5b7190">bis Freitag · HÜ</span></div></div>
+            <div class="item"><div class="ic" style="background:#fff3d6">📐</div><div><b>Mathe Schularbeit</b><br><span style="color:#5b7190">Di · Test · Lernplan läuft</span></div></div>
+          </div>
+          <div class="tabs"><div><i></i>Heute</div><div><i></i>Chat</div><div class="on"><i></i>Planer</div><div><i></i>Inbox</div></div></div></div></div>
+        <button class="pickbtn multi" data-pick="4">Will ich</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="summary" aria-live="polite">
+    <b>Deine Auswahl</b><br>
+    <code id="out">Noch nichts ausgewählt</code>
+    <button class="pickbtn copy" id="copy">Kopieren</button>
+    <p class="vtext" style="margin-top:8px">Schick mir die Zeile einfach im Chat. Was du nicht wählst, bleibt wie es ist.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  var btns=document.querySelectorAll('.wbtn');
+  btns.forEach(function(b){b.addEventListener('click',function(){
+    btns.forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false')});
+    document.querySelectorAll('.wx').forEach(function(s){s.setAttribute('data-w',b.dataset.set)});
+  })});
+  var picks={};
+  document.querySelectorAll('section.topic').forEach(function(sec){
+    var topic=sec.dataset.topic;
+    sec.querySelectorAll('.pickbtn').forEach(function(p){
+      p.setAttribute('aria-pressed','false');
+      p.addEventListener('click',function(){
+        if(p.classList.contains('multi')){
+          var on=p.getAttribute('aria-pressed')!=='true';p.setAttribute('aria-pressed',on?'true':'false');
+          var set=[];sec.querySelectorAll('.pickbtn[aria-pressed="true"]').forEach(function(x){set.push(x.dataset.pick)});
+          if(set.length)picks[topic]=set.join('+');else delete picks[topic];
+        }else{
+          sec.querySelectorAll('.pickbtn').forEach(function(x){x.setAttribute('aria-pressed',x===p?'true':'false')});
+          picks[topic]=p.dataset.pick;
+        }
+        var order=['Blasen','Schreibstil','News','Ziele','Extras'],parts=[];
+        order.forEach(function(k){if(picks[k])parts.push(k+' '+picks[k])});
+        document.getElementById('out').textContent=parts.length?parts.join(', '):'Noch nichts ausgewählt';
+      });
+    });
+  });
+  document.getElementById('copy').addEventListener('click',function(){
+    var t=document.getElementById('out').textContent,c=this;
+    try{navigator.clipboard.writeText(t).then(function(){c.textContent='Kopiert'},function(){sel()})}catch(e){sel()}
+    function sel(){var r=document.createRange();r.selectNodeContents(document.getElementById('out'));var s=getSelection();s.removeAllRanges();s.addRange(r)}
+  });
+})();
+</script>
