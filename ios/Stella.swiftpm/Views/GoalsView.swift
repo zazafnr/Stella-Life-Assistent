@@ -582,10 +582,32 @@ struct GoalLogSheet: View {
 struct GoalsCardView: View {
     var go: () -> Void
     @State private var goals: [GoalProgress] = []
+    @State private var loaded = false
 
     var body: some View {
         if goals.isEmpty {
-            Color.clear.frame(height: 0).task { await load() }
+            // ohne eigenen Ziele-Tab bleibt hier immer ein Einstieg (auch zur Bildschirmzeit), selbst ohne Ziele
+            Group {
+                if loaded {
+                    Button { go() } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "target").foregroundStyle(Theme.blue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(L("today.yourGoals")).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
+                                Text(L("today.goals.empty")).font(.system(size: 13)).foregroundStyle(Theme.muted).multilineTextAlignment(.leading)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.faint)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .card(padding: 14)
+                    }
+                    .buttonStyle(PressableStyle())
+                } else {
+                    Color.clear.frame(height: 0)
+                }
+            }
+            .task { await load() }
         } else {
             Button { go() } label: {
                 VStack(alignment: .leading, spacing: 12) {
@@ -617,5 +639,6 @@ struct GoalsCardView: View {
         if let r: GoalsResponse = try? await API.shared.get("/api/goals") {
             goals = r.goals.filter(\.isActive)
         }
+        loaded = true
     }
 }

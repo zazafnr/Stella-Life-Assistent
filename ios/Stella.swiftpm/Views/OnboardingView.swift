@@ -58,8 +58,9 @@ struct OnboardingView: View {
     var startAt: OnboardingStart
     @Environment(Store.self) private var store
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
-    private enum Step: Hashable { case language, welcome, name, situation, freenotes, age, details, features, location, mail, tone, briefing, done }
+    private enum Step: Hashable { case language, welcome, name, situation, freenotes, age, details, features, location, calendar, mail, tone, briefing, done }
 
     private struct SituationInfo: Identifiable {
         let id: String
@@ -97,6 +98,8 @@ struct OnboardingView: View {
 
     @State private var country = "AT"
     @State private var locationAnswer: String?
+    /** „yes“: Kalender-Abo geöffnet, „no“: Termine nur in Stella */
+    @State private var calendarAnswer: String?
     @State private var notifyFreenotes = false
     @State private var locator = OneShotLocation()
 
@@ -126,7 +129,7 @@ struct OnboardingView: View {
     private var steps: [Step] {
         let hasDetails = ["school", "university", "work", "apprenticeship"].contains(situation ?? "")
         return [.language, .welcome, .name, .situation] + (situation == "school" ? [.freenotes] : []) + [.age] + (hasDetails ? [.details] : [])
-            + [.features, .location, .mail, .tone, .briefing, .done]
+            + [.features, .location, .calendar, .mail, .tone, .briefing, .done]
     }
     private var step: Step { steps[min(index, steps.count - 1)] }
     private var isWork: Bool { situation == "work" || situation == "apprenticeship" }
@@ -286,6 +289,18 @@ struct OnboardingView: View {
                         Button(L("onboarding.location.later")) { locationAnswer = locationAnswer ?? "later"; go(1) }.buttonStyle(SoftButton(filled: false))
                     }
                 }
+            case .calendar:
+                heading(L("onboarding.calendar.title"))
+                paragraph(L("onboarding.calendar.text"))
+                if calendarAnswer == "yes" {
+                    Label(L("onboarding.calendar.added"), systemImage: "checkmark").font(.system(size: 14)).foregroundStyle(Theme.muted)
+                } else {
+                    HStack {
+                        Button(L("onboarding.calendar.yes")) { subscribeCalendar() }.buttonStyle(PrimaryButton())
+                            .disabled(calendarFeed == nil)
+                        Button(L("onboarding.calendar.no")) { calendarAnswer = "no"; go(1) }.buttonStyle(SoftButton(filled: false))
+                    }
+                }
             case .mail:
                 heading(L("onboarding.mail.title"))
                 paragraph(L("onboarding.mail.text"))
@@ -421,6 +436,21 @@ struct OnboardingView: View {
         "other": ["planner", "mails", "shopping", "goals"],
     ]
 
+    /** Stellas Kalender-Abo (dasselbe wie in den Einstellungen der Web-App) als webcal-Link: iOS fragt dann „Abonnieren?“
+        und holt Änderungen alle 15 Minuten nach – auch wenn die App zu ist */
+    private var calendarFeed: URL? {
+        guard let base = store.me?.ingestUrl, !base.isEmpty else { return nil }
+        let webcal = base.replacingOccurrences(of: "https://", with: "webcal://").replacingOccurrences(of: "http://", with: "webcal://")
+        return URL(string: webcal + "/calendar.ics")
+    }
+
+    private func subscribeCalendar() {
+        guard let url = calendarFeed else { return }
+        Haptics.soft()
+        openURL(url)
+        calendarAnswer = "yes"
+    }
+
     private var summary: [String] {
         var lines: [String] = []
         if situation == "school" { lines.append(L("onboarding.sum.school", ["homework": homework])) }
@@ -432,6 +462,7 @@ struct OnboardingView: View {
         if features.contains("mails") { lines.append(L("onboarding.sum.mails")) }
         if features.contains("shopping") { lines.append(L("onboarding.sum.shopping")) }
         if features.contains("goals") { lines.append(L("onboarding.sum.goals")) }
+        if calendarAnswer == "yes" { lines.append(L("onboarding.sum.calendar")) }
         if briefing != "off" {
             lines.append(L("onboarding.sum.briefing", ["when": briefing == "auto" ? L("onboarding.sum.briefingAuto") : L("onboarding.sum.briefingAt", ["time": briefing])]))
         }
