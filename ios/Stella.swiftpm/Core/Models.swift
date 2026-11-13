@@ -565,6 +565,9 @@ struct NewsEntry: Codable, Hashable, Identifiable {
     var url: String
     var publishedAt: String
     var favorite: Bool?
+    /** Vorschaubild (https) und erstes Thema, für das Story-Karussell auf „Heute“ */
+    var image: String?
+    var topic: String?
     var id: String { url }
 }
 

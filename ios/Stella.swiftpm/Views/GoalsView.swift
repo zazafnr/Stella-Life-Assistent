@@ -609,26 +609,20 @@ struct GoalsCardView: View {
             }
             .task { await load() }
         } else {
+            // Fortschritt dieser Woche als Ringe (Design-Auswahl „Ziele A“), Antippen öffnet die Ziele
             Button { go() } label: {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text(L("today.yourGoals")).font(.system(size: 17, weight: .bold)).foregroundStyle(Theme.text)
+                        Text(L("today.yourGoals")).eyebrow()
                         Spacer()
-                        Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.faint)
+                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.faint)
                     }
-                    ForEach(goals.prefix(3)) { g in
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text(g.title).font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.text)
-                                Spacer()
-                                Text("\(g.amount(g.weekValue)) von \(g.amount(g.weekTarget))").font(.system(size: 12.5)).foregroundStyle(Theme.muted)
-                            }
-                            GoalWeekBar(value: g.weekValue, target: g.weekTarget)
+                    HStack(spacing: 10) {
+                        ForEach(Array(goals.prefix(3).enumerated()), id: \.element.id) { i, g in
+                            GoalRing(goal: g, color: [Theme.blue, Theme.greenBright, Theme.pink][i % 3])
                         }
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .card(padding: 16)
             }
             .buttonStyle(PressableStyle())
             .task { await load() }
@@ -640,5 +634,49 @@ struct GoalsCardView: View {
             goals = r.goals.filter(\.isActive)
         }
         loaded = true
+    }
+}
+
+/** Ein Ziel als Ring: Fortschritt dieser Woche, in der Mitte „2/3“ oder ein Haken */
+struct GoalRing: View {
+    var goal: GoalProgress
+    var color: Color
+
+    private var progress: Double { goal.weekTarget > 0 ? min(1, goal.weekValue / goal.weekTarget) : 0 }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            ZStack {
+                Circle().stroke(color.opacity(0.16), lineWidth: 7)
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(color, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8), value: progress)
+                if progress >= 1 {
+                    Image(systemName: "checkmark").font(.system(size: 16, weight: .heavy)).foregroundStyle(color)
+                } else {
+                    Text("\(GoalProgress.number(goal.weekValue))/\(GoalProgress.number(goal.weekTarget))")
+                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Theme.text)
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                        .padding(.horizontal, 6)
+                }
+            }
+            .frame(width: 58, height: 58)
+            Text(goal.title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.text)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 6)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: Theme.blue.opacity(0.07), radius: 10, y: 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(goal.title): \(goal.amount(goal.weekValue)) / \(goal.amount(goal.weekTarget))")
     }
 }

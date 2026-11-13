@@ -193,11 +193,15 @@ export async function deliverHint(user: User, h: FoundHint, push: boolean): Prom
   if (isDelivered(user.id, h.key)) return;
   let actionId: string | undefined;
   let text = h.text;
+  /** Im Chat steht der kurze Satz, die Karte darunter zeigt, was gemacht wurde; die Mitteilung hat keine Karte und nennt es deshalb */
+  let pushText: string | undefined;
   if (h.action) {
     const r = perform(user, h.action.type, h.action.params as never, { source: 'auto', question: h.text, quiet: true });
     if (r.status === 'done') {
       actionId = r.actionId;
-      text = voiceOf(user).hintDone((db.prepare('SELECT summary FROM actions WHERE id = ?').get(r.actionId) as { summary: string }).summary);
+      const summary = (db.prepare('SELECT summary FROM actions WHERE id = ?').get(r.actionId) as { summary: string }).summary;
+      text = voiceOf(user).hintDone(summary);
+      pushText = `${text} ${summary.charAt(0).toUpperCase()}${summary.slice(1)}.`;
       addMessage(user.id, 'assistant', text, { actionId });
     } else if (r.status === 'proposed') {
       actionId = r.actionId;
@@ -209,7 +213,7 @@ export async function deliverHint(user: User, h: FoundHint, push: boolean): Prom
   }
   if (h.pending) setPending(user.id, h.pending.type, h.pending.itemId);
   markDelivered(user.id, h.key, actionId);
-  if (push) await notify(user.id, { title: 'Stella', body: text.replace(/\*\*/g, ''), text, tag: h.key });
+  if (push) { const p = pushText ?? text; await notify(user.id, { title: 'Stella', body: p.replace(/\*\*/g, '').replace(/\n\n/g, ' '), text: p, tag: h.key }); }
 }
 
 /** Hinweis über den Knopf auf „Heute“ erledigen lassen – das ist Zustimmung des Nutzers */

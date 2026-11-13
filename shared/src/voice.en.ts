@@ -334,14 +334,14 @@ export function voiceEn(tone: Tone | undefined): Voice {
       cool: 'Nothing. All under control. 😎',
     }),
     hintReply: (from: string, about: string) => by({
-      nett: `✉️ ${from} is still waiting for your reply (${about}). Shall I write a draft?`,
-      frech: `✉️ ${from} is still waiting for you (${about}). Ghosting isn't a solution. 😏 Draft?`,
-      cool: `✉️ ${from} awaits a reply (${about}). Draft?`,
+      nett: `By the way, ${from} is still waiting to hear back from you.\n\nIt's about: ${about}. Want me to draft something?`,
+      frech: `${from} is still waiting for you. Ghosting isn't a solution. 😏\n\nIt's about: ${about}. Want a draft?`,
+      cool: `${from} is still waiting on you.\n\n${about}. Want a draft?`,
     }),
     hintDone: (summary: string) => by({
-      nett: `✓ Done: ${summary}.`,
-      frech: `✓ Done before you noticed: ${summary}. 💅`,
-      cool: `✓ Done: ${summary}.`,
+      nett: pick(['Done, I took care of it 🙂', 'It\'s in. Have a quick look if it fits.'], summary),
+      frech: 'Done before you even noticed. 💅',
+      cool: 'Done.',
     }),
 
     // ----- Morning briefing -----

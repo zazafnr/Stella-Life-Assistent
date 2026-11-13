@@ -9,7 +9,7 @@ import { allSources, type NewsSource } from './sources.ts';
 
 export const KEEP_MS = 3 * 24 * 3600_000;
 
-export interface NewsRow { id: string; source_id: string; url: string; title: string; teaser: string; published_at: string; topics: string; cluster_id: string; fetched_at: string }
+export interface NewsRow { id: string; source_id: string; url: string; title: string; teaser: string; published_at: string; topics: string; cluster_id: string; fetched_at: string; image?: string | null }
 
 /** Lieblingsquellen der Nutzer sind eigene Quellen mit Kennung `fav:<Hash der Adresse>` */
 export const favoriteId = (feedUrl: string) => `fav:${createHash('sha1').update(feedUrl).digest('hex').slice(0, 12)}`;
@@ -33,7 +33,7 @@ export function storeItems(sourceId: string, items: ReturnType<typeof parseFeed>
   const since = new Date(Date.now() - CLUSTER_WINDOW_MS * 2).toISOString();
   const recent = (db.prepare('SELECT id, title, published_at, cluster_id FROM news_items WHERE published_at > ?').all(since) as { id: string; title: string; published_at: string; cluster_id: string }[])
     .map((r) => ({ id: r.id, title: r.title, publishedAt: Date.parse(r.published_at), clusterId: r.cluster_id }));
-  const insert = db.prepare('INSERT OR IGNORE INTO news_items (id, source_id, url, title, teaser, published_at, topics, cluster_id, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  const insert = db.prepare('INSERT OR IGNORE INTO news_items (id, source_id, url, title, teaser, published_at, topics, cluster_id, fetched_at, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
   let added = 0;
   const cutoff = Date.now() - KEEP_MS;
   db.transaction(() => {
@@ -41,7 +41,7 @@ export function storeItems(sourceId: string, items: ReturnType<typeof parseFeed>
       if (it.publishedAt < cutoff) continue;
       const id = newId();
       const clusterId = assignCluster({ id, title: it.title, publishedAt: it.publishedAt }, recent);
-      const r = insert.run(id, sourceId, it.url, it.title, it.teaser, new Date(it.publishedAt).toISOString(), JSON.stringify(guessTopics(it.title, it.categories, it.teaser)), clusterId, now());
+      const r = insert.run(id, sourceId, it.url, it.title, it.teaser, new Date(it.publishedAt).toISOString(), JSON.stringify(guessTopics(it.title, it.categories, it.teaser)), clusterId, now(), it.image ?? null);
       if (r.changes) { added++; recent.push({ id, title: it.title, publishedAt: it.publishedAt, clusterId }); }
     }
   })();
