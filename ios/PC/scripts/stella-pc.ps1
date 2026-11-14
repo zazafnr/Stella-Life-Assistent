@@ -4,7 +4,7 @@
 #   .\ios\PC\scripts\stella-pc.ps1 -Demo                   Stella offline: lokaler Server mit Beispieldaten
 #   .\ios\PC\scripts\stella-pc.ps1 students [-Demo]        Stella for Students (Repo daneben: ..\Stella-for-Students)
 #   .\ios\PC\scripts\stella-pc.ps1 students -Repo C:\Pfad  Students-Repo woanders
-#   ... -BuildOnly | -Release
+#   ... -BuildOnly | -Release | -NoBuild (zuletzt gebauten Stand ohne Build starten)
 #   ... -AppArgs '-tab','chat'                             weitere Startargumente für die App
 #
 # Braucht: Swift für Windows (winget install Swift.Toolchain) samt Visual Studio Build Tools,
@@ -14,6 +14,7 @@ param(
     [string]$Repo = '',
     [switch]$Demo,
     [switch]$BuildOnly,
+    [switch]$NoBuild,
     [switch]$Release,
     [string[]]$AppArgs = @()
 )
@@ -35,6 +36,14 @@ $Utf8 = New-Object System.Text.UTF8Encoding($false)
 $Work = Join-Path $PC ".work\$Name"
 $Out = Join-Path $Work "Sources\$Name"
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
+$LastBuild = Join-Path $Work 'last-build.txt'
+$bin = $null
+# -NoBuild: den zuletzt gebauten Stand direkt starten (der Launcher nutzt das, wenn sich seit dem letzten Build nichts geändert hat)
+if ($NoBuild -and (Test-Path $LastBuild)) {
+    $last = [IO.File]::ReadAllText($LastBuild).Trim()
+    if ($last -and (Test-Path $last)) { $bin = $last; Write-Host "Keine Änderungen – starte den letzten Build von $Title." }
+}
+if (-not $bin) {
 
 $pkg = @"
 // swift-tools-version: 5.9
@@ -76,6 +85,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Build fehlgeschlagen' }
     $bin = Join-Path (swift build -c $config --show-bin-path) "$Name.exe"
 } finally { Pop-Location }
+[IO.File]::WriteAllText($LastBuild, $bin, $Utf8)
+}
 if ($BuildOnly) { Write-Host "Fertig: $bin"; return }
 $env:STELLA_PC_TITLE = $Title
 # Verbesserungen aus dem Panel neben dem Handy: neben den Repos, z. B. ..\Verbesserungen\Stella
