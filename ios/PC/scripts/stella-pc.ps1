@@ -112,6 +112,18 @@ if ($App -ne 'students') {
 }
 if ($App -eq 'students') { $serverDir = Join-Path $Root 'core\server'; $env:STELLA_EDITION_STUDENTS = Join-Path $Root 'server-plugin' } else { $serverDir = Join-Path $Root 'server' }
 $env:PORT = "$DemoPort"; $env:HOST = '127.0.0.1'
+# Port frei? Ein liegengebliebener Stella-Demo-Server (z. B. nach einem Absturz) wird beendet, sonst würde die App
+# mit seinem alten Stand reden. Gehört der Port etwas anderem, lieber abbrechen.
+foreach ($c in @(Get-NetTCPConnection -LocalPort $DemoPort -State Listen -ErrorAction SilentlyContinue)) {
+    $p = Get-CimInstance Win32_Process -Filter "ProcessId=$($c.OwningProcess)" -ErrorAction SilentlyContinue
+    if ($p -and $p.Name -eq 'node.exe' -and $p.CommandLine -match 'src[\\/]main\.ts') {
+        Write-Host "Beende alten Demo-Server auf Port $DemoPort ..."
+        & taskkill.exe /PID $p.ProcessId /T /F | Out-Null
+        Start-Sleep -Milliseconds 500
+    } else {
+        throw "Port $DemoPort ist belegt (von $($p.Name)) – bitte das Programm beenden und neu starten."
+    }
+}
 $log = Join-Path $Data 'server.log'
 $server = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', "npx tsx src/main.ts > `"$log`" 2>&1" -WorkingDirectory $serverDir -WindowStyle Hidden -PassThru
 try {

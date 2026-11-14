@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stella-Launcher</title>
+<style>
+@font-face { font-family: "Inter"; src: url(/fonts/inter-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; }
+@font-face { font-family: "Nunito"; src: url(/fonts/nunito-latin-wght-normal.woff2) format("woff2"); font-weight: 200 1000; }
+:root {
+  --bg: #f4f6fb; --card: #ffffff; --text: #14213d; --muted: #5d6b85; --line: #e3e8f2;
+  --blue: #3e8fe8; --blue-deep: #1f5fbf; --pink: #e0457b; --green: #1f9d55; --red: #d64545; --amber: #b7791f;
+  --log-bg: #0f1a2e; --log-text: #cfe0ff;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0d1424; --card: #16203a; --text: #e8eefc; --muted: #9aa8c4; --line: #26324f; --log-bg: #0a1020; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 14px/1.45 "Inter", system-ui, sans-serif; display: flex; flex-direction: column; }
+header { padding: 18px 20px 6px; display: flex; align-items: center; gap: 12px; }
+.logo { width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(135deg, #ff9fc2, #b9a7ff 55%, #4b8fe0); display: grid; place-items: center; color: #fff; font: 800 20px "Nunito"; }
+h1 { font: 800 20px "Nunito", sans-serif; margin: 0; }
+.sub { color: var(--muted); font-size: 12.5px; }
+main { flex: 1; padding: 8px 20px 16px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.apps { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.app { border: 2px solid var(--line); background: var(--card); border-radius: 16px; padding: 14px; cursor: pointer; text-align: left; color: inherit; font: inherit; transition: border-color .15s, transform .1s; }
+.app:hover { transform: translateY(-1px); }
+.app.on { border-color: var(--blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 18%, transparent); }
+.app .name { font: 800 16px "Nunito", sans-serif; display: flex; align-items: center; gap: 8px; }
+.app .dot { width: 10px; height: 10px; border-radius: 50%; }
+.app .ver { color: var(--muted); font-size: 12px; margin-top: 6px; min-height: 34px; }
+.badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 99px; background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
+.badge.ok { background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green); }
+.badge.run { background: color-mix(in srgb, var(--blue) 16%, transparent); color: var(--blue-deep); }
+@media (prefers-color-scheme: dark) { .badge.run { color: #8fc0ff; } }
+.opts { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 4px 14px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.row .lbl small { display: block; color: var(--muted); font-size: 12px; }
+.seg { display: inline-flex; background: var(--bg); border-radius: 10px; padding: 3px; gap: 2px; flex-shrink: 0; }
+.seg button { border: 0; background: transparent; color: var(--muted); font: 600 12.5px "Inter"; padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+.seg button.on { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.switch { width: 44px; height: 26px; border-radius: 99px; background: var(--line); border: 0; position: relative; cursor: pointer; flex-shrink: 0; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.switch.on { background: var(--green); }
+.switch.on::after { left: 21px; }
+.actions { display: flex; gap: 8px; }
+.btn { flex: 1; border: 0; border-radius: 12px; padding: 12px 10px; font: 700 14px "Inter"; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn.primary { background: linear-gradient(135deg, var(--blue), var(--blue-deep)); color: #fff; }
+.btn.second { background: var(--card); color: var(--text); border: 1px solid var(--line); }
+.btn.stop { background: color-mix(in srgb, var(--red) 12%, var(--card)); color: var(--red); flex: 0 0 auto; padding: 12px 14px; }
+.btn:disabled { opacity: .5; cursor: default; }
+.status { display: flex; align-items: center; gap: 8px; font-weight: 600; min-height: 22px; }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--blue); animation: s .8s linear infinite; display: none; }
+.busy .spin { display: inline-block; }
+@keyframes s { to { transform: rotate(360deg); } }
+.logwrap { flex: 1; min-height: 120px; background: var(--log-bg); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; }
+.loghead { display: flex; justify-content: space-between; padding: 8px 12px; color: #8ea4c8; font-size: 12px; }
+.loghead button { background: none; border: 0; color: #8ea4c8; cursor: pointer; font: inherit; }
+#log { flex: 1; overflow: auto; padding: 0 12px 10px; font: 12px/1.5 ui-monospace, Consolas, monospace; color: var(--log-text); white-space: pre-wrap; word-break: break-word; }
+#log .cmd { color: #7fb4ff; }
+#log .info { color: #ffd479; }
+#log .err { color: #ff9b9b; }
+footer { padding: 0 20px 14px; display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+footer button { background: none; border: 0; color: var(--muted); cursor: pointer; font: inherit; text-decoration: underline; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">S</div>
+  <div>
+    <h1>Stella-Launcher</h1>
+    <div class="sub">Welche App willst du im Simulator ansehen?</div>
+  </div>
+</header>
+<main>
+  <div class="apps">
+    <button class="app" data-app="stella"><div class="name"><span class="dot" style="background:#4b8fe0"></span>Stella</div><div class="ver" id="v-stella">…</div></button>
+    <button class="app" data-app="students"><div class="name"><span class="dot" style="background:#e0457b"></span>Stella for Students</div><div class="ver" id="v-students">…</div></button>
+  </div>
+
+  <div class="opts">
+    <div class="row">
+      <div class="lbl">Code<small id="src-hint">Neueste Version von GitHub (main)</small></div>
+      <div class="seg" id="source"><button data-v="github">Neueste Version</button><button data-v="local">Meine Ordner</button></div>
+    </div>
+    <div class="row">
+      <div class="lbl">Server<small id="demo-hint">Offline mit Beispieldaten</small></div>
+      <div class="seg" id="demo"><button data-v="1">Demo</button><button data-v="0">Echter Server</button></div>
+    </div>
+    <div class="row">
+      <div class="lbl">Automatisch aktualisieren<small>Beim Öffnen die neueste Version holen, bauen und starten</small></div>
+      <button class="switch" id="auto" aria-label="Automatisch aktualisieren"></button>
+    </div>
+  </div>
+
+  <div class="status" id="status"><span class="spin"></span><span id="status-text">…</span></div>
+
+  <div class="actions">
+    <button class="btn primary" id="update">⟳ Neueste Version holen &amp; starten</button>
+    <button class="btn second" id="start">▶ Starten</button>
+    <button class="btn stop" id="stop" title="Simulator beenden">■</button>
+  </div>
+
+  <div class="logwrap">
+    <div class="loghead"><span>Protokoll</span><button id="clear">leeren</button></div>
+    <div id="log"></div>
+  </div>
+</main>
+<footer>
+  <span id="where"></span>
+  <span><button id="check">Nach Updates suchen</button> · <button id="quit">Launcher beenden</button></span>
+</footer>
+<script>
+const T = "__TOKEN__";
+const $ = (s) => document.querySelector(s);
+const api = (p, body) => fetch(p + "?t=" + T, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+let S = null;
+
+const PHASE = {
+  idle: "Bereit.", updating: "Hole den neuesten Stand von GitHub …", building: "Baue und starte …",
+  running: "läuft – das Fenster ist offen.", stopping: "Wird beendet …", error: "Etwas ist schiefgegangen – siehe Protokoll.",
+};
+const TITLES = { stella: "Stella", students: "Stella for Students" };
+
+function ago(iso) {
+  const m = Math.round((Date.now() - Date.parse(iso)) / 60000);
+  if (m < 60) return `vor ${Math.max(1, m)} Min.`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `vor ${h} Std.`;
+  return `vor ${Math.round(h / 24)} Tagen`;
+}
+function verText(app) {
+  const src = S.settings.source;
+  const v = S.versions[`${src}:${app === "students" ? "students" : "life"}`];
+  if (!v) return src === "github" ? '<span class="badge">noch nicht geholt</span>' : "Ordner fehlt";
+  const parts = [];
+  if (S.running === app) parts.push('<span class="badge run">läuft</span>');
+  if (src === "github") parts.push(v.behind > 0 ? `<span class="badge">${v.behind} neue Änderung${v.behind === 1 ? "" : "en"}</span>` : '<span class="badge ok">aktuell</span>');
+  else if (v.dirty) parts.push('<span class="badge">eigene Änderungen</span>');
+  const what = src === "local" ? `${v.branch} · ` : "";
+  return `${parts.join(" ")}<div>${what}${v.sha} · ${ago(v.date)}</div>`;
+}
+
+function render() {
+  if (!S) return;
+  const st = S.settings;
+  document.querySelectorAll(".app").forEach((b) => b.classList.toggle("on", b.dataset.app === st.app));
+  $("#v-stella").innerHTML = verText("stella");
+  $("#v-students").innerHTML = verText("students");
+  document.querySelectorAll("#source button").forEach((b) => b.classList.toggle("on", b.dataset.v === st.source));
+  document.querySelectorAll("#demo button").forEach((b) => b.classList.toggle("on", (b.dataset.v === "1") === st.demo));
+  $("#auto").classList.toggle("on", st.autoUpdate);
+  $("#src-hint").textContent = st.source === "github" ? "Neueste Version von GitHub (main) – deine Ordner bleiben unberührt" : "So wie es gerade in deinen Ordnern liegt";
+  $("#demo-hint").textContent = st.demo ? "Offline mit Beispieldaten" : "Anmeldung wie am iPhone";
+  const busy = ["updating", "building", "stopping"].includes(S.phase);
+  $("#status").classList.toggle("busy", busy);
+  const who = S.running ? TITLES[S.running] + " " : "";
+  $("#status-text").textContent = S.phase === "running" ? who + PHASE.running : PHASE[S.phase] || S.phase;
+  $("#status-text").style.color = S.phase === "error" ? "var(--red)" : "";
+  $("#update").disabled = busy || st.source !== "github";
+  $("#update").title = st.source === "github" ? "" : "Nur bei „Neueste Version“ – bei „Meine Ordner“ einfach Starten";
+  $("#start").disabled = busy;
+  $("#start").textContent = S.running ? "↻ Neu starten" : "▶ Starten";
+  $("#stop").disabled = !S.running && S.phase !== "building";
+  $("#where").textContent = st.source === "github" ? "Kopien: " + S.sim : "";
+}
+
+function addLog(e) {
+  const box = $("#log");
+  const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+  const div = document.createElement("div");
+  div.className = e.kind;
+  div.textContent = e.text;
+  box.appendChild(div);
+  while (box.childNodes.length > 600) box.removeChild(box.firstChild);
+  if (stick) box.scrollTop = box.scrollHeight;
+}
+
+const es = new EventSource("/api/events?t=" + T);
+es.addEventListener("state", (m) => { S = JSON.parse(m.data); render(); });
+es.addEventListener("history", (m) => { $("#log").textContent = ""; JSON.parse(m.data).forEach(addLog); });
+es.addEventListener("log", (m) => addLog(JSON.parse(m.data)));
+es.onerror = () => { $("#status-text").textContent = "Verbindung zum Launcher verloren – ist das Konsolenfenster noch offen?"; };
+
+document.querySelectorAll(".app").forEach((b) => b.addEventListener("click", () => api("/api/settings", { app: b.dataset.app })));
+document.querySelectorAll("#source button").forEach((b) => b.addEventListener("click", () => api("/api/settings", { source: b.dataset.v })));
+document.querySelectorAll("#demo button").forEach((b) => b.addEventListener("click", () => api("/api/settings", { demo: b.dataset.v === "1" })));
+$("#auto").addEventListener("click", () => api("/api/settings", { autoUpdate: !S.settings.autoUpdate }));
+$("#update").addEventListener("click", () => api("/api/start", { update: true }));
+$("#start").addEventListener("click", () => api("/api/start", { update: false }));
+$("#stop").addEventListener("click", () => api("/api/stop"));
+$("#check").addEventListener("click", () => api("/api/check"));
+$("#clear").addEventListener("click", () => { $("#log").textContent = ""; });
+$("#quit").addEventListener("click", () => { api("/api/quit"); setTimeout(() => window.close(), 300); });
+</script>
+</body>
+</html>
