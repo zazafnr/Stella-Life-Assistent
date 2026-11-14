@@ -44,16 +44,16 @@ export const UNLIMITED = 999;
 export const PLANS_BY_EDITION: Record<Edition, Record<PlanId, Plan>> = {
   life: {
     free: { id: 'free', priceCents: 0, limits: { aiMessagesPerDay: 15, proTasksPerMonth: 3, proTasksHomeworkOnly: true, mailboxes: 1, newsCount: 3, newsFavorites: false, screenTime: false, webTasks: false, priority: false, flashcardsPerMonth: 0, notesPerMonth: 0 } },
-    plus: { id: 'plus', priceCents: 800, limits: { aiMessagesPerDay: 60, proTasksPerMonth: 15, proTasksHomeworkOnly: false, mailboxes: 2, newsCount: 5, newsFavorites: false, screenTime: true, webTasks: true, priority: false, flashcardsPerMonth: 0, notesPerMonth: 0 } },
-    pro: { id: 'pro', priceCents: 1500, limits: { aiMessagesPerDay: 120, proTasksPerMonth: 40, proTasksHomeworkOnly: false, mailboxes: 4, newsCount: 5, newsFavorites: true, screenTime: true, webTasks: true, priority: false, flashcardsPerMonth: 0, notesPerMonth: 0 } },
-    max: { id: 'max', priceCents: 3500, limits: { aiMessagesPerDay: 300, proTasksPerMonth: 150, proTasksHomeworkOnly: false, mailboxes: UNLIMITED, newsCount: 5, newsFavorites: true, screenTime: true, webTasks: true, priority: true, flashcardsPerMonth: 0, notesPerMonth: 0 } },
+    plus: { id: 'plus', priceCents: 800, limits: { aiMessagesPerDay: 60, proTasksPerMonth: 15, proTasksHomeworkOnly: false, mailboxes: 2, newsCount: 8, newsFavorites: false, screenTime: true, webTasks: true, priority: false, flashcardsPerMonth: 0, notesPerMonth: 0 } },
+    pro: { id: 'pro', priceCents: 1500, limits: { aiMessagesPerDay: 120, proTasksPerMonth: 40, proTasksHomeworkOnly: false, mailboxes: 4, newsCount: 8, newsFavorites: true, screenTime: true, webTasks: true, priority: false, flashcardsPerMonth: 0, notesPerMonth: 0 } },
+    max: { id: 'max', priceCents: 3500, limits: { aiMessagesPerDay: 300, proTasksPerMonth: 150, proTasksHomeworkOnly: false, mailboxes: UNLIMITED, newsCount: 8, newsFavorites: true, screenTime: true, webTasks: true, priority: true, flashcardsPerMonth: 0, notesPerMonth: 0 } },
   },
   students: {
     // Hausübungen lösen (HÜ-Autopilot) geht auch im Free-Abo: proTasksHomeworkOnly
     free: { id: 'free', priceCents: 0, limits: { aiMessagesPerDay: 15, proTasksPerMonth: 3, proTasksHomeworkOnly: true, mailboxes: 1, newsCount: 3, newsFavorites: false, screenTime: false, webTasks: false, priority: false, flashcardsPerMonth: 2, notesPerMonth: 1 } },
-    plus: { id: 'plus', priceCents: 500, limits: { aiMessagesPerDay: 60, proTasksPerMonth: 15, proTasksHomeworkOnly: false, mailboxes: 2, newsCount: 5, newsFavorites: false, screenTime: true, webTasks: true, priority: false, flashcardsPerMonth: 15, notesPerMonth: 8 } },
-    pro: { id: 'pro', priceCents: 900, limits: { aiMessagesPerDay: 120, proTasksPerMonth: 40, proTasksHomeworkOnly: false, mailboxes: 4, newsCount: 5, newsFavorites: true, screenTime: true, webTasks: true, priority: false, flashcardsPerMonth: 50, notesPerMonth: 25 } },
-    max: { id: 'max', priceCents: 1900, limits: { aiMessagesPerDay: 300, proTasksPerMonth: 150, proTasksHomeworkOnly: false, mailboxes: UNLIMITED, newsCount: 5, newsFavorites: true, screenTime: true, webTasks: true, priority: true, flashcardsPerMonth: 200, notesPerMonth: 100 } },
+    plus: { id: 'plus', priceCents: 500, limits: { aiMessagesPerDay: 60, proTasksPerMonth: 15, proTasksHomeworkOnly: false, mailboxes: 2, newsCount: 8, newsFavorites: false, screenTime: true, webTasks: true, priority: false, flashcardsPerMonth: 15, notesPerMonth: 8 } },
+    pro: { id: 'pro', priceCents: 900, limits: { aiMessagesPerDay: 120, proTasksPerMonth: 40, proTasksHomeworkOnly: false, mailboxes: 4, newsCount: 8, newsFavorites: true, screenTime: true, webTasks: true, priority: false, flashcardsPerMonth: 50, notesPerMonth: 25 } },
+    max: { id: 'max', priceCents: 1900, limits: { aiMessagesPerDay: 300, proTasksPerMonth: 150, proTasksHomeworkOnly: false, mailboxes: UNLIMITED, newsCount: 8, newsFavorites: true, screenTime: true, webTasks: true, priority: true, flashcardsPerMonth: 200, notesPerMonth: 100 } },
   },
 };
 /** Pläne des normalen Stella (Standard, wenn keine Edition genannt wird) */

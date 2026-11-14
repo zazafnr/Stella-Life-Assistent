@@ -2,7 +2,7 @@
 //  · Tagesausgabe: einmal pro Land und Tag die 15 wichtigsten Geschichten, von der KI (OpenRouter bzw. Claude)
 //    in einem Aufruf aufbereitet – je ein neutraler Satz in der Sprache der Person, Hauptthema, echtes Hauptbild
 //  · jede Person bekommt daraus die Meldungen, die sie am ehesten interessieren (Themen, Länder, Lieblingszeitungen)
-//  · Anzahl je Abo (Free 3, sonst 5)
+//  · Anzahl je Abo (Free 3, bezahlte Abos 8)
 //  · bei Unglücken, Krieg und Tod immer sachlich, auch bei „frech“
 
 import { LANGUAGE_NAMES_EN, todayIn } from '@stella/shared';

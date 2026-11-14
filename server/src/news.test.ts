@@ -203,7 +203,7 @@ test('Auswahl nach Vorlieben: Länder, Themen, eine Meldung pro Geschichte, Rang
   config.defaultPlan = 'plus';
   const p = mk();
   digest.saveNews(p.get(), { enabled: true, topics: [], countries: ['AT', 'DE', 'INT'] });
-  assert.equal(digest.selectNews(p.get()).length, 5, 'Plus: 5');
+  assert.equal(digest.selectNews(p.get()).length, 5, 'Plus: bis zu 8 – hier alle 5 Geschichten');
   digest.saveNews(p.get(), { count: 2 });
   assert.equal(digest.selectNews(p.get()).length, 2, 'eigene kleinere Zahl');
   // „neu seit dem letzten Briefing“
@@ -373,7 +373,7 @@ test('Einstellungen per Route: Themen, Länder, Anzahl; Lieblingsquellen nur ab 
   assert.deepEqual([ys.enabled, ys.asked, ys.countries], [true, true, ['AT', 'INT']]);
   const v = await app.inject({ method: 'GET', url: '/api/news', headers: auth(yes.token) });
   const view = v.json() as { sources: { id: string }[]; topics: string[]; limits: { count: number } };
-  assert.ok(view.sources.some((x) => x.id === 'orf') && view.topics.length === 9 && view.limits.count === 5);
+  assert.ok(view.sources.some((x) => x.id === 'orf') && view.topics.length === 9 && view.limits.count === 8);
 });
 
 test('Alle Abrufe zusammen: Katalog + Lieblingsquellen, Fehler zählen, alte Meldungen weg', async () => {
