@@ -38,7 +38,8 @@ const dirOf = (repo, source) => (source === 'local' ? path.join(TOP, REPOS[repo]
 // ---------- Einstellungen ----------
 
 const SETTINGS_FILE = path.join(SIM, 'launcher.json');
-let settings = { app: 'stella', source: 'github', demo: true, autoUpdate: true };
+// built: welcher GitHub-Stand je App zuletzt erfolgreich gebaut wurde – ist er unverändert, wird nicht neu gebaut
+let settings = { app: 'stella', source: 'github', demo: true, autoUpdate: true, built: {} };
 try { settings = { ...settings, ...JSON.parse(readFileSync(SETTINGS_FILE, 'utf8')) }; } catch { /* erster Start */ }
 const saveSettings = () => writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
 
@@ -193,19 +194,27 @@ async function start({ update }) {
     await refreshVersions(false);
     setPhase('building');
     const life = dirOf('life', source);
+    // Stand der Repos dieser App; gleich wie beim letzten erfolgreichen Build → ohne Build starten
+    const stamp = source === 'github' ? APPS[app].repos.map((r) => git(dirOf(r, 'github'), 'rev-parse', 'HEAD').stdout.trim()).join('+') : '';
+    const scriptText = (() => { try { return readFileSync(path.join(life, 'ios', 'PC', 'scripts', 'stella-pc.ps1'), 'utf8'); } catch { return ''; } })();
+    const noBuild = process.platform === 'win32' && !!stamp && settings.built?.[app] === stamp && scriptText.includes('NoBuild');
     const script = path.join(life, 'ios', 'PC', 'scripts', process.platform === 'win32' ? 'stella-pc.ps1' : 'stella-pc.sh');
     if (!existsSync(script)) throw new Error(`Startskript fehlt: ${script}`);
     const args = process.platform === 'win32'
       // UTF-8-Ausgabe, sonst kommen Umlaute aus PowerShell kaputt im Protokoll an
-      ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `[Console]::OutputEncoding = [Text.Encoding]::UTF8; & ${psQuote(script)}${app === 'students' ? ` students -Repo ${psQuote(dirOf('students', source))}` : ''}${settings.demo ? ' -Demo' : ''}; exit $LASTEXITCODE`]
+      ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `[Console]::OutputEncoding = [Text.Encoding]::UTF8; & ${psQuote(script)}${app === 'students' ? ` students -Repo ${psQuote(dirOf('students', source))}` : ''}${settings.demo ? ' -Demo' : ''}${noBuild ? ' -NoBuild' : ''}; exit $LASTEXITCODE`]
       : [script, ...(app === 'students' ? ['students', '--repo', dirOf('students', source)] : []), ...(settings.demo ? ['--demo'] : [])];
     const env = { ...process.env, STELLA_PC_FEEDBACK: path.join(TOP, 'Verbesserungen', APPS[app].dataName) };
-    say(`${APPS[app].title} bauen und starten (${source === 'local' ? 'meine Ordner' : offline || !update ? 'zuletzt geholte Version' : 'neueste Version'}${settings.demo ? ', offline mit Beispieldaten' : ''}) …`, 'info');
+    say(`${APPS[app].title} ${noBuild ? 'starten – seit dem letzten Build nichts Neues, kein neuer Build nötig' : 'bauen und starten'} (${source === 'local' ? 'meine Ordner' : offline || !update ? 'zuletzt geholte Version' : 'neueste Version'}${settings.demo ? ', offline mit Beispieldaten' : ''}) …`, 'info');
     const child = spawn(process.platform === 'win32' ? 'powershell.exe' : 'bash', args, { cwd: life, env, windowsHide: true, detached: process.platform !== 'win32' });
     running = { app, child };
     child.stdout.on('data', (d) => {
       say(d);
-      if (/Stella l.{1,2}uft|Stella startet/.test(String(d)) && phase !== 'running') setPhase('running');
+      if (/Stella l.{1,2}uft|Stella startet/.test(String(d)) && phase !== 'running') {
+        // Build hat geklappt: diesen Stand merken
+        if (stamp && settings.built?.[app] !== stamp) { settings.built = { ...settings.built, [app]: stamp }; saveSettings(); }
+        setPhase('running');
+      }
     });
     // Swift schreibt auch Warnungen nach stderr – rot nur, was nach Fehler aussieht
     child.stderr.on('data', (d) => say(d, /error|fehler|failed|fehlgeschlagen|exception/i.test(String(d)) && !/warning:/i.test(String(d)) ? 'err' : 'out'));
@@ -227,7 +236,7 @@ async function start({ update }) {
 // ---------- Fenster ----------
 
 const PAGE = readFileSync(path.join(HERE, 'launcher.html'), 'utf8');
-const FONT_DIR = path.join(HERE, '..', 'Sources', 'SwiftUI', 'Web', 'fonts');
+const WEB_DIR = path.join(HERE, '..', 'Sources', 'SwiftUI', 'Web');
 
 function body(req) {
   return new Promise((resolve) => {
@@ -240,10 +249,13 @@ function body(req) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://127.0.0.1');
   const ok = url.searchParams.get('t') === TOKEN || req.headers['x-token'] === TOKEN;
-  if (url.pathname.startsWith('/fonts/')) {
-    const f = path.join(FONT_DIR, path.basename(url.pathname));
-    if (!/\.woff2$/.test(f) || !existsSync(f)) { res.writeHead(404).end(); return; }
-    res.writeHead(200, { 'Content-Type': 'font/woff2', 'Cache-Control': 'max-age=86400' }).end(readFileSync(f));
+  // Schriften und App-Logos aus dem Web-Ordner des Simulators (ohne Schlüssel – nichts Privates)
+  if (url.pathname.startsWith('/fonts/') || url.pathname.startsWith('/icons/')) {
+    const name = path.basename(url.pathname);
+    const f = path.join(url.pathname.startsWith('/fonts/') ? path.join(WEB_DIR, 'fonts') : WEB_DIR, name);
+    const type = name.endsWith('.woff2') ? 'font/woff2' : name.endsWith('.svg') ? 'image/svg+xml' : null;
+    if (!type || !/^[\w.-]+$/.test(name) || !existsSync(f)) { res.writeHead(404).end(); return; }
+    res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'max-age=86400' }).end(readFileSync(f));
     return;
   }
   if (!ok) { res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Kein Zugriff'); return; }

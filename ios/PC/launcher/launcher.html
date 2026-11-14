@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stella-Launcher</title>
+<link rel="icon" type="image/svg+xml" href="/icons/icon-stella.svg">
 <style>
 @font-face { font-family: "Inter"; src: url(/fonts/inter-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; }
 @font-face { font-family: "Nunito"; src: url(/fonts/nunito-latin-wght-normal.woff2) format("woff2"); font-weight: 200 1000; }
@@ -19,7 +20,8 @@
 html, body { margin: 0; height: 100%; }
 body { background: var(--bg); color: var(--text); font: 14px/1.45 "Inter", system-ui, sans-serif; display: flex; flex-direction: column; }
 header { padding: 18px 20px 6px; display: flex; align-items: center; gap: 12px; }
-.logo { width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(135deg, #ff9fc2, #b9a7ff 55%, #4b8fe0); display: grid; place-items: center; color: #fff; font: 800 20px "Nunito"; }
+.logo { width: 42px; height: 42px; border-radius: 11px; box-shadow: 0 2px 8px rgba(30, 80, 160, .25); }
+.appicon { width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0; }
 h1 { font: 800 20px "Nunito", sans-serif; margin: 0; }
 .sub { color: var(--muted); font-size: 12.5px; }
 main { flex: 1; padding: 8px 20px 16px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
@@ -28,7 +30,6 @@ main { flex: 1; padding: 8px 20px 16px; display: flex; flex-direction: column; g
 .app:hover { transform: translateY(-1px); }
 .app.on { border-color: var(--blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 18%, transparent); }
 .app .name { font: 800 16px "Nunito", sans-serif; display: flex; align-items: center; gap: 8px; }
-.app .dot { width: 10px; height: 10px; border-radius: 50%; }
 .app .ver { color: var(--muted); font-size: 12px; margin-top: 6px; min-height: 34px; }
 .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 99px; background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
 .badge.ok { background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green); }
@@ -68,7 +69,7 @@ footer button { background: none; border: 0; color: var(--muted); cursor: pointe
 </head>
 <body>
 <header>
-  <div class="logo">S</div>
+  <img class="logo" src="/icons/icon-stella.svg" alt="Stella">
   <div>
     <h1>Stella-Launcher</h1>
     <div class="sub">Welche App willst du im Simulator ansehen?</div>
@@ -76,8 +77,8 @@ footer button { background: none; border: 0; color: var(--muted); cursor: pointe
 </header>
 <main>
   <div class="apps">
-    <button class="app" data-app="stella"><div class="name"><span class="dot" style="background:#4b8fe0"></span>Stella</div><div class="ver" id="v-stella">…</div></button>
-    <button class="app" data-app="students"><div class="name"><span class="dot" style="background:#e0457b"></span>Stella for Students</div><div class="ver" id="v-students">…</div></button>
+    <button class="app" data-app="stella"><div class="name"><img class="appicon" src="/icons/icon-stella.svg" alt="">Stella</div><div class="ver" id="v-stella">…</div></button>
+    <button class="app" data-app="students"><div class="name"><img class="appicon" src="/icons/icon-students.svg" alt="">Stella for Students</div><div class="ver" id="v-students">…</div></button>
   </div>
 
   <div class="opts">
