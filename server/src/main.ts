@@ -35,6 +35,7 @@ import { LlmUnavailable } from './llm.ts';
 import { buildBriefing } from './briefing.ts';
 import { registerWeatherRoutes, warmWeather } from './weather.ts';
 import { registerNewsRoutes } from './news/routes.ts';
+import { registerNewsImageRoute } from './news/image.ts';
 import { registerErrandRoutes } from './errands/routes.ts';
 import { registerScreenTimeRoutes } from './screentime.ts';
 import { buildDigest } from './news/digest.ts';
@@ -96,6 +97,20 @@ function publicUser(user: User) {
 }
 
 // ---------- öffentlich ----------
+
+// News-Bilder, die die KI gezeichnet hat (nur wenn ein Artikel kein echtes Bild hat)
+registerNewsImageRoute(app);
+
+// Nur im PC-Demo-Modus (ios/PC/scripts/stella-pc.ps1 -Demo setzt STELLA_DEMO_BILDER): Beispielbilder für News und Wetter
+const demoBilder = process.env.STELLA_DEMO_BILDER;
+if (demoBilder && existsSync(demoBilder)) {
+  app.get('/demo-bilder/:name', async (req, reply) => {
+    const { name } = req.params as { name: string };
+    const file = path.join(demoBilder, name);
+    if (!/^[\w-]+\.svg$/.test(name) || !existsSync(file)) return reply.code(404).send({ error: 'Nicht gefunden' });
+    return reply.type('image/svg+xml').header('Cache-Control', 'no-cache').send(createReadStream(file));
+  });
+}
 
 app.get('/api/status', async () => ({
   ok: true, hasUsers: userCount() > 0, registration: registrationMode(), registrationOpen: userCount() === 0 || registrationMode() !== 'closed',

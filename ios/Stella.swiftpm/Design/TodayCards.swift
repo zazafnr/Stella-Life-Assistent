@@ -27,6 +27,23 @@ struct WeatherHeroCard: View {
         }
     }
 
+    /** Beispielbild je Wetter – nur wenn der PC-Demo-Modus `-demoBilder` mitgibt, sonst nil */
+    private var demoImage: URL? {
+        guard let base = UserDefaults.standard.string(forKey: "demoBilder") else { return nil }
+        let w = weather
+        let type: String
+        switch w?.type ?? "clear" {
+        case "clear", "partly", "cloudy", "fog", "rain", "thunder", "snow": type = w?.type ?? "clear"
+        case "drizzle": type = "rain"
+        case "heavy_rain": type = "thunder"
+        case "sleet": type = "snow"
+        default: type = "cloudy"
+        }
+        // ohne Wetterdaten nach der Uhrzeit
+        let night = w.map { !$0.day } ?? !(6..<18).contains(Calendar.current.component(.hour, from: Date()))
+        return URL(string: "\(base)/wetter-\(type)-\(night ? "nacht" : "tag").svg")
+    }
+
     private var symbol: String {
         guard let w = weather else { return "sun.max.fill" }
         switch w.type {
@@ -84,12 +101,23 @@ struct WeatherHeroCard: View {
         .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
         // großes Wetter-Symbol unten rechts als Bild
         .background(alignment: .bottomTrailing) {
-            Image(systemName: symbol)
-                .symbolRenderingMode(.multicolor)
-                .font(.system(size: 92))
-                .opacity(0.9)
-                .offset(x: 14, y: 16)
-                .accessibilityHidden(true)
+            if demoImage == nil {
+                Image(systemName: symbol)
+                    .symbolRenderingMode(.multicolor)
+                    .font(.system(size: 92))
+                    .opacity(0.9)
+                    .offset(x: 14, y: 16)
+                    .accessibilityHidden(true)
+            }
+        }
+        // nur im PC-Demo-Modus: Beispielbild zum Wetter (vom lokalen Demo-Server), dunkel abgetönt für die weiße Schrift
+        .background {
+            if let url = demoImage {
+                AsyncImage(url: url) { phase in
+                    if let image = phase.image { image.resizable().scaledToFill() } else { Color.clear }
+                }
+                .overlay(LinearGradient(colors: [.black.opacity(0.15), .black.opacity(0.45)], startPoint: .top, endPoint: .bottom))
+            }
         }
         .background(LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
@@ -150,7 +178,8 @@ struct NewsStoryCard: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             Rectangle().fill(fallback).frame(width: 220, height: 270)
-            if let s = entry.image, let url = URL(string: s) {
+            // echtes Artikelbild (https) oder KI-/Demo-Bild als Pfad auf Stellas Server; füllt die Karte, Mitte bleibt sichtbar
+            if let s = entry.image, let url = s.hasPrefix("/") ? API.shared.url(s) : URL(string: s) {
                 AsyncImage(url: url) { phase in
                     if let image = phase.image {
                         image.resizable().scaledToFill().frame(width: 220, height: 270).clipped()
