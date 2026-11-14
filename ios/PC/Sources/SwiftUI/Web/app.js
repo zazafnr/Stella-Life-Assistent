@@ -225,6 +225,11 @@ const B = {
     const e = el("img", "img");
     if (n.p.rs) e.classList.add("rs");
     if (n.p.res) e.src = "/res/" + n.p.res;
+    else if (n.p.url && /^https?:\/\//.test(n.p.url)) {
+      e.referrerPolicy = "no-referrer";
+      e.onerror = () => { e.style.visibility = "hidden"; };
+      e.src = n.p.url;
+    }
     else e.alt = "";
     e.draggable = false;
     return e;
@@ -1153,6 +1158,100 @@ document.addEventListener("focusin", (e) => {
 document.addEventListener("focusout", (e) => {
   const w = e.target.closest("[data-fc]");
   if (w) post({ k: "ev", id: Number(w.dataset.fc), v: false });
+});
+
+// Mit der Maus ziehen wie mit dem Finger: Listen und Karussells scrollen (mit Schwung, Karussells rasten ein),
+// Sheets nach unten wegziehen, vom linken Rand nach rechts zurück. DragGesture und Zeilen-Wischen bleiben unten.
+let pan = null;
+function scrollableOf(t, ax) {
+  for (let e = t; e && e !== document.body; e = e.parentElement) {
+    if (!(e instanceof HTMLElement)) continue;
+    const cs = getComputedStyle(e);
+    if (ax === "x" ? e.scrollWidth > e.clientWidth + 1 && /auto|scroll/.test(cs.overflowX)
+                   : e.scrollHeight > e.clientHeight + 1 && /auto|scroll/.test(cs.overflowY)) return e;
+  }
+  return null;
+}
+/** Einrastpunkte eines waagrechten Karussells: Anfang jeder Karte */
+function snapPoints(el) {
+  let box = el.querySelector(".inner") || el;
+  while (box.children.length === 1) box = box.children[0];
+  const er = el.getBoundingClientRect(), kids = [...box.children];
+  if (kids.length < 2) return [];
+  const first = kids[0].getBoundingClientRect().left - er.left + el.scrollLeft;
+  return kids.map((k) => Math.min(el.scrollWidth - el.clientWidth, Math.max(0, k.getBoundingClientRect().left - er.left + el.scrollLeft - first)));
+}
+function glide(el, ax, v) {
+  const key = ax === "x" ? "scrollLeft" : "scrollTop";
+  let last = performance.now();
+  const step = (now) => {
+    const dt = Math.min(50, now - last) / 1000; last = now;
+    v *= Math.pow(0.04, dt);
+    el[key] -= v * dt;
+    if (Math.abs(v) > 30 && !pan) el._glide = requestAnimationFrame(step);
+  };
+  cancelAnimationFrame(el._glide);
+  if (ax === "x") {
+    const pts = snapPoints(el);
+    if (pts.length) {
+      const aim = el.scrollLeft - v * 0.25;
+      const best = pts.reduce((a, b) => (Math.abs(b - aim) < Math.abs(a - aim) ? b : a));
+      el.scrollTo({ left: best, behavior: "smooth" });
+      return;
+    }
+  }
+  el._glide = requestAnimationFrame(step);
+}
+document.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0 || e.pointerType === "touch") return;
+  if (!e.target.closest("#screen") || e.target.closest("input, textarea, select, [contenteditable], [data-drag], .popup")) return;
+  pan = { t: e.target, sx: e.clientX, sy: e.clientY, lx: e.clientX, ly: e.clientY, lt: performance.now(), vx: 0, vy: 0, mode: null };
+});
+document.addEventListener("pointermove", (e) => {
+  const p = pan;
+  if (!p) return;
+  if (!(e.buttons & 1)) { pan = null; return; }
+  const dx = e.clientX - p.sx, dy = e.clientY - p.sy;
+  const now = performance.now(), dt = Math.max(1, now - p.lt);
+  p.vx = 0.6 * p.vx + 0.4 * ((e.clientX - p.lx) / dt) * 1000; p.vy = 0.6 * p.vy + 0.4 * ((e.clientY - p.ly) / dt) * 1000;
+  p.lx = e.clientX; p.ly = e.clientY; p.lt = now;
+  if (!p.mode) {
+    if (Math.hypot(dx, dy) < 6) return;
+    const horizontal = Math.abs(dx) > Math.abs(dy);
+    if (horizontal && p.t.closest(".row[data-swipe]")) { pan = null; return; } // Wischen der Zeile
+    const sheet = p.t.closest(".sheet:not(.full)");
+    const el = scrollableOf(p.t, horizontal ? "x" : "y");
+    const left = app.getBoundingClientRect().left;
+    if (horizontal && dx > 0 && p.sx - left < 40 && app.querySelector(".nav > .bar .back")) p.mode = "back";
+    else if (!horizontal && dy > 0 && sheet && (!el || !sheet.contains(el) || el.scrollTop <= 0)) { p.mode = "sheet"; p.el = sheet; }
+    else if (el) { p.mode = "scroll"; p.el = el; p.ax = horizontal ? "x" : "y"; p.start = horizontal ? el.scrollLeft : el.scrollTop; cancelAnimationFrame(el._glide); }
+    else { pan = null; return; }
+    document.documentElement.classList.add("panning");
+    getSelection().removeAllRanges();
+  }
+  if (p.mode === "scroll") { if (p.ax === "x") p.el.scrollLeft = p.start - dx; else p.el.scrollTop = p.start - dy; }
+  if (p.mode === "sheet") { p.el.style.transition = "none"; p.el.style.transform = `translateY(${Math.max(0, dy)}px)`; }
+  if (p.mode === "back") { const pg = app.querySelector(".nav > .content"); if (pg) { pg.style.transition = "none"; pg.style.transform = `translateX(${Math.max(0, dx)}px)`; p.el = pg; } }
+});
+document.addEventListener("pointerup", (e) => {
+  const p = pan;
+  pan = null;
+  if (!p || !p.mode) return;
+  document.documentElement.classList.remove("panning");
+  const dx = e.clientX - p.sx, dy = e.clientY - p.sy;
+  if (p.mode === "scroll") glide(p.el, p.ax, p.ax === "x" ? p.vx : p.vy);
+  if (p.mode === "sheet") {
+    p.el.style.transition = "transform .25s ease";
+    const portals = overlay.querySelectorAll(".portal"), top = portals[portals.length - 1];
+    if ((dy > 140 || p.vy > 900) && top && top.dataset.dismiss) { p.el.style.transform = "translateY(100%)"; ev(Number(top.dataset.dismiss)); }
+    else p.el.style.transform = "";
+  }
+  if (p.mode === "back") {
+    if (p.el) { p.el.style.transition = "transform .2s ease"; p.el.style.transform = ""; }
+    if (dx > 90 || p.vx > 800) escape();
+  }
+  suppressClick = true;
+  setTimeout(() => { suppressClick = false; }, 0);
 });
 
 // Ziehen (DragGesture) und Wischen (Zeilen)

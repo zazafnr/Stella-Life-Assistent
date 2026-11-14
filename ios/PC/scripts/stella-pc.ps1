@@ -1,4 +1,4 @@
-# Stella (oder Stella for Students) am PC bauen und starten – Windows.
+﻿# Stella (oder Stella for Students) am PC bauen und starten – Windows.
 #
 #   .\ios\PC\scripts\stella-pc.ps1                         Stella, gegen den echten Server (Anmeldung wie am iPhone)
 #   .\ios\PC\scripts\stella-pc.ps1 -Demo                   Stella offline: lokaler Server mit Beispieldaten
@@ -78,6 +78,8 @@ try {
 } finally { Pop-Location }
 if ($BuildOnly) { Write-Host "Fertig: $bin"; return }
 $env:STELLA_PC_TITLE = $Title
+# Verbesserungen aus dem Panel neben dem Handy: neben den Repos, z. B. ..\Verbesserungen\Stella
+if (-not $env:STELLA_PC_FEEDBACK) { $env:STELLA_PC_FEEDBACK = Join-Path (Split-Path $StellaRepo -Parent) "Verbesserungen\$Name" }
 
 if (-not $Demo) { & $bin @AppArgs; return }
 
@@ -101,6 +103,13 @@ if (-not (Test-Path $tokenFile) -or (Get-Item $tokenFile).Length -eq 0) {
     [IO.File]::WriteAllText($tokenFile, $token, $Utf8)
 }
 $token = [IO.File]::ReadAllText($tokenFile).Trim()
+# Echte News von heute (Feeds holen) und Beispielbilder fürs Wetter bzw. für News ganz ohne Bild (ios/PC/demo-bilder)
+$demoArgs = @()
+if ($App -ne 'students') {
+    $env:STELLA_DEMO_BILDER = Join-Path $PC 'demo-bilder'
+    $demoArgs = @('-demoBilder', "http://127.0.0.1:$DemoPort/demo-bilder")
+    Push-Location $Root; try { npx tsx server/scripts/demo-news.ts } finally { Pop-Location }
+}
 if ($App -eq 'students') { $serverDir = Join-Path $Root 'core\server'; $env:STELLA_EDITION_STUDENTS = Join-Path $Root 'server-plugin' } else { $serverDir = Join-Path $Root 'server' }
 $env:PORT = "$DemoPort"; $env:HOST = '127.0.0.1'
 $log = Join-Path $Data 'server.log'
@@ -112,7 +121,7 @@ try {
     }
     if (-not $up) { throw "Demo-Server startet nicht, siehe $log" }
     Write-Host "Demo-Server läuft auf http://127.0.0.1:$DemoPort"
-    & $bin -server "http://127.0.0.1:$DemoPort" -demoToken $token @AppArgs
+    & $bin -server "http://127.0.0.1:$DemoPort" -demoToken $token @demoArgs @AppArgs
 } finally {
     # Server samt Kindprozessen beenden
     & taskkill.exe /PID $server.Id /T /F | Out-Null

@@ -106,7 +106,8 @@ extension Scene {
 /** Fenster in Phonegröße: Edge/Chrome im App-Modus, sonst der Standardbrowser */
 func _openWindow(_ url: String) {
     let fm = FileManager.default
-    let size = "--window-size=440,940"
+    // Breit genug für das Handy und das Verbesserungs-Panel daneben (Web/feedback.js)
+    let size = "--window-size=860,940"
     let profile = _dataDir().appendingPathComponent("window").path
     func launch(_ exe: String, _ args: [String]) -> Bool {
         let p = Process()
@@ -116,7 +117,9 @@ func _openWindow(_ url: String) {
         p.standardError = FileHandle.nullDevice
         do { try p.run(); return true } catch { return false }
     }
-    let appArgs = ["--app=\(url)", size, "--user-data-dir=\(profile)", "--no-first-run", "--no-default-browser-check"]
+    // --auto-accept-this-tab-capture: Screenshots vom Handy (getDisplayMedia auf dieses Fenster) ohne Rückfrage;
+    // gilt nur für dieses eigene Fensterprofil.
+    let appArgs = ["--app=\(url)", size, "--user-data-dir=\(profile)", "--no-first-run", "--no-default-browser-check", "--auto-accept-this-tab-capture"]
     #if os(Windows)
     let env = ProcessInfo.processInfo.environment
     let candidates = [

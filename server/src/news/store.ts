@@ -34,6 +34,7 @@ export function storeItems(sourceId: string, items: ReturnType<typeof parseFeed>
   const recent = (db.prepare('SELECT id, title, published_at, cluster_id FROM news_items WHERE published_at > ?').all(since) as { id: string; title: string; published_at: string; cluster_id: string }[])
     .map((r) => ({ id: r.id, title: r.title, publishedAt: Date.parse(r.published_at), clusterId: r.cluster_id }));
   const insert = db.prepare('INSERT OR IGNORE INTO news_items (id, source_id, url, title, teaser, published_at, topics, cluster_id, fetched_at, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  const retopic = db.prepare('UPDATE news_items SET topics = ? WHERE source_id = ? AND url = ?');
   let added = 0;
   const cutoff = Date.now() - KEEP_MS;
   db.transaction(() => {
@@ -41,8 +42,10 @@ export function storeItems(sourceId: string, items: ReturnType<typeof parseFeed>
       if (it.publishedAt < cutoff) continue;
       const id = newId();
       const clusterId = assignCluster({ id, title: it.title, publishedAt: it.publishedAt }, recent);
-      const r = insert.run(id, sourceId, it.url, it.title, it.teaser, new Date(it.publishedAt).toISOString(), JSON.stringify(guessTopics(it.title, it.categories, it.teaser)), clusterId, now(), it.image ?? null);
+      const topics = JSON.stringify(guessTopics(it.title, it.categories, it.teaser));
+      const r = insert.run(id, sourceId, it.url, it.title, it.teaser, new Date(it.publishedAt).toISOString(), topics, clusterId, now(), it.image ?? null);
       if (r.changes) { added++; recent.push({ id, title: it.title, publishedAt: it.publishedAt, clusterId }); }
+      else retopic.run(topics, sourceId, it.url); // schon da: Themen mit der aktuellen Erkennung nachziehen
     }
   })();
   return added;
@@ -71,6 +74,9 @@ export async function fetchSource(source: NewsSource, strict = false): Promise<{
 
 export function purgeNews() {
   db.prepare('DELETE FROM news_items WHERE published_at < ?').run(new Date(Date.now() - KEEP_MS).toISOString());
+  // Tagesausgaben und aufbereitete Artikel nur so lange wie die Meldungen selbst
+  db.prepare('DELETE FROM news_prepared WHERE prepared_at < ?').run(new Date(Date.now() - KEEP_MS).toISOString());
+  db.prepare('DELETE FROM news_edition WHERE date < ?').run(new Date(Date.now() - KEEP_MS).toISOString().slice(0, 10));
   db.prepare('DELETE FROM news_digest WHERE date < ?').run(new Date(Date.now() - 4 * 24 * 3600_000).toISOString().slice(0, 10));
 }
 

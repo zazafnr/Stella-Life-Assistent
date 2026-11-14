@@ -102,18 +102,27 @@ const TOPIC_WORDS: Record<NewsTopic, RegExp> = {
   tech: /\b(tech|digital|software|künstliche intelligenz|artificial intelligence|\bki\b|\bai\b|intelligence artificielle|inteligencia artificial|intelligenza artificiale|inteligência artificial|yapay zeka|sztuczna inteligencja|internet|app\b|smartphone|cyber|datenschutz|privacy|apple|google|microsoft|meta\b|openai|chip|robot|computer)/i,
   science: /\b(wissenschaft|science|ciencia|scienza|ciência|bilim|nauk|forschung|research|recherche|investigación|ricerca|pesquisa|araştırma|badani|studie|study|étude|estudio|studio|estudo|çalışma|weltraum|space|espace|espacio|spazio|espaço|uzay|kosmos|nasa|esa\b|physik|physics|astronom|archäolog|archaeolog)/i,
   climate: /\b(klima|climate|climat|clima|iklim|klimat|umwelt|environment|environnement|medio ambiente|ambiente|meio ambiente|çevre|środowisk|erderwärmung|global warming|réchauffement|calentamiento|riscaldamento|aquecimento|küresel ısınma|ocieplenie|emission|co2|energie|energy|énergie|energía|energia|enerji|energii|dürre|drought|hochwasser|flood|überschwemm|waldbrand|wildfire)/i,
-  health: /\b(gesundheit|health|santé|salud|salute|saúde|sağlık|zdrowi|krankheit|disease|maladie|enfermedad|malattia|doença|hastalık|chorob|medizin|medicine|médecin|medicina|tıp|medycyn|impf|vaccin|virus|pandemie|pandemic|krebs|cancer|kanser|rak\b|spital|hospital|ospedale|hastane|szpital|ärzt|doctor|pflege|nursing)/i,
+  health: /\b(gesundheit|health|santé|salud|salute|saúde|sağlık|zdrowi|krankheit|disease|maladie|enfermedad|malattia|doença|hastalık|chorob|medizin|medicine|médecin|medicina|tıp|medycyn|impf|vaccin|virus|pandemie|pandemic|masern|measles|rougeole|sarampi|morbillo|sarampo|kızamık|odr[ay]|grippe|influenza|flu|covid|corona|epidemi|infektion|infection|mpox|ebola|krebs|cancer|kanser|rak\b|spital|hospital|ospedale|hastane|szpital|ärzt|doctor|pflege|nursing)/i,
   sport: /\b(sport|fußball|football|soccer|fútbol|calcio|futebol|futbol|piłka|bundesliga|champions league|olymp|formel 1|formula 1|tennis|ski\b|basketball|handball|rugby|golf|boxen|boxing|wm\b|em\b|world cup|coupe du monde|copa|mondiale|dünya kupası|mistrzostw|tor\b|goal|match|spiel)/i,
   culture: /\b(kultur|culture|cultura|kültür|kultura|film|kino|cinema|cine|sinema|kino\b|musik|music|musique|música|musica|müzik|muzyk|buch|book|livre|libro|livro|kitap|książk|theater|theatre|teatro|tiyatro|teatr|kunst|art\b|arte|sanat|sztuk|konzert|concert|festival|ausstellung|exhibition|oscar|nobelpreis|serie\b|streaming)/i,
   local: /\b(lokal|local|regional|région|región|regione|região|bölge|lokaln|stadt|city|ville|ciudad|città|cidade|şehir|miasto|gemeinde|bürgermeister|mayor|alcalde|sindaco|prefeito|belediye|burmistrz|polizei|police|policía|polizia|polícia|polis|policj|unfall|accident|accidente|incidente|kaza|wypadek)/i,
 };
 
 /** Themen einer Meldung: Feed-Kategorien und Titel gegen die Stichwörter prüfen; ohne Treffer „politics“ (Allgemeines) */
+// Das stärkste Thema steht vorne (es wird als Chip auf der Karte gezeigt): Kategorie der Zeitung zählt am meisten,
+// dann die Schlagzeile, zuletzt der Anfang des Anrisstexts. Sonst wäre „Tennis: …“ mit „Präsident“ im Anriss Politik.
 export function guessTopics(title: string, categories: string[] = [], teaser = ''): NewsTopic[] {
-  const fromCats = categories.map((c) => c.toLowerCase().trim()).filter(isNewsTopic);
-  const hay = `${categories.join(' ')} ${title} ${teaser.slice(0, 120)}`;
-  const found = (Object.keys(TOPIC_WORDS) as NewsTopic[]).filter((t) => TOPIC_WORDS[t].test(hay));
-  const all = [...new Set([...fromCats, ...found])];
+  const score = new Map<NewsTopic, number>();
+  const add = (t: NewsTopic, n: number) => score.set(t, (score.get(t) ?? 0) + n);
+  for (const c of categories) { const k = c.toLowerCase().trim(); if (isNewsTopic(k)) add(k, 8); }
+  const cats = categories.join(' '), lead = teaser.slice(0, 120);
+  for (const t of Object.keys(TOPIC_WORDS) as NewsTopic[]) {
+    const re = TOPIC_WORDS[t];
+    if (cats && re.test(cats)) add(t, 4);
+    if (re.test(title)) add(t, 2);
+    if (lead && re.test(lead)) add(t, 1);
+  }
+  const all = [...score.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t); // stabil: bei Gleichstand die Reihenfolge oben
   return all.length ? all : ['politics'];
 }
 

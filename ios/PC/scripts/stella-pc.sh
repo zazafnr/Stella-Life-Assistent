@@ -79,6 +79,13 @@ if [ "$DEMO" = 1 ]; then
     mkdir -p "$STELLA_DATA_DIR"
     if [ "$APP" = students ]; then ( cd "$ROOT" && npx tsx scripts/demo-seed.mts > "$DATA/token" ); else ( cd "$ROOT" && npx tsx server/scripts/demo-seed.ts > "$DATA/token" ); fi
   fi
+  # Echte News von heute (Feeds holen) und Beispielbilder fürs Wetter bzw. für News ganz ohne Bild (ios/PC/demo-bilder)
+  DEMO_ARGS=()
+  if [ "$APP" != students ]; then
+    export STELLA_DEMO_BILDER="$PC/demo-bilder"
+    DEMO_ARGS=(-demoBilder "http://127.0.0.1:$DEMO_PORT/demo-bilder")
+    ( cd "$ROOT" && npx tsx server/scripts/demo-news.ts )
+  fi
   if [ "$APP" = students ]; then SERVER_DIR="$ROOT/core/server"; export STELLA_EDITION_STUDENTS="$ROOT/server-plugin"; else SERVER_DIR="$ROOT/server"; fi
   ( cd "$SERVER_DIR" && PORT=$DEMO_PORT HOST=127.0.0.1 npx tsx src/main.ts > "$DATA/server.log" 2>&1 ) &
   SERVER_PID=$!
@@ -86,7 +93,7 @@ if [ "$DEMO" = 1 ]; then
   for _ in $(seq 1 40); do curl -sf "http://127.0.0.1:$DEMO_PORT/api/status" >/dev/null && break; sleep 1; done
   curl -sf "http://127.0.0.1:$DEMO_PORT/api/status" >/dev/null || { echo "Demo-Server startet nicht, siehe $DATA/server.log"; exit 1; }
   echo "Demo-Server läuft auf http://127.0.0.1:$DEMO_PORT"
-  "$BIN" -server "http://127.0.0.1:$DEMO_PORT" -demoToken "$(cat "$DATA/token")" ${APP_ARGS[@]+"${APP_ARGS[@]}"}
+  "$BIN" -server "http://127.0.0.1:$DEMO_PORT" -demoToken "$(cat "$DATA/token")" ${DEMO_ARGS[@]+"${DEMO_ARGS[@]}"} ${APP_ARGS[@]+"${APP_ARGS[@]}"}
 else
   exec "$BIN" ${APP_ARGS[@]+"${APP_ARGS[@]}"}
 fi

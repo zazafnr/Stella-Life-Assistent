@@ -68,8 +68,34 @@ Bei `-Demo` installiert das Skript beim ersten Mal die Server-Pakete (`npm ci`) 
 Beispieldaten in `ios/PC/.work/demo-<App>/` an. Danach braucht es kein Internet mehr. Neue
 Beispieldaten: diesen Ordner löschen.
 
+Bei jedem Demo-Start holt `server/scripts/demo-news.ts` die echten Nachrichten von heute (dafür braucht
+es Internet) – mit dem Hauptbild jedes Artikels, also jeden Tag neue Meldungen und Bilder. Artikel ganz
+ohne Bild bekommen am echten Server ein KI-Bild, in der Demo ohne KI-Schlüssel ein gezeichnetes
+Platzhalterbild. Die Wetterkarte auf „Heute“ zeigt ein Bild zum aktuellen Wetter (Tag/Nacht). Die
+gezeichneten Bilder liegen in `ios/PC/demo-bilder/` (neu zeichnen: `node ios/PC/demo-bilder/erzeugen.mjs`).
+
+Mit der Maus kann man wie mit dem Finger ziehen: Listen und Karussells scrollen (mit Schwung, Karten
+rasten ein), Sheets nach unten wegziehen, vom linken Rand nach rechts zurückgehen.
+
 Im Fenster: **F5** löst „Ziehen zum Aktualisieren“ aus, **Esc** schließt Sheets und Menüs oder geht
 eine Seite zurück, ein Rechtsklick auf eine Listenzeile zeigt die Wisch-Aktionen.
+
+## Verbesserungen notieren
+
+Rechts neben dem Handy ist das Panel **Verbesserungen** (mit » einklappen, über die Leiste am Rand
+wieder öffnen):
+
+1. **+ Neue Verbesserung**, aufschreiben, was besser werden soll (wird sofort gespeichert).
+2. **Screenshot vom Handy** nimmt den Handy-Bildschirm auf. Danach einen Rahmen um das ziehen, was man
+   sehen soll (wie im Snipping Tool): **Ausschnitt übernehmen**, **Ganzes Bild** oder Esc. Beliebig viele
+   Screenshots pro Verbesserung; ein Klick auf ein Bild schneidet es neu zu. **Bild …** nimmt eine Datei,
+   Strg+V im Textfeld ein Bild aus der Zwischenablage.
+3. **Alle teilen …** schreibt `Verbesserungen.html` (eine Datei mit allen Texten und Bildern, zum
+   Verschicken) und `Verbesserungen.md` und zeigt sie im Explorer.
+
+Alles liegt als Dateien neben den Repos in `Verbesserungen\<App>\` (`verbesserungen.json`, `bilder\`),
+anderer Ort mit der Umgebungsvariable `STELLA_PC_FEEDBACK`. Das Panel gehört nur zum PC-Fenster; die App
+selbst bekommt davon nichts mit.
 
 ## Was am PC anders ist
 

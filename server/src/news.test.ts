@@ -52,7 +52,7 @@ const base = `http://127.0.0.1:${(web.address() as AddressInfo).port}`;
 
 // ---- Claude-Mock: Kurzfassungen ----
 const summaryRequests: MockRequest[] = [];
-let summaryMode: 'ok' | 'down' | 'wrongCount' | 'multi' = 'ok';
+let summaryMode: 'ok' | 'down' | 'wrongCount' | 'multi' | 'topics' = 'ok';
 const claude = await startMockClaude((req) => {
   const sys = JSON.stringify(req.body.system ?? '');
   if (sys.includes('one-sentence summaries')) {
@@ -62,6 +62,8 @@ const claude = await startMockClaude((req) => {
     const n = content.split('\n').filter((l) => /^\d+\. /.test(l)).length;
     if (summaryMode === 'wrongCount') return text(JSON.stringify({ sentences: ['nur einer'] }));
     if (summaryMode === 'multi') return text(JSON.stringify({ sentences: Array.from({ length: n }, (_, i) => `Erster Satz ${i}. Zweiter Satz, der weg muss. Dritter.`) }));
+    const titles = content.split('\n').filter((l) => /^\d+\. /.test(l));
+    if (summaryMode === 'topics') return text(JSON.stringify({ sentences: titles.map((_, i) => `Kurzfassung Nummer ${i + 1} zum Thema.`), topics: titles.map((l) => (/Fußball/.test(l) ? 'sport' : /Planet/.test(l) ? 'science' : 'politics')) }));
     return text(JSON.stringify({ sentences: Array.from({ length: n }, (_, i) => `Kurzfassung Nummer ${i + 1} zum Thema.`) }));
   }
   return text('ok');
@@ -231,6 +233,7 @@ test('Kurzfassung: ein neutraler Satz in der Sprache der Person, Ton-Regel im Pr
 
   // Rückfälle: Ausfall, falsche Anzahl → Titel; mehrere Sätze → nur der erste
   for (const [mode, check] of [['down', (s: string) => !s.startsWith('Kurzfassung')], ['wrongCount', (s: string) => !s.startsWith('nur einer')], ['multi', (s: string) => /^Erster Satz \d\.$/.test(s)]] as const) {
+    db.exec('DELETE FROM news_prepared; DELETE FROM news_edition;'); // aufbereitete Artikel gelten für alle – für jeden Fall neu
     const v = mk();
     digest.saveNews(v.get(), { enabled: true, topics: [], countries: ['AT'] });
     summaryMode = mode;
@@ -238,9 +241,37 @@ test('Kurzfassung: ein neutraler Satz in der Sprache der Person, Ton-Regel im Pr
     assert.ok(e.length > 0 && e.every((x) => check(x.sentence)), mode);
   }
   summaryMode = 'ok';
+  db.exec('DELETE FROM news_prepared; DELETE FROM news_edition;');
   assert.equal(digest.oneSentence('Erster Satz. Zweiter Satz.', 'Titel'), 'Erster Satz.');
   assert.equal(digest.oneSentence('Kurz 🎉', 'Titel'), 'Titel');
   assert.deepEqual(await digest.buildDigest(mk().get()), [], 'ausgeschaltet → nichts');
+});
+
+test('Tagesausgabe: einmal pro Land und Tag aufbereitet, für alle geteilt; jede Person bekommt ihre passendsten', async () => {
+  db.exec('DELETE FROM news_prepared; DELETE FROM news_edition; DELETE FROM news_digest;');
+  summaryRequests.length = 0; summaryMode = 'topics';
+  const a = mk(), b = mk();
+  digest.saveNews(a.get(), { enabled: true, topics: [], countries: ['AT', 'DE'] });
+  digest.saveNews(b.get(), { enabled: true, topics: ['sport'], countries: ['AT', 'DE'] });
+  const ea = await digest.buildDigest(a.get());
+  const calls = summaryRequests.length;
+  assert.equal(calls, 2, 'ein Aufruf je Land (AT, DE) für die ganze Ausgabe');
+  const eb = await digest.buildDigest(b.get());
+  assert.equal(summaryRequests.length, calls, 'zweite Person: kein neuer KI-Aufruf, alles schon aufbereitet');
+  assert.deepEqual(eb.map((e) => e.url), ['https://orf.example/sturm'], 'nur was sie interessiert');
+  assert.equal(eb[0]!.topic, 'sport');
+  assert.ok(ea.length >= 3 && ea.every((e) => e.sentence.startsWith('Kurzfassung')));
+  // Thema von der KI steht vorne und kommt auf die Karte
+  assert.equal(ea.find((e) => e.url.endsWith('/planet'))?.topic, 'science');
+  // höchstens 15, gemischte Themen
+  assert.ok(digest.editionCandidates('AT', '2099-01-01').length <= digest.EDITION_SIZE);
+  summaryMode = 'ok';
+  db.exec('DELETE FROM news_prepared; DELETE FROM news_edition;');
+});
+
+test('Themen: Masern sind Gesundheit, Tennis ist Sport – auch wenn im Anriss Politik-Wörter stehen', () => {
+  assert.equal(guessTopics('USA verlieren laut Berichten Status als masernfreies Land')[0], 'health');
+  assert.equal(guessTopics('Tennis: Sabalenka scheitert bei WTA Finals', [], 'Die Zweite unterliegt der Ukrainerin Switolina.')[0], 'sport');
 });
 
 test('Briefing: Abschnitt „News“ mit Link und Quelle, Karte nur mit Meldungen', async () => {

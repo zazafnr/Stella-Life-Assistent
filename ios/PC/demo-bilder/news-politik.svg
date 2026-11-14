@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 540" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6B26B"/><stop offset="1" stop-color="#7A4E8C"/></linearGradient><linearGradient id="b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E9DCC8"/><stop offset="1" stop-color="#BFAF98"/></linearGradient></defs>
+<rect width="440" height="540" fill="url(#s)"/>
+<circle cx="330" cy="150" r="60" fill="#FFE2A8" opacity=".7"/>
+<g fill="url(#b)">
+  <rect x="60" y="300" width="320" height="170"/>
+  <polygon points="50,300 220,200 390,300"/>
+  <rect x="190" y="140" width="60" height="70"/>
+  <ellipse cx="220" cy="140" rx="48" ry="40"/>
+</g>
+<rect x="215" y="70" width="10" height="40" fill="#BFAF98"/>
+<polygon points="225,70 265,80 225,90" fill="#D9534F"/>
+<rect x="82" y="315" width="16" height="150" fill="#A89880"/><rect x="124" y="315" width="16" height="150" fill="#A89880"/><rect x="166" y="315" width="16" height="150" fill="#A89880"/><rect x="208" y="315" width="16" height="150" fill="#A89880"/><rect x="250" y="315" width="16" height="150" fill="#A89880"/><rect x="292" y="315" width="16" height="150" fill="#A89880"/><rect x="334" y="315" width="16" height="150" fill="#A89880"/>
+<rect x="40" y="465" width="360" height="20" fill="#9C8D78"/>
+<rect x="0" y="485" width="440" height="55" fill="#3C3346"/></svg>

@@ -175,6 +175,7 @@ final class _Server: @unchecked Sendable {
                 body += buf[0..<n]
             }
             guard authed else { reply(c, 403, "text/plain", Array("nein".utf8)); return }
+            if path.hasPrefix("/fb/") { feedbackPost(c, path, query, Array(body.prefix(len))); return }
             let text = String(decoding: body.prefix(len), as: UTF8.self)
             if path == "/ev", let msg = _JSONReader.parse(text) {
                 if case .a(let list) = msg { for m in list { onMessage(m) } } else { onMessage(msg) }
@@ -201,6 +202,9 @@ final class _Server: @unchecked Sendable {
             let r = _Server.resources[id]
             _Server.resLock.unlock()
             if let r { reply(c, 200, r.0, Array(r.1), cache: true) } else { reply(c, 404, "text/plain", []) }
+        case let p where p.hasPrefix("/fb/"):
+            guard authed else { reply(c, 403, "text/plain", Array("nein".utf8)); return }
+            feedbackGet(c, p, query)
         default:
             let name = path == "/" ? "index.html" : String(path.dropFirst())
             if let (mime, body) = _webFile(name) {
@@ -219,11 +223,110 @@ final class _Server: @unchecked Sendable {
     }
 
     private func reply(_ c: _Sock, _ status: Int, _ mime: String, _ body: [UInt8], cache: Bool = false) {
-        let text = status == 200 ? "OK" : status == 204 ? "No Content" : status == 403 ? "Forbidden" : "Not Found"
+        let text = status == 200 ? "OK" : status == 204 ? "No Content" : status == 400 ? "Bad Request" : status == 403 ? "Forbidden" : status == 500 ? "Internal Server Error" : "Not Found"
         let h = "HTTP/1.1 \(status) \(text)\r\nContent-Type: \(mime)\r\nContent-Length: \(body.count)\r\nCache-Control: \(cache ? "max-age=86400" : "no-store")\r\nConnection: close\r\n\r\n"
         _ = _sockSend(c, Array(h.utf8) + body)
         _sockClose(c)
     }
+
+    // ---------- Verbesserungen: Notizen mit Handy-Screenshots aus dem Panel neben dem Handy (feedback.js) ----------
+    // Alles liegt als normale Dateien in einem Ordner: verbesserungen.json, bilder/*.png und beim Teilen
+    // Verbesserungen.html (eine Datei mit allen Bildern) und Verbesserungen.md.
+
+    /** Ordner: STELLA_PC_FEEDBACK (setzt stella-pc.ps1), sonst neben den übrigen Daten der PC-Version */
+    static func feedbackDir() -> URL {
+        if let d = ProcessInfo.processInfo.environment["STELLA_PC_FEEDBACK"], !d.isEmpty { return URL(fileURLWithPath: d, isDirectory: true) }
+        return _dataDir().appendingPathComponent("Verbesserungen", isDirectory: true)
+    }
+
+    /** name=… aus der Anfrage; nur einfache Namen, höchstens ein Unterordner (bilder/x.png) */
+    static func feedbackFile(_ query: String) -> URL? {
+        guard let raw = query.split(separator: "&").first(where: { $0.hasPrefix("name=") }),
+              let name = String(raw.dropFirst(5)).removingPercentEncoding else { return nil }
+        let parts = name.split(separator: "/", omittingEmptySubsequences: false)
+        guard (1...2).contains(parts.count) else { return nil }
+        var url = feedbackDir()
+        for p in parts {
+            guard !p.isEmpty, !p.hasPrefix("."), p.count <= 100,
+                  p.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" || $0 == ".") }) else { return nil }
+            url.appendPathComponent(String(p))
+        }
+        return url
+    }
+
+    private func feedbackPost(_ c: _Sock, _ path: String, _ query: String, _ body: [UInt8]) {
+        guard let url = _Server.feedbackFile(query) else { reply(c, 400, "text/plain", []); return }
+        let fm = FileManager.default
+        switch path {
+        case "/fb/file":
+            do {
+                try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Data(body).write(to: url, options: .atomic)
+                reply(c, 204, "text/plain", [])
+            } catch {
+                reply(c, 500, "text/plain", Array("\(error)".utf8))
+            }
+        case "/fb/delete":
+            try? fm.removeItem(at: url)
+            reply(c, 204, "text/plain", [])
+        case "/fb/open":
+            _revealFile(url)
+            reply(c, 204, "text/plain", [])
+        default:
+            reply(c, 404, "text/plain", [])
+        }
+    }
+
+    private func feedbackGet(_ c: _Sock, _ path: String, _ query: String) {
+        switch path {
+        case "/fb/info":
+            let dir = _nativePath(_Server.feedbackDir())
+            let json = "{\"dir\":\"" + dir.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\"}"
+            reply(c, 200, "application/json", Array(json.utf8))
+        case "/fb/file":
+            guard let url = _Server.feedbackFile(query), let d = try? Data(contentsOf: url) else { reply(c, 404, "text/plain", []); return }
+            let mime: String
+            switch url.pathExtension.lowercased() {
+            case "png": mime = "image/png"
+            case "jpg", "jpeg": mime = "image/jpeg"
+            case "json": mime = "application/json"
+            case "html": mime = "text/html; charset=utf-8"
+            default: mime = "text/plain; charset=utf-8"
+            }
+            reply(c, 200, mime, Array(d))
+        default:
+            reply(c, 404, "text/plain", [])
+        }
+    }
+}
+
+/** Pfad so, wie ihn das Betriebssystem schreibt (unter Windows C:\…\…) */
+func _nativePath(_ url: URL) -> String {
+    #if os(Windows)
+    var p = url.path
+    if p.count > 2, p.hasPrefix("/"), Array(p)[2] == ":" { p.removeFirst() }
+    return p.replacingOccurrences(of: "/", with: "\\")
+    #else
+    return url.path
+    #endif
+}
+
+/** Datei im Explorer (Finder, Dateimanager) zeigen */
+func _revealFile(_ url: URL) {
+    let p = Process()
+    p.standardOutput = FileHandle.nullDevice
+    p.standardError = FileHandle.nullDevice
+    #if os(Windows)
+    p.executableURL = URL(fileURLWithPath: (ProcessInfo.processInfo.environment["SystemRoot"] ?? "C:\\Windows") + "\\explorer.exe")
+    p.arguments = ["/select,", _nativePath(url)]
+    #elseif os(macOS)
+    p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+    p.arguments = ["-R", url.path]
+    #else
+    p.executableURL = URL(fileURLWithPath: "/usr/bin/xdg-open")
+    p.arguments = [url.deletingLastPathComponent().path]
+    #endif
+    try? p.run()
 }
 
 func _find(_ hay: [UInt8], _ needle: [UInt8]) -> Int? {

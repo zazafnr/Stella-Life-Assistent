@@ -193,7 +193,7 @@ extension Text: View, _Primitive {
 
 public struct Image: View, _Primitive, Equatable {
     public typealias Body = Never
-    enum Src: Equatable { case symbol(String), res(String), named(String) }
+    enum Src: Equatable { case symbol(String), res(String), named(String), url(String) }
     let src: Src
     var isResizable = false
     var label: String?
@@ -202,6 +202,7 @@ public struct Image: View, _Primitive, Equatable {
     nonisolated public init(systemName: String, variableValue: Double?) { src = .symbol(systemName) }
     nonisolated public init(_ name: String, bundle: Bundle? = nil) { src = .named(name) }
     nonisolated public init(decorative name: String, bundle: Bundle? = nil) { src = .named(name) }
+    nonisolated init(_url: String) { src = .url(_url) }
     nonisolated public init(uiImage: UIImage) { src = .res(MainActor.assumeIsolated { _resource(uiImage.data, mime: uiImage.mime) }) }
 
     public enum ResizingMode: Sendable { case tile, stretch }
@@ -222,9 +223,45 @@ public struct Image: View, _Primitive, Equatable {
         case .symbol(let name): n = _Node("sym", ["n": .s(name)])
         case .res(let id): n = _Node("img", ["res": .s(id)])
         case .named(let name): n = _Node("img", ["name": .s(name)])
+        case .url(let u): n = _Node("img", ["url": .s(u)])
         }
         if isResizable { n.p["rs"] = true; n.gw = true; n.gh = true }
         return [n]
+    }
+}
+
+// MARK: Bild aus dem Netz – das Fenster lädt es selbst, die App sieht sofort .success
+
+public enum AsyncImagePhase: Sendable {
+    case empty, success(Image), failure(Error)
+    public var image: Image? { if case .success(let i) = self { return i }; return nil }
+    public var error: Error? { if case .failure(let e) = self { return e }; return nil }
+}
+
+public struct AsyncImage<Content: View>: View {
+    let phase: AsyncImagePhase
+    let content: (AsyncImagePhase) -> Content
+
+    nonisolated public init(url: URL?, scale: CGFloat = 1, transaction: Transaction = Transaction(), @ViewBuilder content: @escaping (AsyncImagePhase) -> Content) {
+        let s = url?.absoluteString ?? ""
+        phase = (s.hasPrefix("https://") || s.hasPrefix("http://")) ? .success(Image(_url: s)) : .empty
+        self.content = content
+    }
+    public var body: some View { content(phase) }
+}
+
+extension AsyncImage {
+    nonisolated public init<I: View, P: View>(url: URL?, scale: CGFloat = 1, @ViewBuilder content: @escaping (Image) -> I, @ViewBuilder placeholder: @escaping () -> P) where Content == _Cond<I, P> {
+        self.init(url: url, scale: scale) { phase in
+            if let i = phase.image { content(i) } else { placeholder() }
+        }
+    }
+}
+
+extension AsyncImage where Content == Image {
+    nonisolated public init(url: URL?, scale: CGFloat = 1) where Content == Image {
+        let s = url?.absoluteString ?? ""
+        phase = .success(Image(_url: s)); content = { $0.image ?? Image(_url: s) }
     }
 }
 

@@ -222,11 +222,20 @@ extension View {
     public func scrollBounceBehavior(_ b: ScrollBounceBehavior, axes: Axis.Set = [.vertical]) -> some View { self }
     public func scrollDisabled(_ d: Bool) -> some View { self }
     public func scrollClipDisabled(_ d: Bool = true) -> some View { self }
-    public func scrollTargetBehavior(_ b: Any) -> some View { self }
+    public func scrollTargetBehavior<B: ScrollTargetBehavior>(_ b: B) -> some View { self }
     public func scrollTargetLayout(isEnabled: Bool = true) -> some View { self }
     public func defaultScrollAnchor(_ a: UnitPoint?) -> some View { _env { $0[_Env.scrollAnchor] = a == .bottom ? "bottom" : nil } }
     public func contentMargins(_ edges: Edge.Set = .all, _ length: CGFloat?, for placement: ContentMarginPlacement = .automatic) -> some View { self }
 }
+
+public protocol ScrollTargetBehavior {}
+public struct ViewAlignedScrollTargetBehavior: ScrollTargetBehavior { public enum LimitBehavior: Sendable { case automatic, always, never, alwaysByFew, alwaysByOne }; public init(limitBehavior: LimitBehavior = .automatic) {} }
+public struct PagingScrollTargetBehavior: ScrollTargetBehavior { public init() {} }
+extension ScrollTargetBehavior where Self == ViewAlignedScrollTargetBehavior {
+    public static var viewAligned: ViewAlignedScrollTargetBehavior { .init() }
+    public static func viewAligned(limitBehavior: ViewAlignedScrollTargetBehavior.LimitBehavior) -> ViewAlignedScrollTargetBehavior { .init(limitBehavior: limitBehavior) }
+}
+extension ScrollTargetBehavior where Self == PagingScrollTargetBehavior { public static var paging: PagingScrollTargetBehavior { .init() } }
 
 public struct ContentMarginPlacement: Sendable { public static let automatic = ContentMarginPlacement(), scrollContent = ContentMarginPlacement(), scrollIndicators = ContentMarginPlacement() }
 
