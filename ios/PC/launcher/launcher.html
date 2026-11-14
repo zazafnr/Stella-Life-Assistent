@@ -90,7 +90,7 @@ footer button { background: none; border: 0; color: var(--muted); cursor: pointe
       <div class="seg" id="demo"><button data-v="1">Demo</button><button data-v="0">Echter Server</button></div>
     </div>
     <div class="row">
-      <div class="lbl">Automatisch aktualisieren<small>Beim Öffnen die neueste Version holen, bauen und starten</small></div>
+      <div class="lbl">Automatisch aktualisieren<small id="auto-hint">Beim Öffnen die neueste Version holen. Ohne Internet startet die zuletzt geholte.</small></div>
       <button class="switch" id="auto" aria-label="Automatisch aktualisieren"></button>
     </div>
   </div>
@@ -152,6 +152,7 @@ function render() {
   document.querySelectorAll("#source button").forEach((b) => b.classList.toggle("on", b.dataset.v === st.source));
   document.querySelectorAll("#demo button").forEach((b) => b.classList.toggle("on", (b.dataset.v === "1") === st.demo));
   $("#auto").classList.toggle("on", st.autoUpdate);
+  $("#auto-hint").textContent = st.autoUpdate ? "Beim Öffnen die neueste Version holen. Ohne Internet startet die zuletzt geholte." : "Aus: komplett offline – startet immer die zuletzt geholte Version, sucht nicht nach Updates.";
   $("#src-hint").textContent = st.source === "github" ? "Neueste Version von GitHub (main) – deine Ordner bleiben unberührt" : "So wie es gerade in deinen Ordnern liegt";
   $("#demo-hint").textContent = st.demo ? "Offline mit Beispieldaten" : "Anmeldung wie am iPhone";
   const busy = ["updating", "building", "stopping"].includes(S.phase);

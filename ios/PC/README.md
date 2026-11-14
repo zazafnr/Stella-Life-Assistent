@@ -63,6 +63,8 @@ Im Launcher-Fenster:
 - **Meine Ordner** statt „Neueste Version“: baut genau das, was gerade in deinen Ordnern liegt
 - **Automatisch aktualisieren** (an): beim Öffnen gleich die neueste Version holen, bauen und starten.
   Alle 10 Minuten zeigt der Launcher, ob es auf GitHub Neues gibt.
+- **Offline geht auch**: ohne Internet startet die zuletzt geholte Version (Hinweis im Protokoll).
+  Mit „Automatisch aktualisieren“ aus sucht der Launcher gar nicht nach Updates.
 - Demo (offline mit Beispieldaten) oder echter Server
 
 Verbesserungen aus dem Panel landen immer in `Stella\Verbesserungen\<App>`. Das Konsolenfenster zu

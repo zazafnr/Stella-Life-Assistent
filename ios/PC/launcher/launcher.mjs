@@ -23,7 +23,7 @@ const SIM = process.env.STELLA_SIM_DIR || path.join(TOP, '.simulator');
 const TOKEN = randomBytes(16).toString('hex');
 mkdirSync(SIM, { recursive: true });
 
-const git = (cwd, ...args) => spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true });
+const git = (cwd, ...args) => spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, timeout: 30_000 });
 const remoteOf = (dir, fallback) => (existsSync(dir) && git(dir, 'remote', 'get-url', 'origin').stdout.trim()) || fallback;
 const REPOS = {
   life: { name: 'Stella-Life-Assistent', url: remoteOf(LOCAL_LIFE, 'https://github.com/zazafnr/Stella-Life-Assistent.git') },
@@ -159,16 +159,35 @@ let busy = false;
 async function start({ update }) {
   if (busy) return;
   busy = true;
-  const app = settings.app, source = settings.source;
+  const app = settings.app;
+  let source = settings.source;
+  let offline = false;
   try {
     await stop();
     if (source === 'github') {
       setPhase('updating');
-      // wenn die Kopie fehlt, muss sie auf jeden Fall geholt werden
+      const have = (repo) => existsSync(path.join(dirOf(repo, 'github'), '.git'));
       for (const repo of APPS[app].repos) {
-        if (update || !existsSync(path.join(dirOf(repo, 'github'), '.git'))) await updateRepo(repo);
+        // wenn die Kopie fehlt, muss sie geholt werden; sonst nur auf Wunsch
+        if (!update && have(repo)) continue;
+        try {
+          await updateRepo(repo);
+        } catch (err) {
+          // offline (oder GitHub nicht erreichbar): mit dem arbeiten, was schon da ist
+          if (have(repo)) {
+            say(`GitHub nicht erreichbar (${err.message}) – starte die zuletzt geholte Version.`, 'info');
+            offline = true;
+          } else if (APPS[app].repos.every((r) => existsSync(dirOf(r, 'local')))) {
+            say('GitHub nicht erreichbar und noch keine Kopie da – starte stattdessen deine Ordner.', 'info');
+            source = 'local';
+            break;
+          } else {
+            throw new Error('GitHub nicht erreichbar und noch keine Kopie da – einmal mit Internet starten.');
+          }
+        }
       }
-    } else {
+    }
+    if (source === 'local') {
       say('Meine Ordner: ohne Git, genau der Stand, der gerade auf der Platte liegt.', 'info');
     }
     await refreshVersions(false);
@@ -181,7 +200,7 @@ async function start({ update }) {
       ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `[Console]::OutputEncoding = [Text.Encoding]::UTF8; & ${psQuote(script)}${app === 'students' ? ` students -Repo ${psQuote(dirOf('students', source))}` : ''}${settings.demo ? ' -Demo' : ''}; exit $LASTEXITCODE`]
       : [script, ...(app === 'students' ? ['students', '--repo', dirOf('students', source)] : []), ...(settings.demo ? ['--demo'] : [])];
     const env = { ...process.env, STELLA_PC_FEEDBACK: path.join(TOP, 'Verbesserungen', APPS[app].dataName) };
-    say(`${APPS[app].title} bauen und starten (${source === 'github' ? 'neueste Version' : 'meine Ordner'}${settings.demo ? ', offline mit Beispieldaten' : ''}) …`, 'info');
+    say(`${APPS[app].title} bauen und starten (${source === 'local' ? 'meine Ordner' : offline || !update ? 'zuletzt geholte Version' : 'neueste Version'}${settings.demo ? ', offline mit Beispieldaten' : ''}) …`, 'info');
     const child = spawn(process.platform === 'win32' ? 'powershell.exe' : 'bash', args, { cwd: life, env, windowsHide: true, detached: process.platform !== 'win32' });
     running = { app, child };
     child.stdout.on('data', (d) => {
@@ -292,9 +311,10 @@ server.listen(PORT, '127.0.0.1', async () => {
   console.log(`Stella-Launcher: ${url}`);
   console.log('Zum Beenden dieses Fenster schließen (beendet auch den Simulator).');
   openWindow(url);
-  await refreshVersions(true);
-  // automatisch: beim Öffnen gleich die neueste Version der zuletzt gewählten App bauen und starten
-  if (settings.autoUpdate && !process.env.STELLA_LAUNCHER_NO_AUTOSTART) void start({ update: settings.source === 'github' });
+  await refreshVersions(settings.autoUpdate);
+  // beim Öffnen gleich die zuletzt gewählte App starten – mit „Automatisch aktualisieren“ vorher die neueste Version holen
+  // offline ok: ohne Internet startet die zuletzt geholte Version
+  if (!process.env.STELLA_LAUNCHER_NO_AUTOSTART) void start({ update: settings.autoUpdate && settings.source === 'github' });
   // alle 10 Minuten nachsehen, ob es Neues gibt (Anzeige im Fenster; ein laufender Simulator wird nicht unterbrochen)
-  setInterval(() => { if (!busy) void refreshVersions(true); }, 10 * 60_000).unref();
+  setInterval(() => { if (!busy && settings.autoUpdate) void refreshVersions(true); }, 10 * 60_000).unref();
 });
