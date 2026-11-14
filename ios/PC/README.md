@@ -45,6 +45,31 @@ winget install --id OpenJS.NodeJS.LTS
 
 Danach ein **neues** Terminal öffnen, damit `swift` gefunden wird.
 
+## Launcher: Stella oder Stella for Students, immer die neueste Version
+
+Am bequemsten über den Launcher (`launcher/launcher.mjs`, braucht Node.js). Die Datei
+`launcher/Stella starten.bat` neben die beiden Repo-Ordner legen und doppelklicken:
+
+```
+Stella  Stella starten.bat
+  Stella-Life-Assistent  Stella-for-Students  Verbesserungen```
+
+Im Launcher-Fenster:
+
+- **Stella** oder **Stella for Students** auswählen
+- **Neueste Version holen & starten**: holt den aktuellen Stand von GitHub (`main`), installiert
+  geänderte Pakete, baut und startet. Das läuft in eigenen Kopien unter `Stella\.simulator\`,
+  deine Arbeitsordner (Branches, ungespeicherte Änderungen) bleiben unberührt.
+- **Meine Ordner** statt „Neueste Version“: baut genau das, was gerade in deinen Ordnern liegt
+- **Automatisch aktualisieren** (an): beim Öffnen gleich die neueste Version holen, bauen und starten.
+  Alle 10 Minuten zeigt der Launcher, ob es auf GitHub Neues gibt.
+- **Offline geht auch**: ohne Internet startet die zuletzt geholte Version (Hinweis im Protokoll).
+  Mit „Automatisch aktualisieren“ aus sucht der Launcher gar nicht nach Updates.
+- Demo (offline mit Beispieldaten) oder echter Server
+
+Verbesserungen aus dem Panel landen immer in `Stella\Verbesserungen\<App>`. Das Konsolenfenster zu
+schließen beendet auch den Simulator samt Demo-Server.
+
 ## Starten
 
 Im Ordner `Stella-Life-Assistent`:
