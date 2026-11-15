@@ -166,6 +166,8 @@ export interface CompleteOptions {
   openrouterOnly?: boolean;
   /** höchstens so viele Modelle der Kette probieren (jeder Versuch zählt zum Tageslimit) */
   maxModels?: number;
+  /** zuerst OpenRouters Zufalls-Router "openrouter/free" – nimmt selbst ein Modell, das gerade frei ist */
+  routerFirst?: boolean;
 }
 
 // Groq: kurze Pause pro Modell nach 429, damit nicht jede Anfrage erst scheitert
@@ -239,7 +241,8 @@ async function completeOpenRouter(messages: LlmMessage[], tools: ToolDef[] | und
   if (!openrouterAvailable()) throw new LlmUnavailable('Kein KI-Schlüssel gesetzt (Anthropic oder OpenRouter).');
 
   let tries = 0;
-  for (const model of await modelChain(opts.vision ? 'vision' : 'tools', opts.heavy)) {
+  const chain = await modelChain(opts.vision ? 'vision' : 'tools', opts.heavy);
+  for (const model of opts.routerFirst ? [FALLBACK_ROUTER, ...chain.filter((m) => m !== FALLBACK_ROUTER)] : chain) {
     if ((cooldownUntil.get(model) ?? 0) > Date.now()) continue;
     if (opts.maxModels && tries >= opts.maxModels) break;
     tries++;
@@ -270,7 +273,8 @@ async function completeOpenRouter(messages: LlmMessage[], tools: ToolDef[] | und
         errors.push(`${model}: ${res.status} ${body.slice(0, 160)}`);
         // Überlastet oder Tageslimit → eine Weile in Ruhe lassen
         if (res.status === 429) cooldownUntil.set(model, Date.now() + (body.includes('per-day') ? 3_600_000 : 60_000));
-        if (res.status === 404 || res.status === 400) cooldownUntil.set(model, Date.now() + REFRESH_MS);
+        // weg, kaputt oder in unserer Region gesperrt (403 „not available in your region“) → bis zur nächsten Modell-Liste meiden
+        if (res.status === 404 || res.status === 400 || (res.status === 403 && /region/i.test(body))) cooldownUntil.set(model, Date.now() + REFRESH_MS);
         continue;
       }
       const json = (await res.json()) as { choices?: { message: CompletionResult['message'] }[]; error?: { message: string } };

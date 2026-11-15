@@ -43,7 +43,7 @@ const FEEDS: Record<string, { body: string; etag?: string }> = {
 let feedHits: { url: string; inm?: string }[] = [];
 // ---- OpenRouter-Mock: ein Aufruf pro Artikel mit Foto → Bildpunkt, Thema, Satz in allen Sprachen ----
 const orRequests: { model: string; system: string; text: string; image?: string }[] = [];
-let orMode: 'ok' | 'down' | 'garbage' = 'ok';
+let orMode: 'ok' | 'down' | 'garbage' | 'region' = 'ok';
 const topicOf = (t: string) => (/Fußball|Champions|Atom Meldung/.test(t) ? 'sport' : /Planet|Mars/.test(t) ? 'science' : /vaccine/.test(t) ? 'health'
   : /Stock/.test(t) ? 'economy' : /Film/.test(t) ? 'culture' : /Heatwave/.test(t) ? 'climate' : /Chip|KI/.test(t) ? 'tech' : 'politics');
 function openRouter(url: string, body: string, res: import('node:http').ServerResponse) {
@@ -55,6 +55,7 @@ function openRouter(url: string, body: string, res: import('node:http').ServerRe
   const text = parts.find((p) => p.type === 'text')?.text ?? '';
   orRequests.push({ model: b.model, system: String(b.messages[0]!.content), text, image: parts.find((p) => p.type === 'image_url')?.image_url?.url });
   if (orMode === 'down') { res.statusCode = 503; res.end('{"error":{"message":"down"}}'); return; }
+  if (orMode === 'region' && b.model === 'openrouter/free') { res.statusCode = 403; res.end('{"error":{"message":"This model is not available in your region.","code":403}}'); return; }
   const headline = /^Headline: (.+)$/m.exec(text)?.[1] ?? '';
   const answer = orMode === 'garbage' ? 'Tut mir leid, das kann ich nicht.'
     : '```json\n' + JSON.stringify({ focus: { x: 0.3, y: 0.2 }, topic: topicOf(headline), sentences: Object.fromEntries(['en', 'de', 'es', 'fr', 'it', 'pt-BR', 'tr', 'pl'].map((l) => [l, `${l}: Satz zu ${headline}. Zweiter Satz, der weg muss.`])) }) + '\n```';
@@ -243,7 +244,7 @@ test('Tagesausgabe: 20 international + 3 je Land, nur mit Bild, je Artikel EINE 
   assert.equal(claudeRequests.length, 0, 'Claude wird für die News nicht gebraucht');
 
   const r = orRequests[0]!;
-  assert.equal(r.model, 'test/vision:free');
+  assert.equal(r.model, 'openrouter/free', 'zuerst der Router – er nimmt ein Modell, das gerade frei ist');
   assert.match(r.image ?? '', /^data:image\/jpeg;base64,/, 'das Foto geht mit');
   for (const want of ['German', 'Brazilian Portuguese', 'Turkish', 'Polish', 'focus', 'strictly sober tone', 'no matter how the reader likes to be addressed']) assert.ok(r.system.includes(want), want);
   const p = db.prepare('SELECT * FROM news_prepared WHERE url = ?').get('https://int.example/final') as { focus: string; topic: string; sentences: string };
@@ -328,6 +329,16 @@ test('Tagesausgabe: KI weg oder Kontingent leer → Schlagzeile und Bildmitte; s
   assert.deepEqual(digest.readEnrichment({ focus: { x: 7, y: -1 }, sentences: { de: 'Ein Satz. Noch einer.', xx: 'egal' }, topic: 'quatsch' }, 'Titel'),
     { focus: '1,0', topic: null, sentences: { de: 'Ein Satz.' } });
   assert.equal(digest.oneSentence('Kurz 🎉', 'Titel'), 'Titel');
+});
+
+test('Modell in unserer Region gesperrt (403): danach übersprungen statt bei jedem Artikel neu gefragt', async () => {
+  resetNews();
+  orRequests.length = 0; orMode = 'region';
+  await digest.buildEditions(utcAt(5));
+  assert.ok(orRequests.filter((r) => r.model === 'openrouter/free').length <= 3, 'der gesperrte Router nur bei den ersten drei gleichzeitigen Artikeln');
+  assert.equal(orRequests.filter((r) => r.model === 'test/vision:free').length, 12, 'die anderen mit dem nächsten Modell');
+  assert.equal((db.prepare('SELECT COUNT(*) AS n FROM news_prepared WHERE focus IS NOT NULL').get() as { n: number }).n, 12);
+  orMode = 'ok';
 });
 
 test('Frisch gestarteter Server ohne Ausgabe: die wichtigsten Meldungen mit Bild, ohne KI', async () => {
