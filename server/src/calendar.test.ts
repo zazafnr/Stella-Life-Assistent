@@ -66,10 +66,12 @@ test('freie Zeitfenster stehen nur für heute und später da und sparen belegte 
 
 test('Ziel-Check-ins erscheinen am richtigen Wochentag', async () => {
   const sunday = addDays(today, (7 - weekdayOf(today)) % 7 || 7);
+  // alle Sonntage im Zeitraum heute … heute + 7 (ist heute Sonntag, sind es zwei)
+  const sundays = Array.from({ length: 8 }, (_, i) => addDays(today, i)).filter((d) => weekdayOf(d) === weekdayOf(sunday));
   createGoal(user().id, { title: 'Laufen gehen', target: 3, cadence: 'weekly:3', checkIn: 'So 18:00', minutes: 20 });
   const cal = buildCalendar(user(), today, addDays(today, 7));
   const hits = cal.days.filter((d) => d.blocks.some((b) => b.kind === 'goal'));
-  assert.deepEqual(hits.map((d) => d.date), [sunday]);
+  assert.deepEqual(hits.map((d) => d.date), sundays);
   const goal = hits[0]!.blocks.find((b) => b.kind === 'goal')!;
   assert.deepEqual([goal.start, goal.end], ['18:00', '18:20']);
 });

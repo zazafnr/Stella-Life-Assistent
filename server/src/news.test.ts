@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import Fastify from 'fastify';
-import { startMockClaude, text, httpError, type MockRequest } from './testing/mockClaude.ts';
+import { startMockClaude, text, type MockRequest } from './testing/mockClaude.ts';
 
 // ---- Beispiel-Feeds ----
 const now = Date.now();
@@ -28,11 +28,44 @@ const FEEDS: Record<string, { body: string; etag?: string }> = {
     item('Forscher entdecken neuen Planeten', 'https://spiegel.example/planet', 20, '', 'Wissenschaft'),
   ].join('')) },
   '/atom.xml': { body: `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>Atom Beispiel</title><entry><title>Atom Meldung &amp; mehr</title><link rel="alternate" href="https://atom.example/a1"/><link rel="self" href="https://atom.example/self"/><updated>${iso(10)}</updated><summary type="html">&lt;b&gt;Kurz&lt;/b&gt; zusammengefasst</summary><category term="Sport"/></entry><entry><title>Ohne Link</title></entry></feed>` },
+  '/int.xml': { body: rss('World Desk', [
+    item('World leaders meet in Geneva for peace talks', 'https://int.example/geneva', 70),
+    item('Champions League final ends in penalty drama', 'https://int.example/final', 65),
+    item('New vaccine approved for children', 'https://int.example/vaccine', 60),
+    item('Stock markets fall after rate decision', 'https://int.example/stocks', 55),
+    item('Mars rover finds traces of ancient water', 'https://int.example/mars', 45),
+    item('Film festival opens with record crowds', 'https://int.example/film', 35),
+    item('Heatwave grips southern Europe', 'https://int.example/heat', 25),
+    item('Chip maker unveils faster processor', 'https://int.example/chip', 15),
+  ].join('')) },
   '/rdf.xml': { body: `<?xml version="1.0"?><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/"><channel><title>RDF Beispiel</title></channel><item><title>RDF Meldung</title><link>https://rdf.example/1</link><dc:date>${iso(5)}</dc:date></item></rdf:RDF>` },
 };
 let feedHits: { url: string; inm?: string }[] = [];
+// ---- OpenRouter-Mock: ein Aufruf pro Artikel mit Foto → Bildpunkt, Thema, Satz in allen Sprachen ----
+const orRequests: { model: string; system: string; text: string; image?: string }[] = [];
+let orMode: 'ok' | 'down' | 'garbage' = 'ok';
+const topicOf = (t: string) => (/Fußball|Champions|Atom Meldung/.test(t) ? 'sport' : /Planet|Mars/.test(t) ? 'science' : /vaccine/.test(t) ? 'health'
+  : /Stock/.test(t) ? 'economy' : /Film/.test(t) ? 'culture' : /Heatwave/.test(t) ? 'climate' : /Chip|KI/.test(t) ? 'tech' : 'politics');
+function openRouter(url: string, body: string, res: import('node:http').ServerResponse) {
+  res.setHeader('Content-Type', 'application/json');
+  if (url === '/or/models') { res.end(JSON.stringify({ data: [] })); return; }
+  const b = JSON.parse(body) as { model: string; messages: { role: string; content: unknown }[] };
+  const user = b.messages.find((m) => m.role === 'user')!.content;
+  const parts = Array.isArray(user) ? user as { type: string; text?: string; image_url?: { url: string } }[] : [{ type: 'text', text: String(user) }];
+  const text = parts.find((p) => p.type === 'text')?.text ?? '';
+  orRequests.push({ model: b.model, system: String(b.messages[0]!.content), text, image: parts.find((p) => p.type === 'image_url')?.image_url?.url });
+  if (orMode === 'down') { res.statusCode = 503; res.end('{"error":{"message":"down"}}'); return; }
+  const headline = /^Headline: (.+)$/m.exec(text)?.[1] ?? '';
+  const answer = orMode === 'garbage' ? 'Tut mir leid, das kann ich nicht.'
+    : '```json\n' + JSON.stringify({ focus: { x: 0.3, y: 0.2 }, topic: topicOf(headline), sentences: Object.fromEntries(['en', 'de', 'es', 'fr', 'it', 'pt-BR', 'tr', 'pl'].map((l) => [l, `${l}: Satz zu ${headline}. Zweiter Satz, der weg muss.`])) }) + '\n```';
+  res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: answer } }] }));
+}
+const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(4096, 7)]);
+
 const web = createServer((req, res) => {
   const url = req.url ?? '';
+  if (url.startsWith('/or/')) { let body = ''; req.on('data', (c) => { body += c; }); req.on('end', () => openRouter(url, body, res)); return; }
+  if (url.startsWith('/img/')) { res.setHeader('Content-Type', url.endsWith('.txt') ? 'text/plain' : 'image/jpeg'); res.end(JPEG); return; }
   feedHits.push({ url, inm: req.headers['if-none-match'] as string | undefined });
   if (FEEDS[url]) {
     const f = FEEDS[url]!;
@@ -50,30 +83,17 @@ const web = createServer((req, res) => {
 await new Promise<void>((r) => web.listen(0, r));
 const base = `http://127.0.0.1:${(web.address() as AddressInfo).port}`;
 
-// ---- Claude-Mock: Kurzfassungen ----
-const summaryRequests: MockRequest[] = [];
-let summaryMode: 'ok' | 'down' | 'wrongCount' | 'multi' | 'topics' = 'ok';
-const claude = await startMockClaude((req) => {
-  const sys = JSON.stringify(req.body.system ?? '');
-  if (sys.includes('one-sentence summaries')) {
-    summaryRequests.push(req);
-    if (summaryMode === 'down') return httpError(500);
-    const content = String(req.body.messages?.[0]?.content?.[0]?.text ?? req.body.messages?.[0]?.content ?? '');
-    const n = content.split('\n').filter((l) => /^\d+\. /.test(l)).length;
-    if (summaryMode === 'wrongCount') return text(JSON.stringify({ sentences: ['nur einer'] }));
-    if (summaryMode === 'multi') return text(JSON.stringify({ sentences: Array.from({ length: n }, (_, i) => `Erster Satz ${i}. Zweiter Satz, der weg muss. Dritter.`) }));
-    const titles = content.split('\n').filter((l) => /^\d+\. /.test(l));
-    if (summaryMode === 'topics') return text(JSON.stringify({ sentences: titles.map((_, i) => `Kurzfassung Nummer ${i + 1} zum Thema.`), topics: titles.map((l) => (/Fußball/.test(l) ? 'sport' : /Planet/.test(l) ? 'science' : 'politics')) }));
-    return text(JSON.stringify({ sentences: Array.from({ length: n }, (_, i) => `Kurzfassung Nummer ${i + 1} zum Thema.`) }));
-  }
-  return text('ok');
-});
+// ---- Claude-Mock: die News brauchen Claude nicht mehr – jeder Aufruf hier wäre ein Fehler ----
+const claudeRequests: MockRequest[] = [];
+const claude = await startMockClaude((req) => { claudeRequests.push(req); return text('ok'); });
 after(() => { web.close(); return claude.close(); });
 
 process.env.STELLA_DATA_DIR = mkdtempSync(path.join(tmpdir(), 'stella-news-'));
 process.env.STELLA_SECRET = 'test-secret-1234567890';
 process.env.STELLA_ALLOW_REGISTRATION = 'true';
-process.env.OPENROUTER_API_KEY = '';
+process.env.OPENROUTER_API_KEY = 'sk-or-test';
+process.env.OPENROUTER_BASE_URL = `${base}/or`;
+process.env.STELLA_VISION_MODELS = 'test/vision:free';
 process.env.GROQ_API_KEY = '';
 process.env.ANTHROPIC_API_KEY = 'sk-ant-test-key-123456';
 process.env.ANTHROPIC_BASE_URL = claude.url;
@@ -92,6 +112,7 @@ const { askDue, maybeAskNews } = await import('./news/ask.ts');
 const { registerNewsRoutes, findFavoriteFeed } = await import('./news/routes.ts');
 const net = await import('./news/net.ts');
 const { buildBriefing } = await import('./briefing.ts');
+const { usageToday } = await import('./llm.ts');
 const { giftPlan } = await import('./billing.ts');
 const { setPushForTests } = await import('./channels/deliver.ts');
 const pushes: string[] = [];
@@ -101,6 +122,7 @@ const SOURCES = [
   { id: 'orf', name: 'ORF', country: 'AT' as const, lang: 'de', topics: [], feedUrl: `${base}/orf.xml`, homepage: base },
   { id: 'spiegel', name: 'Der Spiegel', country: 'DE' as const, lang: 'de', topics: [], feedUrl: `${base}/spiegel.xml`, homepage: base },
   { id: 'atom', name: 'Atom Beispiel', country: 'INT' as const, lang: 'en', topics: [], feedUrl: `${base}/atom.xml`, homepage: base },
+  { id: 'world', name: 'World Desk', country: 'INT' as const, lang: 'en', topics: [], feedUrl: `${base}/int.xml`, homepage: base },
 ];
 setSourcesForTests(SOURCES);
 
@@ -186,87 +208,143 @@ test('Abruf: speichert nur Titel, Teaser, Link; ETag → 304; keine Doppelten; F
   assert.equal(db.prepare('SELECT 1 FROM news_items WHERE url = ?').get('https://orf.example/wetter'), undefined);
 });
 
-test('Auswahl nach Vorlieben: Länder, Themen, eine Meldung pro Geschichte, Rangfolge, Anzahl je Abo', () => {
-  config.defaultPlan = 'free';
-  const u = mk();
-  digest.saveNews(u.get(), { enabled: true, topics: [], countries: ['AT', 'DE'] });
-  const all = digest.selectNews(u.get());
-  const urls = all.map((c) => c.row.url);
-  assert.equal(urls.filter((x) => x.endsWith('/budget')).length, 1, 'höchstens eine Meldung pro Gruppe');
-  assert.equal(urls[0]!.endsWith('/budget'), true, 'die Geschichte mit zwei Quellen steht vorn');
-  assert.equal(all.length, 3, 'Free: höchstens 3');
-  assert.ok(!urls.some((x) => x.startsWith('https://atom.example')), 'INT nicht gewählt');
+// ---- Tagesausgabe und Auswahl ----
+const utcAt = (hour: number) => { const d = new Date(); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hour, 0); };
+const resetNews = () => { db.exec('DELETE FROM news_prepared; DELETE FROM news_edition; DELETE FROM news_digest; DELETE FROM llm_usage;'); digest.resetEnrichStateForTests(); };
+/** Bilder setzen: KI-Meldung ohne Bild, beim Chip-Artikel lädt statt eines Bildes eine Textdatei */
+async function prepareFeeds() {
+  await store.fetchSource(SOURCES[3]!);
+  for (const r of db.prepare('SELECT url FROM news_items').all() as { url: string }[]) {
+    if (r.url.endsWith('/ki')) continue;
+    const name = r.url.replace(/\W+/g, '-');
+    db.prepare('UPDATE news_items SET image = ? WHERE url = ?').run(`${base}/img/${name}${r.url.endsWith('/chip') ? '.txt' : '.jpg'}`, r.url);
+  }
+}
+const editionUrls = (country: string) => JSON.parse((db.prepare('SELECT urls FROM news_edition WHERE country = ?').get(country) as { urls: string } | undefined)?.urls ?? '[]') as string[];
 
-  digest.saveNews(u.get(), { topics: ['sport'] });
-  assert.deepEqual(digest.selectNews(u.get()).map((c) => c.row.url), ['https://orf.example/sturm']);
+test('Tagesausgabe: 20 international + 3 je Land, nur mit Bild, je Artikel EINE Anfrage bei OpenRouter (Bildpunkt, Thema, alle Sprachen)', async () => {
+  await prepareFeeds();
+  resetNews();
+  orRequests.length = 0; orMode = 'ok';
+  assert.equal(digest.INT_SIZE + digest.LOCAL_EDITIONS.length * digest.LOCAL_SIZE, 50, 'genau das Gratis-Kontingent');
+  assert.deepEqual([digest.topicCap(20, 'politics'), digest.topicCap(20, 'sport'), digest.topicCap(3, 'politics')], [6, 4, 1]);
 
-  config.defaultPlan = 'plus';
-  const p = mk();
-  digest.saveNews(p.get(), { enabled: true, topics: [], countries: ['AT', 'DE', 'INT'] });
-  assert.equal(digest.selectNews(p.get()).length, 5, 'Plus: bis zu 8 – hier alle 5 Geschichten');
-  digest.saveNews(p.get(), { count: 2 });
-  assert.equal(digest.selectNews(p.get()).length, 2, 'eigene kleinere Zahl');
-  // „neu seit dem letzten Briefing“
-  digest.saveNews(p.get(), { count: 5, lastAt: new Date().toISOString() });
-  assert.equal(digest.selectNews(p.get()).length, 0);
-  config.defaultPlan = 'max';
+  await digest.buildEditions(utcAt(2));
+  assert.equal((db.prepare('SELECT COUNT(*) AS n FROM news_edition').get() as { n: number }).n, 0, 'vor 3 Uhr UTC wird nicht gebaut');
+
+  await digest.buildEditions(utcAt(5));
+  const int = editionUrls('INT'), at = editionUrls('AT'), de = editionUrls('DE');
+  assert.equal(int.length, 8, 'neun Geschichten, aber beim Chip-Artikel lädt kein Bild');
+  assert.ok(!int.includes('https://int.example/chip'));
+  assert.deepEqual(at.sort(), ['https://orf.example/budget', 'https://orf.example/sturm'], 'KI-Meldung ohne Bild fällt weg');
+  assert.equal(de.length, 2);
+  assert.equal(orRequests.length, 12, 'eine Anfrage pro Artikel');
+  assert.equal(usageToday(), 12, 'zählt zum Tageslimit');
+  assert.equal(claudeRequests.length, 0, 'Claude wird für die News nicht gebraucht');
+
+  const r = orRequests[0]!;
+  assert.equal(r.model, 'test/vision:free');
+  assert.match(r.image ?? '', /^data:image\/jpeg;base64,/, 'das Foto geht mit');
+  for (const want of ['German', 'Brazilian Portuguese', 'Turkish', 'Polish', 'focus', 'strictly sober tone', 'no matter how the reader likes to be addressed']) assert.ok(r.system.includes(want), want);
+  const p = db.prepare('SELECT * FROM news_prepared WHERE url = ?').get('https://int.example/final') as { focus: string; topic: string; sentences: string };
+  assert.equal(p.focus, '0.3,0.2');
+  assert.equal(p.topic, 'sport');
+  assert.equal(Object.keys(JSON.parse(p.sentences)).length, 8, 'alle 8 Sprachen');
+  assert.equal(JSON.parse(p.sentences).de, 'de: Satz zu Champions League final ends in penalty drama.', 'nur der erste Satz');
+
+  await digest.buildEditions(utcAt(6));
+  assert.equal(orRequests.length, 12, 'am selben Tag nichts doppelt');
 });
 
-test('Kurzfassung: ein neutraler Satz in der Sprache der Person, Ton-Regel im Prompt, Zwischenspeicher, Rückfall auf Titel', async () => {
-  const u = mk();
-  digest.saveNews(u.get(), { enabled: true, topics: [], countries: ['AT'] });
-  summaryRequests.length = 0; summaryMode = 'ok';
-  const entries = await digest.buildDigest(u.get());
-  assert.equal(entries.length, 4 - 0 > 0 ? entries.length : 0);
-  assert.ok(entries.length >= 3);
-  assert.ok(entries.every((e) => /^Kurzfassung Nummer \d+ zum Thema\.$/.test(e.sentence)));
-  assert.equal(summaryRequests.length, 1, 'ein Aufruf für alle Meldungen');
-  const sys = JSON.stringify(summaryRequests[0]!.body.system);
-  assert.match(sys, /in German/);
-  assert.match(sys, /ONE neutral sentence/);
-  assert.match(sys, /strictly sober tone/);
-  assert.match(sys, /no matter how the reader likes to be addressed/);
-  assert.ok(String(summaryRequests[0]!.body.model).includes('haiku'));
-  assert.ok(entries[0]!.url.startsWith('https://') && entries[0]!.source);
-  await digest.buildDigest(u.get());
-  assert.equal(summaryRequests.length, 1, 'am selben Tag aus dem Zwischenspeicher');
+test('Auswahl: Free 1 lokal + 2 international, bezahlt 2 + 6; Themen gehen vor; Länder ohne Ausgabe nur international', async () => {
+  const fromAt = (urls: string[]) => urls.filter((u) => u.startsWith('https://orf.') || u.startsWith('https://spiegel.')).length;
+  config.defaultPlan = 'free';
+  const free = mk();
+  digest.saveNews(free.get(), { enabled: true, topics: [], countries: ['AT', 'INT'] });
+  const ef = await digest.buildDigest(free.get());
+  assert.equal(ef.length, 3);
+  assert.equal(fromAt(ef.map((e) => e.url)), 1, 'eine lokale');
+  assert.equal(ef[0]!.url, 'https://orf.example/budget', 'die Geschichte mit zwei Quellen steht vorn');
+  assert.ok(ef.every((e) => e.image?.startsWith(`${base}/img/`) && e.focus?.x === 0.3 && e.focus?.y === 0.2 && e.sentence.startsWith('de: ')));
 
-  // Rückfälle: Ausfall, falsche Anzahl → Titel; mehrere Sätze → nur der erste
-  for (const [mode, check] of [['down', (s: string) => !s.startsWith('Kurzfassung')], ['wrongCount', (s: string) => !s.startsWith('nur einer')], ['multi', (s: string) => /^Erster Satz \d\.$/.test(s)]] as const) {
-    db.exec('DELETE FROM news_prepared; DELETE FROM news_edition;'); // aufbereitete Artikel gelten für alle – für jeden Fall neu
-    const v = mk();
-    digest.saveNews(v.get(), { enabled: true, topics: [], countries: ['AT'] });
-    summaryMode = mode;
-    const e = await digest.buildDigest(v.get());
-    assert.ok(e.length > 0 && e.every((x) => check(x.sentence)), mode);
-  }
-  summaryMode = 'ok';
-  db.exec('DELETE FROM news_prepared; DELETE FROM news_edition;');
-  assert.equal(digest.oneSentence('Erster Satz. Zweiter Satz.', 'Titel'), 'Erster Satz.');
-  assert.equal(digest.oneSentence('Kurz 🎉', 'Titel'), 'Titel');
+  const fan = mk();
+  digest.saveNews(fan.get(), { enabled: true, topics: ['sport'], countries: ['AT', 'INT'] });
+  assert.deepEqual((await digest.buildDigest(fan.get())).map((e) => e.url).sort(), ['https://atom.example/a1', 'https://int.example/final', 'https://orf.example/sturm']);
+
+  const tr = mk({ country: 'TR', locale: 'tr' });
+  digest.saveNews(tr.get(), { enabled: true, topics: [], countries: ['TR', 'INT'] });
+  const et = await digest.buildDigest(tr.get());
+  assert.equal(et.length, 3);
+  assert.equal(fromAt(et.map((e) => e.url)), 0, 'Türkei hat (noch) keine Ausgabe → nur international');
+  assert.ok(et.every((e) => e.sentence.startsWith('tr: ')), 'Satz in der Sprache der Person');
+
+  config.defaultPlan = 'plus';
+  const plus = mk();
+  digest.saveNews(plus.get(), { enabled: true, topics: [], countries: ['AT', 'DE', 'INT'] });
+  const ep = await digest.buildDigest(plus.get());
+  assert.equal(ep.length, 8);
+  assert.equal(fromAt(ep.map((e) => e.url)), 2, 'zwei lokale');
+  assert.equal(ep.filter((e) => e.url.endsWith('/budget')).length, 1, 'eine Geschichte nur einmal');
+  const few = mk();
+  digest.saveNews(few.get(), { enabled: true, topics: [], countries: ['AT', 'INT'], count: 2 });
+  assert.equal((await digest.buildDigest(few.get())).length, 2, 'eigene kleinere Zahl');
+  config.defaultPlan = 'max';
+  assert.equal(claudeRequests.length, 0);
   assert.deepEqual(await digest.buildDigest(mk().get()), [], 'ausgeschaltet → nichts');
 });
 
-test('Tagesausgabe: einmal pro Land und Tag aufbereitet, für alle geteilt; jede Person bekommt ihre passendsten', async () => {
-  db.exec('DELETE FROM news_prepared; DELETE FROM news_edition; DELETE FROM news_digest;');
-  summaryRequests.length = 0; summaryMode = 'topics';
-  const a = mk(), b = mk();
-  digest.saveNews(a.get(), { enabled: true, topics: [], countries: ['AT', 'DE'] });
-  digest.saveNews(b.get(), { enabled: true, topics: ['sport'], countries: ['AT', 'DE'] });
-  const ea = await digest.buildDigest(a.get());
-  const calls = summaryRequests.length;
-  assert.equal(calls, 2, 'ein Aufruf je Land (AT, DE) für die ganze Ausgabe');
-  const eb = await digest.buildDigest(b.get());
-  assert.equal(summaryRequests.length, calls, 'zweite Person: kein neuer KI-Aufruf, alles schon aufbereitet');
-  assert.deepEqual(eb.map((e) => e.url), ['https://orf.example/sturm'], 'nur was sie interessiert');
-  assert.equal(eb[0]!.topic, 'sport');
-  assert.ok(ea.length >= 3 && ea.every((e) => e.sentence.startsWith('Kurzfassung')));
-  // Thema von der KI steht vorne und kommt auf die Karte
-  assert.equal(ea.find((e) => e.url.endsWith('/planet'))?.topic, 'science');
-  // höchstens 15, gemischte Themen
-  assert.ok(digest.editionCandidates('AT', '2099-01-01').length <= digest.EDITION_SIZE);
-  summaryMode = 'ok';
-  db.exec('DELETE FROM news_prepared; DELETE FROM news_edition;');
+test('Tagesausgabe: KI weg oder Kontingent leer → Schlagzeile und Bildmitte; später mit Restkontingent nachgeholt', async () => {
+  resetNews();
+  orRequests.length = 0; orMode = 'down';
+  await digest.buildEditions(utcAt(5));
+  assert.equal(editionUrls('INT').length, 8, 'die Ausgabe gibt es trotzdem');
+  assert.ok(orRequests.length <= (3 + 2) * 2, `nach drei Fehlschlägen in Folge Schluss (${orRequests.length})`);
+  const failed = orRequests.length;
+  await digest.buildEditions(utcAt(6));
+  assert.equal(orRequests.length, failed, 'kein neuer Versuch innerhalb von 2 Stunden');
+  config.defaultPlan = 'free';
+  const u = mk();
+  digest.saveNews(u.get(), { enabled: true, topics: [], countries: ['AT', 'INT'] });
+  const e = await digest.buildDigest(u.get());
+  assert.ok(e.length === 3 && e.every((x) => !x.focus && !x.sentence.startsWith('de: ') && x.image));
+  assert.ok(e.some((x) => x.sentence === 'Regierung einigt sich auf neues Budget für 2027'), 'Schlagzeile als Satz');
+
+  // Kontingent aufgebraucht: keine Anfrage mehr
+  orMode = 'ok';
+  const limit = config.openrouter.dailyLimit;
+  config.openrouter.dailyLimit = usageToday();
+  const before = orRequests.length;
+  await digest.buildEditions(utcAt(8));
+  assert.equal(orRequests.length, before);
+  // wieder Platz: fehlende Artikel werden nachgeholt
+  config.openrouter.dailyLimit = limit + 100;
+  await digest.buildEditions(utcAt(9));
+  assert.equal((db.prepare('SELECT COUNT(*) AS n FROM news_prepared WHERE focus IS NOT NULL').get() as { n: number }).n, 12);
+  config.openrouter.dailyLimit = limit;
+  config.defaultPlan = 'max';
+
+  // unbrauchbare Antwort zählt als Fehlschlag
+  assert.equal(digest.readEnrichment(digest.parseJsonObject('Tut mir leid.'), 'Titel'), null);
+  assert.deepEqual(digest.readEnrichment({ focus: { x: 7, y: -1 }, sentences: { de: 'Ein Satz. Noch einer.', xx: 'egal' }, topic: 'quatsch' }, 'Titel'),
+    { focus: '1,0', topic: null, sentences: { de: 'Ein Satz.' } });
+  assert.equal(digest.oneSentence('Kurz 🎉', 'Titel'), 'Titel');
+});
+
+test('Frisch gestarteter Server ohne Ausgabe: die wichtigsten Meldungen mit Bild, ohne KI', async () => {
+  resetNews();
+  orRequests.length = 0;
+  config.defaultPlan = 'free';
+  const u = mk();
+  digest.saveNews(u.get(), { enabled: true, topics: [], countries: ['AT', 'INT'] });
+  const e = await digest.buildDigest(u.get());
+  config.defaultPlan = 'max';
+  assert.equal(e.length, 3);
+  assert.ok(e.every((x) => x.image && !x.url.endsWith('/ki') && !x.url.endsWith('/chip')), 'nur mit Bild');
+  assert.equal(orRequests.length, 0);
+  // danach wieder eine richtige Ausgabe für die folgenden Tests
+  resetNews();
+  orMode = 'ok';
+  await digest.buildEditions(utcAt(5));
 });
 
 test('Themen: Masern sind Gesundheit, Tennis ist Sport – auch wenn im Anriss Politik-Wörter stehen', () => {
@@ -282,7 +360,7 @@ test('Briefing: Abschnitt „News“ mit Link und Quelle, Karte nur mit Meldunge
   const b = buildBriefing(u.get());
   const sec = b.sections.find((s) => s.id === 'news')!;
   assert.equal(sec.title, 'News');
-  assert.match(sec.lines[0]!, /^Kurzfassung Nummer 1 zum Thema\. \(\[[^\]]+\]\(https:\/\/[^)]+\), \d{2}:\d{2}\)$/);
+  assert.match(sec.lines[0]!, /^de: Satz zu .+\. \(\[[^\]]+\]\(https:\/\/[^)]+\), \d{2}:\d{2}\)$/);
   assert.ok(b.news!.length >= 3);
   assert.ok(b.text.includes('**News**'));
   assert.equal(buildBriefing(mk().get()).news, undefined);

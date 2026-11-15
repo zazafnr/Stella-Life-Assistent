@@ -95,8 +95,8 @@ Beispieldaten: diesen Ordner löschen.
 
 Bei jedem Demo-Start holt `server/scripts/demo-news.ts` die echten Nachrichten von heute (dafür braucht
 es Internet) – mit dem Hauptbild jedes Artikels, also jeden Tag neue Meldungen und Bilder. Artikel ganz
-ohne Bild bekommen am echten Server ein KI-Bild, in der Demo ohne KI-Schlüssel ein gezeichnetes
-Platzhalterbild. Die Wetterkarte auf „Heute“ zeigt ein Bild zum aktuellen Wetter (Tag/Nacht). Die
+ohne Bild kommen am echten Server nicht in die Ausgabe (es wird der nächstwichtigste genommen), in der
+Demo bekommen sie ein gezeichnetes Platzhalterbild. Die Wetterkarte auf „Heute“ zeigt ein Bild zum aktuellen Wetter (Tag/Nacht). Die
 gezeichneten Bilder liegen in `ios/PC/demo-bilder/` (neu zeichnen: `node ios/PC/demo-bilder/erzeugen.mjs`).
 
 Mit der Maus kann man wie mit dem Finger ziehen: Listen und Karussells scrollen (mit Schwung, Karten

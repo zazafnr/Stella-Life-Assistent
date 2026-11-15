@@ -162,6 +162,24 @@ struct NewsStoriesView: View {
     }
 }
 
+/** Füllt den Rahmen mit dem Bild und schiebt den Ausschnitt so, dass der Bildpunkt `focus` (0–1) möglichst mittig liegt – ohne Ränder */
+struct FocusFill: Layout {
+    var focus: CGPoint
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        proposal.replacingUnspecifiedDimensions()
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let image = subviews.first else { return }
+        // scaledToFill meldet die Größe, mit der das Bild den Rahmen ganz bedeckt (eine Seite steht über)
+        let size = image.sizeThatFits(ProposedViewSize(bounds.size))
+        let x = min(0, max(bounds.width - size.width, bounds.width / 2 - focus.x * size.width))
+        let y = min(0, max(bounds.height - size.height, bounds.height / 2 - focus.y * size.height))
+        image.place(at: CGPoint(x: bounds.minX + x, y: bounds.minY + y), anchor: .topLeading, proposal: ProposedViewSize(size))
+    }
+}
+
 struct NewsStoryCard: View {
     var entry: NewsEntry
     var index: Int
@@ -178,11 +196,15 @@ struct NewsStoryCard: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             Rectangle().fill(fallback).frame(width: 220, height: 270)
-            // echtes Artikelbild (https) oder KI-/Demo-Bild als Pfad auf Stellas Server; füllt die Karte, Mitte bleibt sichtbar
+            // echtes Artikelbild (https) oder Demo-Bild als Pfad auf Stellas Server; füllt die Karte, der Bildpunkt der KI bleibt sichtbar
             if let s = entry.image, let url = s.hasPrefix("/") ? API.shared.url(s) : URL(string: s) {
                 AsyncImage(url: url) { phase in
                     if let image = phase.image {
-                        image.resizable().scaledToFill().frame(width: 220, height: 270).clipped()
+                        FocusFill(focus: CGPoint(x: entry.focus?.x ?? 0.5, y: entry.focus?.y ?? 0.5)) {
+                            image.resizable().scaledToFill()
+                        }
+                        .frame(width: 220, height: 270)
+                        .clipped()
                     } else { Color.clear }
                 }
             }

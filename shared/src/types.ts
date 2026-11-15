@@ -214,7 +214,11 @@ export interface Hint {
 export interface BriefingSection { id: string; title: string; lines: string[] }
 
 /** Eine Meldung im Briefing: ein neutraler Satz, die Quelle und der Link zum Artikel */
-export interface NewsEntry { sentence: string; source: string; url: string; publishedAt: string; favorite?: boolean; image?: string; topic?: string }
+export interface NewsEntry {
+  sentence: string; source: string; url: string; publishedAt: string; favorite?: boolean; image?: string; topic?: string;
+  /** Bildpunkt, der beim Zuschneiden sichtbar bleibt (x, y je 0–1 von links oben, von der KI bestimmt); ohne: Mitte */
+  focus?: { x: number; y: number };
+}
 
 /** Der Überblick am Morgen */
 export interface Briefing {

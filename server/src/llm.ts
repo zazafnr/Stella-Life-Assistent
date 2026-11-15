@@ -162,6 +162,10 @@ export interface CompleteOptions {
   maxTokens?: number;
   /** Server-Werkzeuge von Claude (Websuche …) */
   serverTools?: Record<string, unknown>[];
+  /** nur OpenRouter (kein Claude, kein Groq) – z. B. die Tagesausgabe der News, die das Gratis-Kontingent nutzt */
+  openrouterOnly?: boolean;
+  /** höchstens so viele Modelle der Kette probieren (jeder Versuch zählt zum Tageslimit) */
+  maxModels?: number;
 }
 
 // Groq: kurze Pause pro Modell nach 429, damit nicht jede Anfrage erst scheitert
@@ -198,6 +202,7 @@ async function completeGroq(messages: LlmMessage[], tools: ToolDef[] | undefined
 
 export async function complete(messages: LlmMessage[], tools?: ToolDef[], opts: CompleteOptions = {}): Promise<CompletionResult> {
   const errors: string[] = [];
+  if (opts.openrouterOnly) return completeOpenRouter(messages, tools, opts, errors);
   if (opts.provider === 'groq' && groqAvailable()) {
     try {
       return await completeGroq(messages, tools, opts);
@@ -227,10 +232,17 @@ export async function complete(messages: LlmMessage[], tools?: ToolDef[], opts: 
     if (!errors.length) errors.push('Kein Claude-Schlüssel für vertrauliche Inhalte.');
     throw new LlmUnavailable(errors.join('\n'));
   }
+  return completeOpenRouter(messages, tools, opts, errors);
+}
+
+async function completeOpenRouter(messages: LlmMessage[], tools: ToolDef[] | undefined, opts: CompleteOptions, errors: string[]): Promise<CompletionResult> {
   if (!openrouterAvailable()) throw new LlmUnavailable('Kein KI-Schlüssel gesetzt (Anthropic oder OpenRouter).');
 
+  let tries = 0;
   for (const model of await modelChain(opts.vision ? 'vision' : 'tools', opts.heavy)) {
     if ((cooldownUntil.get(model) ?? 0) > Date.now()) continue;
+    if (opts.maxModels && tries >= opts.maxModels) break;
+    tries++;
     if (isFree(model)) {
       checkBudget(!!opts.background);
       countRequest('openrouter', opts.userId);
