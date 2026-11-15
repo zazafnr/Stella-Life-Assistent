@@ -16,6 +16,7 @@ import { advanceRecurring } from './planner.ts';
 import { sendGoalCheckIns } from './goals.ts';
 import { notify } from './channels/deliver.ts';
 import { fetchAllFeeds } from './news/store.ts';
+import { buildEditions } from './news/digest.ts';
 import { maybeAskNews } from './news/ask.ts';
 
 type ReminderRow = { id: string; user_id: string; item_id: string | null; message: string; with_attachments: number; always: number };
@@ -85,7 +86,11 @@ async function every(key: string, ms: number, fn: () => Promise<void>) {
 async function periodic() {
   await every('mail-bodies', 6 * 3600_000, async () => { purgeMailBodies(); }).catch((err) => console.warn('Mail-Cache:', err.message));
   // Nachrichten: alle 30 Minuten zentral für alle Nutzer
-  await every('news-feeds', 30 * 60_000, async () => { await fetchAllFeeds(); }).catch((err) => console.warn('News:', err.message));
+  await every('news-feeds', 30 * 60_000, async () => {
+    await fetchAllFeeds();
+    // Tagesausgabe (50 KI-Anfragen) im Hintergrund – blockiert die anderen Aufgaben nicht
+    void buildEditions().catch((err) => console.warn('News-Ausgabe:', (err as Error).message));
+  }).catch((err) => console.warn('News:', err.message));
   for (const userId of allUserIds()) {
     await every(`news-ask:${userId}`, 10 * 60_000, async () => { await maybeAskNews(userId); }).catch((err) => console.warn('News-Frage:', err.message));
     if (listAccounts(userId).length) {

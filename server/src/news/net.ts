@@ -54,3 +54,31 @@ export async function fetchText(url: string, opts: { strict?: boolean; etag?: st
   }
   throw new Error('Zu viele Weiterleitungen.');
 }
+
+export const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Artikelbild laden, um es der KI zu zeigen (und um zu prüfen, dass es wirklich lädt). Jede Weiterleitung wird geprüft.
+ * null = kein brauchbares Bild (Fehler, kein image/*, zu groß, zu klein).
+ */
+export async function fetchImage(url: string, timeoutMs = 10_000): Promise<{ mime: string; data: Buffer } | null> {
+  try {
+    let current = url;
+    for (let hop = 0; hop < 4; hop++) {
+      await assertPublicUrl(current);
+      const res = await fetch(current, {
+        redirect: 'manual', signal: AbortSignal.timeout(timeoutMs),
+        headers: { 'User-Agent': 'StellaNewsBot/1.0 (+https://stella.evolsior.com)', Accept: 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8' },
+      });
+      if (res.status >= 300 && res.status < 400 && res.headers.get('location')) { current = new URL(res.headers.get('location')!, current).toString(); continue; }
+      const mime = (res.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase();
+      if (res.status !== 200 || !/^image\/(jpeg|jpg|png|webp|gif|avif)$/.test(mime)) return null;
+      if (Number(res.headers.get('content-length') ?? 0) > MAX_IMAGE_BYTES) return null;
+      const data = Buffer.from(await res.arrayBuffer());
+      // winzige Dateien sind Zählpixel oder Platzhalter, kein Foto
+      if (data.length > MAX_IMAGE_BYTES || data.length < 2048) return null;
+      return { mime: mime === 'image/jpg' ? 'image/jpeg' : mime, data };
+    }
+    return null;
+  } catch { return null; }
+}

@@ -91,7 +91,11 @@ export function NewsStories({ items }: { items: NewsEntry[] }) {
       <div className="news-strip">
         {items.map((n, i) => (
           <a key={n.url} className="news-story" href={n.url} target="_blank" rel="noopener noreferrer"
-            style={{ backgroundImage: n.image ? `url("${n.image.replace(/"/g, '%22')}"), ${FALLBACKS[i % 4]}` : FALLBACKS[i % 4] }}
+            style={{
+              backgroundImage: n.image ? `url("${n.image.replace(/"/g, '%22')}"), ${FALLBACKS[i % 4]}` : FALLBACKS[i % 4],
+              // Ausschnitt nach dem Bildpunkt der KI (sonst Mitte)
+              ...(n.focus ? { backgroundPosition: `${Math.round(n.focus.x * 100)}% ${Math.round(n.focus.y * 100)}%, center` } : {}),
+            }}
             aria-label={`${n.sentence} – ${n.source}. ${t('news.card.open')}`}>
             <span className="ns-shade" aria-hidden="true" />
             <span className="ns-body">

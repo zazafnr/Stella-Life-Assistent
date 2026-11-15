@@ -577,6 +577,8 @@ const MIGRATIONS: string[] = [
     sentences TEXT NOT NULL DEFAULT '{}',
     prepared_at TEXT NOT NULL
   );`,
+  // News: Bildpunkt, nach dem die Karte das Bild zuschneidet ("x,y", je 0–1; von der KI bei der Tagesausgabe bestimmt)
+  `ALTER TABLE news_prepared ADD COLUMN focus TEXT;`,
 ];
 
 function migrate() {

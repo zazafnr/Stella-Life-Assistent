@@ -568,7 +568,14 @@ struct NewsEntry: Codable, Hashable, Identifiable {
     /** Vorschaubild (https) und erstes Thema, für das Story-Karussell auf „Heute“ */
     var image: String?
     var topic: String?
+    /** Bildpunkt (x, y je 0–1 von links oben), der beim Zuschneiden sichtbar bleibt – von der KI bestimmt; ohne: Mitte */
+    var focus: NewsFocus?
     var id: String { url }
+}
+
+struct NewsFocus: Codable, Hashable {
+    var x: Double
+    var y: Double
 }
 
 struct Briefing: Codable {
