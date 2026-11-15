@@ -266,7 +266,7 @@ async function askAi(c: Candidate, image: { url: string; data?: { mime: string; 
       { role: 'user', content: image.data
         ? [{ type: 'text', text }, { type: 'image_url', image_url: { url: `data:${image.data.mime};base64,${image.data.data.toString('base64')}` } }]
         : text },
-    ], undefined, { openrouterOnly: true, vision: true, maxModels: 2, timeoutMs: 90_000 });
+    ], undefined, { openrouterOnly: true, vision: true, routerFirst: true, maxModels: 2, timeoutMs: 90_000 });
     const out = readEnrichment(parseJsonObject(String(message.content ?? '')), c.row.title);
     if (!out) return false;
     savePrepared(c.row.url, { topic: out.topic, sentences: out.sentences, focus: out.focus });
