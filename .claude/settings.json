@@ -1,10 +1,26 @@
 {
   "extraKnownMarketplaces": {
     "winter-castle-local": {
-      "source": { "source": "github", "repo": "zazafnr/claude-winter-castle" }
+      "source": {
+        "source": "github",
+        "repo": "zazafnr/claude-winter-castle"
+      }
     }
   },
   "enabledPlugins": {
     "winter-castle@winter-castle-local": true
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/brain-hook.mjs",
+            "timeout": 90
+          }
+        ]
+      }
+    ]
   }
 }
