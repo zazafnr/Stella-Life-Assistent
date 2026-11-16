@@ -1,0 +1,10 @@
+{
+  "extraKnownMarketplaces": {
+    "winter-castle-local": {
+      "source": { "source": "github", "repo": "zazafnr/claude-winter-castle" }
+    }
+  },
+  "enabledPlugins": {
+    "winter-castle@winter-castle-local": true
+  }
+}
