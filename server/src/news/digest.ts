@@ -88,6 +88,19 @@ export const newsCountFor = (user: User, s = newsSettings(user)) => Math.max(1, 
 /** Wie viele der Meldungen lokal sind: Free (3) → 1, bezahlte Abos (8) → 2; der Rest ist international */
 export const localShare = (count: number) => Math.max(1, Math.round(count / 4));
 
+/**
+ * Wie viele lokale Meldungen es heute wirklich werden. Grundlage ist `localShare`; bei bezahlten Abos (ab 2 lokalen)
+ * darf es eine mehr sein – aus 2 + 6 wird 3 + 5 –, wenn die nächste lokale Meldung interessanter ist als die schwächste
+ * internationale, die sonst hineinkäme. Free bleibt fest bei 1 + 2.
+ * `local` und `intl` sind die Interesse-Werte der Kandidaten, absteigend sortiert.
+ */
+export function localCount(count: number, local: number[], intl: number[]): number {
+  const base = Math.min(localShare(count), local.length);
+  if (base < 2 || local.length <= base) return base;
+  const weakestIntl = intl[count - base - 1];
+  return weakestIntl === undefined || local[base]! > weakestIntl ? base + 1 : base;
+}
+
 // ---------- Tagesausgabe: einmal am Tag für alle, 50 Artikel, je einer KI-Anfrage bei OpenRouter ----------
 //
 // 1. rankedCandidates: die wichtigsten Geschichten (viele Zeitungen berichten, aktuell), ohne die der letzten zwei Ausgaben
@@ -424,7 +437,7 @@ export function selectNews(user: User, nowMs = Date.now()): Candidate[] {
   const l = rank(local), i = rank(intl);
 
   const count = newsCountFor(user, s);
-  const nLocal = l.length ? Math.min(localShare(count), l.length) : 0;
+  const nLocal = l.length ? localCount(count, l.map((c) => interest(c, wanted)), i.map((c) => interest(c, wanted))) : 0;
   const out = [...l.slice(0, nLocal), ...i.slice(0, count - nLocal)];
   // zu wenig auf einer Seite: mit den interessantesten der anderen auffüllen
   for (const c of [...l, ...i].sort((a, b) => interest(b, wanted) - interest(a, wanted))) {

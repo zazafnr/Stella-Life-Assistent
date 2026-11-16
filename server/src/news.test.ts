@@ -257,7 +257,7 @@ test('Tagesausgabe: 20 international + 3 je Land, nur mit Bild, je Artikel EINE 
   assert.equal(orRequests.length, 12, 'am selben Tag nichts doppelt');
 });
 
-test('Auswahl: Free 1 lokal + 2 international, bezahlt 2 + 6; Themen gehen vor; Länder ohne Ausgabe nur international', async () => {
+test('Auswahl: Free 1 lokal + 2 international, bezahlt 2 + 6 (oder 3 + 5); Themen gehen vor; Länder ohne Ausgabe nur international', async () => {
   const fromAt = (urls: string[]) => urls.filter((u) => u.startsWith('https://orf.') || u.startsWith('https://spiegel.')).length;
   config.defaultPlan = 'free';
   const free = mk();
@@ -284,7 +284,8 @@ test('Auswahl: Free 1 lokal + 2 international, bezahlt 2 + 6; Themen gehen vor; 
   digest.saveNews(plus.get(), { enabled: true, topics: [], countries: ['AT', 'DE', 'INT'] });
   const ep = await digest.buildDigest(plus.get());
   assert.equal(ep.length, 8);
-  assert.equal(fromAt(ep.map((e) => e.url)), 2, 'zwei lokale');
+  // drei lokale: die dritte (orf/sturm, 18:15) ist neuer als die sechste internationale (vaccine, 17:45) → 3 + 5 statt 2 + 6
+  assert.equal(fromAt(ep.map((e) => e.url)), 3, 'drei lokale, weil die dritte interessanter ist');
   assert.equal(ep.filter((e) => e.url.endsWith('/budget')).length, 1, 'eine Geschichte nur einmal');
   const few = mk();
   digest.saveNews(few.get(), { enabled: true, topics: [], countries: ['AT', 'INT'], count: 2 });
@@ -292,6 +293,18 @@ test('Auswahl: Free 1 lokal + 2 international, bezahlt 2 + 6; Themen gehen vor; 
   config.defaultPlan = 'max';
   assert.equal(claudeRequests.length, 0);
   assert.deepEqual(await digest.buildDigest(mk().get()), [], 'ausgeschaltet → nichts');
+});
+
+test('Auswahl: bezahlt 3 lokal + 5 international, wenn die dritte lokale interessanter ist als die schwächste internationale; Free bleibt 1 + 2', () => {
+  const intl = [90, 80, 70, 60, 50, 40, 30];
+  assert.equal(digest.localCount(8, [100, 95, 45], intl), 3, '45 schlägt die sechste internationale (40)');
+  assert.equal(digest.localCount(8, [100, 95, 35], intl), 2, '35 ist schwächer als 40 → bleibt 2 + 6');
+  assert.equal(digest.localCount(8, [100, 95, 40], intl), 2, 'gleich gut → international bleibt');
+  assert.equal(digest.localCount(8, [100, 95, 45, 44], intl), 3, 'höchstens eine mehr');
+  assert.equal(digest.localCount(8, [100, 95], intl), 2, 'nur zwei lokale da');
+  assert.equal(digest.localCount(8, [100], intl), 1);
+  assert.equal(digest.localCount(8, [100, 95, 10], [90, 80]), 3, 'zu wenig internationale → lokale füllen auf');
+  assert.equal(digest.localCount(3, [100, 99, 98], [10, 5]), 1, 'Free: immer genau eine lokale');
 });
 
 test('Tagesausgabe: KI weg oder Kontingent leer → Schlagzeile und Bildmitte; später mit Restkontingent nachgeholt', async () => {
